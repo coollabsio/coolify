@@ -1,5 +1,6 @@
 # documentation: https://github.com/eduardolat/pgbackweb
 # slogan: Effortless PostgreSQL backups with a user-friendly web interface!
+# category: devtools
 # tags: backup, postgresql, web-interface
 # logo: svgs/pgbackweb.svg
 # port: 8085

@@ -1,5 +1,6 @@
 # documentation: https://sequinstream.com/docs/
 # slogan: The fastest Postgres change data capture
+# category: analytics
 # tags: postgres, sync, data
 # logo: svgs/sequin.svg
 # port: 7376

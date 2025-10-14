@@ -1,5 +1,6 @@
 # documentation: https://cookbook.chromadb.dev/
 # slogan: Chroma is the open-source search and retrieval database for AI applications.
+# category: ai
 # tags: ai,vector-database,semantic-search,machine-learning,bm25,embeddings,llm
 # logo: svgs/chroma.svg
 # port: 8000

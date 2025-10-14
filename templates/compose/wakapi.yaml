@@ -1,5 +1,6 @@
 # documentation: https://wakapi.dev/
-# slogan: A minimalist, self-hosted WakaTime-compatible backend for coding statistics 
+# slogan: A minimalist, self-hosted WakaTime-compatible backend for coding statistics
+# category: analytics
 # tags: productivity, self-hosted, developer-tools, time-tracker, wakatime, wakatime-api, coding-statistics, statistics, timetracking, analytics
 # logo: svgs/wakapi.svg
 # port: 3000
@@ -39,7 +40,7 @@ services:
       - WAKAPI_LEADERBOARD_ENABLED=${WAKAPI_LEADERBOARD_ENABLED:-true}
       - WAKAPI_DISABLE_FRONTPAGE=${WAKAPI_DISABLE_FRONTPAGE:-true}
       - WAKAPI_PUBLIC_URL=${WAKAPI_PUBLIC_URL}
-    
+
     volumes:
       - wakapi-data:/data
     depends_on:

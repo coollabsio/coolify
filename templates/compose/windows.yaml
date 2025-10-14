@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://github.com/dockur/windows
 # slogan: Run Windows in a containerized environment.
+# category: productivity
 # tags: windows, virtualization, container, os
 # logo: svgs/windows.svg
 # port: 8006

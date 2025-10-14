@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
@@ -108,7 +108,63 @@ function connectProxyToNetworks(Server $server)
 
     return $commands->flatten();
 }
-function generate_default_proxy_configuration(Server $server)
+function extractCustomProxyCommands(Server $server, string $existing_config): array
+{
+    $custom_commands = [];
+    $proxy_type = $server->proxyType();
+
+    if ($proxy_type !== ProxyTypes::TRAEFIK->value || empty($existing_config)) {
+        return $custom_commands;
+    }
+
+    try {
+        $yaml = Yaml::parse($existing_config);
+        $existing_commands = data_get($yaml, 'services.traefik.command', []);
+
+        if (empty($existing_commands)) {
+            return $custom_commands;
+        }
+
+        // Define default commands that Coolify generates
+        $default_command_prefixes = [
+            '--ping=',
+            '--api.',
+            '--entrypoints.http.address=',
+            '--entrypoints.https.address=',
+            '--entrypoints.http.http.encodequerysemicolons=',
+            '--entryPoints.http.http2.maxConcurrentStreams=',
+            '--entrypoints.https.http.encodequerysemicolons=',
+            '--entryPoints.https.http2.maxConcurrentStreams=',
+            '--entrypoints.https.http3',
+            '--providers.file.',
+            '--certificatesresolvers.',
+            '--providers.docker',
+            '--providers.swarm',
+            '--log.level=',
+            '--accesslog.',
+        ];
+
+        // Extract commands that don't match default prefixes (these are custom)
+        foreach ($existing_commands as $command) {
+            $is_default = false;
+            foreach ($default_command_prefixes as $prefix) {
+                if (str_starts_with($command, $prefix)) {
+                    $is_default = true;
+                    break;
+                }
+            }
+            if (! $is_default) {
+                $custom_commands[] = $command;
+            }
+        }
+    } catch (\Exception $e) {
+        // If we can't parse the config, return empty array
+        // Silently fail to avoid breaking the proxy regeneration
+    }
+
+    return $custom_commands;
+}
+function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
@@ -130,10 +186,16 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $array_of_networks = collect([]);
-    $networks->map(function ($network) use ($array_of_networks) {
+    $filtered_networks = collect([]);
+    $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
+        if ($network === 'host') {
+            return; // network-scoped alias is supported only for containers in user defined networks
+        }
+
         $array_of_networks[$network] = [
             'external' => true,
         ];
+        $filtered_networks->push($network);
     });
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
@@ -155,7 +217,7 @@ function generate_default_proxy_configuration(Server $server)
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',
@@ -222,6 +284,13 @@ function generate_default_proxy_configuration(Server $server)
             $config['services']['traefik']['command'][] = '--providers.docker=true';
             $config['services']['traefik']['command'][] = '--providers.docker.exposedbydefault=false';
         }
+
+        // Append custom commands (e.g., trustedIPs for Cloudflare)
+        if (! empty($custom_commands)) {
+            foreach ($custom_commands as $custom_command) {
+                $config['services']['traefik']['command'][] = $custom_command;
+            }
+        }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
             'networks' => $array_of_networks->toArray(),
@@ -237,7 +306,7 @@ function generate_default_proxy_configuration(Server $server)
                         'CADDY_DOCKER_POLLING_INTERVAL=5s',
                         'CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',
@@ -261,7 +330,7 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $config = Yaml::dump($config, 12, 2);
-    SaveConfiguration::run($server, $config);
+    SaveProxyConfiguration::run($server, $config);
 
     return $config;
 }

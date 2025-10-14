@@ -1,5 +1,6 @@
 # documentation: https://supertokens.com/docs/guides
 # slogan: An open-source authentication solution that simplifies the implementation of secure user authentication and session management for web and mobile applications.
+# category: auth
 # tags: supertokens,login,authentication,authorization,oauth,user-management,session-management,access-control,otp,magic-link,passwordless
 # logo: svgs/supertokens.svg
 # port: 3567

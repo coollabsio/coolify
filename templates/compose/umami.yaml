@@ -1,5 +1,6 @@
 # documentation: https://umami.is
 # slogan: Umami is web analytics platform which provides insights into visitor behavior without compromising user privacy.
+# category: analytics
 # tags: analytics, insights, privacy
 # logo: svgs/umami.svg
 # port: 3000

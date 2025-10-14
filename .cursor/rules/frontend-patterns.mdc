@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Livewire components, Alpine.js patterns, Tailwind CSS, and enhanced form components
+globs: app/Livewire/**/*.php, resources/views/**/*.blade.php, resources/js/**/*.js, resources/css/**/*.css
 alwaysApply: false
 ---
 # Coolify Frontend Architecture & Patterns
@@ -229,6 +229,41 @@ class ServerList extends Component
 - **Image optimization** with lazy loading
 - **Asset bundling** and compression
 - **CDN integration** for static assets
+
+## Enhanced Form Components
+
+### Built-in Authorization System
+Coolify features **enhanced form components** with automatic authorization handling:
+
+```html
+<!-- ✅ New Pattern: Single line with built-in authorization -->
+<x-forms.input canGate="update" :canResource="$application" id="application.name" label="Name" />
+<x-forms.checkbox instantSave canGate="update" :canResource="$application" id="application.settings.is_static" label="Static Site" />
+<x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+
+<!-- ❌ Old Pattern: Verbose @can/@else blocks (deprecated) -->
+@can('update', $application)
+    <x-forms.input id="application.name" label="Name" />
+@else
+    <x-forms.input disabled id="application.name" label="Name" />
+@endcan
+```
+
+### Authorization Parameters
+```php
+// Available on all form components (Input, Select, Textarea, Checkbox, Button)
+public ?string $canGate = null;        // Gate name: 'update', 'view', 'deploy', 'delete'
+public mixed $canResource = null;      // Resource model instance to check against
+public bool $autoDisable = true;       // Automatically disable if no permission (default: true)
+```
+
+### Benefits
+- **90% code reduction** for authorization-protected forms
+- **Consistent security** across all form components
+- **Automatic disabling** for unauthorized users
+- **Smart behavior** (disables instantSave on checkboxes for unauthorized users)
+
+For complete documentation, see **[form-components.mdc](mdc:.cursor/rules/form-components.mdc)**
 
 ## Form Handling Patterns
 

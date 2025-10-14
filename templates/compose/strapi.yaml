@@ -1,5 +1,6 @@
 # documentation: https://docs.strapi.io/
 # slogan: Open-source headless CMS to build powerful APIs with built-in content management.
+# category: backend
 # tags: cms, headless, mysql, api
 # logo: svgs/strapi.svg
 # port: 1337

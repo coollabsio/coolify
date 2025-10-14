@@ -1,5 +1,6 @@
 # documentation: https://pi-hole.net/
 # slogan: Network-wide Ad Blocking
+# category: proxy
 # tags: ad-block,dns,sinkhole,ntp,dhcp
 # logo: svgs/pihole.svg
 # port: 80

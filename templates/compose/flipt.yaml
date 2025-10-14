@@ -1,5 +1,6 @@
 # documentation: https://docs.flipt.io/cloud/overview
 # slogan: Flipt is a fully managed feature flag solution that enables you to keep your feature flags and remote config next to your code in Git.
+# category: backend
 # tags: feature flags,devops, CI, CD
 # logo: svgs/flipt.svg
 # port: 8080

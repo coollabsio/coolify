@@ -1,5 +1,6 @@
 # documentation: https://typesense.org/docs
 # slogan: Cutting-edge, in-memory search engine for mere mortals. Knowledge of rocket science optional.
+# category: search
 # tags: search, search-engine, search-api, elasticsearch-alternative
 # logo: svgs/typesense.png
 # port: 8108

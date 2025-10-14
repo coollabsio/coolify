@@ -1,5 +1,6 @@
 # documentation: https://zipline.diced.sh/docs/config
 # slogan: A ShareX/file upload server that is easy to use, packed with features, and with an easy setup!
+# category: media
 # tags: zipline,file-sharing,upload,sharing
 # logo: svgs/zipline.png
 # port: 3000

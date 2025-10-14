@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.azimutt.app/
 # slogan: Next-Gen ERD: Design, Explore, Document and Analyze your database.
+# category: productivity
 # tags: erd, entity-relationship diagram, database tool, database schema, diagram
 # logo: svgs/azimutt.png
 # port: 4000

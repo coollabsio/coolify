@@ -1,5 +1,6 @@
 # documentation: https://weaviate.io/developers/weaviate
 # slogan: Weaviate is an open-source vector database that stores both objects and vectors, allowing for combining vector search with structured filtering.
+# category: ai
 # tags: ai, vector-database, semantic-search, machine-learning, bm25, embeddings, llm
 # logo: svgs/weaviate.png
 # port: 8080

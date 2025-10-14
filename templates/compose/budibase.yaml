@@ -1,5 +1,6 @@
 # documentation: https://docs.budibase.com/docs/docker-compose
 # slogan: Low code platform for building business apps and workflows in minutes. Supports PostgreSQL, MySQL, MSSQL, MongoDB, Rest API, Docker, K8s, and more.
+# category: automation
 # tags: budibase,low-code,business-apps,workflow,automation,postgresql,mysql,mssql,mongodb,docker,kubernetes
 # logo: svgs/budibase.svg
 # port: 10000

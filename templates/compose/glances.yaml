@@ -1,5 +1,6 @@
 # documentation: https://nicolargo.github.io/glances/
 # slogan: An Eye on your system
+# category: monitoring
 # tags: monitoring tool python cross platform
 # logo: svgs/glances.png
 # port: 61208

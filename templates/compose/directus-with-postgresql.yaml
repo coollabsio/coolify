@@ -1,5 +1,6 @@
 # documentation: https://directus.io
 # slogan: Directus wraps databases with a dynamic API, and provides an intuitive app for managing its content.
+# category: cms
 # tags: directus, cms, database, sql
 # logo: svgs/directus.svg
 # port: 8055

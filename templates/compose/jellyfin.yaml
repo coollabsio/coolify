@@ -1,5 +1,6 @@
 # documentation: https://jellyfin.org
 # slogan: Jellyfin is a media server for hosting and streaming your media collection.
+# category: media
 # tags: media, server, movies, tv, music
 # logo: svgs/jellyfin.svg
 # port: 8096

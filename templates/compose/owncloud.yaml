@@ -1,5 +1,6 @@
 # documentation: https://owncloud.com/docs-guides/
 # slogan: OwnCloud with Open Web UI integrates file management with a powerful, user-friendly interface.
+# category: storage
 # tags: owncloud,file-management,open-web-ui,integration,cloud
 # logo: svgs/owncloud.svg
 # port: 8080

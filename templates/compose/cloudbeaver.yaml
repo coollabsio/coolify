@@ -1,5 +1,6 @@
 # documentation: https://dbeaver.com/docs/cloudbeaver/
 # slogan: CloudBeaver is a lightweight web application designed for comprehensive data management.
+# category: devtools
 # tags: dbeaver, data management, data, database, mysql, postgres, sqlite, sql, mongodb
 # logo: svgs/cloudbeaver.svg
 # port: 8978

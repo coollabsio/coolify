@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.peppermint.sh/
 # slogan: Open source helpdesk solution designed to enhance the user experience for teams currently utilizing costly software alternatives
+# category: productivity
 # tags: helpdesk, open-source, peppermint, postgres
 # logo: svgs/peppermint.png
 # port: 3000

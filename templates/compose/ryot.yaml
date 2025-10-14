@@ -1,5 +1,6 @@
 # documentation: https://github.com/ignisda/ryot
 # slogan: Roll your own tracker! Ryot is a self-hosted platform for tracking various aspects of life such as media consumption, fitness activities, and more.
+# category: productivity
 # tags: rss, reader, self-hosted, automation, tracker, media, fitness
 # logo: svgs/ryot.svg
 # port: 8000

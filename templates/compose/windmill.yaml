@@ -1,5 +1,6 @@
 # documentation: https://www.windmill.dev/docs/
 # slogan: Windmill is a developer platform to build production-grade multi-steps automations and internal apps.
+# category: automation
 # tags: windmill,workflow,automation,developer,platform
 # logo: svgs/windmill.svg
 # port: 8000

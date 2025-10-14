@@ -1,5 +1,6 @@
 # documentation: https://docs.goauthentik.io/docs/installation/docker-compose
 # slogan: An open-source Identity Provider, focused on flexibility and versatility.
+# category: auth
 # tags: identity,login,user,oauth,openid,oidc,authentication,saml,auth0,okta
 # logo: svgs/authentik.png
 # port: 9000

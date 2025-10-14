@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://github.com/dockur/macos
 # slogan: Run macOS in a containerized environment.
+# category: productivity
 # tags: macos, virtualization, container, os
 # logo: svgs/macos.svg
 # port: 8006

@@ -1,5 +1,6 @@
 # documentation: https://github.com/dgtlmoon/changedetection.io/
 # slogan: Website change detection monitor and notifications.
+# category: monitoring
 # tags: web, alert, monitor
 # logo: svgs/changedetection.png
 # port: 5000

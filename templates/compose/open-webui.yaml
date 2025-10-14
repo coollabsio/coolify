@@ -1,5 +1,6 @@
 # documentation: https://docs.openwebui.com
 # slogan: User-friendly AI Interface (Supports Ollama, OpenAI API, ...)
+# category: ai
 # tags: ai,models,deployment,open-web-ui,integration
 # logo: svgs/openwebui.svg
 # port: 8080

@@ -2,6 +2,8 @@
     dropdownOpen: false,
     search: '',
     allEntries: [],
+    darkColorContent: getComputedStyle($el).getPropertyValue('--color-base'),
+    whiteColorContent: getComputedStyle($el).getPropertyValue('--color-white'),
     init() {
         this.mounted();
         // Load all entries when component initializes
@@ -45,11 +47,16 @@
         const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const userSettings = localStorage.getItem('theme') || 'dark';
         localStorage.setItem('theme', userSettings);
+
+        const themeMetaTag = document.querySelector('meta[name=theme-color]');
+
         if (userSettings === 'dark') {
             document.documentElement.classList.add('dark');
+            themeMetaTag.setAttribute('content', this.darkColorContent);
             this.theme = 'dark';
         } else if (userSettings === 'light') {
             document.documentElement.classList.remove('dark');
+            themeMetaTag.setAttribute('content', this.whiteColorContent);
             this.theme = 'light';
         } else if (darkModePreference) {
             this.theme = 'system';
@@ -104,7 +111,7 @@
             <!-- Unread Count Badge -->
             @if ($unreadCount > 0)
                 <span
-                    class="absolute -top-1 -right-1 bg-error text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    class="absolute -top-1 -right-1 bg-error text-white text-xs rounded-full w-4.5 h-4.5 flex items-center justify-center">
                     {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                 </span>
             @endif
@@ -116,7 +123,7 @@
             x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-2" class="absolute right-0 top-full mt-1 z-50 w-48" x-cloak>
             <div
-                class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-black border-neutral-300">
+                class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
                 <div class="flex flex-col gap-1">
                     <!-- What's New Section -->
                     @if ($unreadCount > 0)
@@ -242,6 +249,9 @@
                         <p class="mt-1 text-sm dark:text-neutral-400">
                             Stay up to date with the latest features and improvements.
                         </p>
+                        <p class="mt-1 text-xs dark:text-neutral-500">
+                            Current version: <span class="font-semibold dark:text-neutral-300">{{ $currentVersion }}</span>
+                        </p>
                     </div>
                     <div class="flex items-center gap-2">
                         @if (isDev())
@@ -299,10 +309,14 @@
                                                         <span x-text="entry.title"></span>
                                                         <x-external-link />
                                                     </a></span>
+                                                <span x-show="entry.tag_name === '{{ $currentVersion }}'"
+                                                    class="px-2 py-1 text-xs font-semibold bg-success text-white rounded-sm">
+                                                    CURRENT VERSION
+                                                </span>
                                                 <span class="text-xs dark:text-neutral-400"
                                                     x-text="new Date(entry.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })"></span>
                                             </div>
-                                            <div class="dark:text-neutral-300 leading-relaxed  max-w-none"
+                                            <div class="dark:text-neutral-300 leading-relaxed max-w-none"
                                                 x-html="entry.content_html">
                                             </div>
                                         </div>

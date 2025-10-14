@@ -1,5 +1,6 @@
 # documentation: https://www.prefect.io/
 # slogan: Prefect is an orchestration and observability platform that empowers developers to build and scale workflows quickly.
+# category: automation
 # tags: workflow, orchestration, data-pipeline, python, automation, data-processing, data-integration, etl
 # logo: svgs/prefect.png
 # port: 4200

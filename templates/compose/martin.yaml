@@ -1,5 +1,6 @@
 # documentation: https://maplibre.org/martin/introduction.html/
 # slogan: Martin is a tile server able to generate and serve vector tiles on the fly from large PostGIS databases, PMTiles (local or remote), and MBTiles files, allowing multiple tile sources to be dynamically combined into one.
+# category: backend
 # tags: postgis, vector, tiles
 # logo: svgs/martin.png
 # port: 3000

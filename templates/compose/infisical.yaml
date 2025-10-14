@@ -1,5 +1,6 @@
 # documentation: https://infisical.com/docs/documentation/getting-started/introduction
 # slogan: Infisical is the open source secret management platform that developers use to centralize their application configuration and secrets like API keys and database credentials.
+# category: security
 # tags: security, environment, secrets, infisical, database, configuration, secret, api, keys, auth, encryption
 # logo: svgs/infisical.png
 # port: 8080

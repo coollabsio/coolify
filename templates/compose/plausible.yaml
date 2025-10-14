@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://plausible.io/docs/self-hosting
 # slogan: "Plausible Analytics is a simple, open-source, lightweight (< 1 KB) and privacy-friendly web analytics alternative to Google Analytics."
+# category: analytics
 # tags: analytics, privacy, google, alternative
 # port: 8000
 

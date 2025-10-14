@@ -89,3 +89,22 @@ function allowedPathsForInvalidAccounts()
         'livewire/update',
     ];
 }
+
+function updateStripeCustomerEmail(Team $team, string $newEmail): void
+{
+    if (! isStripe()) {
+        return;
+    }
+
+    $stripe_customer_id = data_get($team, 'subscription.stripe_customer_id');
+    if (! $stripe_customer_id) {
+        return;
+    }
+
+    Stripe::setApiKey(config('subscription.stripe_api_key'));
+
+    \Stripe\Customer::update(
+        $stripe_customer_id,
+        ['email' => $newEmail]
+    );
+}

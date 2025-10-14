@@ -1,5 +1,6 @@
 # documentation: https://miniflux.app/docs/index.html
 # slogan: Miniflux is a minimalist and opinionated feed reader.
+# category: cms
 # tags: miniflux,rss,feed,self,hosted
 # logo: svgs/miniflux.svg
 # port: 8080

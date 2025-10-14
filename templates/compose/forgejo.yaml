@@ -1,5 +1,6 @@
 # documentation: https://forgejo.org/docs
 # slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
+# category: git
 # tags: version control, collaboration, code, hosting, lightweight
 # logo: svgs/forgejo.svg
 # port: 3000

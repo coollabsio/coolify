@@ -1,8 +1,10 @@
 # documentation: https://docs.argilla.io/latest/
 # slogan: Argilla is a collaboration tool for AI engineers and domain experts who need to build high-quality datasets for their projects.
+# category: ai
 # tags: workflow, orchestration, data-pipeline, python, argilla, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp
 # logo: svgs/argilla.png
 # port: 6900
+# category: productivity
 
 services:
   argilla:

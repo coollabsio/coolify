@@ -80,9 +80,23 @@ class FortifyServiceProvider extends ServiceProvider
             ) {
                 $user->updated_at = now();
                 $user->save();
-                $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                if (! $user->currentTeam) {
-                    $user->currentTeam = $user->recreate_personal_team();
+
+                // Check if user has a pending invitation they haven't accepted yet
+                $invitation = \App\Models\TeamInvitation::whereEmail($email)->first();
+                if ($invitation && $invitation->isValid()) {
+                    // User is logging in for the first time after being invited
+                    // Attach them to the invited team if not already attached
+                    if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
+                        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+                    }
+                    $user->currentTeam = $invitation->team;
+                    $invitation->delete();
+                } else {
+                    // Normal login - use personal team
+                    $user->currentTeam = $user->teams->firstWhere('personal_team', true);
+                    if (! $user->currentTeam) {
+                        $user->currentTeam = $user->recreate_personal_team();
+                    }
                 }
                 session(['currentTeam' => $user->currentTeam]);
 

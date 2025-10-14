@@ -4,6 +4,7 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -26,7 +27,19 @@ class Input extends Component
         public ?int $minlength = null,
         public ?int $maxlength = null,
         public bool $autofocus = false,
-    ) {}
+        public ?string $canGate = null,
+        public mixed $canResource = null,
+        public bool $autoDisable = true,
+    ) {
+        // Handle authorization-based disabling
+        if ($this->canGate && $this->canResource && $this->autoDisable) {
+            $hasPermission = Gate::allows($this->canGate, $this->canResource);
+
+            if (! $hasPermission) {
+                $this->disabled = true;
+            }
+        }
+    }
 
     public function render(): View|Closure|string
     {

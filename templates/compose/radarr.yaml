@@ -1,5 +1,6 @@
 # documentation: https://hub.docker.com/r/linuxserver/radarr
 # slogan: Radarr⁠ - A fork of Sonarr to work with movies à la Couchpotato.
+# category: media
 # tags: media, server, movies
 # logo: svgs/radarr.svg
 # port: 7878

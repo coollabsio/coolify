@@ -1,5 +1,6 @@
 # documentation: https://help.teable.io/
 # slogan: Teable is a powerful visual interface built on relational databases (PostgreSQL).
+# category: productivity
 # tags: airtable, teable, database, visual, interface, relational, postgresql
 # logo: svgs/teable.png
 # port: 3000

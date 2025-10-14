@@ -1,6 +1,6 @@
 <div x-data x-init="$nextTick(() => { if ($refs.autofocusInput) $refs.autofocusInput.focus(); })">
     <h1>Create a new Application</h1>
-    <div class="pb-4">Deploy any public Git repositories.</div>
+    <div class="pb-8">Deploy any public Git repositories.</div>
 
     <!-- Repository URL Form -->
     <form class="flex flex-col gap-2" wire:submit='loadBranch'>
@@ -53,9 +53,9 @@
                 </div>
                 @if ($build_pack === 'dockercompose')
                     <div x-data="{ baseDir: '{{ $base_directory }}', composeLocation: '{{ $docker_compose_location }}' }" class="gap-2 flex flex-col">
-                        <x-forms.input placeholder="/" wire:model.blur-sm="base_directory" label="Base Directory"
+                        <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
                             helper="Directory to use as root. Useful for monorepos." x-model="baseDir" />
-                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.blur-sm="docker_compose_location"
+                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.blur="docker_compose_location"
                             label="Docker Compose Location" helper="It is calculated together with the Base Directory."
                             x-model="composeLocation" />
                         <div class="pt-2">

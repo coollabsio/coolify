@@ -1,5 +1,6 @@
 # documentation: https://langfuse.com/docs
 # slogan: Langfuse is an open-source LLM engineering platform that helps teams collaboratively debug, analyze, and iterate on their LLM applications.
+# category: ai
 # tags: ai, qdrant, weaviate, langchain, openai, gpt, llm, lmops, langfuse, llmops, tracing, observation, metrics
 # logo: svgs/langfuse.svg
 # port: 3000

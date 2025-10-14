@@ -8,10 +8,13 @@ use App\Actions\Proxy\StopProxy;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Navbar extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public bool $isChecking = false;
@@ -29,7 +32,7 @@ class Navbar extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            'refreshServerShow' => '$refresh',
+            'refreshServerShow' => 'refreshServer',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
         ];
     }
@@ -57,6 +60,7 @@ class Navbar extends Component
     public function restart()
     {
         try {
+            $this->authorize('manageProxy', $this->server);
             RestartProxyJob::dispatch($this->server);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -66,6 +70,7 @@ class Navbar extends Component
     public function checkProxy()
     {
         try {
+            $this->authorize('manageProxy', $this->server);
             CheckProxy::run($this->server, true);
             $this->dispatch('startProxy')->self();
         } catch (\Throwable $e) {
@@ -76,6 +81,7 @@ class Navbar extends Component
     public function startProxy()
     {
         try {
+            $this->authorize('manageProxy', $this->server);
             $activity = StartProxy::run($this->server, force: true);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -86,6 +92,7 @@ class Navbar extends Component
     public function stop(bool $forceStop = true)
     {
         try {
+            $this->authorize('manageProxy', $this->server);
             StopProxy::dispatch($this->server, $forceStop);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -111,20 +118,40 @@ class Navbar extends Component
 
     public function showNotification()
     {
+        $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
-        $forceStop = $this->server->proxy->force_stop ?? false;
 
         switch ($this->proxyStatus) {
             case 'running':
                 $this->loadProxyConfiguration();
+                $this->dispatch('success', 'Proxy is running.');
                 break;
             case 'restarting':
                 $this->dispatch('info', 'Initiating proxy restart.');
                 break;
+            case 'exited':
+                $this->dispatch('info', 'Proxy has exited.');
+                break;
+            case 'stopping':
+                $this->dispatch('info', 'Proxy is stopping.');
+                break;
+            case 'starting':
+                $this->dispatch('info', 'Proxy is starting.');
+                break;
+            case 'unknown':
+                $this->dispatch('info', 'Proxy status is unknown.');
+                break;
             default:
+                $this->dispatch('info', 'Proxy status updated.');
                 break;
         }
 
+    }
+
+    public function refreshServer()
+    {
+        $this->server->refresh();
+        $this->server->load('settings');
     }
 
     public function render()

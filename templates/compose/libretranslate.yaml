@@ -1,5 +1,6 @@
 # documentation: https://libretranslate.com/docs/
 # slogan: Free and open-source machine translation API, entirely self-hosted.
+# category: ai
 # tags: translate, api
 # logo: svgs/libretranslate.svg
 # port: 5000

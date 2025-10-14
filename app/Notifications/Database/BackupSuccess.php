@@ -85,4 +85,20 @@ class BackupSuccess extends CustomEmailNotification
             color: SlackMessage::successColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+
+        return [
+            'success' => true,
+            'message' => 'Database backup successful',
+            'event' => 'backup_success',
+            'database_name' => $this->name,
+            'database_uuid' => $this->database->uuid,
+            'database_type' => $this->database_name,
+            'frequency' => $this->frequency,
+            'url' => $url,
+        ];
+    }
 }

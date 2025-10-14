@@ -1,5 +1,6 @@
 # documentation: https://docs.portainer.io
 # slogan: Portainer is a lightweight management UI for Docker
+# category: devtools
 # tags: docker, management, ui
 # logo: svgs/portainer.png
 # port: 9000

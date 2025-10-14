@@ -1,5 +1,6 @@
 # documentation: https://docs.unsend.dev/get-started/self-hosting
 # slogan: Unsend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.
+# category: messaging
 # tags: resend, mailer, marketing emails, transaction emails, self-hosting, postmark
 # logo: svgs/unsend.svg
 # port: 3000

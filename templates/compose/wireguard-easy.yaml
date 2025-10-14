@@ -1,5 +1,6 @@
 # documentation: https://github.com/wg-easy/wg-easy
 # slogan: The easiest way to run WireGuard VPN + Web-based Admin UI.
+# category: vps
 # tags: wireguard,vpn,web,admin
 # logo: svgs/wireguard.svg
 # port: 8000

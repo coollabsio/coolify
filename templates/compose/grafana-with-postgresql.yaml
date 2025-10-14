@@ -1,5 +1,6 @@
 # documentation: https://grafana.com
 # slogan: Grafana is the open source analytics & monitoring solution for every database.
+# category: monitoring
 # tags: grafana,analytics,monitoring,dashboard
 # logo: svgs/grafana.svg
 # port: 3000

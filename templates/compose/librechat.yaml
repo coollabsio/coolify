@@ -1,5 +1,6 @@
 # documentation: https://docs.librechat.ai/install/configuration/dotenv.html
 # slogan: Self-hosted, powerful, and privacy-focused chat UI for multiple AI models
+# category: ai
 # tags: ai,chat,gpt,claude,palm,openai,azure,huggingface,anthropic,ollama,llm
 # logo: svgs/librechat.svg
 # port: 3080

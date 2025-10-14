@@ -74,6 +74,7 @@ class Services extends Command
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
             'tags' => $tags,
+            'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
         ];
@@ -143,6 +144,7 @@ class Services extends Command
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
             'tags' => $tags,
+            'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
         ];
@@ -211,6 +213,7 @@ class Services extends Command
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
             'tags' => $tags,
+            'category' => $data->get('category'),
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
         ];

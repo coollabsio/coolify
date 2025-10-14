@@ -1,5 +1,6 @@
 # documentation: https://github.com/RobinLinus/snapdrop
 # slogan: A self-hosted file-sharing service for secure and convenient file transfers, whether on a local network or the internet.
+# category: productivity
 # tags: file, sharing, transfer, local, network, internet
 
 services:

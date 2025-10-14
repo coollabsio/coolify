@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Complete guide to Coolify Cursor rules and development patterns
+globs: .cursor/rules/*.mdc
 alwaysApply: false
 ---
 # Coolify Cursor Rules - Complete Guide
@@ -8,6 +8,10 @@ alwaysApply: false
 ## Overview
 
 This comprehensive set of Cursor Rules provides deep insights into **Coolify**, an open-source self-hostable alternative to Heroku/Netlify/Vercel. These rules will help you understand, navigate, and contribute to this complex Laravel-based deployment platform.
+
+> **Cross-Reference**: This directory is for **detailed, topic-specific rules** used by Cursor IDE and other AI assistants. For Claude Code specifically, also see **[CLAUDE.md](mdc:CLAUDE.md)** which provides a condensed, workflow-focused guide. Both systems share core principles but are optimized for their respective tools.
+>
+> **Maintaining Rules**: When updating these rules, see **[.AI_INSTRUCTIONS_SYNC.md](mdc:.AI_INSTRUCTIONS_SYNC.md)** for synchronization guidelines to keep CLAUDE.md and .cursor/rules/ consistent.
 
 ## Rule Categories
 
@@ -18,6 +22,7 @@ This comprehensive set of Cursor Rules provides deep insights into **Coolify**, 
 
 ### 🎨 Frontend Development
 - **[frontend-patterns.mdc](mdc:.cursor/rules/frontend-patterns.mdc)** - Livewire + Alpine.js + Tailwind architecture
+- **[form-components.mdc](mdc:.cursor/rules/form-components.mdc)** - Enhanced form components with built-in authorization
 
 ### 🗄️ Data & Backend
 - **[database-patterns.mdc](mdc:.cursor/rules/database-patterns.mdc)** - Database architecture, models, and data management
@@ -70,7 +75,7 @@ Coolify uses a **team-based multi-tenancy** model where:
 - **Multi-server** support with SSH connections
 
 ### 3. Technology Stack
-- **Backend**: Laravel 11 + PHP 8.4
+- **Backend**: Laravel 12 + PHP 8.4
 - **Frontend**: Livewire 3.5 + Alpine.js + Tailwind CSS 4.1
 - **Database**: PostgreSQL 15 + Redis 7
 - **Containerization**: Docker + Docker Compose

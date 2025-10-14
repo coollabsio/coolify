@@ -1,5 +1,6 @@
 # documentation: https://www.navidrome.org/docs/
 # slogan: Standalone server, that allows you to browse and listen to your music collection using a web browser or any Subsonic-compatible client.
+# category: media
 # tags: media, server, music, subsonic
 # logo: svgs/navidrome.svg
 # port: 4533

@@ -1,5 +1,6 @@
 # documentation: https://glitchtip.com
 # slogan: GlitchTip is a self-hosted, open-source error tracking system.
+# category: monitoring
 # tags: error, tracking, open-source, self-hosted, sentry
 # logo: svgs/glitchtip.png
 # port: 8080
@@ -50,7 +51,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-  
+
   worker:
     image: glitchtip/glitchtip
     command: ./bin/run-celery-with-beat.sh

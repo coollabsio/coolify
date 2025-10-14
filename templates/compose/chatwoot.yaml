@@ -1,5 +1,6 @@
 # documentation: https://www.chatwoot.com/docs/self-hosted/
 # slogan: Delightful customer relationships at scale.
+# category: cms
 # tags: chatwoot,chat,api,open,source,rails,redis,postgresql,sidekiq
 # logo: svgs/chatwoot.svg
 # port: 3000

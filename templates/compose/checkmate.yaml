@@ -1,5 +1,6 @@
 # documentation: https://bluewavelabs.gitbook.io/checkmate
 # slogan: An open source server monitoring application
+# category: monitoring
 # tags: monitoring,server,uptime,healthcheck
 # logo: svgs/checkmate.png
 # port: 80

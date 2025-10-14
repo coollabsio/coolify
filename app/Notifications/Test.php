@@ -7,6 +7,7 @@ use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\WebhookChannel;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
@@ -36,6 +37,7 @@ class Test extends Notification implements ShouldQueue
                 'telegram' => [TelegramChannel::class],
                 'slack' => [SlackChannel::class],
                 'pushover' => [PushoverChannel::class],
+                'webhook' => [WebhookChannel::class],
                 default => [],
             };
         } else {
@@ -109,5 +111,15 @@ class Test extends Notification implements ShouldQueue
             title: 'Test Slack Notification',
             description: 'This is a test Slack notification from Coolify.'
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => true,
+            'message' => 'This is a test webhook notification from Coolify.',
+            'event' => 'test',
+            'url' => base_url(),
+        ];
     }
 }

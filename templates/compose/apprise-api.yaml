@@ -1,5 +1,6 @@
 # documentation: https://docs.linuxserver.io/images/docker-apprise-api/
 # slogan: Push Notifications API
+# category: automation
 # tags: api, apprise
 # logo: svgs/apprise.png
 # port: 8000

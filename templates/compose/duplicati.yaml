@@ -1,5 +1,6 @@
 # documentation: https://duplicati.readthedocs.io
 # slogan: Duplicati is a backup solution, allowing you to make scheduled backups with encryption.
+# category: storage
 # tags: backup, encryption
 # logo: svgs/duplicati.webp
 # port: 8200

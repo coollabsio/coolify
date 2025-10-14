@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,8 @@ use Spatie\Url\Url;
 
 class ServiceApplicationView extends Component
 {
+    use AuthorizesRequests;
+
     public ServiceApplication $application;
 
     public $parameters;
@@ -19,6 +22,12 @@ class ServiceApplicationView extends Component
     public $docker_cleanup = true;
 
     public $delete_volumes = true;
+
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
 
     protected $rules = [
         'application.human_name' => 'nullable',
@@ -34,32 +43,44 @@ class ServiceApplicationView extends Component
 
     public function instantSave()
     {
-        $this->submit();
+        try {
+            $this->authorize('update', $this->application);
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSaveAdvanced()
     {
-        if (! $this->application->service->destination->server->isLogDrainEnabled()) {
-            $this->application->is_log_drain_enabled = false;
-            $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+        try {
+            $this->authorize('update', $this->application);
+            if (! $this->application->service->destination->server->isLogDrainEnabled()) {
+                $this->application->is_log_drain_enabled = false;
+                $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
-            return;
+                return;
+            }
+            $this->application->save();
+            $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->application->save();
-        $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
     }
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
-        }
-
         try {
+            $this->authorize('delete', $this->application);
+
+            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+                if (! Hash::check($password, Auth::user()->password)) {
+                    $this->addError('password', 'The provided password is incorrect.');
+
+                    return;
+                }
+            }
+
             $this->application->delete();
             $this->dispatch('success', 'Application deleted.');
 
@@ -71,12 +92,18 @@ class ServiceApplicationView extends Component
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
+        try {
+            $this->parameters = get_route_parameters();
+            $this->authorize('view', $this->application);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function convertToDatabase()
     {
         try {
+            $this->authorize('update', $this->application);
             $service = $this->application->service;
             $serviceApplication = $this->application;
 
@@ -108,22 +135,44 @@ class ServiceApplicationView extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                $domain = trim($domain);
                 Url::fromString($domain, ['http', 'https']);
 
-                return str($domain)->trim()->lower();
+                return str($domain)->lower();
             });
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
             $warning = sslipDomainWarning($this->application->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            check_domain_usage(resource: $this->application);
+            // Check for domain conflicts if not forcing save
+            if (! $this->forceSaveDomains) {
+                $result = checkDomainUsage(resource: $this->application);
+                if ($result['hasConflicts']) {
+                    $this->domainConflicts = $result['conflicts'];
+                    $this->showDomainConflictModal = true;
+
+                    return;
+                }
+            } else {
+                // Reset the force flag after using it
+                $this->forceSaveDomains = false;
+            }
+
             $this->validate();
             $this->application->save();
             updateCompose($this->application);

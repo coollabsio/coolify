@@ -1,5 +1,6 @@
 # documentation: https://docs.linuxserver.io/images/docker-libreoffice/
 # slogan: LibreOffice is a free and powerful office suite.
+# category: productivity
 # tags: office,document,spreadsheet,presentation,open-source
 # logo: svgs/libreoffice.svg
 # port: 3000

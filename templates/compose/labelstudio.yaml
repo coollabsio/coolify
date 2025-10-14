@@ -1,5 +1,6 @@
 # documentation: https://labelstud.io/guide/
 # slogan: Label Studio is a multi-type data labeling and annotation tool with standardized output format
+# category: ai
 # tags: workflow, orchestration, data-pipeline, python, labelstudio, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp, images, vision
 # logo: svgs/labelstudio.png
 # port: 8080

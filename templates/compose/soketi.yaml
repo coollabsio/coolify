@@ -1,5 +1,6 @@
 # documentation: https://docs.soketi.app
 # slogan: Soketi is your simple, fast, and resilient open-source WebSockets server.
+# category: messaging
 # tags: websockets,open,source,messaging
 # logo: svgs/soketi.jpeg
 # port: 6001

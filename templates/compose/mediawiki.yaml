@@ -1,9 +1,10 @@
 # documentation: https://www.mediawiki.org
 # slogan: MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.
+# category: cms
 # tags: wiki, collaboration, documentation
 # logo: svgs/mediawiki.ico
 # port: 80
- 
+
 services:
   mediawiki:
     image: mediawiki:latest

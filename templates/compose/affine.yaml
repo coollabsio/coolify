@@ -1,15 +1,16 @@
 # documentation: https://docs.affine.pro/docs/self-host-affine
 # slogan: Affine is an open-source, all-in-one workspace and OS for knowledge management, a Notion/Miro alternative.
+# category: productivity
 # tags: knowledge-management,notion,miro,workspace
 # logo: svgs/affine.svg
 # port: 3010
 
 services:
   affine:
-    image: ghcr.io/toeverything/affine-graphql:stable
+    image: ghcr.io/toeverything/affine:stable
     depends_on:
       redis:
-        condition: service_healthy  
+        condition: service_healthy
       postgres:
         condition: service_healthy
     volumes:
@@ -43,7 +44,7 @@ services:
 
   affine_migration:
     exclude_from_hc: true
-    image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
     restart: on-failure
     volumes:
       - affine-storage:/root/.affine/storage
@@ -74,7 +75,7 @@ services:
       timeout: 5s
       retries: 5
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     volumes:
       - affine-postgres-data:/var/lib/postgresql/data
     healthcheck:

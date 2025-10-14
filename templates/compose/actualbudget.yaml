@@ -1,5 +1,6 @@
 # documentation: https://actualbudget.org/docs/install/docker
 # slogan: A local-first personal finance app.
+# category: productivity
 # tags: budgeting,actual,finance,budget,money,expenses,income
 # logo: svgs/actualbudget.png
 # port: 5006

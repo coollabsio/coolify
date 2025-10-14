@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\Server;
+use App\Models\Team;
 use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class ScheduledJobManager implements ShouldQueue
@@ -73,6 +76,16 @@ class ScheduledJobManager implements ShouldQueue
             $this->processScheduledTasks();
         } catch (\Exception $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled tasks', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        // Process Docker cleanups - don't let failures stop the job manager
+        try {
+            $this->processDockerCleanups();
+        } catch (\Exception $e) {
+            Log::channel('scheduled-errors')->error('Failed to process docker cleanups', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -225,5 +238,76 @@ class ScheduledJobManager implements ShouldQueue
         $executionTime = $baseTime->copy()->setTimezone($timezone);
 
         return $cron->isDue($executionTime);
+    }
+
+    private function processDockerCleanups(): void
+    {
+        // Get all servers that need cleanup checks
+        $servers = $this->getServersForCleanup();
+
+        foreach ($servers as $server) {
+            try {
+                if (! $this->shouldProcessDockerCleanup($server)) {
+                    continue;
+                }
+
+                $serverTimezone = data_get($server->settings, 'server_timezone', config('app.timezone'));
+                if (validate_timezone($serverTimezone) === false) {
+                    $serverTimezone = config('app.timezone');
+                }
+
+                $frequency = data_get($server->settings, 'docker_cleanup_frequency', '0 * * * *');
+                if (isset(VALID_CRON_STRINGS[$frequency])) {
+                    $frequency = VALID_CRON_STRINGS[$frequency];
+                }
+
+                // Use the frozen execution time for consistent evaluation
+                if ($this->shouldRunNow($frequency, $serverTimezone)) {
+                    DockerCleanupJob::dispatch(
+                        $server,
+                        false,
+                        $server->settings->delete_unused_volumes,
+                        $server->settings->delete_unused_networks
+                    );
+                }
+            } catch (\Exception $e) {
+                Log::channel('scheduled-errors')->error('Error processing docker cleanup', [
+                    'server_id' => $server->id,
+                    'server_name' => $server->name,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function getServersForCleanup(): Collection
+    {
+        $query = Server::with('settings')
+            ->where('ip', '!=', '1.2.3.4');
+
+        if (isCloud()) {
+            $servers = $query->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
+            $own = Team::find(0)->servers()->with('settings')->get();
+
+            return $servers->merge($own);
+        }
+
+        return $query->get();
+    }
+
+    private function shouldProcessDockerCleanup(Server $server): bool
+    {
+        if (! $server->isFunctional()) {
+            return false;
+        }
+
+        // In cloud, check subscription status (except team 0)
+        if (isCloud() && $server->team_id !== 0) {
+            if (data_get($server->team->subscription, 'stripe_invoice_paid', false) === false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

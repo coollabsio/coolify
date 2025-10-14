@@ -1,5 +1,6 @@
 # documentation: https://support.rallly.co/self-hosting/introduction
 # slogan: Rallly is an open-source scheduling and collaboration tool designed to make organizing events and meetings easier.
+# category: productivity
 # tags: scheduling,rallly,events,meeting,doodle
 # logo: svgs/rallly.svg
 # port: 3000
