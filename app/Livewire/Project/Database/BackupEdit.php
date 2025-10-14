@@ -85,6 +85,7 @@ class BackupEdit extends Component
     public function mount()
     {
         try {
+            $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
         } catch (Exception $e) {

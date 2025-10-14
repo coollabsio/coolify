@@ -122,6 +122,7 @@ class General extends Component
     public function mount()
     {
         try {
+            $this->authorize('view', $this->database);
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
             if (! $this->server) {
