@@ -79,14 +79,14 @@ class DockerImage extends Component
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
-        // Determine the image tag based on whether it's a hash or regular tag
-        $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
-
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();
         if ($parser->isImageHash() && ! str_ends_with($imageName, '@sha256')) {
             $imageName .= '@sha256';
         }
+
+        // Determine the image tag based on whether it's a hash or regular tag
+        $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
@@ -96,7 +96,7 @@ class DockerImage extends Component
             'build_pack' => 'dockerimage',
             'ports_exposes' => 80,
             'docker_registry_image_name' => $imageName,
-            'docker_registry_image_tag' => $parser->getTag(),
+            'docker_registry_image_tag' => $imageTag,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
