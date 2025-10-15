@@ -45,6 +45,7 @@ services:
       - ENTE_SMTP_PASSWORD=${ENTE_SMTP_PASSWORD}
       - ENTE_SMTP_EMAIL=${ENTE_SMTP_EMAIL}
       - ENTE_SMTP_SENDER_NAME=${ENTE_SMTP_SENDER_NAME}
+      - ENTE_SMTP_ENCRYPTION=${ENTE_SMTP_ENCRYPTION:-tls}
 
     depends_on:
       postgres:
