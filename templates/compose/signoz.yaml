@@ -21,13 +21,14 @@ services:
         mkdir -p /var/lib/clickhouse/user_scripts/histogramQuantile
         mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
     restart: on-failure
+    exclude_from_hc: true
     logging:
       options:
         max-size: 50m
         max-file: "3"
 
   zookeeper:
-    image: signoz/zookeeper:latest
+    image: signoz/zookeeper:3.9.3
     user: root
     healthcheck:
       test:
@@ -384,7 +385,7 @@ services:
           </clickhouse>
 
   signoz:
-    image: signoz/signoz:latest
+    image: signoz/signoz:v0.97.1
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -462,7 +463,7 @@ services:
       retries: 3
 
   otel-collector:
-    image: signoz/signoz-otel-collector:latest
+    image: signoz/signoz-otel-collector:v0.129.7
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -592,7 +593,7 @@ services:
       retries: 3
 
   schema-migrator-sync:
-    image: signoz/signoz-schema-migrator:latest
+    image: signoz/signoz-schema-migrator:v0.129.7
     command:
       - sync
       - --dsn=tcp://clickhouse:9000
@@ -601,18 +602,21 @@ services:
       clickhouse:
         condition: service_healthy
     restart: on-failure
+    exclude_from_hc: true
     logging:
       options:
         max-size: 50m
         max-file: "3"
 
   schema-migrator-async:
-    image: signoz/signoz-schema-migrator:latest
+    image: signoz/signoz-schema-migrator:v0.129.7
     depends_on:
       clickhouse:
         condition: service_healthy
       schema-migrator-sync:
         condition: service_completed_successfully
+    restart: on-failure
+    exclude_from_hc: true
     logging:
       options:
         max-size: 50m
@@ -621,4 +625,3 @@ services:
       - async
       - --dsn=tcp://clickhouse:9000
       - --up=
-    restart: on-failure
