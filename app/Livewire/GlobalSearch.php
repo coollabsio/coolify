@@ -1147,6 +1147,9 @@ class GlobalSearch extends Component
         $this->selectedResourceType = $type;
         $this->isSelectingResource = true;
 
+        // Clear search query to show selection UI instead of creatable items
+        $this->searchQuery = '';
+
         // Reset selections
         $this->selectedServerId = null;
         $this->selectedDestinationUuid = null;
@@ -1316,10 +1319,10 @@ class GlobalSearch extends Component
                 $queryParams['database_image'] = 'postgres:16-alpine';
             }
 
-            return redirect()->route('project.resource.create', [
+            $this->redirect(route('project.resource.create', [
                 'project_uuid' => $this->selectedProjectUuid,
                 'environment_uuid' => $this->selectedEnvironmentUuid,
-            ] + $queryParams);
+            ] + $queryParams));
         }
     }
 

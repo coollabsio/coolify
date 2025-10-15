@@ -136,13 +136,17 @@
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
                 'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse'
             ];
-
             if (exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
                     const itemSearchText = `new ${item.name}`.toLowerCase();
                     const itemType = `new ${item.type}`.toLowerCase();
-                    return itemSearchText === trimmed || itemType === trimmed ||
-                        (item.type && trimmed.includes(item.type.replace(/-/g, ' ')));
+                    const itemTypeWithSpaces = item.type ? `new ${item.type.replace(/-/g, ' ')}` : '';
+
+                    // Check if trimmed matches exactly or if the item's quickcommand includes this command
+                    return itemSearchText === trimmed ||
+                           itemType === trimmed ||
+                           itemTypeWithSpaces === trimmed ||
+                           (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
                 });
 
                 if (matchingItem) {
@@ -250,8 +254,7 @@
             class="fixed top-0 left-0 z-99 flex items-start justify-center w-screen h-screen pt-[10vh]">
             <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm">
             </div>
-            <div x-show="modalOpen" x-trap.inert="modalOpen"
-                x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
+            <div x-show="modalOpen" x-trap.inert="modalOpen" x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
                 x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-4 scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="ease-in duration-150"
                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
@@ -268,7 +271,8 @@
                         </svg>
                         <svg x-show="isLoadingInitialData" x-cloak class="animate-spin h-5 w-5 text-warning"
                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                stroke-width="4">
                             </circle>
                             <path class="opacity-75" fill="currentColor"
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
@@ -307,8 +311,8 @@
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M15 19l-7-7 7-7" />
                                                 </svg>
                                             </button>
                                             <div>
@@ -323,11 +327,13 @@
                                             </div>
                                         </div>
                                         @if ($loadingServers)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
+                                            <div
+                                                class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
                                                     <path class="opacity-75" fill="currentColor"
                                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                                     </path>
@@ -337,7 +343,8 @@
                                             </div>
                                         @elseif (count($availableServers) > 0)
                                             @foreach ($availableServers as $index => $server)
-                                                <button type="button" wire:click="selectServer({{ $server['id'] }}, true)"
+                                                <button type="button"
+                                                    wire:click="selectServer({{ $server['id'] }}, true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
                                                     <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
@@ -345,7 +352,8 @@
                                                                 {{ $server['name'] }}
                                                             </div>
                                                             @if (!empty($server['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                <div
+                                                                    class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $server['description'] }}
                                                                 </div>
                                                             @else
@@ -355,10 +363,10 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
+                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M9 5l7 7-7 7" />
                                                         </svg>
                                                     </div>
                                                 </button>
@@ -380,10 +388,10 @@
                                             <button type="button"
                                                 @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M15 19l-7-7 7-7" />
                                                 </svg>
                                             </button>
                                             <div>
@@ -398,11 +406,13 @@
                                             </div>
                                         </div>
                                         @if ($loadingDestinations)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
+                                            <div
+                                                class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
                                                     <path class="opacity-75" fill="currentColor"
                                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                                     </path>
@@ -412,22 +422,25 @@
                                             </div>
                                         @elseif (count($availableDestinations) > 0)
                                             @foreach ($availableDestinations as $index => $destination)
-                                                <button type="button" wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
+                                                <button type="button"
+                                                    wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $destination['name'] }}
                                                             </div>
-                                                            <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            <div
+                                                                class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                 Network: {{ $destination['network'] }}
                                                             </div>
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
+                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M9 5l7 7-7 7" />
                                                         </svg>
                                                     </div>
                                                 </button>
@@ -449,10 +462,10 @@
                                             <button type="button"
                                                 @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M15 19l-7-7 7-7" />
                                                 </svg>
                                             </button>
                                             <div>
@@ -467,11 +480,13 @@
                                             </div>
                                         </div>
                                         @if ($loadingProjects)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
+                                            <div
+                                                class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
                                                     <path class="opacity-75" fill="currentColor"
                                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                                     </path>
@@ -481,15 +496,18 @@
                                             </div>
                                         @elseif (count($availableProjects) > 0)
                                             @foreach ($availableProjects as $index => $project)
-                                                <button type="button" wire:click="selectProject('{{ $project['uuid'] }}', true)"
+                                                <button type="button"
+                                                    wire:click="selectProject('{{ $project['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $project['name'] }}
                                                             </div>
                                                             @if (!empty($project['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                <div
+                                                                    class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $project['description'] }}
                                                                 </div>
                                                             @else
@@ -499,10 +517,10 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
+                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M9 5l7 7-7 7" />
                                                         </svg>
                                                     </div>
                                                 </button>
@@ -524,10 +542,10 @@
                                             <button type="button"
                                                 @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M15 19l-7-7 7-7" />
                                                 </svg>
                                             </button>
                                             <div>
@@ -542,11 +560,13 @@
                                             </div>
                                         </div>
                                         @if ($loadingEnvironments)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
+                                            <div
+                                                class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
                                                     <path class="opacity-75" fill="currentColor"
                                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                                     </path>
@@ -556,15 +576,18 @@
                                             </div>
                                         @elseif (count($availableEnvironments) > 0)
                                             @foreach ($availableEnvironments as $index => $environment)
-                                                <button type="button" wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
+                                                <button type="button"
+                                                    wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $environment['name'] }}
                                                             </div>
                                                             @if (!empty($environment['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                <div
+                                                                    class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $environment['description'] }}
                                                                 </div>
                                                             @else
@@ -574,10 +597,10 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
+                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M9 5l7 7-7 7" />
                                                         </svg>
                                                     </div>
                                                 </button>
@@ -616,7 +639,8 @@
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
-                                                            <span class="font-medium text-neutral-900 dark:text-white truncate">
+                                                            <span
+                                                                class="font-medium text-neutral-900 dark:text-white truncate">
                                                                 {{ $result['name'] }}
                                                             </span>
                                                             <span
@@ -637,13 +661,15 @@
                                                             </span>
                                                         </div>
                                                         @if (!empty($result['project']) && !empty($result['environment']))
-                                                            <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                                                            <div
+                                                                class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
                                                                 {{ $result['project'] }} /
                                                                 {{ $result['environment'] }}
                                                             </div>
                                                         @endif
                                                         @if (!empty($result['description']))
-                                                            <div class="text-sm text-neutral-600 dark:text-neutral-400">
+                                                            <div
+                                                                class="text-sm text-neutral-600 dark:text-neutral-400">
                                                                 {{ Str::limit($result['description'], 80) }}
                                                             </div>
                                                         @endif
@@ -651,8 +677,8 @@
                                                     <svg xmlns="http://www.w3.org/2000/svg"
                                                         class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
                                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                            d="M9 5l7 7-7 7" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M9 5l7 7-7 7" />
                                                     </svg>
                                                 </div>
                                             </a>
@@ -682,15 +708,16 @@
                                                     <div
                                                         class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 text-yellow-600 dark:text-yellow-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M12 4v16m8-8H4" />
+                                                            class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M12 4v16m8-8H4" />
                                                         </svg>
                                                     </div>
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
-                                                            <div class="font-medium text-neutral-900 dark:text-white truncate">
+                                                            <div
+                                                                class="font-medium text-neutral-900 dark:text-white truncate">
                                                                 {{ $item['name'] }}
                                                             </div>
                                                             @if (isset($item['quickcommand']))
@@ -698,7 +725,8 @@
                                                                     class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0">{{ $item['quickcommand'] }}</span>
                                                             @endif
                                                         </div>
-                                                        <div class="text-sm text-neutral-600 dark:text-neutral-400 truncate">
+                                                        <div
+                                                            class="text-sm text-neutral-600 dark:text-neutral-400 truncate">
                                                             {{ $item['description'] }}
                                                         </div>
                                                     </div>
@@ -706,8 +734,8 @@
                                                 <svg xmlns="http://www.w3.org/2000/svg"
                                                     class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
                                                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M9 5l7 7-7 7" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M9 5l7 7-7 7" />
                                                 </svg>
                                             </div>
                                         </button>
@@ -792,7 +820,8 @@
                                                             class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
                                                             <svg xmlns="http://www.w3.org/2000/svg"
                                                                 class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
-                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
                                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                                     stroke-width="2" d="M12 4v16m8-8H4" />
                                                             </svg>
@@ -860,10 +889,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -876,8 +907,8 @@
                         <h3 class="text-2xl font-bold">New Project</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -900,10 +931,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -916,8 +949,8 @@
                         <h3 class="text-2xl font-bold">New Server</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -940,10 +973,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -956,8 +991,8 @@
                         <h3 class="text-2xl font-bold">New Team</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -980,10 +1015,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -996,8 +1033,8 @@
                         <h3 class="text-2xl font-bold">New S3 Storage</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -1020,10 +1057,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -1036,8 +1075,8 @@
                         <h3 class="text-2xl font-bold">New Private Key</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -1060,10 +1099,12 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
+            })"
+                class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
                     class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -1076,8 +1117,8 @@
                         <h3 class="text-2xl font-bold">New GitHub App</h3>
                         <button @click="modalOpen=false"
                             class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
