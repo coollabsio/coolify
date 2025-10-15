@@ -1319,12 +1319,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function generate_buildtime_environment_variables()
     {
+        if (isDev()) {
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] Generating build-time environment variables');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+        }
+
         $envs = collect([]);
         $coolify_envs = $this->generate_coolify_env_variables();
 
         // Add COOLIFY variables
         $coolify_envs->each(function ($item, $key) use ($envs) {
-            $envs->push($key.'='.$item);
+            $envs->push($key.'='.escapeBashEnvValue($item));
         });
 
         // Add SERVICE_NAME variables for Docker Compose builds
@@ -1338,7 +1344,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.escapeBashEnvValue($serviceName));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
@@ -1351,8 +1357,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
                     }
                 }
             } else {
@@ -1360,7 +1366,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id)));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -1373,8 +1379,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
                     }
                 }
             }
@@ -1396,7 +1402,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For literal/multiline vars, real_value includes quotes that we need to remove
+                if ($env->is_literal || $env->is_multiline) {
+                    // Strip outer quotes from real_value and apply proper bash escaping
+                    $value = trim($env->real_value, "'");
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                } else {
+                    // For normal vars, use double quotes to allow $VAR expansion
+                    $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                }
             }
         } else {
             $sorted_environment_variables = $this->application->environment_variables_preview()
@@ -1413,11 +1444,42 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For literal/multiline vars, real_value includes quotes that we need to remove
+                if ($env->is_literal || $env->is_multiline) {
+                    // Strip outer quotes from real_value and apply proper bash escaping
+                    $value = trim($env->real_value, "'");
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                } else {
+                    // For normal vars, use double quotes to allow $VAR expansion
+                    $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                }
             }
         }
 
         // Return the generated environment variables
+        if (isDev()) {
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry("[DEBUG] Total build-time env variables: {$envs->count()}");
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+        }
+
         return $envs;
     }
 

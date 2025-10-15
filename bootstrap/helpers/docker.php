@@ -1121,6 +1121,72 @@ function escapeDollarSign($value)
 }
 
 /**
+ * Escape a value for use in a bash .env file that will be sourced with 'source' command
+ * Wraps the value in single quotes and escapes any single quotes within the value
+ *
+ * @param  string|null  $value  The value to escape
+ * @return string The escaped value wrapped in single quotes
+ */
+function escapeBashEnvValue(?string $value): string
+{
+    // Handle null or empty values
+    if ($value === null || $value === '') {
+        return "''";
+    }
+
+    // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+    // This is the standard way to escape single quotes in bash single-quoted strings
+    $escaped = str_replace("'", "'\\''", $value);
+
+    // Wrap in single quotes
+    return "'{$escaped}'";
+}
+
+/**
+ * Escape a value for bash double-quoted strings (allows $VAR expansion)
+ *
+ * This function wraps values in double quotes while escaping special characters,
+ * but preserves valid bash variable references like $VAR and ${VAR}.
+ *
+ * @param  string|null  $value  The value to escape
+ * @return string The escaped value wrapped in double quotes
+ */
+function escapeBashDoubleQuoted(?string $value): string
+{
+    // Handle null or empty values
+    if ($value === null || $value === '') {
+        return '""';
+    }
+
+    // Step 1: Escape backslashes first (must be done before other escaping)
+    $escaped = str_replace('\\', '\\\\', $value);
+
+    // Step 2: Escape double quotes
+    $escaped = str_replace('"', '\\"', $escaped);
+
+    // Step 3: Escape backticks (command substitution)
+    $escaped = str_replace('`', '\\`', $escaped);
+
+    // Step 4: Escape invalid $ patterns while preserving valid variable references
+    // Valid patterns to keep:
+    //   - $VAR_NAME (alphanumeric + underscore, starting with letter or _)
+    //   - ${VAR_NAME} (brace expansion)
+    //   - $0-$9 (positional parameters)
+    // Invalid patterns to escape: $&, $#, $$, $*, $@, $!, $(, etc.
+
+    // Match $ followed by anything that's NOT a valid variable start
+    // Valid variable starts: letter, underscore, digit (for $0-$9), or open brace
+    $escaped = preg_replace(
+        '/\$(?![a-zA-Z_0-9{])/',
+        '\\\$',
+        $escaped
+    );
+
+    // Wrap in double quotes
+    return "\"{$escaped}\"";
+}
+
+/**
  * Generate Docker build arguments from environment variables collection
  * Returns only keys (no values) since values are sourced from environment via export
  *
