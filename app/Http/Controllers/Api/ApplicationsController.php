@@ -17,6 +17,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -1512,31 +1513,32 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            // Process docker image name and tag for SHA256 digests
+            // Process docker image name and tag using DockerImageParser
             $dockerImageName = $request->docker_registry_image_name;
             $dockerImageTag = $request->docker_registry_image_tag;
 
-            // Strip 'sha256:' prefix if user provided it in the tag
+            // Build the full Docker image string for parsing
             if ($dockerImageTag) {
-                $dockerImageTag = preg_replace('/^sha256:/i', '', trim($dockerImageTag));
+                $dockerImageString = $dockerImageName.':'.$dockerImageTag;
+            } else {
+                $dockerImageString = $dockerImageName;
             }
 
-            // Remove @sha256 from image name if user added it
-            if ($dockerImageName) {
-                $dockerImageName = preg_replace('/@sha256$/i', '', trim($dockerImageName));
-            }
+            // Parse using DockerImageParser to normalize the image reference
+            $parser = new DockerImageParser;
+            $parser->parse($dockerImageString);
 
-            // Check if tag is a valid SHA256 hash (64 hex characters)
-            $isSha256Hash = $dockerImageTag && preg_match('/^[a-f0-9]{64}$/i', $dockerImageTag);
+            // Get normalized image name and tag
+            $normalizedImageName = $parser->getFullImageNameWithoutTag();
 
-            // Append @sha256 to image name if using digest and not already present
-            if ($isSha256Hash && ! str_ends_with($dockerImageName, '@sha256')) {
-                $dockerImageName .= '@sha256';
+            // Append @sha256 to image name if using digest
+            if ($parser->isImageHash() && ! str_ends_with($normalizedImageName, '@sha256')) {
+                $normalizedImageName .= '@sha256';
             }
 
             // Set processed values back to request
-            $request->offsetSet('docker_registry_image_name', $dockerImageName);
-            $request->offsetSet('docker_registry_image_tag', $dockerImageTag ?: 'latest');
+            $request->offsetSet('docker_registry_image_name', $normalizedImageName);
+            $request->offsetSet('docker_registry_image_tag', $parser->getTag());
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
