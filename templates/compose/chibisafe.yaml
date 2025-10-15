@@ -6,7 +6,7 @@
 
 services:
   chibisafe:
-    image: chibisafe/chibisafe:latest
+    image: chibisafe/chibisafe:v6.5.5
     environment:
       - BASE_API_URL=http://chibisafe_server:8000
     healthcheck:
@@ -17,7 +17,7 @@ services:
       start_period: 10s
 
   chibisafe_server:
-    image: chibisafe/chibisafe-server:latest
+    image: chibisafe/chibisafe-server:v6.5.5
     volumes:
       - database:/app/database:rw
       - uploads:/app/uploads:rw
