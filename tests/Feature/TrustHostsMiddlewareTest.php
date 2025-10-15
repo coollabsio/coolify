@@ -2,8 +2,14 @@
 
 use App\Http\Middleware\TrustHosts;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Facades\Cache;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+beforeEach(function () {
+    // Clear cache before each test to ensure isolation
+    Cache::forget('instance_settings_fqdn_host');
+});
 
 it('trusts the configured FQDN from InstanceSettings', function () {
     // Create instance settings with FQDN
@@ -139,4 +145,58 @@ it('trusts IPv6 addresses', function () {
 
     // IPv6 addresses are enclosed in brackets, getHost() should handle this
     expect($hosts)->toContain('[2001:db8::1]');
+});
+
+it('invalidates cache when FQDN is updated', function () {
+    // Set initial FQDN
+    $settings = InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://old-domain.com']
+    );
+
+    // First call should cache it
+    $middleware = new TrustHosts($this->app);
+    $hosts1 = $middleware->hosts();
+    expect($hosts1)->toContain('old-domain.com');
+
+    // Verify cache exists
+    expect(Cache::has('instance_settings_fqdn_host'))->toBeTrue();
+
+    // Update FQDN - should trigger cache invalidation
+    $settings->fqdn = 'https://new-domain.com';
+    $settings->save();
+
+    // Cache should be cleared
+    expect(Cache::has('instance_settings_fqdn_host'))->toBeFalse();
+
+    // New call should return updated host
+    $middleware2 = new TrustHosts($this->app);
+    $hosts2 = $middleware2->hosts();
+    expect($hosts2)->toContain('new-domain.com');
+    expect($hosts2)->not->toContain('old-domain.com');
+});
+
+it('caches trusted hosts to avoid database queries on every request', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    // Clear cache first
+    Cache::forget('instance_settings_fqdn_host');
+
+    // First call - should query database and cache result
+    $middleware1 = new TrustHosts($this->app);
+    $hosts1 = $middleware1->hosts();
+
+    // Verify result is cached
+    expect(Cache::has('instance_settings_fqdn_host'))->toBeTrue();
+    expect(Cache::get('instance_settings_fqdn_host'))->toBe('coolify.example.com');
+
+    // Subsequent calls should use cache (no DB query)
+    $middleware2 = new TrustHosts($this->app);
+    $hosts2 = $middleware2->hosts();
+
+    expect($hosts1)->toBe($hosts2);
+    expect($hosts2)->toContain('coolify.example.com');
 });

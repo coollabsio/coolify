@@ -42,6 +42,11 @@ class InstanceSettings extends Model
                     }
                 });
             }
+
+            // Clear trusted hosts cache when FQDN changes
+            if ($settings->isDirty('fqdn')) {
+                \Cache::forget('instance_settings_fqdn_host');
+            }
         });
     }
 
