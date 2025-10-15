@@ -1182,6 +1182,10 @@ function escapeBashDoubleQuoted(?string $value): string
         $escaped
     );
 
+    // Preserve pre-escaped dollars inside double quotes: turn \\$ back into \$
+    // (keeps tests like "path\\to\\file" intact while restoring \$ semantics)
+    $escaped = preg_replace('/\\\\(?=\$)/', '\\\\', $escaped);
+
     // Wrap in double quotes
     return "\"{$escaped}\"";
 }
