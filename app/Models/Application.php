@@ -1064,18 +1064,24 @@ class Application extends BaseModel
             $source_html_url_scheme = $url['scheme'];
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                $escapedCustomRepository = escapeshellarg($customRepository);
                 if ($this->source->is_public) {
+                    $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
-                    $base_command = "{$base_command} {$this->source->html_url}/{$customRepository}";
+                    $base_command = "{$base_command} {$escapedRepoUrl}";
                 } else {
                     $github_access_token = generateGithubInstallationToken($this->source);
 
                     if ($exec_in_docker) {
-                        $base_command = "{$base_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
-                        $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
+                        $repoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
+                        $escapedRepoUrl = escapeshellarg($repoUrl);
+                        $base_command = "{$base_command} {$escapedRepoUrl}";
+                        $fullRepoUrl = $repoUrl;
                     } else {
-                        $base_command = "{$base_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}";
-                        $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}";
+                        $repoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}";
+                        $escapedRepoUrl = escapeshellarg($repoUrl);
+                        $base_command = "{$base_command} {$escapedRepoUrl}";
+                        $fullRepoUrl = $repoUrl;
                     }
                 }
 
@@ -1100,7 +1106,10 @@ class Application extends BaseModel
                 throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
             }
             $private_key = base64_encode($private_key);
-            $base_comamnd = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$base_command} {$customRepository}";
+            // When used with executeInDocker (which uses bash -c '...'), we need to escape for bash context
+            // Replace ' with '\'' to safely escape within single-quoted bash strings
+            $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
+            $base_comamnd = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$base_command} '{$escapedCustomRepository}'";
 
             if ($exec_in_docker) {
                 $commands = collect([
