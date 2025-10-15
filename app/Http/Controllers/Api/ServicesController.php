@@ -331,9 +331,18 @@ class ServicesController extends Controller
                 $dockerComposeRaw = base64_decode($oneClickService);
 
                 // Validate for command injection BEFORE creating service
-                validateDockerComposeForInjection($dockerComposeRaw);
+                try {
+                    validateDockerComposeForInjection($dockerComposeRaw);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => $e->getMessage(),
+                        ],
+                    ], 422);
+                }
 
-                $service_payload = [
+                $servicePayload = [
                     'name' => "$oneClickServiceName-".str()->random(10),
                     'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
@@ -343,9 +352,9 @@ class ServicesController extends Controller
                     'destination_type' => $destination->getMorphClass(),
                 ];
                 if ($oneClickServiceName === 'cloudflared') {
-                    data_set($service_payload, 'connect_to_docker_network', true);
+                    data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = Service::create($service_payload);
+                $service = Service::create($servicePayload);
                 $service->name = "$oneClickServiceName-".$service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
@@ -468,7 +477,16 @@ class ServicesController extends Controller
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
-            validateDockerComposeForInjection($dockerComposeRaw);
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
 
             $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
             $instantDeploy = $request->instant_deploy ?? false;
@@ -787,7 +805,16 @@ class ServicesController extends Controller
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
-            validateDockerComposeForInjection($dockerComposeRaw);
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
 
             $service->docker_compose_raw = $dockerComposeRaw;
         }
