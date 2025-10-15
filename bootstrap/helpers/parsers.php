@@ -29,7 +29,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
     try {
         $parsed = Yaml::parse($composeYaml);
     } catch (\Exception $e) {
-        throw new \Exception('Invalid YAML format: '.$e->getMessage());
+        throw new \Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
     }
 
     if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
@@ -42,7 +42,9 @@ function validateDockerComposeForInjection(string $composeYaml): void
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                ' Service names must not contain shell metacharacters.'
+                ' Service names must not contain shell metacharacters.',
+                0,
+                $e
             );
         }
 
@@ -64,7 +66,9 @@ function validateDockerComposeForInjection(string $composeYaml): void
                                 } catch (\Exception $e) {
                                     throw new \Exception(
                                         'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.'
+                                        ' Please use safe path names without shell metacharacters.',
+                                        0,
+                                        $e
                                     );
                                 }
                             }
@@ -78,7 +82,9 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
+                                    ' Please use safe path names without shell metacharacters.',
+                                    0,
+                                    $e
                                 );
                             }
                         }
@@ -107,7 +113,9 @@ function validateVolumeStringForInjection(string $volumeString): void
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe names without shell metacharacters.'
+                ' Please use safe names without shell metacharacters.',
+                0,
+                $e
             );
         }
 
@@ -125,7 +133,9 @@ function validateVolumeStringForInjection(string $volumeString): void
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.'
+                ' Please use safe path names without shell metacharacters.',
+                0,
+                $e
             );
         }
     }
@@ -136,7 +146,9 @@ function validateVolumeStringForInjection(string $volumeString): void
     } catch (\Exception $e) {
         throw new \Exception(
             'Invalid Docker volume definition: '.$e->getMessage().
-            ' Please use safe path names without shell metacharacters.'
+            ' Please use safe path names without shell metacharacters.',
+            0,
+            $e
         );
     }
 }
