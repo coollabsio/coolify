@@ -16,7 +16,7 @@
         "pusher-js": "8.4.0",
         "tailwind-scrollbar": "4.0.2",
         "tailwindcss": "4.1.10",
-        "vite": "6.3.5",
+        "vite": "6.3.6",
         "vue": "3.5.16"
     },
     "dependencies": {

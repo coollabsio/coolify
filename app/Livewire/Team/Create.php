@@ -3,16 +3,27 @@
 namespace App\Livewire\Team;
 
 use App\Models\Team;
-use Livewire\Attributes\Validate;
+use App\Support\ValidationPatterns;
 use Livewire\Component;
 
 class Create extends Component
 {
-    #[Validate(['required', 'min:3', 'max:255'])]
     public string $name = '';
 
-    #[Validate(['nullable', 'min:3', 'max:255'])]
     public ?string $description = null;
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return ValidationPatterns::combinedMessages();
+    }
 
     public function submit()
     {
@@ -24,7 +35,7 @@ class Create extends Component
                 'personal_team' => false,
             ]);
             auth()->user()->teams()->attach($team, ['role' => 'admin']);
-            refreshSession();
+            refreshSession($team);
 
             return redirect()->route('team.index');
         } catch (\Throwable $e) {

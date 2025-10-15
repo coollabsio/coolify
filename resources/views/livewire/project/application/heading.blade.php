@@ -15,10 +15,12 @@
                 Logs
             </a>
             @if (!$application->destination->server->isSwarm())
-                <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.application.command', $parameters) }}">
-                    Terminal
-                </a>
+                @can('canAccessTerminal')
+                    <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
+                        href="{{ route('project.application.command', $parameters) }}">
+                        Terminal
+                    </a>
+                @endcan
             @endif
             <x-applications.links :application="$application" />
         </nav>

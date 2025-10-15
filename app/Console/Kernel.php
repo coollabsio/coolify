@@ -6,10 +6,11 @@ use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CleanupInstanceStuffsJob;
+use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledJobManager;
-use App\Jobs\ServerResourceManager;
+use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -54,7 +55,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new CheckHelperImageJob)->everyTenMinutes()->onOneServer();
 
             // Server Jobs
-            $this->scheduleInstance->job(new ServerResourceManager)->everyMinute()->onOneServer();
+            $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
             $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
@@ -67,12 +68,13 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->command('cleanup:unreachable-servers')->daily()->onOneServer();
 
             $this->scheduleInstance->job(new PullTemplatesFromCDN)->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->job(new PullChangelog)->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $this->scheduleUpdates();
 
             // Server Jobs
-            $this->scheduleInstance->job(new ServerResourceManager)->everyMinute()->onOneServer();
+            $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             $this->pullImages();
 

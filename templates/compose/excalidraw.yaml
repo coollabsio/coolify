@@ -1,5 +1,6 @@
 # documentation: https://docs.excalidraw.com/docs
-# slogan: Virtual whiteboard for sketching hand-drawn like diagrams 
+# slogan: Virtual whiteboard for sketching hand-drawn like diagrams
+# category: productivity
 # tags: canvas,diagrams,drawing,productivity,whiteboard
 # logo: svgs/excalidraw.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   excalidraw:
     image: excalidraw/excalidraw:latest
     environment:
-      - SERVICE_FQDN_EXCALIDRAW_80
+      - SERVICE_URL_EXCALIDRAW_80
     healthcheck:
       test:
         - CMD

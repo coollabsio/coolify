@@ -113,4 +113,19 @@ class StatusChanged extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => 'Application stopped',
+            'event' => 'status_changed',
+            'application_name' => $this->resource_name,
+            'application_uuid' => $this->resource->uuid,
+            'url' => $this->resource_url,
+            'project' => data_get($this->resource, 'environment.project.name'),
+            'environment' => $this->environment_name,
+            'fqdn' => $this->fqdn,
+        ];
+    }
 }

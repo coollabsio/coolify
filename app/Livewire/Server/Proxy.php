@@ -2,22 +2,25 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Proxy\CheckConfiguration;
-use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\GetProxyConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Proxy extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public ?string $selectedProxy = null;
 
-    public $proxy_settings = null;
+    public $proxySettings = null;
 
-    public bool $redirect_enabled = true;
+    public bool $redirectEnabled = true;
 
-    public ?string $redirect_url = null;
+    public ?string $redirectUrl = null;
 
     public function getListeners()
     {
@@ -36,17 +39,18 @@ class Proxy extends Component
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
-        $this->redirect_enabled = data_get($this->server, 'proxy.redirect_enabled', true);
-        $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
+        $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
+        $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
     }
 
-    // public function proxyStatusUpdated()
-    // {
-    //     $this->dispatch('refresh')->self();
-    // }
+    public function getConfigurationFilePathProperty()
+    {
+        return $this->server->proxyPath().'docker-compose.yml';
+    }
 
     public function changeProxy()
     {
+        $this->authorize('update', $this->server);
         $this->server->proxy = null;
         $this->server->save();
 
@@ -56,6 +60,7 @@ class Proxy extends Component
     public function selectProxy($proxy_type)
     {
         try {
+            $this->authorize('update', $this->server);
             $this->server->changeProxy($proxy_type, async: false);
             $this->selectedProxy = $this->server->proxy->type;
 
@@ -68,6 +73,7 @@ class Proxy extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->save();
             $this->dispatch('success', 'Settings saved.');
@@ -79,7 +85,8 @@ class Proxy extends Component
     public function instantSaveRedirect()
     {
         try {
-            $this->server->proxy->redirect_enabled = $this->redirect_enabled;
+            $this->authorize('update', $this->server);
+            $this->server->proxy->redirect_enabled = $this->redirectEnabled;
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
@@ -91,8 +98,9 @@ class Proxy extends Component
     public function submit()
     {
         try {
-            SaveConfiguration::run($this->server, $this->proxy_settings);
-            $this->server->proxy->redirect_url = $this->redirect_url;
+            $this->authorize('update', $this->server);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings);
+            $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
@@ -101,13 +109,15 @@ class Proxy extends Component
         }
     }
 
-    public function reset_proxy_configuration()
+    public function resetProxyConfiguration()
     {
         try {
-            $this->proxy_settings = CheckConfiguration::run($this->server, true);
-            SaveConfiguration::run($this->server, $this->proxy_settings);
+            $this->authorize('update', $this->server);
+            // Explicitly regenerate default configuration
+            $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->save();
-            $this->dispatch('success', 'Proxy configuration saved.');
+            $this->dispatch('success', 'Proxy configuration reset to default.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -116,7 +126,7 @@ class Proxy extends Component
     public function loadProxyConfiguration()
     {
         try {
-            $this->proxy_settings = CheckConfiguration::run($this->server);
+            $this->proxySettings = GetProxyConfiguration::run($this->server);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

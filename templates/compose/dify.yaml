@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.dify.ai
 # slogan: Dify is an open-source LLM app development platform. Dify's intuitive interface combines AI workflow, RAG pipeline, agent capabilities, model management, observability features and more, letting you quickly go from prototype to production.
+# category: ai
 # tags: ai, weaviate, openai, gpt, llm, lmops, dify, redis, postgres, qdrant, RAG, agent
 # logo: svgs/dify.png
 # port: 3000
@@ -210,9 +211,9 @@ services:
   web:
     image: langgenius/dify-web:latest
     environment:
-      - SERVICE_FQDN_WEB_3000
-      - CONSOLE_API_URL=${SERVICE_FQDN_WEB}
-      - APP_API_URL=${SERVICE_FQDN_API}
+      - SERVICE_URL_WEB_3000
+      - CONSOLE_API_URL=${SERVICE_URL_WEB}
+      - APP_API_URL=${SERVICE_URL_API}
       - SENTRY_DSN=${WEB_SENTRY_DSN:-}
       - NEXT_TELEMETRY_DISABLED=${NEXT_TELEMETRY_DISABLED:-0}
     healthcheck:
@@ -574,7 +575,7 @@ services:
       - './volumes/certbot/www:/var/www/html'
     entrypoint: [ "sh", "-c", "cp /docker-entrypoint-mount.sh /docker-entrypoint.sh && sed -i 's/\r$$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh && /docker-entrypoint.sh" ]
     environment:
-      NGINX_SERVER_NAME: $SERVICE_FQDN_NGINX
+      NGINX_SERVER_NAME: $SERVICE_URL_NGINX
       NGINX_HTTPS_ENABLED: ${NGINX_HTTPS_ENABLED:-false}
       NGINX_SSL_PORT: ${NGINX_SSL_PORT:-443}
       NGINX_PORT: ${NGINX_PORT:-80}

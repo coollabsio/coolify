@@ -1,5 +1,6 @@
 # documentation: https://freshrss.org/index.html
 # slogan: A free, self-hostable feed aggregator.
+# category: cms
 # tags: rss, feed
 # logo: svgs/freshrss.png
 # port: 80
@@ -8,7 +9,7 @@ services:
   freshrss:
     image: freshrss/freshrss:latest
     environment:
-      - SERVICE_FQDN_FRESHRSS_80
+      - SERVICE_URL_FRESHRSS_80
       - CRON_MIN=${CRON_MIN:-1,31}
       - MYSQL_DB=${MYSQL_DATABASE:-freshrss}
       - MYSQL_USER=${SERVICE_USER_MYSQL}
@@ -24,7 +25,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 3
-  
+
   freshrss-db:
     image: mysql:8
     volumes:

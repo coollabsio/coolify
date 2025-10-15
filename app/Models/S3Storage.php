@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
 
 class S3Storage extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, HasSafeStringAttribute;
 
     protected $guarded = [];
 

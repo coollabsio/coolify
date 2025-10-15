@@ -20,8 +20,12 @@
         @if (count($containers) === 0)
             <div>No containers are running or terminal access is disabled on this server.</div>
         @else
-            <form class="w-full flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')">
-                <x-forms.select label="Container" id="container" required wire:model="selected_container">
+            <form class="w-96 min-w-fit flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')"
+                x-data="{ autoConnected: false }" x-init="if ({{ count($containers) }} === 1 && !autoConnected) {
+                    autoConnected = true;
+                    $nextTick(() => $wire.dispatchSelf('connectToContainer'));
+                }">
+                <x-forms.select label="Container" id="container" required wire:model.live="selected_container">
                     @foreach ($containers as $container)
                         @if ($loop->first)
                             <option disabled value="default">Select a container</option>
@@ -45,7 +49,8 @@
         <livewire:server.navbar :server="$servers->first()" />
         @if ($servers->first()->isTerminalEnabled() && $servers->first()->isFunctional())
             <form class="w-full flex gap-2 items-start" wire:submit="$dispatchSelf('connectToServer')"
-                wire:init="$dispatchSelf('connectToServer')">
+                x-data="{ autoConnected: false }"
+                x-on:terminal-websocket-ready.window="if (!autoConnected) { autoConnected = true; $wire.dispatchSelf('connectToServer'); }">
                 <h2 class="pb-4">Terminal</h2>
                 <x-forms.button :disabled="$isConnecting"
                     type="submit">{{ $isConnecting ? 'Connecting...' : 'Connect' }}</x-forms.button>

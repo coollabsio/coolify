@@ -3,10 +3,13 @@
 namespace App\Livewire\Project;
 
 use App\Models\Environment;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
 {
+    use AuthorizesRequests;
+
     public int $environment_id;
 
     public bool $disabled = false;
@@ -31,6 +34,8 @@ class DeleteEnvironment extends Component
             'environment_id' => 'required|int',
         ]);
         $environment = Environment::findOrFail($this->environment_id);
+        $this->authorize('delete', $environment);
+
         if ($environment->isEmpty()) {
             $environment->delete();
 

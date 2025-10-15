@@ -4,12 +4,14 @@
     </x-slot>
     <div class="flex items-center gap-2">
         <h1>Servers</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
-            <livewire:server.create />
-        </x-modal-input>
+        @can('createAnyResource')
+            <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
+                <livewire:server.create />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="subtitle">All your servers are here.</div>
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($servers as $server)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                 @class([

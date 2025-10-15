@@ -4,7 +4,7 @@
     </x-slot>
     <form wire:submit='submit' class="flex flex-col pb-10">
         <div class="flex gap-2">
-            <h1>Project: {{ data_get($project, 'name') }}</h1>
+            <h1>Project: {{ data_get_str($project, 'name')->limit(15) }}</h1>
             <div class="flex items-end gap-2">
                 <x-forms.button type="submit">Save</x-forms.button>
                 <livewire:project.delete-project :disabled="!$project->isEmpty()" :project_id="$project->id" />

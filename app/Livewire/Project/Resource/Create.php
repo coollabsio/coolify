@@ -15,6 +15,7 @@ class Create extends Component
 
     public function mount()
     {
+
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $server_id = request()->query('server_id');
@@ -80,7 +81,7 @@ class Create extends Component
                         'destination_id' => $destination->id,
                         'destination_type' => $destination->getMorphClass(),
                     ];
-                    if ($oneClickServiceName === 'cloudflared') {
+                    if ($oneClickServiceName === 'cloudflared' || $oneClickServiceName === 'pgadmin') {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
                     $service = Service::create($service_payload);
@@ -96,7 +97,6 @@ class Create extends Component
                                     'value' => $value,
                                     'resourceable_id' => $service->id,
                                     'resourceable_type' => $service->getMorphClass(),
-                                    'is_build_time' => false,
                                     'is_preview' => false,
                                 ]);
                             }

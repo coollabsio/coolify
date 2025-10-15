@@ -1,5 +1,6 @@
 # documentation: https://docs.portainer.io
 # slogan: Portainer is a lightweight management UI for Docker
+# category: devtools
 # tags: docker, management, ui
 # logo: svgs/portainer.png
 # port: 9000
@@ -8,7 +9,7 @@ services:
   portainer:
     image: portainer/portainer-ce:alpine
     environment:
-      - SERVICE_FQDN_PORTAINER_9000
+      - SERVICE_URL_PORTAINER_9000
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - 'portainer_data:/data'

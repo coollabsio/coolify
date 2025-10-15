@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.peppermint.sh/
 # slogan: Open source helpdesk solution designed to enhance the user experience for teams currently utilizing costly software alternatives
+# category: productivity
 # tags: helpdesk, open-source, peppermint, postgres
 # logo: svgs/peppermint.png
 # port: 3000
@@ -31,12 +32,12 @@ services:
       timeout: 10s
       retries: 15
     environment:
-      - SERVICE_FQDN_PEPPERMINT_3000
-      - SERVICE_FQDN_PEPPERMINT_5003
+      - SERVICE_URL_PEPPERMINT_3000
+      - SERVICE_URL_PEPPERMINT_5003
       - DB_USERNAME=${SERVICE_USER_POSTGRES}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_HOST=postgres
       - DB_NAME=${POSTGRES_DB:-peppermint-db}
       - SECRET=${SERVICE_PASSWORD_PEPPERMINT}
-      - API_URL=${SERVICE_FQDN_PEPPERMINT_5003}
+      - API_URL=${SERVICE_URL_PEPPERMINT_5003}
       # The default login is "admin@admin.com" with the password "1234"

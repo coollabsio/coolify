@@ -10,7 +10,7 @@
         </x-slot:content>
     </x-slide-over>
 
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row" x-init="$wire.checkForUpdates()">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>
@@ -20,12 +20,16 @@
                     <x-helper
                         helper="Only available for apt, dnf and zypper package managers atm, more coming
             soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
-                    <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
-                        Check Now</x-forms.button>
+                    @if (isDev())
+                        <x-forms.button type="button" wire:click="sendTestEmail">
+                            Send Test Email (dev only)</x-forms.button>
+                    @endif
                 </div>
                 <div>Update your servers semi-automatically.</div>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
+                        <x-forms.button type="button" wire:click="$dispatch('checkForUpdates')">
+                            Check for Updates</x-forms.button>
                         <div class="flex flex-col">
                             <div>
                                 <div class="pb-2" wire:target="checkForUpdates" wire:loading>
@@ -105,6 +109,9 @@
     </div>
     @script
         <script>
+            $wire.on('checkForUpdates', () => {
+                $wire.$call('checkForUpdatesDispatch');
+            });
             $wire.on('updateAllPackages', () => {
                 window.dispatchEvent(new CustomEvent('startupdate'));
                 $wire.$call('updateAllPackages');

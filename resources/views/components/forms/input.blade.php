@@ -28,24 +28,24 @@
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
                 @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
+                wire:dirty.class="dark:ring-warning ring-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
-                aria-placeholder="{{ $attributes->get('placeholder') }}">
+                aria-placeholder="{{ $attributes->get('placeholder') }}"
+                @if ($autofocus) x-ref="autofocusInput" @endif>
 
         </div>
     @else
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
             @if ($id !== 'null') wire:model={{ $id }} @endif
-            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-            wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
+            wire:dirty.class="dark:ring-warning ring-warning" wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
             max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
-            placeholder="{{ $attributes->get('placeholder') }}">
+            placeholder="{{ $attributes->get('placeholder') }}"
+            @if ($autofocus) x-ref="autofocusInput" @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

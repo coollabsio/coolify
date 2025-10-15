@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             DisableTwoStepConfirmationSeeder::class,
             SentinelSeeder::class,
             CaSslCertSeeder::class,
+            PersonalAccessTokenSeeder::class,
         ]);
     }
 }

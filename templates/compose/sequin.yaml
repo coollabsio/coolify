@@ -1,0 +1,69 @@
+# documentation: https://sequinstream.com/docs/
+# slogan: The fastest Postgres change data capture
+# category: analytics
+# tags: postgres, sync, data
+# logo: svgs/sequin.svg
+# port: 7376
+
+services:
+  sequin:
+    image: sequin/sequin:latest
+    environment:
+      - SERVICE_URL_SEQUIN_7376
+      - SERVER_HOST=${SERVICE_URL_SEQUIN}
+      - PG_HOSTNAME=postgres
+      - PG_DATABASE=${POSTGRES_DB:-sequin-db}
+      - PG_PORT=5432
+      - PG_USERNAME=${SERVICE_USER_POSTGRES}
+      - PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PG_POOL_SIZE=20
+      - SECRET_KEY_BASE=${SERVICE_REALBASE64_64_SECRETKEY}
+      - VAULT_KEY=${SERVICE_REALBASE64_VAULTKEY}
+      - REDIS_URL=redis://redis:6379
+      - CONFIG_FILE_PATH=/config/playground.yml
+      - FEATURE_ACCOUNT_SELF_SIGNUP=${FEATURE_ACCOUNT_SELF_SIGNUP:-false}
+      - SEQUIN_TELEMETRY_DISABLED=${SEQUIN_TELEMETRY_DISABLED:-false}
+      - CRASH_REPORTING_DISABLED=${CRASH_REPORTING_DISABLED:-false}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:7376/health"]
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-sequin-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    command:
+      - postgres
+      - "-c"
+      - wal_level=logical
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${SERVICE_USER_POSTGRES} -d sequin"
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+      start_interval: 1s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    command:
+      - redis-server
+      - "--port"
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - redis_data:/data

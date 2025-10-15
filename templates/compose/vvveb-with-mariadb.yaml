@@ -1,5 +1,6 @@
 # documentation: https://docs.vvveb.com
 # slogan: Powerful and easy to use cms to build websites, blogs or ecommerce stores.
+# category: cms
 # tags: cms, blog, content, management, ecommerce, page-builder, nocode, mysql, sqlite, pgsql
 # logo: svgs/vvveb.svg
 # port: 80
@@ -10,7 +11,7 @@ services:
     volumes:
       - vvveb-data:/var/www/html
     environment:
-      - SERVICE_FQDN_VVVEB_80
+      - SERVICE_URL_VVVEB_80
       - DB_ENGINE=mysqli
       - DB_HOST=mariadb
       - DB_USER=${SERVICE_USER_VVVEB}

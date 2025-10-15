@@ -2,10 +2,13 @@
 
 namespace App\Livewire\Project\Shared;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class ResourceLimits extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     protected $rules = [
@@ -31,6 +34,7 @@ class ResourceLimits extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             if (! $this->resource->limits_memory) {
                 $this->resource->limits_memory = '0';
             }

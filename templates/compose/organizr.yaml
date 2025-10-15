@@ -1,5 +1,6 @@
 # documentation: https://docs.organizr.app/
 # slogan: Homelab Services Organizer
+# category: productivity
 # tags: tool
 # logo: svgs/organizr.png
 # port: 80
@@ -8,7 +9,7 @@ services:
   organizr:
     image: organizr/organizr:latest
     environment:
-      - SERVICE_FQDN_ORGANIZR_80
+      - SERVICE_URL_ORGANIZR_80
       - branch=${branch:-v2-master}
     volumes:
       - organizr-data:/config

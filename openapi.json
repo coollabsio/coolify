@@ -357,6 +357,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -385,6 +389,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -709,6 +767,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -737,6 +799,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -1061,6 +1177,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -1089,6 +1209,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -1342,6 +1516,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -1370,6 +1548,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -1606,6 +1838,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -1634,6 +1870,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -1709,6 +1999,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -1737,6 +2031,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -2175,6 +2523,10 @@
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"
@@ -2206,6 +2558,60 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -2367,10 +2773,6 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
                                     },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -2463,10 +2865,6 @@
                                     "is_preview": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                    },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
                                     },
                                     "is_literal": {
                                         "type": "boolean",
@@ -2565,10 +2963,6 @@
                                                 "is_preview": {
                                                     "type": "boolean",
                                                     "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                                },
-                                                "is_build_time": {
-                                                    "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable is used in build time."
                                                 },
                                                 "is_literal": {
                                                     "type": "boolean",
@@ -2906,6 +3300,55 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get",
+                "description": "Get backups details by database UUID.",
+                "operationId": "get-database-backups-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get all backups for a database",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "example": "Content is very complex. Will be implemented later."
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
                     }
                 },
                 "security": [
@@ -3255,6 +3698,206 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/backups\/{scheduled_backup_uuid}": {
+            "delete": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Delete backup configuration",
+                "description": "Deletes a backup configuration and all its executions.",
+                "operationId": "delete-backup-configuration-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "scheduled_backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup configuration to delete",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "delete_s3",
+                        "in": "query",
+                        "description": "Whether to delete all backup files from S3",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup configuration deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Backup configuration and all executions deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Backup configuration not found.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Backup configuration not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Update",
+                "description": "Update a specific backup configuration for a given database, identified by its UUID and the backup ID",
+                "operationId": "update-database-backup",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "scheduled_backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup configuration.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Database backup configuration data",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "save_s3": {
+                                        "type": "boolean",
+                                        "description": "Whether data is saved in s3 or not"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "type": "string",
+                                        "description": "S3 storage UUID"
+                                    },
+                                    "backup_now": {
+                                        "type": "boolean",
+                                        "description": "Whether to take a backup now or not"
+                                    },
+                                    "enabled": {
+                                        "type": "boolean",
+                                        "description": "Whether the backup is enabled or not"
+                                    },
+                                    "databases_to_backup": {
+                                        "type": "string",
+                                        "description": "Comma separated list of databases to backup"
+                                    },
+                                    "dump_all": {
+                                        "type": "boolean",
+                                        "description": "Whether all databases are dumped or not"
+                                    },
+                                    "frequency": {
+                                        "type": "string",
+                                        "description": "Frequency of the backup"
+                                    },
+                                    "database_backup_retention_amount_locally": {
+                                        "type": "integer",
+                                        "description": "Retention amount of the backup locally"
+                                    },
+                                    "database_backup_retention_days_locally": {
+                                        "type": "integer",
+                                        "description": "Retention days of the backup locally"
+                                    },
+                                    "database_backup_retention_max_storage_locally": {
+                                        "type": "integer",
+                                        "description": "Max storage of the backup locally"
+                                    },
+                                    "database_backup_retention_amount_s3": {
+                                        "type": "integer",
+                                        "description": "Retention amount of the backup in s3"
+                                    },
+                                    "database_backup_retention_days_s3": {
+                                        "type": "integer",
+                                        "description": "Retention days of the backup in s3"
+                                    },
+                                    "database_backup_retention_max_storage_s3": {
+                                        "type": "integer",
+                                        "description": "Max storage of the backup in S3"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Database backup configuration updated"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3396,6 +4039,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3521,6 +4167,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3642,6 +4291,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3767,6 +4419,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3892,6 +4547,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4029,6 +4687,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4166,6 +4827,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4291,6 +4955,178 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/backups\/{scheduled_backup_uuid}\/executions\/{execution_uuid}": {
+            "delete": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Delete backup execution",
+                "description": "Deletes a specific backup execution.",
+                "operationId": "delete-backup-execution-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "scheduled_backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup configuration",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "execution_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup execution to delete",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "delete_s3",
+                        "in": "query",
+                        "description": "Whether to delete the backup from S3",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup execution deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Backup execution deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Backup execution not found.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Backup execution not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/backups\/{scheduled_backup_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "List backup executions",
+                "description": "Get all executions for a specific backup configuration.",
+                "operationId": "list-backup-executions",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "scheduled_backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup configuration",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of backup executions",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "executions": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "uuid": {
+                                                        "type": "string"
+                                                    },
+                                                    "filename": {
+                                                        "type": "string"
+                                                    },
+                                                    "size": {
+                                                        "type": "integer"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string"
+                                                    },
+                                                    "message": {
+                                                        "type": "string"
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Backup configuration not found."
                     }
                 },
                 "security": [
@@ -4701,6 +5537,477 @@
                 ]
             }
         },
+        "\/github-apps": {
+            "post": {
+                "tags": [
+                    "GitHub Apps"
+                ],
+                "summary": "Create GitHub App",
+                "description": "Create a new GitHub app.",
+                "operationId": "create-github-app",
+                "requestBody": {
+                    "description": "GitHub app creation payload.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "api_url",
+                                    "html_url",
+                                    "app_id",
+                                    "installation_id",
+                                    "client_id",
+                                    "client_secret",
+                                    "private_key_uuid"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Name of the GitHub app."
+                                    },
+                                    "organization": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Organization to associate the app with."
+                                    },
+                                    "api_url": {
+                                        "type": "string",
+                                        "description": "API URL for the GitHub app (e.g., https:\/\/api.github.com)."
+                                    },
+                                    "html_url": {
+                                        "type": "string",
+                                        "description": "HTML URL for the GitHub app (e.g., https:\/\/github.com)."
+                                    },
+                                    "custom_user": {
+                                        "type": "string",
+                                        "description": "Custom user for SSH access (default: git)."
+                                    },
+                                    "custom_port": {
+                                        "type": "integer",
+                                        "description": "Custom port for SSH access (default: 22)."
+                                    },
+                                    "app_id": {
+                                        "type": "integer",
+                                        "description": "GitHub App ID from GitHub."
+                                    },
+                                    "installation_id": {
+                                        "type": "integer",
+                                        "description": "GitHub Installation ID."
+                                    },
+                                    "client_id": {
+                                        "type": "string",
+                                        "description": "GitHub OAuth App Client ID."
+                                    },
+                                    "client_secret": {
+                                        "type": "string",
+                                        "description": "GitHub OAuth App Client Secret."
+                                    },
+                                    "webhook_secret": {
+                                        "type": "string",
+                                        "description": "Webhook secret for GitHub webhooks."
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of an existing private key for GitHub App authentication."
+                                    },
+                                    "is_system_wide": {
+                                        "type": "boolean",
+                                        "description": "Is this app system-wide (cloud only)."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "GitHub app created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "organization": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "api_url": {
+                                            "type": "string"
+                                        },
+                                        "html_url": {
+                                            "type": "string"
+                                        },
+                                        "custom_user": {
+                                            "type": "string"
+                                        },
+                                        "custom_port": {
+                                            "type": "integer"
+                                        },
+                                        "app_id": {
+                                            "type": "integer"
+                                        },
+                                        "installation_id": {
+                                            "type": "integer"
+                                        },
+                                        "client_id": {
+                                            "type": "string"
+                                        },
+                                        "private_key_id": {
+                                            "type": "integer"
+                                        },
+                                        "is_system_wide": {
+                                            "type": "boolean"
+                                        },
+                                        "team_id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/github-apps\/{github_app_id}\/repositories": {
+            "get": {
+                "tags": [
+                    "GitHub Apps"
+                ],
+                "summary": "Load Repositories for a GitHub App",
+                "description": "Fetch repositories from GitHub for a given GitHub app.",
+                "operationId": "load-repositories",
+                "parameters": [
+                    {
+                        "name": "github_app_id",
+                        "in": "path",
+                        "description": "GitHub App ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Repositories loaded successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "repositories": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/github-apps\/{github_app_id}\/repositories\/{owner}\/{repo}\/branches": {
+            "get": {
+                "tags": [
+                    "GitHub Apps"
+                ],
+                "summary": "Load Branches for a GitHub Repository",
+                "description": "Fetch branches from GitHub for a given repository.",
+                "operationId": "load-branches",
+                "parameters": [
+                    {
+                        "name": "github_app_id",
+                        "in": "path",
+                        "description": "GitHub App ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "owner",
+                        "in": "path",
+                        "description": "Repository owner",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "repo",
+                        "in": "path",
+                        "description": "Repository name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Branches loaded successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "branches": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/github-apps\/{github_app_id}": {
+            "delete": {
+                "tags": [
+                    "GitHub Apps"
+                ],
+                "summary": "Delete GitHub App",
+                "description": "Delete a GitHub app if it's not being used by any applications.",
+                "operationId": "deleteGithubApp",
+                "parameters": [
+                    {
+                        "name": "github_app_id",
+                        "in": "path",
+                        "description": "GitHub App ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GitHub app deleted successfully",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "GitHub app deleted successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "GitHub app not found"
+                    },
+                    "409": {
+                        "description": "Conflict - GitHub app is in use",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "This GitHub app is being used by 5 application(s). Please delete all applications first."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "GitHub Apps"
+                ],
+                "summary": "Update GitHub App",
+                "description": "Update an existing GitHub app.",
+                "operationId": "updateGithubApp",
+                "parameters": [
+                    {
+                        "name": "github_app_id",
+                        "in": "path",
+                        "description": "GitHub App ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "GitHub App name"
+                                    },
+                                    "organization": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "GitHub organization"
+                                    },
+                                    "api_url": {
+                                        "type": "string",
+                                        "description": "GitHub API URL"
+                                    },
+                                    "html_url": {
+                                        "type": "string",
+                                        "description": "GitHub HTML URL"
+                                    },
+                                    "custom_user": {
+                                        "type": "string",
+                                        "description": "Custom user for SSH"
+                                    },
+                                    "custom_port": {
+                                        "type": "integer",
+                                        "description": "Custom port for SSH"
+                                    },
+                                    "app_id": {
+                                        "type": "integer",
+                                        "description": "GitHub App ID"
+                                    },
+                                    "installation_id": {
+                                        "type": "integer",
+                                        "description": "GitHub Installation ID"
+                                    },
+                                    "client_id": {
+                                        "type": "string",
+                                        "description": "GitHub Client ID"
+                                    },
+                                    "client_secret": {
+                                        "type": "string",
+                                        "description": "GitHub Client Secret"
+                                    },
+                                    "webhook_secret": {
+                                        "type": "string",
+                                        "description": "GitHub Webhook Secret"
+                                    },
+                                    "private_key_uuid": {
+                                        "type": "string",
+                                        "description": "Private key UUID"
+                                    },
+                                    "is_system_wide": {
+                                        "type": "boolean",
+                                        "description": "Is system wide (non-cloud instances only)"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "GitHub app updated successfully",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "GitHub app updated successfully"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "description": "Updated GitHub app data"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "GitHub app not found"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/version": {
             "get": {
                 "summary": "Version",
@@ -4710,7 +6017,7 @@
                     "200": {
                         "description": "Returns the version of the application",
                         "content": {
-                            "application\/json": {
+                            "text\/html": {
                                 "schema": {
                                     "type": "string"
                                 },
@@ -4845,7 +6152,7 @@
                     "200": {
                         "description": "Healthcheck endpoint.",
                         "content": {
-                            "application\/json": {
+                            "text\/html": {
                                 "schema": {
                                     "type": "string"
                                 },
@@ -4951,6 +6258,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5050,6 +6360,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5131,6 +6444,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5187,6 +6503,202 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/environments": {
+            "get": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "List Environments",
+                "description": "List all environments in a project.",
+                "operationId": "get-environments",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of environments",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/Environment"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Project not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Create Environment",
+                "description": "Create environment in project.",
+                "operationId": "create-environment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Environment created.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the environment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Environment created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string",
+                                            "example": "env123",
+                                            "description": "The UUID of the environment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Project not found."
+                    },
+                    "409": {
+                        "description": "Environment with this name already exists."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/environments\/{environment_name_or_uuid}": {
+            "delete": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Delete Environment",
+                "description": "Delete environment by name or UUID. Environment must be empty.",
+                "operationId": "delete-environment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_name_or_uuid",
+                        "in": "path",
+                        "description": "Environment name or UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Environment deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Environment deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "description": "Environment has resources, so it cannot be deleted."
+                    },
+                    "404": {
+                        "description": "Project or environment not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5318,6 +6830,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5379,6 +6894,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5633,6 +7151,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5732,6 +7253,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5831,6 +7355,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6012,6 +7539,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6241,6 +7771,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6412,13 +7945,6 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "server_uuid",
-                                    "project_uuid",
-                                    "environment_name",
-                                    "environment_uuid",
-                                    "docker_compose_raw"
-                                ],
                                 "properties": {
                                     "name": {
                                         "type": "string",
@@ -6499,6 +8025,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6596,10 +8125,6 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
                                     },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -6643,6 +8168,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6693,10 +8221,6 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
                                     },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -6740,6 +8264,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6795,10 +8322,6 @@
                                                     "type": "boolean",
                                                     "description": "The flag to indicate if the environment variable is used in preview deployments."
                                                 },
-                                                "is_build_time": {
-                                                    "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable is used in build time."
-                                                },
                                                 "is_literal": {
                                                     "type": "boolean",
                                                     "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -6846,6 +8369,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7792,9 +9318,6 @@
                     "resourceable_id": {
                         "type": "integer"
                     },
-                    "is_build_time": {
-                        "type": "boolean"
-                    },
                     "is_literal": {
                         "type": "boolean"
                     },
@@ -7802,6 +9325,12 @@
                         "type": "boolean"
                     },
                     "is_preview": {
+                        "type": "boolean"
+                    },
+                    "is_runtime": {
+                        "type": "boolean"
+                    },
+                    "is_buildtime": {
                         "type": "boolean"
                     },
                     "is_shared": {
@@ -8024,6 +9553,9 @@
                         "type": "boolean"
                     },
                     "is_swarm_worker": {
+                        "type": "boolean"
+                    },
+                    "is_terminal_enabled": {
                         "type": "boolean"
                     },
                     "is_usable": {
@@ -8302,6 +9834,40 @@
                         }
                     }
                 }
+            },
+            "422": {
+                "description": "Validation error.",
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Validation error."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "example": {
+                                        "name": [
+                                            "The name field is required."
+                                        ],
+                                        "api_url": [
+                                            "The api url field is required.",
+                                            "The api url format is invalid."
+                                        ]
+                                    },
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
             }
         },
         "securitySchemes": {
@@ -8324,6 +9890,10 @@
         {
             "name": "Deployments",
             "description": "Deployments"
+        },
+        {
+            "name": "GitHub Apps",
+            "description": "GitHub Apps"
         },
         {
             "name": "Projects",

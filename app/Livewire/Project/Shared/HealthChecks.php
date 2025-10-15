@@ -2,10 +2,13 @@
 
 namespace App\Livewire\Project\Shared;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class HealthChecks extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     protected $rules = [
@@ -27,6 +30,7 @@ class HealthChecks extends Component
 
     public function instantSave()
     {
+        $this->authorize('update', $this->resource);
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
     }
@@ -34,9 +38,28 @@ class HealthChecks extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->validate();
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function toggleHealthcheck()
+    {
+        try {
+            $this->authorize('update', $this->resource);
+            $wasEnabled = $this->resource->health_check_enabled;
+            $this->resource->health_check_enabled = ! $this->resource->health_check_enabled;
+            $this->resource->save();
+
+            if ($this->resource->health_check_enabled && ! $wasEnabled && $this->resource->isRunning()) {
+                $this->dispatch('info', 'Health check has been enabled. A restart is required to apply the new settings.');
+            } else {
+                $this->dispatch('success', 'Health check '.($this->resource->health_check_enabled ? 'enabled' : 'disabled').'.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

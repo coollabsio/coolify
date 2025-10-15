@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class Import extends Component
 {
+    use AuthorizesRequests;
+
     public bool $unsupported = false;
 
     public $resource;
@@ -128,6 +131,7 @@ EOD;
         if (is_null($resource)) {
             abort(404);
         }
+        $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
         $this->container = $this->resource->uuid;
@@ -165,12 +169,15 @@ EOD;
 
     public function runImport()
     {
+        $this->authorize('update', $this->resource);
+
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
             return;
         }
         try {
+            $this->importRunning = true;
             $this->importCommands = [];
             if (filled($this->customLocation)) {
                 $backupFileName = '/tmp/restore_'.$this->resource->uuid;

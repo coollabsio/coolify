@@ -1,5 +1,6 @@
 # documentation: https://docs.baby-buddy.net
 # slogan: It helps parents track their baby's daily activities, growth, and health with ease.
+# category: productivity
 # tags: baby, parents, health, growth, activities
 # logo: svgs/babybuddy.png
 
@@ -7,11 +8,11 @@ services:
   babybuddy:
     image: lscr.io/linuxserver/babybuddy:latest
     environment:
-      - SERVICE_FQDN_BABYBUDDY
+      - SERVICE_URL_BABYBUDDY
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
-      - CSRF_TRUSTED_ORIGINS=$SERVICE_FQDN_BABYBUDDY
+      - CSRF_TRUSTED_ORIGINS=$SERVICE_URL_BABYBUDDY
     volumes:
       - babybuddy-config:/config
     healthcheck:

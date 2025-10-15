@@ -225,6 +225,14 @@ class DeployController extends Controller
         foreach ($uuids as $uuid) {
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
+                if ($pr !== 0) {
+                    $preview = $resource->previews()->where('pull_request_id', $pr)->first();
+                    if (! $preview) {
+                        $deployments->push(['message' => "Pull request {$pr} not found for this resource.", 'resource_uuid' => $uuid]);
+
+                        continue;
+                    }
+                }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force, $pr);
                 if ($deployment_uuid) {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
@@ -299,6 +307,12 @@ class DeployController extends Controller
         }
         switch ($resource?->getMorphClass()) {
             case Application::class:
+                // Check authorization for application deployment
+                try {
+                    $this->authorize('deploy', $resource);
+                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    return ['message' => 'Unauthorized to deploy this application.', 'deployment_uuid' => null];
+                }
                 $deployment_uuid = new Cuid2;
                 $result = queue_application_deployment(
                     application: $resource,
@@ -313,11 +327,22 @@ class DeployController extends Controller
                 }
                 break;
             case Service::class:
+                // Check authorization for service deployment
+                try {
+                    $this->authorize('deploy', $resource);
+                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    return ['message' => 'Unauthorized to deploy this service.', 'deployment_uuid' => null];
+                }
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 break;
             default:
-                // Database resource
+                // Database resource - check authorization
+                try {
+                    $this->authorize('manage', $resource);
+                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                    return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
+                }
                 StartDatabase::dispatch($resource);
 
                 $resource->started_at ??= now();
@@ -423,6 +448,10 @@ class DeployController extends Controller
         if (is_null($application)) {
             return response()->json(['message' => 'Application not found'], 404);
         }
+
+        // Check authorization to view application deployments
+        $this->authorize('view', $application);
+
         $deployments = $application->deployments($skip, $take);
 
         return response()->json($deployments);
