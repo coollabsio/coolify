@@ -101,6 +101,10 @@ class StackForm extends Component
     {
         try {
             $this->validate();
+
+            // Validate for command injection BEFORE saving to database
+            validateDockerComposeForInjection($this->service->docker_compose_raw);
+
             $this->service->save();
             $this->service->saveExtraFields($this->fields);
             $this->service->parse();

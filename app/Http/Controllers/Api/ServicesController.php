@@ -328,9 +328,14 @@ class ServicesController extends Controller
                 });
             }
             if ($oneClickService) {
+                $dockerComposeRaw = base64_decode($oneClickService);
+
+                // Validate for command injection BEFORE creating service
+                validateDockerComposeForInjection($dockerComposeRaw);
+
                 $service_payload = [
                     'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
                     'server_id' => $server->id,
@@ -461,6 +466,9 @@ class ServicesController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            validateDockerComposeForInjection($dockerComposeRaw);
 
             $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
             $instantDeploy = $request->instant_deploy ?? false;
@@ -777,6 +785,10 @@ class ServicesController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            validateDockerComposeForInjection($dockerComposeRaw);
+
             $service->docker_compose_raw = $dockerComposeRaw;
         }
 
