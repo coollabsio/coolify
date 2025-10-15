@@ -32,10 +32,9 @@ function validateDockerComposeForInjection(string $composeYaml): void
         throw new \Exception('Invalid YAML format: '.$e->getMessage());
     }
 
-    if (! isset($parsed['services']) || ! is_array($parsed['services'])) {
+    if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
         throw new \Exception('Docker Compose file must contain a "services" section');
     }
-
     // Validate service names
     foreach ($parsed['services'] as $serviceName => $serviceConfig) {
         try {
