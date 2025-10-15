@@ -200,3 +200,30 @@ it('caches trusted hosts to avoid database queries on every request', function (
     expect($hosts1)->toBe($hosts2);
     expect($hosts2)->toContain('coolify.example.com');
 });
+
+it('caches negative results when no FQDN is configured', function () {
+    // Create instance settings without FQDN
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => null]
+    );
+
+    // Clear cache first
+    Cache::forget('instance_settings_fqdn_host');
+
+    // First call - should query database and cache empty string sentinel
+    $middleware1 = new TrustHosts($this->app);
+    $hosts1 = $middleware1->hosts();
+
+    // Verify empty string sentinel is cached (not null, which wouldn't be cached)
+    expect(Cache::has('instance_settings_fqdn_host'))->toBeTrue();
+    expect(Cache::get('instance_settings_fqdn_host'))->toBe('');
+
+    // Subsequent calls should use cached sentinel value
+    $middleware2 = new TrustHosts($this->app);
+    $hosts2 = $middleware2->hosts();
+
+    expect($hosts1)->toBe($hosts2);
+    // Should only contain APP_URL pattern, not any FQDN
+    expect($hosts2)->not->toBeEmpty();
+});
