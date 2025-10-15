@@ -39,7 +39,7 @@ services:
   caddy:
     image: caddy:2-alpine
     environment:
-      - SERVICE_FQDN_CHIBISAFE_80
+      - SERVICE_URL_CHIBISAFE_80
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
       interval: 30s
