@@ -7,7 +7,7 @@
 
 services:
   museum:
-    image: 'ghcr.io/ente-io/server:613c6a96390d7a624cf30b946955705d632423cc' # Released at 2025-09-14T22:16:37-07:00
+    image: 'ghcr.io/ente-io/server:613c6a96390d7a624cf30b946955705d632423cc'
     environment:
       - SERVICE_URL_MUSEUM_8080
       - ENTE_DB_HOST=postgres
@@ -28,6 +28,12 @@ services:
       - 'ENTE_JWT_SECRET=${SERVICE_REALBASE64_JWT}'
       - 'ENTE_INTERNAL_ADMIN=${ENTE_INTERNAL_ADMIN:-1580559962386438}'
       - 'ENTE_INTERNAL_DISABLE_REGISTRATION=${ENTE_INTERNAL_DISABLE_REGISTRATION:-false}'
+      - 'ENTE_SMTP_HOST=${ENTE_SMTP_HOST:-smtp.gmail.com}'
+      - 'ENTE_SMTP_PORT=${ENTE_SMTP_PORT:-587}'
+      - 'ENTE_SMTP_USERNAME=${ENTE_SMTP_USERNAME}'
+      - 'ENTE_SMTP_PASSWORD=${ENTE_SMTP_PASSWORD}'
+      - 'ENTE_SMTP_EMAIL=${ENTE_SMTP_EMAIL}'
+      - 'ENTE_SMTP_SENDER_NAME=${ENTE_SMTP_SENDER_NAME}'
     volumes:
       - 'museum-data:/data'
       - 'museum-config:/config'
@@ -46,9 +52,8 @@ services:
       timeout: 10s
       retries: 3
 
-      
   web:
-    image: 'ghcr.io/ente-io/web:ca03165f5e7f2a50105e6e40019c17ae6cdd934f' # Released at 2025-10-08T00:57:05-07:00
+    image: 'ghcr.io/ente-io/web:ca03165f5e7f2a50105e6e40019c17ae6cdd934f'
     environment:
       - SERVICE_URL_WEB_3000
       - 'ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}'
@@ -63,7 +68,6 @@ services:
       retries: 3
       start_period: 10s
 
-      
   postgres:
     image: 'postgres:15-alpine'
     environment:
@@ -80,9 +84,8 @@ services:
       timeout: 5s
       retries: 5
 
-      
   minio:
-    image: 'quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z' # Released at 2025-09-07T16-13-09Z
+    image: 'quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z'
     command: 'server /data --console-address ":9001"'
     environment:
       - MINIO_SERVER_URL=$MINIO_SERVER_URL
@@ -100,10 +103,9 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
       
   minio-init:
-    image: 'minio/mc:RELEASE.2025-08-13T08-35-41Z' # Released at 2025-08-13T08-35-41Z
+    image: 'minio/mc:RELEASE.2025-08-13T08-35-41Z'
     depends_on:
       minio:
         condition: service_started
