@@ -174,3 +174,13 @@ test('parseDockerVolumeString rejects redirection operators', function () {
             ->toThrow(Exception::class);
     }
 });
+
+test('parseDockerVolumeString rejects newline and tab in volume strings', function () {
+    // Newline can be used as command separator
+    expect(fn () => parseDockerVolumeString("/data\n:/app"))
+        ->toThrow(Exception::class);
+
+    // Tab can be used as token separator
+    expect(fn () => parseDockerVolumeString("/data\t:/app"))
+        ->toThrow(Exception::class);
+});
