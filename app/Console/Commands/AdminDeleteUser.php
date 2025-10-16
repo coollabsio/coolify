@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands\Cloud;
+namespace App\Console\Commands;
 
 use App\Actions\Stripe\CancelSubscription;
 use App\Actions\User\DeleteUserResources;
@@ -12,16 +12,16 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class CloudDeleteUser extends Command
+class AdminDeleteUser extends Command
 {
-    protected $signature = 'cloud:delete-user {email}
+    protected $signature = 'admin:delete-user {email}
                             {--dry-run : Preview what will be deleted without actually deleting}
                             {--skip-stripe : Skip Stripe subscription cancellation}
                             {--skip-resources : Skip resource deletion}
                             {--auto-confirm : Skip all confirmation prompts between phases}
                             {--force : Bypass the lock check and force deletion (use with caution)}';
 
-    protected $description = 'Delete a user with phase-by-phase confirmation (works on cloud and self-hosted)';
+    protected $description = 'Delete a user with comprehensive resource cleanup and phase-by-phase confirmation (works on cloud and self-hosted)';
 
     private bool $isDryRun = false;
 
