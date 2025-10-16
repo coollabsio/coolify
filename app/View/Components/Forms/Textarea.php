@@ -27,6 +27,7 @@ class Textarea extends Component
         public bool $readonly = false,
         public bool $allowTab = false,
         public bool $spellcheck = false,
+        public bool $autofocus = false,
         public ?string $helper = null,
         public bool $realtimeValidation = false,
         public bool $allowToPeak = true,

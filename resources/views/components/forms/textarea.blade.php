@@ -27,7 +27,7 @@
     @if ($useMonacoEditor)
         <x-forms.monaco-editor id="{{ $id }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
             name="{{ $id }}" model="{{ $value ?? $id }}" wire:model="{{ $value ?? $id }}"
-            readonly="{{ $readonly }}" label="dockerfile" />
+            readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
     @else
         @if ($type === 'password')
             <div class="relative" x-data="{ type: 'password' }">
@@ -46,7 +46,7 @@
                 <input x-cloak x-show="type === 'password'" value="{{ $value }}"
                     {{ $attributes->merge(['class' => $defaultClassInput]) }} @required($required)
                     @if ($id !== 'null') wire:model={{ $id }} @endif
-                    wire:dirty.class="dark:ring-warning ring-warning" wire:loading.attr="disabled"
+                    wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" wire:loading.attr="disabled"
                     type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                     name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                     aria-placeholder="{{ $attributes->get('placeholder') }}">
@@ -55,9 +55,10 @@
                     @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
                 @else
             wire:model={{ $value ?? $id }}
-                     wire:dirty.class="dark:ring-warning ring-warning" @endif
+                     wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
                     @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                    name="{{ $name }}" name={{ $id }}></textarea>
+                    name="{{ $name }}" name={{ $id }}
+                    @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
 
             </div>
         @else
@@ -67,9 +68,10 @@
                 @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
     wire:model={{ $value ?? $id }}
-    wire:dirty.class="dark:ring-warning ring-warning" @endif
+    wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
                 @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                name="{{ $name }}" name={{ $id }}></textarea>
+                name="{{ $name }}" name={{ $id }}
+                @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
         @endif
     @endif
     @error($id)

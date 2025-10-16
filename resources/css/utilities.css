@@ -46,20 +46,20 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-2 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
 }
 
 /* Readonly */
 @utility input {
     @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility select {
     @apply w-full;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility button {
