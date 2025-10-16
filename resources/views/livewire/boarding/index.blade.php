@@ -13,9 +13,8 @@
                         </p>
                     </div>
 
-                    <div
-                        class="bg-white dark:bg-coolgray-100 rounded-lg shadow-sm border border-neutral-200 dark:border-coolgray-300 p-8 text-left">
-                        <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400 mb-4">
+                    <div class="text-left space-y-4 p-8 rounded-lg border border-neutral-200 dark:border-coolgray-400">
+                        <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400">
                             What You'll Set Up
                         </h2>
                         <div class="space-y-3">
@@ -649,9 +648,8 @@
                         </p>
                     </div>
 
-                    <div
-                        class="bg-white dark:bg-coolgray-100 rounded-lg shadow-sm border border-neutral-200 dark:border-coolgray-300 p-8 text-left">
-                        <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400 mb-4">
+                    <div class="text-left space-y-4 p-8 rounded-lg border border-neutral-200 dark:border-coolgray-400">
+                        <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400">
                             What's Configured
                         </h2>
                         <div class="space-y-3">
