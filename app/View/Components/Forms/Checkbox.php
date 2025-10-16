@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
+use Visus\Cuid2\Cuid2;
 
 class Checkbox extends Component
 {
@@ -57,7 +58,7 @@ class Checkbox extends Component
         // Generate unique HTML ID by adding random suffix
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->id) {
-            $uniqueSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 8);
+            $uniqueSuffix = new Cuid2;
             $this->htmlId = $this->id.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = $this->id;

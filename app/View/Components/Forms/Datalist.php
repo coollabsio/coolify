@@ -64,7 +64,7 @@ class Datalist extends Component
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
-            $uniqueSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 8);
+            $uniqueSuffix = new Cuid2;
             $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;
