@@ -96,6 +96,7 @@ class HealthChecks extends Component
 
     public function mount()
     {
+        $this->authorize('view', $this->resource);
         $this->syncData(false);
     }
 
