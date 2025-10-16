@@ -32,7 +32,7 @@
 }
 
 @utility input-sticky {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility input-sticky-active {
