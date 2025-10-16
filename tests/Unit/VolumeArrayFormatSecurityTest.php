@@ -168,7 +168,7 @@ YAML;
     expect($source)->toBe('${DATA_PATH}');
     // Our validation allows simple env var references
     $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
-    expect($isSimpleEnvVar)->toBeTrue();
+    expect($isSimpleEnvVar)->toBe(1); // preg_match returns 1 on success, not true
 });
 
 test('array-format with malicious environment variable default', function () {

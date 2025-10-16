@@ -104,53 +104,8 @@ function validateDockerComposeForInjection(string $composeYaml): void
  */
 function validateVolumeStringForInjection(string $volumeString): void
 {
-    // Parse the volume string to extract source and target
-    $parts = explode(':', $volumeString);
-    if (count($parts) < 2) {
-        // Named volume without target - only validate the name
-        try {
-            validateShellSafePath($parts[0], 'volume name');
-        } catch (\Exception $e) {
-            throw new \Exception(
-                'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe names without shell metacharacters.',
-                0,
-                $e
-            );
-        }
-
-        return;
-    }
-
-    $source = $parts[0];
-    $target = $parts[1];
-
-    // Validate source (but allow simple environment variables)
-    $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
-    if (! $isSimpleEnvVar) {
-        try {
-            validateShellSafePath($source, 'volume source');
-        } catch (\Exception $e) {
-            throw new \Exception(
-                'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.',
-                0,
-                $e
-            );
-        }
-    }
-
-    // Validate target
-    try {
-        validateShellSafePath($target, 'volume target');
-    } catch (\Exception $e) {
-        throw new \Exception(
-            'Invalid Docker volume definition: '.$e->getMessage().
-            ' Please use safe path names without shell metacharacters.',
-            0,
-            $e
-        );
-    }
+    // Canonical parsing also validates and throws on unsafe input
+    parseDockerVolumeString($volumeString);
 }
 
 function parseDockerVolumeString(string $volumeString): array
