@@ -75,18 +75,32 @@ class PreviewsCompose extends Component
                 $preview_fqdn = str($generated_fqdn)->before('://').'://'.$preview_fqdn;
             } else {
                 // Use the existing domain from the main application
-                $url = Url::fromString($domain_string);
+                // Handle multiple domains separated by commas
+                $domain_list = explode(',', $domain_string);
+                $preview_fqdns = [];
                 $template = $this->preview->application->preview_url_template;
-                $host = $url->getHost();
-                $schema = $url->getScheme();
-                $portInt = $url->getPort();
-                $port = $portInt !== null ? ':'.$portInt : '';
                 $random = new Cuid2;
-                $preview_fqdn = str_replace('{{random}}', $random, $template);
-                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                $preview_fqdn = str_replace('{{pr_id}}', $this->preview->pull_request_id, $preview_fqdn);
-                $preview_fqdn = str_replace('{{port}}', $port, $preview_fqdn);
-                $preview_fqdn = "$schema://$preview_fqdn";
+
+                foreach ($domain_list as $single_domain) {
+                    $single_domain = trim($single_domain);
+                    if (empty($single_domain)) {
+                        continue;
+                    }
+
+                    $url = Url::fromString($single_domain);
+                    $host = $url->getHost();
+                    $schema = $url->getScheme();
+                    $portInt = $url->getPort();
+                    $port = $portInt !== null ? ':'.$portInt : '';
+
+                    $preview_fqdn = str_replace('{{random}}', $random, $template);
+                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                    $preview_fqdn = str_replace('{{pr_id}}', $this->preview->pull_request_id, $preview_fqdn);
+                    $preview_fqdn = str_replace('{{port}}', $port, $preview_fqdn);
+                    $preview_fqdns[] = "$schema://$preview_fqdn";
+                }
+
+                $preview_fqdn = implode(',', $preview_fqdns);
             }
 
             // Save the generated domain
