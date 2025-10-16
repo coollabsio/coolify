@@ -128,6 +128,7 @@ function validateShellSafePath(string $input, string $context = 'path'): string
         ';' => 'command separator',
         "\n" => 'newline (command separator)',
         "\r" => 'carriage return',
+        "\t" => 'tab (token separator)',
         '>' => 'output redirection',
         '<' => 'input redirection',
     ];
@@ -140,15 +141,6 @@ function validateShellSafePath(string $input, string $context = 'path'): string
                 'Shell metacharacters are not allowed for security reasons.'
             );
         }
-    }
-
-    // Additional pattern-based checks for complex attack vectors
-    // Check for command substitution patterns: $(command) or `command`
-    if (preg_match('/\$\(|\$\{|`/', $input)) {
-        throw new \Exception(
-            "Invalid {$context}: command substitution patterns detected. ".
-            'This is not allowed for security reasons.'
-        );
     }
 
     return $input;

