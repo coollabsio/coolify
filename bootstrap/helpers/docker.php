@@ -378,6 +378,16 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     if ($serviceLabels) {
         $middlewares_from_labels = $serviceLabels->map(function ($item) {
+            // Handle array values from YAML parsing (e.g., "traefik.enable: true" becomes an array)
+            if (is_array($item)) {
+                // Convert array to string format "key=value"
+                $key = collect($item)->keys()->first();
+                $value = collect($item)->values()->first();
+                $item = "$key=$value";
+            }
+            if (! is_string($item)) {
+                return null;
+            }
             if (preg_match('/traefik\.http\.middlewares\.(.*?)(\.|$)/', $item, $matches)) {
                 return $matches[1];
             }
