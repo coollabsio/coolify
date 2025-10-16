@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Livewire\Concerns\SynchronizesModelData;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class HealthChecks extends Component
 {
     use AuthorizesRequests;
+    use SynchronizesModelData;
 
     public $resource;
 
@@ -54,57 +56,36 @@ class HealthChecks extends Component
         'customHealthcheckFound' => 'boolean',
     ];
 
-    /**
-     * Sync data between component properties and model
-     *
-     * @param  bool  $toModel  If true, sync FROM properties TO model. If false, sync FROM model TO properties.
-     */
-    private function syncData(bool $toModel = false): void
+    protected function getModelBindings(): array
     {
-        if ($toModel) {
-            // Sync TO model (before save)
-            $this->resource->health_check_enabled = $this->healthCheckEnabled;
-            $this->resource->health_check_method = $this->healthCheckMethod;
-            $this->resource->health_check_scheme = $this->healthCheckScheme;
-            $this->resource->health_check_host = $this->healthCheckHost;
-            $this->resource->health_check_port = $this->healthCheckPort;
-            $this->resource->health_check_path = $this->healthCheckPath;
-            $this->resource->health_check_return_code = $this->healthCheckReturnCode;
-            $this->resource->health_check_response_text = $this->healthCheckResponseText;
-            $this->resource->health_check_interval = $this->healthCheckInterval;
-            $this->resource->health_check_timeout = $this->healthCheckTimeout;
-            $this->resource->health_check_retries = $this->healthCheckRetries;
-            $this->resource->health_check_start_period = $this->healthCheckStartPeriod;
-            $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
-        } else {
-            // Sync FROM model (on load/refresh)
-            $this->healthCheckEnabled = $this->resource->health_check_enabled;
-            $this->healthCheckMethod = $this->resource->health_check_method;
-            $this->healthCheckScheme = $this->resource->health_check_scheme;
-            $this->healthCheckHost = $this->resource->health_check_host;
-            $this->healthCheckPort = $this->resource->health_check_port;
-            $this->healthCheckPath = $this->resource->health_check_path;
-            $this->healthCheckReturnCode = $this->resource->health_check_return_code;
-            $this->healthCheckResponseText = $this->resource->health_check_response_text;
-            $this->healthCheckInterval = $this->resource->health_check_interval;
-            $this->healthCheckTimeout = $this->resource->health_check_timeout;
-            $this->healthCheckRetries = $this->resource->health_check_retries;
-            $this->healthCheckStartPeriod = $this->resource->health_check_start_period;
-            $this->customHealthcheckFound = $this->resource->custom_healthcheck_found;
-        }
+        return [
+            'healthCheckEnabled' => 'resource.health_check_enabled',
+            'healthCheckMethod' => 'resource.health_check_method',
+            'healthCheckScheme' => 'resource.health_check_scheme',
+            'healthCheckHost' => 'resource.health_check_host',
+            'healthCheckPort' => 'resource.health_check_port',
+            'healthCheckPath' => 'resource.health_check_path',
+            'healthCheckReturnCode' => 'resource.health_check_return_code',
+            'healthCheckResponseText' => 'resource.health_check_response_text',
+            'healthCheckInterval' => 'resource.health_check_interval',
+            'healthCheckTimeout' => 'resource.health_check_timeout',
+            'healthCheckRetries' => 'resource.health_check_retries',
+            'healthCheckStartPeriod' => 'resource.health_check_start_period',
+            'customHealthcheckFound' => 'resource.custom_healthcheck_found',
+        ];
     }
 
     public function mount()
     {
         $this->authorize('view', $this->resource);
-        $this->syncData(false);
+        $this->syncFromModel();
     }
 
     public function instantSave()
     {
         $this->authorize('update', $this->resource);
 
-        $this->syncData(true);
+        $this->syncToModel();
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
     }
@@ -115,7 +96,7 @@ class HealthChecks extends Component
             $this->authorize('update', $this->resource);
             $this->validate();
 
-            $this->syncData(true);
+            $this->syncToModel();
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');
         } catch (\Throwable $e) {
@@ -130,7 +111,7 @@ class HealthChecks extends Component
             $wasEnabled = $this->healthCheckEnabled;
             $this->healthCheckEnabled = ! $this->healthCheckEnabled;
 
-            $this->syncData(true);
+            $this->syncToModel();
             $this->resource->save();
 
             if ($this->healthCheckEnabled && ! $wasEnabled && $this->resource->isRunning()) {

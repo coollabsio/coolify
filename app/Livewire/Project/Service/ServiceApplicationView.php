@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +15,7 @@ use Spatie\Url\Url;
 class ServiceApplicationView extends Component
 {
     use AuthorizesRequests;
+    use SynchronizesModelData;
 
     public ServiceApplication $application;
 
@@ -77,7 +79,7 @@ class ServiceApplicationView extends Component
 
                 return;
             }
-            $this->syncData(true);
+            $this->syncToModel();
             $this->application->save();
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (\Throwable $e) {
@@ -112,33 +114,24 @@ class ServiceApplicationView extends Component
         try {
             $this->parameters = get_route_parameters();
             $this->authorize('view', $this->application);
-            $this->syncData(false);
+            $this->syncFromModel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    private function syncData(bool $toModel = false): void
+    protected function getModelBindings(): array
     {
-        if ($toModel) {
-            $this->application->human_name = $this->humanName;
-            $this->application->description = $this->description;
-            $this->application->fqdn = $this->fqdn;
-            $this->application->image = $this->image;
-            $this->application->exclude_from_status = $this->excludeFromStatus;
-            $this->application->is_log_drain_enabled = $this->isLogDrainEnabled;
-            $this->application->is_gzip_enabled = $this->isGzipEnabled;
-            $this->application->is_stripprefix_enabled = $this->isStripprefixEnabled;
-        } else {
-            $this->humanName = $this->application->human_name;
-            $this->description = $this->application->description;
-            $this->fqdn = $this->application->fqdn;
-            $this->image = $this->application->image;
-            $this->excludeFromStatus = $this->application->exclude_from_status ?? false;
-            $this->isLogDrainEnabled = $this->application->is_log_drain_enabled ?? false;
-            $this->isGzipEnabled = $this->application->is_gzip_enabled ?? false;
-            $this->isStripprefixEnabled = $this->application->is_stripprefix_enabled ?? false;
-        }
+        return [
+            'humanName' => 'application.human_name',
+            'description' => 'application.description',
+            'fqdn' => 'application.fqdn',
+            'image' => 'application.image',
+            'excludeFromStatus' => 'application.exclude_from_status',
+            'isLogDrainEnabled' => 'application.is_log_drain_enabled',
+            'isGzipEnabled' => 'application.is_gzip_enabled',
+            'isStripprefixEnabled' => 'application.is_stripprefix_enabled',
+        ];
     }
 
     public function convertToDatabase()
@@ -201,7 +194,7 @@ class ServiceApplicationView extends Component
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
             // Sync to model for domain conflict check
-            $this->syncData(true);
+            $this->syncToModel();
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -219,7 +212,7 @@ class ServiceApplicationView extends Component
             $this->validate();
             $this->application->save();
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -231,7 +224,7 @@ class ServiceApplicationView extends Component
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
-                $this->syncData(false);
+                $this->syncFromModel();
             }
 
             return handleError($e, $this);

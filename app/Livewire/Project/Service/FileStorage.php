@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
@@ -22,7 +23,7 @@ use Livewire\Component;
 
 class FileStorage extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, SynchronizesModelData;
 
     public LocalFileVolume $fileStorage;
 
@@ -60,18 +61,15 @@ class FileStorage extends Component
         }
 
         $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
-        $this->syncData(false);
+        $this->syncFromModel();
     }
 
-    private function syncData(bool $toModel = false): void
+    protected function getModelBindings(): array
     {
-        if ($toModel) {
-            $this->fileStorage->content = $this->content;
-            $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
-        } else {
-            $this->content = $this->fileStorage->content;
-            $this->isBasedOnGit = $this->fileStorage->is_based_on_git ?? false;
-        }
+        return [
+            'content' => 'fileStorage.content',
+            'isBasedOnGit' => 'fileStorage.is_based_on_git',
+        ];
     }
 
     public function convertToDirectory()
@@ -98,7 +96,7 @@ class FileStorage extends Component
             $this->authorize('update', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
-            $this->syncData(false);
+            $this->syncFromModel();
             $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -167,14 +165,14 @@ class FileStorage extends Component
             if ($this->fileStorage->is_directory) {
                 $this->content = null;
             }
-            $this->syncData(true);
+            $this->syncToModel();
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
-            $this->syncData(false);
+            $this->syncFromModel();
 
             return handleError($e, $this);
         }

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\Application;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +15,7 @@ use Visus\Cuid2\Cuid2;
 class General extends Component
 {
     use AuthorizesRequests;
+    use SynchronizesModelData;
 
     public string $applicationId;
 
@@ -264,14 +266,14 @@ class General extends Component
             if (is_null($this->parsedServices) || empty($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
                 // Still sync data even if parse fails, so form fields are populated
-                $this->syncData(false);
+                $this->syncFromModel();
 
                 return;
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
             // Still sync data even on error, so form fields are populated
-            $this->syncData(false);
+            $this->syncFromModel();
         }
         if ($this->application->build_pack === 'dockercompose') {
             // Only update if user has permission
@@ -323,102 +325,57 @@ class General extends Component
 
         // Sync data from model to properties at the END, after all business logic
         // This ensures any modifications to $this->application during mount() are reflected in properties
-        $this->syncData(false);
+        $this->syncFromModel();
     }
 
-    private function syncData(bool $toModel = false): void
+    protected function getModelBindings(): array
     {
-        if ($toModel) {
-            $this->application->name = $this->name;
-            $this->application->description = $this->description;
-            $this->application->fqdn = $this->fqdn;
-            $this->application->git_repository = $this->git_repository;
-            $this->application->git_branch = $this->git_branch;
-            $this->application->git_commit_sha = $this->git_commit_sha;
-            $this->application->install_command = $this->install_command;
-            $this->application->build_command = $this->build_command;
-            $this->application->start_command = $this->start_command;
-            $this->application->build_pack = $this->build_pack;
-            $this->application->static_image = $this->static_image;
-            $this->application->base_directory = $this->base_directory;
-            $this->application->publish_directory = $this->publish_directory;
-            $this->application->ports_exposes = $this->ports_exposes;
-            $this->application->ports_mappings = $this->ports_mappings;
-            $this->application->custom_network_aliases = $this->custom_network_aliases;
-            $this->application->dockerfile = $this->dockerfile;
-            $this->application->dockerfile_location = $this->dockerfile_location;
-            $this->application->dockerfile_target_build = $this->dockerfile_target_build;
-            $this->application->docker_registry_image_name = $this->docker_registry_image_name;
-            $this->application->docker_registry_image_tag = $this->docker_registry_image_tag;
-            $this->application->docker_compose_location = $this->docker_compose_location;
-            $this->application->docker_compose = $this->docker_compose;
-            $this->application->docker_compose_raw = $this->docker_compose_raw;
-            $this->application->docker_compose_custom_start_command = $this->docker_compose_custom_start_command;
-            $this->application->docker_compose_custom_build_command = $this->docker_compose_custom_build_command;
-            $this->application->custom_labels = $this->custom_labels;
-            $this->application->custom_docker_run_options = $this->custom_docker_run_options;
-            $this->application->pre_deployment_command = $this->pre_deployment_command;
-            $this->application->pre_deployment_command_container = $this->pre_deployment_command_container;
-            $this->application->post_deployment_command = $this->post_deployment_command;
-            $this->application->post_deployment_command_container = $this->post_deployment_command_container;
-            $this->application->custom_nginx_configuration = $this->custom_nginx_configuration;
-            $this->application->settings->is_static = $this->is_static;
-            $this->application->settings->is_spa = $this->is_spa;
-            $this->application->settings->is_build_server_enabled = $this->is_build_server_enabled;
-            $this->application->settings->is_preserve_repository_enabled = $this->is_preserve_repository_enabled;
-            $this->application->settings->is_container_label_escape_enabled = $this->is_container_label_escape_enabled;
-            $this->application->settings->is_container_label_readonly_enabled = $this->is_container_label_readonly_enabled;
-            $this->application->is_http_basic_auth_enabled = $this->is_http_basic_auth_enabled;
-            $this->application->http_basic_auth_username = $this->http_basic_auth_username;
-            $this->application->http_basic_auth_password = $this->http_basic_auth_password;
-            $this->application->watch_paths = $this->watch_paths;
-            $this->application->redirect = $this->redirect;
-        } else {
-            $this->name = $this->application->name;
-            $this->description = $this->application->description;
-            $this->fqdn = $this->application->fqdn;
-            $this->git_repository = $this->application->git_repository;
-            $this->git_branch = $this->application->git_branch;
-            $this->git_commit_sha = $this->application->git_commit_sha;
-            $this->install_command = $this->application->install_command;
-            $this->build_command = $this->application->build_command;
-            $this->start_command = $this->application->start_command;
-            $this->build_pack = $this->application->build_pack;
-            $this->static_image = $this->application->static_image;
-            $this->base_directory = $this->application->base_directory;
-            $this->publish_directory = $this->application->publish_directory;
-            $this->ports_exposes = $this->application->ports_exposes;
-            $this->ports_mappings = $this->application->ports_mappings;
-            $this->custom_network_aliases = $this->application->custom_network_aliases;
-            $this->dockerfile = $this->application->dockerfile;
-            $this->dockerfile_location = $this->application->dockerfile_location;
-            $this->dockerfile_target_build = $this->application->dockerfile_target_build;
-            $this->docker_registry_image_name = $this->application->docker_registry_image_name;
-            $this->docker_registry_image_tag = $this->application->docker_registry_image_tag;
-            $this->docker_compose_location = $this->application->docker_compose_location;
-            $this->docker_compose = $this->application->docker_compose;
-            $this->docker_compose_raw = $this->application->docker_compose_raw;
-            $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
-            $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
-            $this->custom_labels = $this->application->custom_labels;
-            $this->custom_docker_run_options = $this->application->custom_docker_run_options;
-            $this->pre_deployment_command = $this->application->pre_deployment_command;
-            $this->pre_deployment_command_container = $this->application->pre_deployment_command_container;
-            $this->post_deployment_command = $this->application->post_deployment_command;
-            $this->post_deployment_command_container = $this->application->post_deployment_command_container;
-            $this->custom_nginx_configuration = $this->application->custom_nginx_configuration;
-            $this->is_static = $this->application->settings->is_static ?? false;
-            $this->is_spa = $this->application->settings->is_spa ?? false;
-            $this->is_build_server_enabled = $this->application->settings->is_build_server_enabled ?? false;
-            $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled ?? false;
-            $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled ?? true;
-            $this->is_container_label_readonly_enabled = $this->application->settings->is_container_label_readonly_enabled ?? false;
-            $this->is_http_basic_auth_enabled = $this->application->is_http_basic_auth_enabled ?? false;
-            $this->http_basic_auth_username = $this->application->http_basic_auth_username;
-            $this->http_basic_auth_password = $this->application->http_basic_auth_password;
-            $this->watch_paths = $this->application->watch_paths;
-            $this->redirect = $this->application->redirect;
-        }
+        return [
+            'name' => 'application.name',
+            'description' => 'application.description',
+            'fqdn' => 'application.fqdn',
+            'git_repository' => 'application.git_repository',
+            'git_branch' => 'application.git_branch',
+            'git_commit_sha' => 'application.git_commit_sha',
+            'install_command' => 'application.install_command',
+            'build_command' => 'application.build_command',
+            'start_command' => 'application.start_command',
+            'build_pack' => 'application.build_pack',
+            'static_image' => 'application.static_image',
+            'base_directory' => 'application.base_directory',
+            'publish_directory' => 'application.publish_directory',
+            'ports_exposes' => 'application.ports_exposes',
+            'ports_mappings' => 'application.ports_mappings',
+            'custom_network_aliases' => 'application.custom_network_aliases',
+            'dockerfile' => 'application.dockerfile',
+            'dockerfile_location' => 'application.dockerfile_location',
+            'dockerfile_target_build' => 'application.dockerfile_target_build',
+            'docker_registry_image_name' => 'application.docker_registry_image_name',
+            'docker_registry_image_tag' => 'application.docker_registry_image_tag',
+            'docker_compose_location' => 'application.docker_compose_location',
+            'docker_compose' => 'application.docker_compose',
+            'docker_compose_raw' => 'application.docker_compose_raw',
+            'docker_compose_custom_start_command' => 'application.docker_compose_custom_start_command',
+            'docker_compose_custom_build_command' => 'application.docker_compose_custom_build_command',
+            'custom_labels' => 'application.custom_labels',
+            'custom_docker_run_options' => 'application.custom_docker_run_options',
+            'pre_deployment_command' => 'application.pre_deployment_command',
+            'pre_deployment_command_container' => 'application.pre_deployment_command_container',
+            'post_deployment_command' => 'application.post_deployment_command',
+            'post_deployment_command_container' => 'application.post_deployment_command_container',
+            'custom_nginx_configuration' => 'application.custom_nginx_configuration',
+            'is_static' => 'application.settings.is_static',
+            'is_spa' => 'application.settings.is_spa',
+            'is_build_server_enabled' => 'application.settings.is_build_server_enabled',
+            'is_preserve_repository_enabled' => 'application.settings.is_preserve_repository_enabled',
+            'is_container_label_escape_enabled' => 'application.settings.is_container_label_escape_enabled',
+            'is_container_label_readonly_enabled' => 'application.settings.is_container_label_readonly_enabled',
+            'is_http_basic_auth_enabled' => 'application.is_http_basic_auth_enabled',
+            'http_basic_auth_username' => 'application.http_basic_auth_username',
+            'http_basic_auth_password' => 'application.http_basic_auth_password',
+            'watch_paths' => 'application.watch_paths',
+            'redirect' => 'application.redirect',
+        ];
     }
 
     public function instantSave()
@@ -430,7 +387,7 @@ class General extends Component
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldIsPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
 
-            $this->syncData(true);
+            $this->syncToModel();
 
             if ($this->application->settings->isDirty('is_spa')) {
                 $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
@@ -441,7 +398,7 @@ class General extends Component
             $this->application->settings->save();
             $this->dispatch('success', 'Settings saved.');
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
 
             // If port_exposes changed, reset default labels
             if ($oldPortsExposes !== $this->ports_exposes || $oldIsContainerLabelEscapeEnabled !== $this->is_container_label_escape_enabled) {
@@ -565,13 +522,13 @@ class General extends Component
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             // User doesn't have permission, revert the change and return
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
 
             return;
         }
 
         // Sync property to model before checking/modifying
-        $this->syncData(true);
+        $this->syncToModel();
 
         if ($this->build_pack !== 'nixpacks') {
             $this->is_static = false;
@@ -624,10 +581,10 @@ class General extends Component
             if ($server) {
                 $fqdn = generateUrl(server: $server, random: $this->application->uuid);
                 $this->fqdn = $fqdn;
-                $this->syncData(true);
+                $this->syncToModel();
                 $this->application->save();
                 $this->application->refresh();
-                $this->syncData(false);
+                $this->syncFromModel();
                 $this->resetDefaultLabels();
                 $this->dispatch('success', 'Wildcard domain generated.');
             }
@@ -642,10 +599,10 @@ class General extends Component
             $this->authorize('update', $this->application);
 
             $this->custom_nginx_configuration = defaultNginxConfiguration($type);
-            $this->syncData(true);
+            $this->syncToModel();
             $this->application->save();
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
             $this->dispatch('success', 'Nginx configuration generated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -660,10 +617,10 @@ class General extends Component
             }
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->custom_labels = base64_encode($this->customLabels);
-            $this->syncData(true);
+            $this->syncToModel();
             $this->application->save();
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
             if ($this->build_pack === 'dockercompose') {
                 $this->loadComposeFile(showToast: false);
             }
@@ -760,7 +717,7 @@ class General extends Component
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
 
-            $this->syncData(true);
+            $this->syncToModel();
 
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
@@ -847,11 +804,11 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $this->application->refresh();
-            $this->syncData(false);
+            $this->syncFromModel();
 
             return handleError($e, $this);
         } finally {

@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\ServiceApplication;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class EditDomain extends Component
 {
+    use SynchronizesModelData;
     public $applicationId;
 
     public ServiceApplication $application;
@@ -28,16 +30,14 @@ class EditDomain extends Component
     {
         $this->application = ServiceApplication::query()->findOrFail($this->applicationId);
         $this->authorize('view', $this->application);
-        $this->syncData(false);
+        $this->syncFromModel();
     }
 
-    private function syncData(bool $toModel = false): void
+    protected function getModelBindings(): array
     {
-        if ($toModel) {
-            $this->application->fqdn = $this->fqdn;
-        } else {
-            $this->fqdn = $this->application->fqdn;
-        }
+        return [
+            'fqdn' => 'application.fqdn',
+        ];
     }
 
     public function confirmDomainUsage()
@@ -65,7 +65,7 @@ class EditDomain extends Component
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
             // Sync to model for domain conflict check
-            $this->syncData(true);
+            $this->syncToModel();
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
