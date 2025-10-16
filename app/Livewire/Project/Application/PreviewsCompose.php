@@ -36,7 +36,8 @@ class PreviewsCompose extends Component
             $this->authorize('update', $this->preview->application);
 
             $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
-            $docker_compose_domains = json_decode($docker_compose_domains, true);
+            $docker_compose_domains = json_decode($docker_compose_domains, true) ?: [];
+            $docker_compose_domains[$this->serviceName] = $docker_compose_domains[$this->serviceName] ?? [];
             $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
             $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
             $this->preview->save();
@@ -52,7 +53,7 @@ class PreviewsCompose extends Component
         try {
             $this->authorize('update', $this->preview->application);
 
-            $domains = collect(json_decode($this->preview->application->docker_compose_domains)) ?? collect();
+            $domains = collect(json_decode($this->preview->application->docker_compose_domains, true) ?: []);
             $domain = $domains->first(function ($_, $key) {
                 return $key === $this->serviceName;
             });
@@ -91,7 +92,8 @@ class PreviewsCompose extends Component
             // Save the generated domain
             $this->domain = $preview_fqdn;
             $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
-            $docker_compose_domains = json_decode($docker_compose_domains, true);
+            $docker_compose_domains = json_decode($docker_compose_domains, true) ?: [];
+            $docker_compose_domains[$this->serviceName] = $docker_compose_domains[$this->serviceName] ?? [];
             $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
             $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
             $this->preview->save();
