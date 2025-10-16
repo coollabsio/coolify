@@ -26,7 +26,8 @@ class EditDomain extends Component
 
     public function mount()
     {
-        $this->application = ServiceApplication::find($this->applicationId);
+        $this->application = ServiceApplication::query()->findOrFail($this->applicationId);
+        $this->authorize('view', $this->application);
         $this->syncData(false);
     }
 
@@ -49,6 +50,7 @@ class EditDomain extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
             $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
             $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
