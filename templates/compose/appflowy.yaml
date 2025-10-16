@@ -7,9 +7,9 @@
 
 services:
   nginx:
-    image: nginx:latest
+    image: nginx:1.29.2
     environment:
-      - SERVICE_URL_BACKEND
+      - SERVICE_URL_ADMIN
     volumes:
       - type: bind
         source: ./nginx/nginx.conf
@@ -42,10 +42,13 @@ services:
                   # Backend services
                   set $appflowy_cloud_backend "http://appflowy_cloud:8000";
                   set $gotrue_backend "http://gotrue:9999";
+                  set $admin_frontend_backend "http://admin_frontend:3000";
                   # GoTrue Authentication Service
                   location /gotrue/ {
                       proxy_pass $gotrue_backend;
+
                       rewrite ^/gotrue(/.*)$ $1 break;
+                      
                       # Allow headers like redirect_to to be handed over to the gotrue
                       # for correct redirecting
                       proxy_set_header Host $http_host;
@@ -53,8 +56,9 @@ services:
                   }
 
                   # WebSocket endpoint - handle both /ws and /ws/v2
-                  location ~ ^/ws(/.*)?$ {
+                  location /ws {
                       proxy_pass $appflowy_cloud_backend;
+
                       proxy_http_version 1.1;
                       proxy_set_header Upgrade $http_upgrade;
                       proxy_set_header Connection "Upgrade";
@@ -68,8 +72,6 @@ services:
                   # API endpoints
                   location /api {
                       proxy_pass $appflowy_cloud_backend;
-
-                      # Headers
                       proxy_set_header X-Request-Id $request_id;
                       proxy_set_header Host $http_host;
 
@@ -113,6 +115,33 @@ services:
                       }
                   }
 
+                  # Admin Frontend
+                  # Optional Module, comment this section if you did not deploy admin_frontend in docker-compose.yml
+                  location /console {
+                      proxy_pass $admin_frontend_backend;
+
+                      proxy_set_header X-Scheme $scheme;
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+
+                      proxy_http_version 1.1;
+                      proxy_set_header Connection "";
+
+                      proxy_buffering off;
+                      proxy_cache off;
+
+                      proxy_read_timeout 60s;
+                      proxy_connect_timeout 60s;
+                      proxy_send_timeout 60s;
+                  }
+
+                  # Redirect root path to /console
+                  location = / {
+                      return 301 /console;
+                  }
+
                   # Health check endpoint
                   location /health {
                       access_log off;
@@ -124,6 +153,7 @@ services:
     depends_on:
       - appflowy_cloud
       - gotrue
+      - admin_frontend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
@@ -134,31 +164,22 @@ services:
   appflowy_web:
     environment:
       - SERVICE_URL_APPFLOWYWEB
-      - APPFLOWY_BASE_URL=${SERVICE_URL_CLOUD}
-      - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_GOTRUE}
-      - APPFLOWY_WS_BASE_URL=${SERVICE_URL_CLOUD}/ws/v2
-    image: appflowyinc/appflowy_web:latest
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
+      - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
+      - APPFLOWY_WS_BASE_URL=${SERVICE_URL_ADMIN}/ws/v2
+    image: appflowyinc/appflowy_web:0.9.132
     depends_on:
       - appflowy_cloud
 
   appflowy_cloud:
-    image: appflowyinc/appflowy_cloud:latest
-    labels:
-      - "traefik.http.middlewares.appflowy-cors.headers.customRequestHeaders.X-Request-Id={{.RequestID}}"
-      - "traefik.http.middlewares.appflowy-cors.headers.accessControlAllowMethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
-      - "traefik.http.middlewares.appflowy-cors.headers.accessControlAllowHeaders=Content-Type,Authorization,Accept,Client-Version,Device-Id"
-      - "traefik.http.middlewares.appflowy-cors.headers.accessControlMaxAge=3600"
-      - "traefik.http.middlewares.appflowy-cors.headers.accessControlAllowOriginList=*"
-      - "traefik.http.middlewares.appflowy-cors.headers.addvaryheader=true"
+    image: appflowyinc/appflowy_cloud:0.9.149
     environment:
-      - SERVICE_URL_CLOUD_8000
       - RUST_LOG=${RUST_LOG:-info}
-      - APPFLOWY_BASE_URL=${SERVICE_URL_CLOUD}
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
       - APPFLOWY_ENVIRONMENT=production
       - APPFLOWY_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
       - APPFLOWY_REDIS_URI=redis://redis:6379
       - APPFLOWY_GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - APPFLOWY_GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
       - APPFLOWY_GOTRUE_BASE_URL=http://gotrue:9999
       - APPFLOWY_S3_CREATE_BUCKET=${APPFLOWY_S3_CREATE_BUCKET:-true}
       - APPFLOWY_S3_USE_MINIO=true
@@ -179,6 +200,12 @@ services:
       - AI_SERVER_PORT=5001
       - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
       - APPFLOWY_WEB_URL=${SERVICE_URL_APPFLOWYWEB}
+    healthcheck:
+      test: "curl --fail http://127.0.0.1:8000/api/health || exit 1"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    
     depends_on:
       gotrue:
         condition: service_healthy
@@ -188,9 +215,8 @@ services:
         condition: service_started
 
   gotrue:
-    image: appflowyinc/gotrue:latest
+    image: appflowyinc/gotrue:0.9.149
     environment:
-      - SERVICE_URL_GOTRUE_9999
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
       - PORT=9999
@@ -202,7 +228,7 @@ services:
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
       - GOTRUE_DB_DRIVER=postgres
-      - API_EXTERNAL_URL=${SERVICE_URL_GOTRUE}
+      - API_EXTERNAL_URL=${SERVICE_URL_ADMIN}/gotrue
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}?search_path=auth
       - GOTRUE_SMTP_HOST=${GOTRUE_SMTP_HOST}
       - GOTRUE_SMTP_PORT=${GOTRUE_SMTP_PORT:-587}
@@ -226,13 +252,10 @@ services:
       retries: 12
 
   admin_frontend:
-    image: appflowyinc/admin_frontend:latest
+    image: appflowyinc/admin_frontend:0.9.149
     environment:
-      - SERVICE_URL_ADMINFRONTEND_3000
-      - RUST_LOG=info
-      - ADMIN_FRONTEND_REDIS_URL=redis://redis:6379
-      - ADMIN_FRONTEND_GOTRUE_URL=http://gotrue:9999
-      - ADMIN_FRONTEND_APPFLOWY_CLOUD_URL=http://appflowy_cloud:8000
+      - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
     depends_on:
       gotrue:
         condition: service_healthy
@@ -240,7 +263,7 @@ services:
         condition: service_started
 
   ai:
-    image: appflowyinc/appflowy_ai:latest
+    image: appflowyinc/appflowy_ai:0.9.149
     environment:
       - OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
       - AI_SERVER_PORT=5001
@@ -265,7 +288,7 @@ services:
         condition: service_healthy
 
   appflowy_worker:
-    image: appflowyinc/appflowy_worker:latest
+    image: appflowyinc/appflowy_worker:0.9.149
     environment:
       - RUST_LOG=info
       - APPFLOWY_ENVIRONMENT=production
@@ -293,16 +316,16 @@ services:
         condition: service_started
 
   minio:
-    image: minio/minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
       timeout: 20s
-      retries: 10
+      retries: 3
     volumes:
       # Coolify will manage this named volume for persistent object storage.
       - minio_data:/data
@@ -324,7 +347,7 @@ services:
       retries: 12
 
   redis:
-    image: redis
+    image: redis:8.2.2-alpine3.22
     volumes:
       - "redis_data:/data"
     healthcheck:
