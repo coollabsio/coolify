@@ -15,6 +15,21 @@ class ApplicationSeeder extends Seeder
     public function run(): void
     {
         Application::create([
+            'name' => 'Docker Compose Example',
+            'repository_project_id' => 603035348,
+            'git_repository' => 'coollabsio/coolify-examples',
+            'git_branch' => 'v4.x',
+            'base_directory' => '/docker-compose',
+            'docker_compose_location' => 'docker-compose-test.yaml',
+            'build_pack' => 'dockercompose',
+            'ports_exposes' => '80',
+            'environment_id' => 1,
+            'destination_id' => 0,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => 1,
+            'source_type' => GithubApp::class,
+        ]);
+        Application::create([
             'name' => 'NodeJS Fastify Example',
             'fqdn' => 'http://nodejs.127.0.0.1.sslip.io',
             'repository_project_id' => 603035348,
