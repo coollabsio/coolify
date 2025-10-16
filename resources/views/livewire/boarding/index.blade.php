@@ -67,11 +67,15 @@
                         </div>
                     </div>
 
-                    <div class="flex justify-center pt-4">
+                    <div class="flex flex-col items-center gap-3 pt-4">
                         <x-forms.button class="justify-center px-12 py-4 text-lg font-bold box-boarding"
                             wire:click="explanation">
-                            Start Setup
+                            Let's go!
                         </x-forms.button>
+                        <button wire:click="skipBoarding"
+                            class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
+                            Skip Setup
+                        </button>
                     </div>
                 </div>
             @elseif ($currentState === 'explanation')
@@ -161,34 +165,36 @@
                                 </div>
                             </button>
                             @can('viewAny', App\Models\CloudProviderToken::class)
-                                <x-modal-input title="Connect a Hetzner Server" isFullWidth>
-                                    <x-slot:content>
-                                        <div
-                                            class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
-                                            <div class="flex flex-col gap-4 text-left">
-                                                <div class="flex items-center justify-between">
-                                                    <svg class="size-10" viewBox="0 0 200 200"
-                                                        xmlns="http://www.w3.org/2000/svg">
-                                                        <rect width="200" height="200" fill="#D50C2D" rx="8" />
-                                                        <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z"
-                                                            fill="white" />
-                                                    </svg>
-                                                    <span
-                                                        class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
-                                                        Recommended
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <h3 class="text-xl font-bold mb-2">Hetzner Cloud</h3>
-                                                    <p class="text-sm dark:text-neutral-400">
-                                                        Deploy servers directly from your Hetzner Cloud account.
-                                                    </p>
+                                @if ($currentState === 'select-server-type')
+                                    <x-modal-input title="Connect a Hetzner Server" isFullWidth>
+                                        <x-slot:content>
+                                            <div
+                                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
+                                                <div class="flex flex-col gap-4 text-left">
+                                                    <div class="flex items-center justify-between">
+                                                        <svg class="size-10" viewBox="0 0 200 200"
+                                                            xmlns="http://www.w3.org/2000/svg">
+                                                            <rect width="200" height="200" fill="#D50C2D" rx="8" />
+                                                            <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z"
+                                                                fill="white" />
+                                                        </svg>
+                                                        <span
+                                                            class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
+                                                            Recommended
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="text-xl font-bold mb-2">Hetzner Cloud</h3>
+                                                        <p class="text-sm dark:text-neutral-400">
+                                                            Deploy servers directly from your Hetzner Cloud account.
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </x-slot:content>
-                                    <livewire:server.new.by-hetzner :private_keys="$this->privateKeys" :limit_reached="false" />
-                                </x-modal-input>
+                                        </x-slot:content>
+                                        <livewire:server.new.by-hetzner :private_keys="$this->privateKeys" :limit_reached="false" />
+                                    </x-modal-input>
+                                @endif
                             @endcan
                         </div>
 
