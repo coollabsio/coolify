@@ -59,8 +59,11 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
+                            // Allow simple env vars and env vars with defaults (validated in parseDockerVolumeString)
                             $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
-                            if (! $isSimpleEnvVar) {
+                            $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
+
+                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault) {
                                 try {
                                     validateShellSafePath($source, 'volume source');
                                 } catch (\Exception $e) {

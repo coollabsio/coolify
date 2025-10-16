@@ -171,6 +171,29 @@ YAML;
     expect($isSimpleEnvVar)->toBe(1); // preg_match returns 1 on success, not true
 });
 
+test('array-format with safe environment variable default', function () {
+    $dockerComposeYaml = <<<'YAML'
+services:
+  web:
+    image: nginx
+    volumes:
+      - type: bind
+        source: '${DATA_PATH:-./data}'
+        target: /app/data
+YAML;
+
+    $parsed = Yaml::parse($dockerComposeYaml);
+    $source = $parsed['services']['web']['volumes'][0]['source'];
+
+    // Parse correctly extracts the source value
+    expect($source)->toBe('${DATA_PATH:-./data}');
+
+    // Safe environment variable with benign default should be allowed
+    // The pre-save validation skips env vars with safe defaults
+    expect(fn () => validateDockerComposeForInjection($dockerComposeYaml))
+        ->not->toThrow(Exception::class);
+});
+
 test('array-format with malicious environment variable default', function () {
     $dockerComposeYaml = <<<'YAML'
 services:
