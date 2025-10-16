@@ -1,0 +1,34 @@
+name: Cleanup Untagged GHCR Images
+
+on:
+  workflow_dispatch: # Allow manual trigger
+  schedule:
+    - cron: '0 */6 * * *' # Run every 6 hours to handle large volume (16k+ images)
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  IMAGE_NAME: "coollabsio/coolify"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        # Run 5 batches in parallel (5 x 100 = 500 versions per run)
+        batch: [1, 2, 3, 4, 5]
+    steps:
+      - name: Delete untagged images (batch ${{ matrix.batch }})
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'coolify'
+          package-type: 'container'
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: 'true'
+        continue-on-error: true # Continue even if some batches fail
+
+      - name: Wait between batches
+        if: matrix.batch < 5
+        run: sleep 10
