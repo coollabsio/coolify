@@ -79,8 +79,14 @@ class Show extends Component
     public function mount()
     {
         try {
-            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
+            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid(request()->private_key_uuid)->firstOrFail();
+
+            // Explicit authorization check - will throw 403 if not authorized
+            $this->authorize('view', $this->private_key);
+
             $this->syncData(false);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            abort(403, 'You do not have permission to view this private key.');
         } catch (\Throwable) {
             abort(404);
         }

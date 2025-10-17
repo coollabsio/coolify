@@ -82,9 +82,10 @@ class PrivateKey extends BaseModel
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
+        $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
-        return self::whereTeamId(currentTeam()->id)->select($selectArray->all());
+        return self::whereTeamId($teamId)->select($selectArray->all());
     }
 
     public static function validatePrivateKey($privateKey)
