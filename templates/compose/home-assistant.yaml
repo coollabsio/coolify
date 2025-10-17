@@ -16,7 +16,6 @@ services:
       - homeassistant-config:/config
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
-
       - type: bind
         source: ./configuration.yaml
         target: /config/configuration.yaml
@@ -33,10 +32,6 @@ services:
               - 192.168.0.0/16
             ip_ban_enabled: true
             login_attempts_threshold: 5
-
-          automation: !include automations.yaml
-          script: !include scripts.yaml
-          scene: !include scenes.yaml
     privileged: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123"]
