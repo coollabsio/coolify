@@ -4,7 +4,7 @@
 [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
 
 
-![Release](https://yesiamworking.com/stats/coollabsio/coolify?compare=v4.0.0-beta.435...latestRelease)
+![Release](https://yesiamworking.com/stats/coollabsio/coolify?compare=v4.0.0-beta.435...latestRelease&style=badge)
 
 
 # About the Project
