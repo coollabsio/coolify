@@ -50,7 +50,7 @@ x-shared-env: &shared-api-env
 
 services:
   opnform-api:
-    image: jhumanj/opnform-api:latest
+    image: jhumanj/opnform-api:1.9.7
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -77,7 +77,7 @@ services:
       start_period: 60s
 
   api-worker:
-    image: jhumanj/opnform-api:latest
+    image: jhumanj/opnform-api:1.9.7
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -97,7 +97,7 @@ services:
       start_period: 30s
   
   api-scheduler:
-    image: jhumanj/opnform-api:latest
+    image: jhumanj/opnform-api:1.9.7
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -117,7 +117,7 @@ services:
       start_period: 70s # Allow time for first scheduled run and cache write
 
   opnform-ui:
-    image: jhumanj/opnform-client:latest
+    image: jhumanj/opnform-client:1.9.6
     environment:
       - NUXT_PUBLIC_APP_URL=/
       - NUXT_PUBLIC_API_BASE=/api
@@ -163,7 +163,7 @@ services:
   # The nginx reverse proxy.
   # used for reverse proxying the API service and Web service.
   nginx:
-    image: nginx:latest
+    image: nginx:1.29.2
     volumes:
       - type: bind
         source: ./nginx/nginx.conf.template
