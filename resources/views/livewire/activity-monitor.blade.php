@@ -15,6 +15,7 @@
         <div x-data="{
             autoScrollEnabled: true,
             observer: null,
+            scrollHandler: null,
             scrollToBottom() {
                 if (this.autoScrollEnabled) {
                     this.$el.scrollTop = this.$el.scrollHeight;
@@ -31,22 +32,33 @@
                 } else {
                     this.autoScrollEnabled = false;
                 }
+            },
+            cleanup() {
+                if (this.observer) {
+                    this.observer.disconnect();
+                    this.observer = null;
+                }
+                if (this.scrollHandler) {
+                    this.$el.removeEventListener('scroll', this.scrollHandler);
+                    this.scrollHandler = null;
+                }
             }
         }" x-init="// Initial scroll
         $nextTick(() => scrollToBottom());
-        
+
         // Add scroll event listener
-        $el.addEventListener('scroll', () => handleScroll());
-        
+        this.scrollHandler = () => handleScroll();
+        $el.addEventListener('scroll', this.scrollHandler);
+
         // Set up mutation observer to watch for content changes
-        observer = new MutationObserver(() => {
+        this.observer = new MutationObserver(() => {
             $nextTick(() => scrollToBottom());
         });
-        observer.observe($el, {
+        this.observer.observe($el, {
             childList: true,
             subtree: true,
             characterData: true
-        });" x-destroy="observer && observer.disconnect()"
+        });" x-destroy="cleanup()"
             @class([
                 'flex flex-col w-full px-4 py-2 overflow-y-auto bg-white border border-solid rounded-sm dark:text-white dark:bg-coolgray-100 scrollbar border-neutral-300 dark:border-coolgray-300',
                 'flex-1 min-h-0' => $fullHeight,

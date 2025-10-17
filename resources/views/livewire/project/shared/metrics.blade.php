@@ -23,7 +23,28 @@
                 <option value="10080">1 week</option>
                 <option value="43200">30 days</option>
             </x-forms.select>
-            <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()"
+            <div @if ($poll) wire:poll.5000ms='pollData' @endif x-data="{
+                destroy() {
+                    // Remove Livewire event listeners
+                    if (window.cpuChartHandler_{!! $chartId !!}) {
+                        Livewire.off('refreshChartData-{!! $chartId !!}-cpu', window.cpuChartHandler_{!! $chartId !!});
+                        window.cpuChartHandler_{!! $chartId !!} = null;
+                    }
+                    if (window.memoryChartHandler_{!! $chartId !!}) {
+                        Livewire.off('refreshChartData-{!! $chartId !!}-memory', window.memoryChartHandler_{!! $chartId !!});
+                        window.memoryChartHandler_{!! $chartId !!} = null;
+                    }
+                    // Destroy ApexCharts instances to free memory
+                    if (window.serverCpuChart) {
+                        window.serverCpuChart.destroy();
+                        window.serverCpuChart = null;
+                    }
+                    if (window.serverMemoryChart) {
+                        window.serverMemoryChart.destroy();
+                        window.serverMemoryChart = null;
+                    }
+                }
+            }" x-init="$wire.loadData()"
                 class="pt-5">
                 <h4>CPU Usage</h4>
                 <div wire:ignore id="{!! $chartId !!}-cpu"></div>
@@ -111,11 +132,14 @@
                              show: false
                          }
                     }
-                     const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`), optionsServerCpu);
-                     serverCpuChart.render();
-                     Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
+                     window.serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`), optionsServerCpu);
+                     window.serverCpuChart.render();
+
+                     // Store listener reference for cleanup
+                     const cpuChartHandler = (chartData) => {
                          checkTheme();
-                          serverCpuChart.updateOptions({
+                         if (window.serverCpuChart) {
+                          window.serverCpuChart.updateOptions({
                               series: [{
                                   data: chartData[0].seriesData,
                               }],
@@ -148,7 +172,12 @@
                                  }
                              }
                          });
-                     });
+                         }
+                     };
+
+                     Livewire.on('refreshChartData-{!! $chartId !!}-cpu', cpuChartHandler);
+                     // Store in global scope for cleanup
+                     window.cpuChartHandler_{!! $chartId !!} = cpuChartHandler;
                 </script>
 
                 <h4>Memory Usage</h4>
@@ -243,12 +272,15 @@
                              show: false
                          }
                     }
-                     const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
+                     window.serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
                          optionsServerMemory);
-                     serverMemoryChart.render();
-                     Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
+                     window.serverMemoryChart.render();
+
+                     // Store listener reference for cleanup
+                     const memoryChartHandler = (chartData) => {
                          checkTheme();
-                          serverMemoryChart.updateOptions({
+                         if (window.serverMemoryChart) {
+                          window.serverMemoryChart.updateOptions({
                               series: [{
                                   data: chartData[0].seriesData,
                               }],
@@ -282,7 +314,12 @@
                                  }
                              }
                          });
-                     });
+                         }
+                     };
+
+                     Livewire.on('refreshChartData-{!! $chartId !!}-memory', memoryChartHandler);
+                     // Store in global scope for cleanup
+                     window.memoryChartHandler_{!! $chartId !!} = memoryChartHandler;
                 </script>
             </div>
             </div>

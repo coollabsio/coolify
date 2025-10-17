@@ -9,7 +9,28 @@
             <h2>Metrics</h2>
             <div class="pb-4">Basic metrics for your server.</div>
             @if ($server->isMetricsEnabled())
-                <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
+                <div @if ($poll) wire:poll.5000ms='pollData' @endif x-data="{
+                    destroy() {
+                        // Remove Livewire event listeners
+                        if (window.cpuChartHandler_{!! $chartId !!}) {
+                            Livewire.off('refreshChartData-{!! $chartId !!}-cpu', window.cpuChartHandler_{!! $chartId !!});
+                            window.cpuChartHandler_{!! $chartId !!} = null;
+                        }
+                        if (window.memoryChartHandler_{!! $chartId !!}) {
+                            Livewire.off('refreshChartData-{!! $chartId !!}-memory', window.memoryChartHandler_{!! $chartId !!});
+                            window.memoryChartHandler_{!! $chartId !!} = null;
+                        }
+                        // Destroy ApexCharts instances
+                        if (window.serverCpuChart_{!! $chartId !!}) {
+                            window.serverCpuChart_{!! $chartId !!}.destroy();
+                            window.serverCpuChart_{!! $chartId !!} = null;
+                        }
+                        if (window.serverMemoryChart_{!! $chartId !!}) {
+                            window.serverMemoryChart_{!! $chartId !!}.destroy();
+                            window.serverMemoryChart_{!! $chartId !!} = null;
+                        }
+                    }
+                }" x-init="$wire.loadData()">
                     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
                         <option value="5">5 minutes (live)</option>
                         <option value="10">10 minutes (live)</option>
@@ -105,13 +126,14 @@
                                 show: false
                             }
                         }
-                        const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
+                        window.serverCpuChart_{!! $chartId !!} = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
                             optionsServerCpu);
-                        serverCpuChart.render();
-                        document.addEventListener('livewire:init', () => {
-                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
-                                checkTheme();
-                                 serverCpuChart.updateOptions({
+                        window.serverCpuChart_{!! $chartId !!}.render();
+
+                        const cpuChartHandler = (chartData) => {
+                            checkTheme();
+                            if (window.serverCpuChart_{!! $chartId !!}) {
+                                window.serverCpuChart_{!! $chartId !!}.updateOptions({
                                      series: [{
                                          data: chartData[0].seriesData,
                                      }],
@@ -144,8 +166,13 @@
                                         }
                                     }
                                 });
-                            });
+                            }
+                        };
+
+                        document.addEventListener('livewire:init', () => {
+                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', cpuChartHandler);
                         });
+                        window.cpuChartHandler_{!! $chartId !!} = cpuChartHandler;
                     </script>
 
                     <div>
@@ -241,13 +268,14 @@
                                     show: false
                                 }
                             }
-                            const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
+                            window.serverMemoryChart_{!! $chartId !!} = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
                                 optionsServerMemory);
-                            serverMemoryChart.render();
-                            document.addEventListener('livewire:init', () => {
-                                Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
-                                    checkTheme();
-                                     serverMemoryChart.updateOptions({
+                            window.serverMemoryChart_{!! $chartId !!}.render();
+
+                            const memoryChartHandler = (chartData) => {
+                                checkTheme();
+                                if (window.serverMemoryChart_{!! $chartId !!}) {
+                                    window.serverMemoryChart_{!! $chartId !!}.updateOptions({
                                          series: [{
                                              data: chartData[0].seriesData,
                                          }],
@@ -281,8 +309,13 @@
                                             }
                                         }
                                     });
-                                });
+                                }
+                            };
+
+                            document.addEventListener('livewire:init', () => {
+                                Livewire.on('refreshChartData-{!! $chartId !!}-memory', memoryChartHandler);
                             });
+                            window.memoryChartHandler_{!! $chartId !!} = memoryChartHandler;
                         </script>
 
                     </div>

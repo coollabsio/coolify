@@ -5,24 +5,27 @@
         realtime: false,
     },
     isDevelopment: {{ isDev() ? 'true' : 'false' }},
+    checkPusherInterval: null,
     init() {
         this.popups.sponsorship = this.shouldShowMonthlyPopup('popupSponsorship');
         this.popups.notification = this.shouldShowMonthlyPopup('popupNotification');
         this.popups.realtime = localStorage.getItem('popupRealtime');
 
         let checkNumber = 1;
-        let checkPusherInterval = null;
-        let checkReconnectInterval = null;
 
         if (!this.popups.realtime) {
-            checkPusherInterval = setInterval(() => {
+            this.checkPusherInterval = setInterval(() => {
                 if (window.Echo) {
                     if (window.Echo.connector.pusher.connection.state === 'connected') {
                         this.popups.realtime = false;
+                        clearInterval(this.checkPusherInterval);
+                        this.checkPusherInterval = null;
                     } else {
                         checkNumber++;
                         if (checkNumber > 5) {
                             this.popups.realtime = true;
+                            clearInterval(this.checkPusherInterval);
+                            this.checkPusherInterval = null;
                             console.error(
                                 'Coolify could not connect to its real-time service. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/knowledge-base/cloudflare/tunnels/overview) or get help on Discord (https://coollabs.io/discord).)'
                             );
@@ -31,6 +34,12 @@
                     }
                 }
             }, 2000);
+        }
+    },
+    destroy() {
+        if (this.checkPusherInterval) {
+            clearInterval(this.checkPusherInterval);
+            this.checkPusherInterval = null;
         }
     },
     shouldShowMonthlyPopup(storageKey) {

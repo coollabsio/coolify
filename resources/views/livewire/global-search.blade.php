@@ -111,9 +111,10 @@
     },
     init() {
         // Listen for reset index event from Livewire
-        Livewire.on('reset-selected-index', () => {
+        this.resetIndexHandler = () => {
             this.selectedIndex = -1;
-        });
+        };
+        Livewire.on('reset-selected-index', this.resetIndexHandler);
 
         this.$watch('searchQuery', (value) => {
             this.selectedIndex = -1;
@@ -220,11 +221,17 @@
 
         // Cleanup on component destroy
         this.$el.addEventListener('alpine:destroy', () => {
+            // Remove keyboard event listeners
             window.removeEventListener('open-global-search', openGlobalSearchHandler);
             document.removeEventListener('keydown', slashKeyHandler);
             document.removeEventListener('keydown', cmdKHandler);
             document.removeEventListener('keydown', escapeKeyHandler);
             document.removeEventListener('keydown', arrowKeyHandler);
+
+            // Remove Livewire event listener
+            if (this.resetIndexHandler) {
+                Livewire.off('reset-selected-index', this.resetIndexHandler);
+            }
         });
 
         // Watch for auto-open resource
