@@ -6,6 +6,77 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Implement TrustHosts middleware to handle FQDN and IP address trust logic
+- Implement TrustHosts middleware to handle FQDN and IP address trust logic
+- Allow safe environment variable defaults in array-format volumes
+- Add signoz template
+- *(signoz)* Replace png icon by svg icon
+- *(signoz)* Remove explicit 'networks' setting
+- *(signoz)* Add predefined environment variables to configure Telemetry, SMTP and email sending for Alert Manager
+- *(signoz)* Generate URLs for `otel-collector` service
+- *(signoz)* Update documentation link
+- *(signoz)* Add healthcheck to otel-collector service
+- *(signoz)* Use latest tag instead of hardcoded versions
+- *(signoz)* Remove redundant users.xml volume from clickhouse container
+- *(signoz)* Replace clickhouse' config.xml volume with simpler configuration
+- *(signoz)* Remove deprecated parameters of signoz container
+- *(signoz)* Remove volumes from signoz.yaml
+- *(signoz)* Assume there is a single zookeeper container
+- *(signoz)* Update Clickhouse config to include all settings required by Signoz
+- *(signoz)* Update config.xml and users.xml to ensure clickhouse boots correctly
+- *(signoz)* Update otel-collector configuration to match upstream
+- *(signoz)* Fix otel-collector config for version v0.128.0
+- *(signoz)* Remove unecessary port mapping for otel-collector
+- *(signoz)* Add SIGNOZ_JWT_SECRET env var generation
+- *(signoz)* Upgrade clickhouse image to 25.5.6
+- *(signoz)* Use latest tag for signoz/zookeeper
+- *(signoz)* Update variables for SMTP configuration
+- *(signoz)* Replace deprecated `TELEMETRY_ENABLED` by `SIGNOZ_STATSREPORTER_ENABLED`
+- *(signoz)* Pin service image tags and `exclude_from_hc` flag to services excluded from health checks
+- *(templates)* Add SMTP configuration to ente-photos compose templates
+- *(templates)* Add SMTP encryption configuration to ente-photos compose templates
+
+### 🐛 Bug Fixes
+
+- Use wasChanged() instead of isDirty() in updated hooks
+- Prevent command injection in git ls-remote operations
+- Handle null environment variable values in bash escaping
+- Critical privilege escalation in team invitation system
+- Add authentication context to TeamPolicyTest
+- Ensure negative cache results are stored in TrustHosts middleware
+- Use wasChanged() instead of isDirty() in updated hook
+- Prevent command injection in Docker Compose parsing - add pre-save validation
+- Use canonical parser for Windows path validation
+- Correct variable name typo in generateGitLsRemoteCommands method
+- Update version numbers to 4.0.0-beta.436 and 4.0.0-beta.437
+- Ensure authorization checks are in place for viewing and updating the application
+- Ensure authorization check is performed during component mount
+- *(signoz)* Remove example secrets to avoid triggering GitGuardian
+- *(signoz)* Remove hardcoded container names
+- *(signoz)* Remove HTTP collector FQDN in otel-collector
+- *(n8n)* Add DB_SQLITE_POOL_SIZE environment variable for configuration
+
+### 🚜 Refactor
+
+- Improve validation error handling and coding standards
+- Preserve exception chain in validation error handling
+- Harden and deduplicate validateShellSafePath
+- Replace random ID generation with Cuid2 for unique HTML IDs in form components
+
+### 🧪 Testing
+
+- Add coverage for newline and tab rejection in volume strings
+
+### ⚙️ Miscellaneous Tasks
+
+- *(signoz)* Remove unused ports
+- *(signoz)* Bump version to 0.77.0
+- *(signoz)* Bump version to 0.78.1
+
+## [4.0.0-beta.435] - 2025-10-15
+
+### 🚀 Features
+
 - *(docker)* Enhance Docker image handling with new validation and parsing logic
 - *(docker)* Improve Docker image submission logic with enhanced parsing
 - *(docker)* Refine Docker image processing in application creation
@@ -204,6 +275,7 @@ All notable changes to this project will be documented in this file.
 - *(sync)* Create AI Instructions Synchronization Guide and update CLAUDE.md references
 - *(database-patterns)* Add critical note on mass assignment protection for new columns
 - Clarify cloud-init script compatibility
+- Update changelog
 - Update changelog
 
 ### 🎨 Styling
