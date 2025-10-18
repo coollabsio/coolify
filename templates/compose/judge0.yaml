@@ -12,6 +12,7 @@ x-logging: &default-logging
 services:
   judge0:
     image: judge0/judge0:1.13.1
+    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/server"]
     privileged: true
     environment:
       - SERVICE_FQDN_JUDGE0_2358
@@ -22,6 +23,8 @@ services:
       - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - AUTHZ_TOKEN=${SERVICE_PASSWORD_AUTHZ}
+      - ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=true
+      - ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,7 +40,7 @@ services:
 
   worker:
     image: judge0/judge0:1.13.1
-    command: ["./scripts/workers"]
+    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/workers"]
     privileged: true
     environment:
       - REDIS_HOST=${COOLIFY_REDIS_HOST:-redis}
@@ -47,6 +50,8 @@ services:
       - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - AUTHZ_TOKEN=${SERVICE_PASSWORD_AUTHZ}
+      - ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=true
+      - ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=true
     depends_on:
       postgres:
         condition: service_healthy
