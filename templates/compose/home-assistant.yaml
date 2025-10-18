@@ -14,7 +14,6 @@ services:
       - DISABLE_JEMALLOC=${DISABLE_JEMALLOC:-false}
     volumes:
       - homeassistant-config:/config
-      - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro
       - type: bind
         source: ./configuration.yaml
