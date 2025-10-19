@@ -136,6 +136,7 @@ class Server extends BaseModel
                 $destination->delete();
             });
             $server->settings()->delete();
+            $server->sslCertificates()->delete();
         });
     }
 
@@ -161,7 +162,11 @@ class Server extends BaseModel
         'user',
         'description',
         'private_key_id',
+        'cloud_provider_token_id',
         'team_id',
+        'hetzner_server_id',
+        'hetzner_server_status',
+        'is_validating',
     ];
 
     protected $guarded = [];
@@ -889,6 +894,16 @@ $schema://$host {
         return $this->belongsTo(PrivateKey::class);
     }
 
+    public function cloudProviderToken()
+    {
+        return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function sslCertificates()
+    {
+        return $this->hasMany(SslCertificate::class);
+    }
+
     public function muxFilename()
     {
         return 'mux_'.$this->uuid;
@@ -1327,7 +1342,7 @@ $schema://$host {
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;

@@ -131,6 +131,161 @@ class DeployController extends Controller
         return response()->json($this->removeSensitiveData($deployment));
     }
 
+    #[OA\Post(
+        summary: 'Cancel',
+        description: 'Cancel a deployment by UUID.',
+        path: '/deployments/{uuid}/cancel',
+        operationId: 'cancel-deployment-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Deployment UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Deployment cancelled successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Deployment cancelled successfully.'],
+                                'deployment_uuid' => ['type' => 'string', 'example' => 'cm37r6cqj000008jm0veg5tkm'],
+                                'status' => ['type' => 'string', 'example' => 'cancelled-by-user'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 400,
+                description: 'Deployment cannot be cancelled (already finished/failed/cancelled).',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Deployment cannot be cancelled. Current status: finished'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'User doesn\'t have permission to cancel this deployment.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'You do not have permission to cancel this deployment.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function cancel_deployment(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        // Find the deployment by UUID
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first();
+        if (! $deployment) {
+            return response()->json(['message' => 'Deployment not found.'], 404);
+        }
+
+        // Check if the deployment belongs to the user's team
+        $servers = Server::whereTeamId($teamId)->pluck('id');
+        if (! $servers->contains($deployment->server_id)) {
+            return response()->json(['message' => 'You do not have permission to cancel this deployment.'], 403);
+        }
+
+        // Check if deployment can be cancelled (must be queued or in_progress)
+        $cancellableStatuses = [
+            \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
+            \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ];
+
+        if (! in_array($deployment->status, $cancellableStatuses)) {
+            return response()->json([
+                'message' => "Deployment cannot be cancelled. Current status: {$deployment->status}",
+            ], 400);
+        }
+
+        // Perform the cancellation
+        try {
+            $deployment_uuid = $deployment->deployment_uuid;
+            $kill_command = "docker rm -f {$deployment_uuid}";
+            $build_server_id = $deployment->build_server_id ?? $deployment->server_id;
+
+            // Mark deployment as cancelled
+            $deployment->update([
+                'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+            ]);
+
+            // Get the server
+            $server = Server::find($build_server_id);
+
+            if ($server) {
+                // Add cancellation log entry
+                $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
+
+                // Check if container exists and kill it
+                $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
+                $containerExists = instant_remote_process([$checkCommand], $server);
+
+                if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
+                    instant_remote_process([$kill_command], $server);
+                    $deployment->addLogEntry('Deployment container stopped.');
+                } else {
+                    $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
+                }
+
+                // Kill running process if process ID exists
+                if ($deployment->current_process_id) {
+                    try {
+                        $processKillCommand = "kill -9 {$deployment->current_process_id}";
+                        instant_remote_process([$processKillCommand], $server);
+                    } catch (\Throwable $e) {
+                        // Process might already be gone
+                    }
+                }
+            }
+
+            return response()->json([
+                'message' => 'Deployment cancelled successfully.',
+                'deployment_uuid' => $deployment->deployment_uuid,
+                'status' => $deployment->status,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to cancel deployment: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
     #[OA\Get(
         summary: 'Deploy',
         description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.',

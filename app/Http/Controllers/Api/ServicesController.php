@@ -235,6 +235,10 @@ class ServicesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_service(Request $request)
@@ -324,9 +328,23 @@ class ServicesController extends Controller
                 });
             }
             if ($oneClickService) {
-                $service_payload = [
+                $dockerComposeRaw = base64_decode($oneClickService);
+
+                // Validate for command injection BEFORE creating service
+                try {
+                    validateDockerComposeForInjection($dockerComposeRaw);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => $e->getMessage(),
+                        ],
+                    ], 422);
+                }
+
+                $servicePayload = [
                     'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
                     'server_id' => $server->id,
@@ -334,9 +352,9 @@ class ServicesController extends Controller
                     'destination_type' => $destination->getMorphClass(),
                 ];
                 if ($oneClickServiceName === 'cloudflared') {
-                    data_set($service_payload, 'connect_to_docker_network', true);
+                    data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = Service::create($service_payload);
+                $service = Service::create($servicePayload);
                 $service->name = "$oneClickServiceName-".$service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
@@ -457,6 +475,18 @@ class ServicesController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
 
             $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
             $instantDeploy = $request->instant_deploy ?? false;
@@ -704,6 +734,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -769,6 +803,19 @@ class ServicesController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+
             $service->docker_compose_raw = $dockerComposeRaw;
         }
 
@@ -954,6 +1001,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_env_by_uuid(Request $request)
@@ -1075,6 +1126,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_bulk_envs(Request $request)
@@ -1190,6 +1245,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]

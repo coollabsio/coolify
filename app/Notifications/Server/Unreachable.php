@@ -82,4 +82,18 @@ class Unreachable extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $url = base_url().'/server/'.$this->server->uuid;
+
+        return [
+            'success' => false,
+            'message' => 'Server unreachable',
+            'event' => 'server_unreachable',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => $url,
+        ];
+    }
 }

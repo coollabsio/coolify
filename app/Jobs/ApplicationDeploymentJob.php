@@ -484,9 +484,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
         $this->generate_image_names();
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
+
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -1310,12 +1319,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function generate_buildtime_environment_variables()
     {
+        if (isDev()) {
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] Generating build-time environment variables');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+        }
+
         $envs = collect([]);
         $coolify_envs = $this->generate_coolify_env_variables();
 
         // Add COOLIFY variables
         $coolify_envs->each(function ($item, $key) use ($envs) {
-            $envs->push($key.'='.$item);
+            $envs->push($key.'='.escapeBashEnvValue($item));
         });
 
         // Add SERVICE_NAME variables for Docker Compose builds
@@ -1329,7 +1344,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.escapeBashEnvValue($serviceName));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
@@ -1342,8 +1357,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
                     }
                 }
             } else {
@@ -1351,7 +1366,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id)));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -1364,8 +1379,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
                     }
                 }
             }
@@ -1387,7 +1402,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For literal/multiline vars, real_value includes quotes that we need to remove
+                if ($env->is_literal || $env->is_multiline) {
+                    // Strip outer quotes from real_value and apply proper bash escaping
+                    $value = trim($env->real_value, "'");
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                } else {
+                    // For normal vars, use double quotes to allow $VAR expansion
+                    $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                }
             }
         } else {
             $sorted_environment_variables = $this->application->environment_variables_preview()
@@ -1404,11 +1444,42 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For literal/multiline vars, real_value includes quotes that we need to remove
+                if ($env->is_literal || $env->is_multiline) {
+                    // Strip outer quotes from real_value and apply proper bash escaping
+                    $value = trim($env->real_value, "'");
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                } else {
+                    // For normal vars, use double quotes to allow $VAR expansion
+                    $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$env->real_value}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                    }
+                }
             }
         }
 
         // Return the generated environment variables
+        if (isDev()) {
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry("[DEBUG] Total build-time env variables: {$envs->count()}");
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+        }
+
         return $envs;
     }
 
@@ -1432,9 +1503,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'hidden' => true,
                 ],
             );
-        } elseif ($this->build_pack === 'dockercompose') {
-            // For Docker Compose, create an empty .env file even if there are no build-time variables
-            // This ensures the file exists when referenced in docker-compose commands
+        } elseif ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerfile') {
+            // For Docker Compose and Dockerfile, create an empty .env file even if there are no build-time variables
+            // This ensures the file exists when referenced in build commands
             $this->application_deployment_queue->addLogEntry('Creating empty build-time .env file in /artifacts (no build-time variables defined).', hidden: true);
 
             $this->execute_remote_command(
@@ -1888,9 +1959,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
-            $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
-            $this->application_deployment_queue->commit = $this->commit;
-            $this->application_deployment_queue->save();
+            // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
+            // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
+            // Note: Git warnings can be on the same line as the result (no newline)
+            $lsRemoteOutput = $this->saved_outputs->get('git_commit_sha');
+
+            // Find the part containing a tab (the actual ls-remote result)
+            // Handle cases where warning is on the same line as the result
+            if ($lsRemoteOutput->contains("\t")) {
+                // Get everything from the last occurrence of a valid commit SHA pattern before the tab
+                // A valid commit SHA is 40 hex characters
+                $output = $lsRemoteOutput->value();
+
+                // Extract the line with the tab (actual ls-remote result)
+                preg_match('/\b([0-9a-fA-F]{40})(?=\s*\t)/', $output, $matches);
+
+                if (isset($matches[1])) {
+                    $this->commit = $matches[1];
+                    $this->application_deployment_queue->commit = $this->commit;
+                    $this->application_deployment_queue->save();
+                }
+            }
         }
         $this->set_coolify_variables();
 
@@ -1905,7 +1994,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $importCommands = $this->generate_git_import_commands();
         $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
-        $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
+        $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->commit}) to {$this->basedir}.");
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
@@ -2701,10 +2790,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ]
                 );
             }
+            $publishDir = trim($this->application->publish_directory, '/');
+            $publishDir = $publishDir ? "/{$publishDir}" : '';
             $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
-COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
+COPY --from=$this->build_image_name /app{$publishDir} .
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                 $nginx_config = base64_encode($this->application->custom_nginx_configuration);
@@ -3196,7 +3287,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info');
+            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info', hidden: true);
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),

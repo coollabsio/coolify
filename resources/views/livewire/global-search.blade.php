@@ -14,6 +14,11 @@
             return [];
         }
 
+        // Don't execute search if data is still loading
+        if (this.isLoadingInitialData) {
+            return [];
+        }
+
         const query = this.searchQuery.toLowerCase().trim();
 
         const results = this.allSearchableItems.filter(item => {
@@ -28,6 +33,12 @@
         if (!this.searchQuery || this.searchQuery.length < 1) {
             return [];
         }
+
+        // Don't execute search if data is still loading
+        if (this.isLoadingInitialData) {
+            return [];
+        }
+
         const query = this.searchQuery.toLowerCase().trim();
 
         if (query === 'new') {
@@ -125,13 +136,17 @@
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
                 'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse'
             ];
-
             if (exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
                     const itemSearchText = `new ${item.name}`.toLowerCase();
                     const itemType = `new ${item.type}`.toLowerCase();
-                    return itemSearchText === trimmed || itemType === trimmed ||
-                        (item.type && trimmed.includes(item.type.replace(/-/g, ' ')));
+                    const itemTypeWithSpaces = item.type ? `new ${item.type.replace(/-/g, ' ')}` : '';
+
+                    // Check if trimmed matches exactly or if the item's quickcommand includes this command
+                    return itemSearchText === trimmed ||
+                           itemType === trimmed ||
+                           itemTypeWithSpaces === trimmed ||
+                           (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
                 });
 
                 if (matchingItem) {
@@ -249,24 +264,25 @@
                 <!-- Search input (always visible) -->
                 <div class="relative">
                     <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                        <svg x-show="!isLoadingInitialData" class="w-5 h-5 text-neutral-400" xmlns="http://www.w3.org/2000/svg" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
+                        <svg x-show="!isLoadingInitialData" class="w-5 h-5 text-neutral-400"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         <svg x-show="isLoadingInitialData" x-cloak class="animate-spin h-5 w-5 text-warning"
                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
+                                stroke-width="4">
+                            </circle>
                             <path class="opacity-75" fill="currentColor"
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                             </path>
                         </svg>
                     </div>
                     <input type="text" x-model="searchQuery"
-                        placeholder="Search resources (type new for create things)..." x-ref="searchInput"
-                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })" :disabled="isLoadingInitialData"
-                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed" />
+                        placeholder="Search resources, paths, everything (type new for create)..." x-ref="searchInput"
+                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
+                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning" />
                     <div class="absolute inset-y-0 right-2 flex items-center gap-2 pointer-events-none">
                         <span class="text-xs font-medium text-neutral-400 dark:text-neutral-500">
                             / or ⌘K to focus
@@ -277,22 +293,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- Debug: Show data loaded (temporary) -->
-                {{-- <div x-show="!isLoadingInitialData && searchQuery === '' && allSearchableItems.length > 0" x-cloak
-                    class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden p-6">
-                    <div class="text-center">
-                        <p class="text-sm font-semibold text-green-600 dark:text-green-400">
-                            ✓ Data loaded successfully!
-                        </p>
-                        <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
-                            <span x-text="allSearchableItems.length"></span> searchable items available
-                        </p>
-                        <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1">
-                            Start typing to search...
-                        </p>
-                    </div>
-                </div> --}}
 
                 <!-- Search results (with background) -->
                 <div x-show="searchQuery.length >= 1" x-cloak
@@ -425,7 +425,8 @@
                                                 <button type="button"
                                                     wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $destination['name'] }}
@@ -498,7 +499,8 @@
                                                 <button type="button"
                                                     wire:click="selectProject('{{ $project['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $project['name'] }}
@@ -577,7 +579,8 @@
                                                 <button type="button"
                                                     wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
                                                     class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
+                                                    <div
+                                                        class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $environment['name'] }}
@@ -854,7 +857,7 @@
                         </template>
 
                         <template
-                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource">
+                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
                             <div class="flex items-center justify-center py-12 px-4">
                                 <div class="text-center">
                                     <p class="mt-4 text-sm font-medium text-neutral-900 dark:text-white">

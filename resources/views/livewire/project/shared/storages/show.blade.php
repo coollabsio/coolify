@@ -9,47 +9,47 @@
                     @if (
                         $storage->resource_type === 'App\Models\ServiceApplication' ||
                             $storage->resource_type === 'App\Models\ServiceDatabase')
-                        <x-forms.input id="storage.name" label="Volume Name" required readonly
+                        <x-forms.input id="name" label="Volume Name" required readonly
                             helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
                     @else
-                        <x-forms.input id="storage.name" label="Volume Name" required readonly
+                        <x-forms.input id="name" label="Volume Name" required readonly
                             helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
                     @endif
                     @if ($isService || $startedAt)
-                        <x-forms.input id="storage.host_path" readonly helper="Directory on the host system."
+                        <x-forms.input id="hostPath" readonly helper="Directory on the host system."
                             label="Source Path"
                             helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="storage.mount_path" label="Destination Path"
+                        <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required readonly />
                     @else
-                        <x-forms.input id="storage.host_path" readonly helper="Directory on the host system."
+                        <x-forms.input id="hostPath" readonly helper="Directory on the host system."
                             label="Source Path"
                             helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="storage.mount_path" label="Destination Path"
+                        <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required readonly />
                     @endif
                 </div>
             @else
                 <div class="flex gap-2 items-end w-full">
-                    <x-forms.input id="storage.name" required readonly />
-                    <x-forms.input id="storage.host_path" readonly />
-                    <x-forms.input id="storage.mount_path" required readonly />
+                    <x-forms.input id="name" required readonly />
+                    <x-forms.input id="hostPath" readonly />
+                    <x-forms.input id="mountPath" required readonly />
                 </div>
             @endif
         @else
             @can('update', $resource)
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="storage.name" label="Volume Name" required />
-                        <x-forms.input id="storage.host_path" helper="Directory on the host system." label="Source Path" />
-                        <x-forms.input id="storage.mount_path" label="Destination Path"
+                        <x-forms.input id="name" label="Volume Name" required />
+                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path" />
+                        <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="storage.name" required />
-                        <x-forms.input id="storage.host_path" />
-                        <x-forms.input id="storage.mount_path" required />
+                        <x-forms.input id="name" required />
+                        <x-forms.input id="hostPath" />
+                        <x-forms.input id="mountPath" required />
                     </div>
                 @endif
                 <div class="flex gap-2">
@@ -67,17 +67,17 @@
             @else
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="storage.name" label="Volume Name" required disabled />
-                        <x-forms.input id="storage.host_path" helper="Directory on the host system." label="Source Path"
+                        <x-forms.input id="name" label="Volume Name" required disabled />
+                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path"
                             disabled />
-                        <x-forms.input id="storage.mount_path" label="Destination Path"
+                        <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required disabled />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="storage.name" required disabled />
-                        <x-forms.input id="storage.host_path" disabled />
-                        <x-forms.input id="storage.mount_path" required disabled />
+                        <x-forms.input id="name" required disabled />
+                        <x-forms.input id="hostPath" disabled />
+                        <x-forms.input id="mountPath" required disabled />
                     </div>
                 @endif
             @endcan

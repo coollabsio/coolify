@@ -22,6 +22,8 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public bool $generateExactLabels = false;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -33,7 +35,7 @@ class Proxy extends Component
     }
 
     protected $rules = [
-        'server.settings.generate_exact_labels' => 'required|boolean',
+        'generateExactLabels' => 'required|boolean',
     ];
 
     public function mount()
@@ -41,6 +43,16 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->syncData(false);
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->server->settings->generate_exact_labels = $this->generateExactLabels;
+        } else {
+            $this->generateExactLabels = $this->server->settings->generate_exact_labels ?? false;
+        }
     }
 
     public function getConfigurationFilePathProperty()
@@ -75,6 +87,7 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->validate();
+            $this->syncData(true);
             $this->server->settings->save();
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {

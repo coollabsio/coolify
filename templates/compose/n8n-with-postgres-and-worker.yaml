@@ -7,7 +7,7 @@
 
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n
+    image: docker.n8n.io/n8nio/n8n:1.114.4
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -29,7 +29,9 @@ services:
       - N8N_RUNNERS_ENABLED=true
       - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-true}
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=${N8N_GIT_NODE_DISABLE_BARE_REPOS:-true}
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
     volumes:
       - n8n-data:/home/node/.n8n
     depends_on:
@@ -44,7 +46,7 @@ services:
       retries: 10
 
   n8n-worker:
-    image: docker.n8n.io/n8nio/n8n
+    image: docker.n8n.io/n8nio/n8n:1.114.4
     command: worker
     environment:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
@@ -62,7 +64,9 @@ services:
       - N8N_ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTION}
       - N8N_RUNNERS_ENABLED=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-true}
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=${N8N_GIT_NODE_DISABLE_BARE_REPOS:-true}
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
     volumes:
       - n8n-data:/home/node/.n8n
     healthcheck:

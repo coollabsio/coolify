@@ -54,6 +54,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            // Check Hetzner server status if applicable
+            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
+                $this->checkHetznerStatus();
+            }
+
             // Temporarily disable mux if requested
             if ($this->disableMux) {
                 $this->disableSshMux();
@@ -86,6 +91,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
         } catch (\Throwable $e) {
+
+            Log::error('ServerConnectionCheckJob failed', [
+                'error' => $e->getMessage(),
+                'server_id' => $this->server->id,
+            ]);
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,
@@ -93,6 +103,30 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function checkHetznerStatus(): void
+    {
+        try {
+            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
+            $status = $serverData['status'] ?? null;
+
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Hetzner status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+        if ($this->server->hetzner_server_status !== $status) {
+            $this->server->update(['hetzner_server_status' => $status]);
+            $this->server->hetzner_server_status = $status;
+            if ($status === 'off') {
+                ray('Server is powered off, marking as unreachable');
+                throw new \Exception('Server is powered off');
+            }
+        }
+
     }
 
     private function checkConnection(): bool

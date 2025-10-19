@@ -18,9 +18,18 @@ services:
       - MARIADB_COLLATE=utf8mb4_unicode_ci
     volumes:
       - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c '</dev/tcp/localhost/3306'
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   moodle:
     image: docker.io/bitnamilegacy/moodle:4.3
+    depends_on:
+      - mariadb
     environment:
       - SERVICE_URL_MOODLE_8080
       - MOODLE_DATABASE_HOST=mariadb
@@ -36,5 +45,12 @@ services:
     volumes:
       - moodle-data:/bitnami/moodle
       - moodledata-data:/bitnami/moodledata
-    depends_on:
-      - mariadb
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - "exit(file_exists('/opt/bitnami/moodle/config.php') ? 0 : 1);"
+      interval: 20s
+      timeout: 10s
+      retries: 5

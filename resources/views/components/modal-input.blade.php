@@ -8,8 +8,11 @@
     'content' => null,
     'closeOutside' => true,
     'minWidth' => '36rem',
+    'isFullWidth' => false,
 ])
-<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
+<div x-data="{ modalOpen: false }"
+    x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
+    :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     class="relative w-auto h-auto" wire:ignore>
     @if ($content)
         <div @click="modalOpen=true">
@@ -17,13 +20,13 @@
         </div>
     @else
         @if ($disabled)
-            <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError disabled @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isErrorButton)
-            <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isHighlightedButton)
-            <x-forms.button isHighlighted @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isHighlighted @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @else
-            <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @endif
     @endif
     <template x-teleport="body">
@@ -46,7 +49,7 @@
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"
-                        class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
+                        class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />

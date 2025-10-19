@@ -32,7 +32,7 @@
 }
 
 @utility input-sticky {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility input-sticky-active {
@@ -41,29 +41,29 @@
 
 /* Focus */
 @utility input-focus {
-    @apply focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
 }
 
 /*  input, select before */
 @utility input-select {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-2 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
 }
 
 /* Readonly */
 @utility input {
     @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
-    @apply input-focus;
     @apply input-select;
+    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility select {
     @apply w-full;
-    @apply input-focus;
     @apply input-select;
+    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100;
+    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
 }
 
 @utility alert-success {

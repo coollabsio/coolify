@@ -27,10 +27,9 @@
             @endif
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-                @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
-                type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
+                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
+                wire:loading.attr="disabled"
+                type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
                 @if ($autofocus) x-ref="autofocusInput" @endif>
@@ -39,20 +38,19 @@
     @else
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
-            @if ($id !== 'null') wire:model={{ $id }} @endif
-            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-            wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
+            @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
+            wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
             max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"
             maxlength="{{ $attributes->get('maxlength') }}"
-            @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
+            @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif
-    @error($id)
+    @error($modelBinding)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>
         </label>

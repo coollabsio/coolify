@@ -114,4 +114,28 @@ class TaskFailed extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $data = [
+            'success' => false,
+            'message' => 'Scheduled task failed',
+            'event' => 'task_failed',
+            'task_name' => $this->task->name,
+            'task_uuid' => $this->task->uuid,
+            'output' => $this->output,
+        ];
+
+        if ($this->task->application) {
+            $data['application_uuid'] = $this->task->application->uuid;
+        } elseif ($this->task->service) {
+            $data['service_uuid'] = $this->task->service->uuid;
+        }
+
+        if ($this->url) {
+            $data['url'] = $this->url;
+        }
+
+        return $data;
+    }
 }

@@ -19,6 +19,11 @@ class StartProxy
         if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
             return 'OK';
         }
+        $server->proxy->set('status', 'starting');
+        $server->save();
+        $server->refresh();
+        ProxyStatusChangedUI::dispatch($server->team_id);
+
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
         $configuration = GetProxyConfiguration::run($server);
@@ -64,14 +69,12 @@ class StartProxy
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
-        $server->proxy->set('status', 'starting');
-        $server->save();
-        ProxyStatusChangedUI::dispatch($server->team_id);
 
         if ($async) {
             return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id);
         } else {
             instant_remote_process($commands, $server);
+
             $server->proxy->set('type', $proxyType);
             $server->save();
             ProxyStatusChanged::dispatch($server->id);

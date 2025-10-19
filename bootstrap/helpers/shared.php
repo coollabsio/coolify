@@ -104,6 +104,48 @@ function sanitize_string(?string $input = null): ?string
     return $sanitized;
 }
 
+/**
+ * Validate that a path or identifier is safe for use in shell commands.
+ *
+ * This function prevents command injection by rejecting strings that contain
+ * shell metacharacters or command substitution patterns.
+ *
+ * @param  string  $input  The path or identifier to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'volume source', 'service name')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws \Exception If dangerous characters are detected
+ */
+function validateShellSafePath(string $input, string $context = 'path'): string
+{
+    // List of dangerous shell metacharacters that enable command injection
+    $dangerousChars = [
+        '`' => 'backtick (command substitution)',
+        '$(' => 'command substitution',
+        '${' => 'variable substitution with potential command injection',
+        '|' => 'pipe operator',
+        '&' => 'background/AND operator',
+        ';' => 'command separator',
+        "\n" => 'newline (command separator)',
+        "\r" => 'carriage return',
+        "\t" => 'tab (token separator)',
+        '>' => 'output redirection',
+        '<' => 'input redirection',
+    ];
+
+    // Check for dangerous characters
+    foreach ($dangerousChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new \Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description}). ".
+                'Shell metacharacters are not allowed for security reasons.'
+            );
+        }
+    }
+
+    return $input;
+}
+
 function generate_readme_file(string $name, string $updated_at): string
 {
     $name = sanitize_string($name);
@@ -1285,6 +1327,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                        // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                        if (is_array($serviceLabel)) {
+                            $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                            return false;
+                        }
                         if (! str($serviceLabel)->contains('=')) {
                             $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -1294,6 +1342,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         return $serviceLabel;
                     });
                     foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                        // Convert array values to strings
+                        if (is_array($removedLabel)) {
+                            $removedLabel = (string) collect($removedLabel)->first();
+                        }
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
@@ -1317,6 +1369,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'name' => $serviceName,
                             'service_id' => $resource->id,
                         ])->first();
+                        if (is_null($savedService)) {
+                            $savedService = ServiceDatabase::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        }
                     }
                 } else {
                     if ($isNew) {
@@ -1330,21 +1389,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'name' => $serviceName,
                             'service_id' => $resource->id,
                         ])->first();
-                    }
-                }
-                if (is_null($savedService)) {
-                    if ($isDatabase) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if (is_null($savedService)) {
+                            $savedService = ServiceApplication::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        }
                     }
                 }
 
@@ -2006,6 +2057,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                    // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                    if (is_array($serviceLabel)) {
+                        $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                        return false;
+                    }
                     if (! str($serviceLabel)->contains('=')) {
                         $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -2015,6 +2072,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     return $serviceLabel;
                 });
                 foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                    // Convert array values to strings
+                    if (is_array($removedLabel)) {
+                        $removedLabel = (string) collect($removedLabel)->first();
+                    }
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }

@@ -54,6 +54,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->slackNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
+            $team->webhookNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -258,6 +259,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(PrivateKey::class);
     }
 
+    public function cloudProviderTokens()
+    {
+        return $this->hasMany(CloudProviderToken::class);
+    }
+
     public function sources()
     {
         $sources = collect([]);
@@ -306,5 +312,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);
+    }
+
+    public function webhookNotificationSettings()
+    {
+        return $this->hasOne(WebhookNotificationSettings::class);
     }
 }

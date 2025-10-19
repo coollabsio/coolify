@@ -317,6 +317,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -593,6 +597,224 @@ class DatabasesController extends Controller
         ]);
     }
 
+    #[OA\Post(
+        summary: 'Create Backup',
+        description: 'Create a new scheduled backup configuration for a database',
+        path: '/databases/{uuid}/backups',
+        operationId: 'create-database-backup',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Backup configuration data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['frequency'],
+                    properties: [
+                        'frequency' => ['type' => 'string', 'description' => 'Backup frequency (cron expression or: every_minute, hourly, daily, weekly, monthly, yearly)'],
+                        'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled', 'default' => true],
+                        'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
+                        's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
+                        'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
+                        'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
+                        'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
+                        'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
+                        'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
+                        'database_backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Max storage (MB) for local backups'],
+                        'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Number of backups to retain in S3'],
+                        'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
+                        'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage (MB) for S3 backups'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Backup configuration created successfully',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        'uuid' => ['type' => 'string', 'format' => 'uuid', 'example' => '550e8400-e29b-41d4-a716-446655440000'],
+                        'message' => ['type' => 'string', 'example' => 'Backup configuration created successfully.'],
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_backup(Request $request)
+    {
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        // Validate incoming request is valid JSON
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'frequency' => 'required|string',
+            'enabled' => 'boolean',
+            'save_s3' => 'boolean',
+            'dump_all' => 'boolean',
+            'backup_now' => 'boolean|nullable',
+            's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
+            'databases_to_backup' => 'string|nullable',
+            'database_backup_retention_amount_locally' => 'integer|min:0',
+            'database_backup_retention_days_locally' => 'integer|min:0',
+            'database_backup_retention_max_storage_locally' => 'integer|min:0',
+            'database_backup_retention_amount_s3' => 'integer|min:0',
+            'database_backup_retention_days_s3' => 'integer|min:0',
+            'database_backup_retention_max_storage_s3' => 'integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'UUID is required.'], 404);
+        }
+
+        $uuid = $request->uuid;
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('manageBackups', $database);
+
+        // Validate frequency is a valid cron expression
+        $isValid = validate_cron_expression($request->frequency);
+        if (! $isValid) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['frequency' => ['Invalid cron expression or frequency format.']],
+            ], 422);
+        }
+
+        // Validate S3 storage if save_s3 is true
+        if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid field is required when save_s3 is true.']],
+            ], 422);
+        }
+
+        if ($request->filled('s3_storage_uuid')) {
+            $existsInTeam = S3Storage::ownedByCurrentTeam()->where('uuid', $request->s3_storage_uuid)->exists();
+            if (! $existsInTeam) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                ], 422);
+            }
+        }
+
+        // Check for extra fields
+        $extraFields = array_diff(array_keys($request->all()), $backupConfigFields, ['backup_now']);
+        if (! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $backupData = $request->only($backupConfigFields);
+
+        // Convert s3_storage_uuid to s3_storage_id
+        if (isset($backupData['s3_storage_uuid'])) {
+            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
+            if ($s3Storage) {
+                $backupData['s3_storage_id'] = $s3Storage->id;
+            } elseif ($request->boolean('save_s3')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                ], 422);
+            }
+            unset($backupData['s3_storage_uuid']);
+        }
+
+        // Set default databases_to_backup based on database type if not provided
+        if (! isset($backupData['databases_to_backup']) || empty($backupData['databases_to_backup'])) {
+            if ($database->type() === 'standalone-postgresql') {
+                $backupData['databases_to_backup'] = $database->postgres_db;
+            } elseif ($database->type() === 'standalone-mysql') {
+                $backupData['databases_to_backup'] = $database->mysql_database;
+            } elseif ($database->type() === 'standalone-mariadb') {
+                $backupData['databases_to_backup'] = $database->mariadb_database;
+            }
+        }
+
+        // Add required fields
+        $backupData['database_id'] = $database->id;
+        $backupData['database_type'] = $database->getMorphClass();
+        $backupData['team_id'] = $teamId;
+
+        // Set defaults
+        if (! isset($backupData['enabled'])) {
+            $backupData['enabled'] = true;
+        }
+
+        $backupConfig = ScheduledDatabaseBackup::create($backupData);
+
+        // Trigger immediate backup if requested
+        if ($request->backup_now) {
+            dispatch(new DatabaseBackupJob($backupConfig));
+        }
+
+        return response()->json([
+            'uuid' => $backupConfig->uuid,
+            'message' => 'Backup configuration created successfully.',
+        ], 201);
+    }
+
     #[OA\Patch(
         summary: 'Update',
         description: 'Update a specific backup configuration for a given database, identified by its UUID and the backup ID',
@@ -665,6 +887,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -844,6 +1070,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_postgresql(Request $request)
@@ -907,6 +1137,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_clickhouse(Request $request)
@@ -968,6 +1202,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1032,6 +1270,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_redis(Request $request)
@@ -1094,6 +1336,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1161,6 +1407,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_mariadb(Request $request)
@@ -1227,6 +1477,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_mysql(Request $request)
@@ -1289,6 +1543,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1941,7 +2199,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup configuration and all executions deleted.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup configuration and all executions deleted.'),
                     ]
                 )
             ),
@@ -1951,7 +2209,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup configuration not found.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup configuration not found.'),
                     ]
                 )
             ),
@@ -2065,7 +2323,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup execution deleted.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup execution deleted.'),
                     ]
                 )
             ),
@@ -2075,7 +2333,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup execution not found.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup execution not found.'),
                     ]
                 )
             ),
@@ -2171,17 +2429,18 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'executions' => new OA\Schema(
+                        new OA\Property(
+                            property: 'executions',
                             type: 'array',
                             items: new OA\Items(
                                 type: 'object',
                                 properties: [
-                                    'uuid' => ['type' => 'string'],
-                                    'filename' => ['type' => 'string'],
-                                    'size' => ['type' => 'integer'],
-                                    'created_at' => ['type' => 'string'],
-                                    'message' => ['type' => 'string'],
-                                    'status' => ['type' => 'string'],
+                                    new OA\Property(property: 'uuid', type: 'string'),
+                                    new OA\Property(property: 'filename', type: 'string'),
+                                    new OA\Property(property: 'size', type: 'integer'),
+                                    new OA\Property(property: 'created_at', type: 'string'),
+                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'status', type: 'string'),
                                 ]
                             )
                         ),

@@ -16,6 +16,101 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * Validates a Docker Compose YAML string for command injection vulnerabilities.
+ * This should be called BEFORE saving to database to prevent malicious data from being stored.
+ *
+ * @param  string  $composeYaml  The raw Docker Compose YAML content
+ *
+ * @throws \Exception If the compose file contains command injection attempts
+ */
+function validateDockerComposeForInjection(string $composeYaml): void
+{
+    try {
+        $parsed = Yaml::parse($composeYaml);
+    } catch (\Exception $e) {
+        throw new \Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
+    }
+
+    if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
+        throw new \Exception('Docker Compose file must contain a "services" section');
+    }
+    // Validate service names
+    foreach ($parsed['services'] as $serviceName => $serviceConfig) {
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.',
+                0,
+                $e
+            );
+        }
+
+        // Validate volumes in this service (both string and array formats)
+        if (isset($serviceConfig['volumes']) && is_array($serviceConfig['volumes'])) {
+            foreach ($serviceConfig['volumes'] as $volume) {
+                if (is_string($volume)) {
+                    // String format: "source:target" or "source:target:mode"
+                    validateVolumeStringForInjection($volume);
+                } elseif (is_array($volume)) {
+                    // Array format: {type: bind, source: ..., target: ...}
+                    if (isset($volume['source'])) {
+                        $source = $volume['source'];
+                        if (is_string($source)) {
+                            // Allow simple env vars and env vars with defaults (validated in parseDockerVolumeString)
+                            $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
+                            $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
+
+                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault) {
+                                try {
+                                    validateShellSafePath($source, 'volume source');
+                                } catch (\Exception $e) {
+                                    throw new \Exception(
+                                        'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                        ' Please use safe path names without shell metacharacters.',
+                                        0,
+                                        $e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    if (isset($volume['target'])) {
+                        $target = $volume['target'];
+                        if (is_string($target)) {
+                            try {
+                                validateShellSafePath($target, 'volume target');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.',
+                                    0,
+                                    $e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Validates a Docker volume string (format: "source:target" or "source:target:mode")
+ *
+ * @param  string  $volumeString  The volume string to validate
+ *
+ * @throws \Exception If the volume string contains command injection attempts
+ */
+function validateVolumeStringForInjection(string $volumeString): void
+{
+    // Canonical parsing also validates and throws on unsafe input
+    parseDockerVolumeString($volumeString);
+}
+
 function parseDockerVolumeString(string $volumeString): array
 {
     $volumeString = trim($volumeString);
@@ -212,6 +307,46 @@ function parseDockerVolumeString(string $volumeString): array
         // Otherwise keep the variable as-is for later expansion (no default value)
     }
 
+    // Validate source path for command injection attempts
+    // We validate the final source value after environment variable processing
+    if ($source !== null) {
+        // Allow simple environment variables like ${VAR_NAME} or ${VAR}
+        // but validate everything else for shell metacharacters
+        $sourceStr = is_string($source) ? $source : $source;
+
+        // Skip validation for simple environment variable references
+        // Pattern: ${WORD_CHARS} with no special characters inside
+        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
+
+        if (! $isSimpleEnvVar) {
+            try {
+                validateShellSafePath($sourceStr, 'volume source');
+            } catch (\Exception $e) {
+                // Re-throw with more context about the volume string
+                throw new \Exception(
+                    'Invalid Docker volume definition: '.$e->getMessage().
+                    ' Please use safe path names without shell metacharacters.'
+                );
+            }
+        }
+    }
+
+    // Also validate target path
+    if ($target !== null) {
+        $targetStr = is_string($target) ? $target : $target;
+        // Target paths in containers are typically absolute paths, so we validate them too
+        // but they're less likely to be dangerous since they're not used in host commands
+        // Still, defense in depth is important
+        try {
+            validateShellSafePath($targetStr, 'volume target');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker volume definition: '.$e->getMessage().
+                ' Please use safe path names without shell metacharacters.'
+            );
+        }
+    }
+
     return [
         'source' => $source !== null ? str($source) : null,
         'target' => $target !== null ? str($target) : null,
@@ -265,6 +400,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
+        // Validate service name for command injection
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.'
+            );
+        }
+
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
         $environment = collect(data_get($service, 'environment', []));
@@ -560,6 +705,33 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+
+                    // Validate source and target for command injection (array/long syntax)
+                    if ($source !== null && ! empty($source->value())) {
+                        $sourceValue = $source->value();
+                        // Allow simple environment variable references
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
+                        if (! $isSimpleEnvVar) {
+                            try {
+                                validateShellSafePath($sourceValue, 'volume source');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.'
+                                );
+                            }
+                        }
+                    }
+                    if ($target !== null && ! empty($target->value())) {
+                        try {
+                            validateShellSafePath($target->value(), 'volume target');
+                        } catch (\Exception $e) {
+                            throw new \Exception(
+                                'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                ' Please use safe path names without shell metacharacters.'
+                            );
+                        }
+                    }
 
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if ($foundConfig) {
@@ -1178,25 +1350,38 @@ function serviceParser(Service $resource): Collection
     $allMagicEnvironments = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
+        // Validate service name for command injection
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.'
+            );
+        }
+
         $image = data_get_str($service, 'image');
         $isDatabase = isDatabaseImage($image, $service);
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
+        }
+        // Update image if it changed
+        if ($savedService->image !== $image) {
+            $savedService->image = $image;
+            $savedService->save();
         }
     }
     foreach ($services as $serviceName => $service) {
@@ -1514,20 +1699,18 @@ function serviceParser(Service $resource): Collection
         }
 
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
         }
@@ -1573,6 +1756,33 @@ function serviceParser(Service $resource): Collection
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+
+                    // Validate source and target for command injection (array/long syntax)
+                    if ($source !== null && ! empty($source->value())) {
+                        $sourceValue = $source->value();
+                        // Allow simple environment variable references
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
+                        if (! $isSimpleEnvVar) {
+                            try {
+                                validateShellSafePath($sourceValue, 'volume source');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.'
+                                );
+                            }
+                        }
+                    }
+                    if ($target !== null && ! empty($target->value())) {
+                        try {
+                            validateShellSafePath($target->value(), 'volume target');
+                        } catch (\Exception $e) {
+                            throw new \Exception(
+                                'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                ' Please use safe path names without shell metacharacters.'
+                            );
+                        }
+                    }
 
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if ($foundConfig) {

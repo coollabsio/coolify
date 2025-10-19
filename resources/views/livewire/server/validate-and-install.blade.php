@@ -123,6 +123,9 @@
         <livewire:activity-monitor header="Docker Installation Logs" :showWaiting="false" />
         @isset($error)
             <pre class="font-bold whitespace-pre-line text-error">{!! $error !!}</pre>
+            <x-forms.button canGate="update" :canResource="$server" wire:click="retry" class="mt-4">
+                Retry Validation
+            </x-forms.button>
         @endisset
     @endif
 </div>

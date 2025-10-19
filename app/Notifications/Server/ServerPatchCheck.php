@@ -345,4 +345,47 @@ class ServerPatchCheck extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        // Handle error case
+        if (isset($this->patchData['error'])) {
+            return [
+                'success' => false,
+                'message' => 'Failed to check patches',
+                'event' => 'server_patch_check_error',
+                'server_name' => $this->server->name,
+                'server_uuid' => $this->server->uuid,
+                'os_id' => $this->patchData['osId'] ?? 'unknown',
+                'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
+                'error' => $this->patchData['error'],
+                'url' => $this->serverUrl,
+            ];
+        }
+
+        $totalUpdates = $this->patchData['total_updates'] ?? 0;
+        $updates = $this->patchData['updates'] ?? [];
+
+        // Check for critical packages
+        $criticalPackages = collect($updates)->filter(function ($update) {
+            return str_contains(strtolower($update['package']), 'docker') ||
+                str_contains(strtolower($update['package']), 'kernel') ||
+                str_contains(strtolower($update['package']), 'openssh') ||
+                str_contains(strtolower($update['package']), 'ssl');
+        });
+
+        return [
+            'success' => false,
+            'message' => 'Server patches available',
+            'event' => 'server_patch_check',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'total_updates' => $totalUpdates,
+            'os_id' => $this->patchData['osId'] ?? 'unknown',
+            'package_manager' => $this->patchData['package_manager'] ?? 'unknown',
+            'updates' => $updates,
+            'critical_packages_count' => $criticalPackages->count(),
+            'url' => $this->serverUrl,
+        ];
+    }
 }

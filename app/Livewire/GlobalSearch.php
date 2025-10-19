@@ -617,7 +617,14 @@ class GlobalSearch extends Component
                     'type' => 'navigation',
                     'description' => 'Manage private keys and API tokens',
                     'link' => route('security.private-key.index'),
-                    'search_text' => 'security private keys ssh api tokens',
+                    'search_text' => 'security private keys ssh api tokens cloud-init scripts',
+                ],
+                [
+                    'name' => 'Cloud-Init Scripts',
+                    'type' => 'navigation',
+                    'description' => 'Manage reusable cloud-init scripts',
+                    'link' => route('security.cloud-init-scripts'),
+                    'search_text' => 'cloud-init scripts cloud init cloudinit initialization startup server setup',
                 ],
                 [
                     'name' => 'Sources',
@@ -1140,6 +1147,9 @@ class GlobalSearch extends Component
         $this->selectedResourceType = $type;
         $this->isSelectingResource = true;
 
+        // Clear search query to show selection UI instead of creatable items
+        $this->searchQuery = '';
+
         // Reset selections
         $this->selectedServerId = null;
         $this->selectedDestinationUuid = null;
@@ -1309,10 +1319,10 @@ class GlobalSearch extends Component
                 $queryParams['database_image'] = 'postgres:16-alpine';
             }
 
-            return redirect()->route('project.resource.create', [
+            $this->redirect(route('project.resource.create', [
                 'project_uuid' => $this->selectedProjectUuid,
                 'environment_uuid' => $this->selectedEnvironmentUuid,
-            ] + $queryParams);
+            ] + $queryParams));
         }
     }
 

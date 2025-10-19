@@ -131,6 +131,7 @@ EOD;
         if (is_null($resource)) {
             abort(404);
         }
+        $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
         $this->container = $this->resource->uuid;
