@@ -3,6 +3,8 @@
 # tags: code,run,compute
 # logo: svgs/judge0.png
 # port: 2358
+
+# More info about environmental variables can be found at: https://github.com/judge0/judge0/blob/master/judge0.conf
 x-logging: &default-logging
   logging:
     driver: json-file
@@ -29,8 +31,10 @@ services:
       - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - AUTHZ_TOKEN=${SERVICE_PASSWORD_AUTHZ}
-      - ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=true
-      - ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=true
+      - ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT=${ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT:-true}
+      - ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=${ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT:-true}
+      - WALL_TIME_LIMIT=${WALL_TIME_LIMIT:-10} # Default wall time limit already (https://github.com/judge0/judge0/blob/master/judge0.conf)
+      - MAX_WALL_TIME_LIMIT=${MAX_WALL_TIME_LIMIT:-20} # Default max wall time limit already (https://github.com/judge0/judge0/blob/master/judge0.conf)
     depends_on:
       postgres:
         condition: service_healthy
