@@ -12,10 +12,16 @@ x-logging: &default-logging
 services:
   judge0:
     image: judge0/judge0:1.13.1
-    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/server"]
+    command:
+      - bash
+      - -c
+      - >
+        sudo mkdir -p /box &&
+        sudo chmod 1777 /box &&
+        exec ./scripts/server
     privileged: true
     environment:
-      - SERVICE_FQDN_JUDGE0_2358
+      - SERVICE_URL_JUDGE0_2358
       - REDIS_HOST=${COOLIFY_REDIS_HOST:-redis}
       - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
       - POSTGRES_HOST=${COOLIFY_POSTGRES_HOST:-postgres}
@@ -40,7 +46,13 @@ services:
 
   worker:
     image: judge0/judge0:1.13.1
-    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/workers"]
+    command:
+      - bash
+      - -c
+      - >
+        sudo mkdir -p /box &&
+        sudo chmod 1777 /box &&
+        exec ./scripts/workers
     privileged: true
     environment:
       - REDIS_HOST=${COOLIFY_REDIS_HOST:-redis}
@@ -74,7 +86,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data/
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -85,7 +97,7 @@ services:
     command:
       - bash
       - -c
-      - docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"
+      - docker-entrypoint.sh --appendonly no --requirepass "$REDIS_PASSWORD"
     environment:
       - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
     healthcheck:
