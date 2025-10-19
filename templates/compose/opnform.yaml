@@ -119,13 +119,13 @@ services:
   opnform-ui:
     image: jhumanj/opnform-client:1.10.0
     environment:
-      - NUXT_PUBLIC_APP_URL=/
-      - NUXT_PUBLIC_API_BASE=/api
-      - NUXT_PRIVATE_API_BASE=http://nginx/api
-      - NUXT_PUBLIC_ENV=${NUXT_PUBLIC_ENV:-production}
-      - NUXT_PUBLIC_H_CAPTCHA_SITE_KEY=${H_CAPTCHA_SITE_KEY}
-      - NUXT_PUBLIC_RE_CAPTCHA_SITE_KEY=${RE_CAPTCHA_SITE_KEY}
-      - NUXT_PUBLIC_ROOT_REDIRECT_URL=${NUXT_PUBLIC_ROOT_REDIRECT_URL}
+      NUXT_PUBLIC_APP_URL: ${NUXT_PUBLIC_APP_URL:-/}
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-/api}
+      NUXT_PRIVATE_API_BASE: ${NUXT_PRIVATE_API_BASE:-http://nginx/api}
+      NUXT_PUBLIC_ENV: ${NUXT_PUBLIC_ENV:-production}
+      NUXT_PUBLIC_H_CAPTCHA_SITE_KEY: ${H_CAPTCHA_SITE_KEY}
+      NUXT_PUBLIC_RE_CAPTCHA_SITE_KEY: ${RE_CAPTCHA_SITE_KEY}
+      NUXT_PUBLIC_ROOT_REDIRECT_URL: ${NUXT_PUBLIC_ROOT_REDIRECT_URL}
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://opnform-ui:3000/login || exit 1"]
       interval: 30s
