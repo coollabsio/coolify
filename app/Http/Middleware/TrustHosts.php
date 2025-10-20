@@ -30,6 +30,12 @@ class TrustHosts extends Middleware
             return $next($request);
         }
 
+        // Skip host validation if no FQDN is configured (initial setup)
+        $fqdnHost = Cache::get('instance_settings_fqdn_host');
+        if ($fqdnHost === '' || $fqdnHost === null) {
+            return $next($request);
+        }
+
         // For all other routes, use parent's host validation
         return parent::handle($request, $next);
     }
@@ -67,6 +73,19 @@ class TrustHosts extends Middleware
 
         if ($fqdnHost) {
             $trustedHosts[] = $fqdnHost;
+        }
+
+        // Trust the APP_URL host itself (not just subdomains)
+        $appUrl = config('app.url');
+        if ($appUrl) {
+            try {
+                $appUrlHost = parse_url($appUrl, PHP_URL_HOST);
+                if ($appUrlHost && ! in_array($appUrlHost, $trustedHosts, true)) {
+                    $trustedHosts[] = $appUrlHost;
+                }
+            } catch (\Exception $e) {
+                // Ignore parse errors
+            }
         }
 
         // Trust all subdomains of APP_URL as fallback

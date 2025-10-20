@@ -139,7 +139,7 @@
         </div>
     </template>
 
-    <template x-for="option in (filteredOptions || [])" :key="option.value">
+    <template x-for="(option, index) in (filteredOptions || [])" :key="option?.value || index">
         <div @click="toggleOption(option.value)"
             class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
             :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
@@ -268,7 +268,7 @@
             </div>
         </template>
 
-        <template x-for="option in (filteredOptions || [])" :key="option.value">
+        <template x-for="(option, index) in (filteredOptions || [])" :key="option?.value || index">
             <div @click="selectOption(option.value)"
                 class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200"
                 :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selected == option.value }">
