@@ -4,11 +4,36 @@ namespace App\Http\Middleware;
 
 use App\Models\InstanceSettings;
 use Illuminate\Http\Middleware\TrustHosts as Middleware;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Spatie\Url\Url;
 
 class TrustHosts extends Middleware
 {
+    /**
+     * Handle the incoming request.
+     *
+     * Skip host validation for certain routes:
+     * - Terminal auth routes (called by realtime container)
+     * - API routes (use token-based authentication, not host validation)
+     * - Webhook endpoints (use cryptographic signature validation)
+     */
+    public function handle(Request $request, $next)
+    {
+        // Skip host validation for these routes
+        if ($request->is(
+            'terminal/auth',
+            'terminal/auth/ips',
+            'api/*',
+            'webhooks/*'
+        )) {
+            return $next($request);
+        }
+
+        // For all other routes, use parent's host validation
+        return parent::handle($request, $next);
+    }
+
     /**
      * Get the host patterns that should be trusted.
      *
