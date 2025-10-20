@@ -22,7 +22,7 @@ services:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
-    pull_policy: always
+    pull_policy: never
     ports:
       - "${FORWARD_DB_PORT:-5432}:5432"
     env_file:
@@ -35,7 +35,7 @@ services:
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
   redis:
-    pull_policy: always
+    pull_policy: never
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"
     env_file:
@@ -61,10 +61,10 @@ services:
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
-    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
+    entrypoint: [ "/bin/sh", "/soketi-entrypoint.sh" ]
   vite:
     image: node:24-alpine
-    pull_policy: always
+    pull_policy: never
     container_name: coolify-vite
     working_dir: /var/www/html
     environment:
@@ -96,7 +96,7 @@ services:
       - coolify
   mailpit:
     image: axllent/mailpit:latest
-    pull_policy: always
+    pull_policy: never
     container_name: coolify-mail
     ports:
       - "${FORWARD_MAILPIT_PORT:-1025}:1025"
@@ -105,7 +105,7 @@ services:
       - coolify
   minio:
     image: minio/minio:latest
-    pull_policy: always
+    pull_policy: never
     container_name: coolify-minio
     command: server /data --console-address ":9001"
     ports:
@@ -125,6 +125,7 @@ volumes:
   dev_redis_data:
   dev_coolify_data:
   dev_minio_data:
+
 
 networks:
   coolify:
