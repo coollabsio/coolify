@@ -227,3 +227,84 @@ it('caches negative results when no FQDN is configured', function () {
     // Should only contain APP_URL pattern, not any FQDN
     expect($hosts2)->not->toBeEmpty();
 });
+
+it('skips host validation for terminal auth routes', function () {
+    // These routes should be accessible with any Host header (for internal container communication)
+    $response = $this->postJson('/terminal/auth', [], [
+        'Host' => 'coolify:8080',  // Internal Docker host
+    ]);
+
+    // Should not get 400 Bad Host (might get 401 Unauthorized instead)
+    expect($response->status())->not->toBe(400);
+});
+
+it('skips host validation for terminal auth ips route', function () {
+    // These routes should be accessible with any Host header (for internal container communication)
+    $response = $this->postJson('/terminal/auth/ips', [], [
+        'Host' => 'soketi:6002',  // Another internal Docker host
+    ]);
+
+    // Should not get 400 Bad Host (might get 401 Unauthorized instead)
+    expect($response->status())->not->toBe(400);
+});
+
+it('still enforces host validation for non-terminal routes', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    // Regular routes should still validate Host header
+    $response = $this->get('/', [
+        'Host' => 'evil.com',
+    ]);
+
+    // Should get 400 Bad Host for untrusted host
+    expect($response->status())->toBe(400);
+});
+
+it('skips host validation for API routes', function () {
+    // All API routes use token-based auth (Sanctum), not host validation
+    // They should be accessible from any host (mobile apps, CLI tools, scripts)
+
+    // Test health check endpoint
+    $response = $this->get('/api/health', [
+        'Host' => 'internal-lb.local',
+    ]);
+    expect($response->status())->not->toBe(400);
+
+    // Test v1 health check
+    $response = $this->get('/api/v1/health', [
+        'Host' => '10.0.0.5',
+    ]);
+    expect($response->status())->not->toBe(400);
+
+    // Test feedback endpoint
+    $response = $this->post('/api/feedback', [], [
+        'Host' => 'mobile-app.local',
+    ]);
+    expect($response->status())->not->toBe(400);
+});
+
+it('skips host validation for webhook endpoints', function () {
+    // All webhook routes are under /webhooks/* prefix (see RouteServiceProvider)
+    // and use cryptographic signature validation instead of host validation
+
+    // Test GitHub webhook
+    $response = $this->post('/webhooks/source/github/events', [], [
+        'Host' => 'github-webhook-proxy.local',
+    ]);
+    expect($response->status())->not->toBe(400);
+
+    // Test GitLab webhook
+    $response = $this->post('/webhooks/source/gitlab/events/manual', [], [
+        'Host' => 'gitlab.example.com',
+    ]);
+    expect($response->status())->not->toBe(400);
+
+    // Test Stripe webhook
+    $response = $this->post('/webhooks/payments/stripe/events', [], [
+        'Host' => 'stripe-webhook-forwarder.local',
+    ]);
+    expect($response->status())->not->toBe(400);
+});
