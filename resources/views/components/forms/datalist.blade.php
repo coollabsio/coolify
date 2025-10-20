@@ -106,7 +106,7 @@
                 wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4">
 
                 {{-- Selected Tags Inside Input --}}
-                <template x-for="value in (selected || [])" :key="value">
+                <template x-for="value in selected" :key="value">
                     <button
                         type="button"
                         @click.stop="removeOption(value, $event)"
@@ -133,13 +133,13 @@
 <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
     class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
 
-    <template x-if="(filteredOptions || []).length === 0">
+    <template x-if="filteredOptions.length === 0">
         <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
             No options found
         </div>
     </template>
 
-    <template x-for="(option, index) in (filteredOptions || [])" :key="option?.value || index">
+    <template x-for="option in filteredOptions" :key="option.value">
         <div @click="toggleOption(option.value)"
             class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
             :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
@@ -262,13 +262,13 @@
     <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
         class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
 
-        <template x-if="(filteredOptions || []).length === 0">
+        <template x-if="filteredOptions.length === 0">
             <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
                 No options found
             </div>
         </template>
 
-        <template x-for="(option, index) in (filteredOptions || [])" :key="option?.value || index">
+        <template x-for="option in filteredOptions" :key="option.value">
             <div @click="selectOption(option.value)"
                 class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200"
                 :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selected == option.value }">
