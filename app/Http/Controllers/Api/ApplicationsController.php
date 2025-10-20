@@ -2305,6 +2305,10 @@ class ApplicationsController extends Controller
             data_set($data, 'fqdn', $domains);
         }
 
+        if($request->has('docker_compose_raw')) {
+            data_set($data, 'docker_compose_raw', base64_decode($request->docker_compose_raw));
+        }
+
         if ($dockerComposeDomainsJson->count() > 0) {
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }
