@@ -115,6 +115,7 @@
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
+                                <div class="max-w-full px-4 truncate box-description" x-text="`running on ${item.destination?.server?.name || ''}`"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
@@ -164,6 +165,7 @@
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
+                                <div class="max-w-full px-4 truncate box-description" x-text="`running on ${item.destination?.server?.name || ''}`"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
@@ -213,6 +215,7 @@
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
+                                <div class="max-w-full px-4 truncate box-description" x-text="`running on ${item.destination?.server?.name || ''}`"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
