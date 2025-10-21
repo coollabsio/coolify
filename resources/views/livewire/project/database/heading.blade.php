@@ -10,17 +10,17 @@
         <nav
             class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.configuration', $parameters) }}">
+                href="{{ route('project.database.configuration', $parameters) }}" wire:navigate.hover>
                 Configuration
             </a>
 
             <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.logs', $parameters) }}">
+                href="{{ route('project.database.logs', $parameters) }}" wire:navigate.hover>
                 Logs
             </a>
             @can('canAccessTerminal')
                 <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.database.command', $parameters) }}">
+                    href="{{ route('project.database.command', $parameters) }}" wire:navigate.hover>
                     Terminal
                 </a>
             @endcan
@@ -30,7 +30,7 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
                 <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.database.backup.index', $parameters) }}">
+                    href="{{ route('project.database.backup.index', $parameters) }}" wire:navigate.hover>
                     Backups
                 </a>
             @endif

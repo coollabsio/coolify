@@ -59,7 +59,7 @@
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" wire:navigate.hover>
                 Configuration
             </a>
 
@@ -67,21 +67,21 @@
                 <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.proxy', [
                         'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
+                    ]) }}" wire:navigate.hover>
                     Proxy
                 </a>
             @endif
             <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.resources', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" wire:navigate.hover>
                 Resources
             </a>
             @can('canAccessTerminal')
                 <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.command', [
                         'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
+                    ]) }}" wire:navigate.hover>
                     Terminal
                 </a>
             @endcan
@@ -89,7 +89,7 @@
                 <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.security.patches', [
                         'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
+                    ]) }}" wire:navigate.hover>
                     Security
                 </a>
             @endcan

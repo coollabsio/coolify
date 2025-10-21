@@ -144,9 +144,9 @@
 
                     // Check if trimmed matches exactly or if the item's quickcommand includes this command
                     return itemSearchText === trimmed ||
-                           itemType === trimmed ||
-                           itemTypeWithSpaces === trimmed ||
-                           (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
+                        itemType === trimmed ||
+                        itemTypeWithSpaces === trimmed ||
+                        (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
                 });
 
                 if (matchingItem) {
@@ -635,7 +635,8 @@
                                     @foreach ($searchResults as $result)
                                         @if (!isset($result['is_creatable_suggestion']))
                                             <a href="{{ $result['link'] ?? '#' }}"
-                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
+                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400"
+                                                wire:navigate.hover>
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">

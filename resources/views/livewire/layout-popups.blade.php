@@ -138,7 +138,7 @@
                 latest
                 payment is not paid within a week, all automations <span class="font-bold text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
-                    class="underline dark:text-white">/subscription</a> to check your subscription status or pay
+                    class="underline dark:text-white" wire:navigate.hover>/subscription</a> to check your subscription status or pay
                 your
                 invoice (or check your email for the invoice).
             </div>
@@ -149,7 +149,7 @@
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
                 covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
-                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some
+                    class="underline dark:text-white" wire:navigate.hover>/subscription</a> to update your subscription or remove some
                 servers.
             </div>
         </x-banner>
@@ -172,7 +172,7 @@
                     highly recommended to enable at least
                     one
                     notification channel to receive important alerts.<br>Visit <a
-                        href="{{ route('notifications.email') }}" class="underline dark:text-white">/notification</a> to
+                        href="{{ route('notifications.email') }}" class="underline dark:text-white" wire:navigate.hover>/notification</a> to
                     enable notifications.</span>
         </x-slot:description>
         <x-slot:button-text @click="disableNotification()">

@@ -3,21 +3,21 @@
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.application.configuration', $parameters) }}">
+                href="{{ route('project.application.configuration', $parameters) }}" wire:navigate.hover>
                 Configuration
             </a>
             <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.application.deployment.index', $parameters) }}">
+                href="{{ route('project.application.deployment.index', $parameters) }}" wire:navigate.hover>
                 Deployments
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.application.logs', $parameters) }}">
+                href="{{ route('project.application.logs', $parameters) }}" wire:navigate.hover>
                 Logs
             </a>
             @if (!$application->destination->server->isSwarm())
                 @can('canAccessTerminal')
                     <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                        href="{{ route('project.application.command', $parameters) }}">
+                        href="{{ route('project.application.command', $parameters) }}" wire:navigate.hover>
                         Terminal
                     </a>
                 @endcan

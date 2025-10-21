@@ -8,19 +8,19 @@
             @if ($environment->isEmpty())
                 @can('createAnyResource')
                     <a class="button"
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" wire:navigate.hover>
                         Clone
                     </a>
                 @endcan
             @else
                 @can('createAnyResource')
                     <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                        class="button">+
+                        class="button" wire:navigate.hover>+
                         New</a>
                 @endcan
                 @can('createAnyResource')
                     <a class="button"
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" wire:navigate.hover>
                         Clone
                     </a>
                 @endcan
@@ -33,7 +33,7 @@
             <ol class="flex items-center">
                 <li class="inline-flex items-center">
                     <a class="text-xs truncate lg:text-sm"
-                        href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
+                        href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}" wire:navigate.hover>
                         {{ $project->name }}</a>
                 </li>
                 <li>
@@ -54,7 +54,7 @@
     @if ($environment->isEmpty())
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                class="items-center justify-center box">+ Add Resource</a>
+                class="items-center justify-center box" wire:navigate.hover>+ Add Resource</a>
         @else
             <div
                 class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">

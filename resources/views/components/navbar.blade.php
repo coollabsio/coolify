@@ -59,20 +59,20 @@
                 if (this.zoom === '90') {
                     const style = document.createElement('style');
                     style.textContent = `
-                                                    html {
-                                                        font-size: 93.75%;
-                                                    }
-                                
-                                                    :root {
-                                                        --vh: 1vh;
-                                                    }
-                                
-                                                    @media (min-width: 1024px) {
-                                                        html {
-                                                            font-size: 87.5%;
-                                                        }
-                                                    }
-                                                `;
+                                                                                                                html {
+                                                                                                                    font-size: 93.75%;
+                                                                                                                }
+
+                                                                                                                :root {
+                                                                                                                    --vh: 1vh;
+                                                                                                                }
+
+                                                                                                                @media (min-width: 1024px) {
+                                                                                                                    html {
+                                                                                                                        font-size: 87.5%;
+                                                                                                                    }
+                                                                                                                }
+                                                                                                            `;
                     document.head.appendChild(style);
                 }
             }
@@ -106,7 +106,7 @@
                 @if (isSubscribed() || !isCloud())
                     <li>
                         <a title="Dashboard" href="/"
-                            class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
+                            class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}" wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -118,7 +118,7 @@
                     <li>
                         <a title="Projects"
                             class="{{ request()->is('project/*') || request()->is('projects') ? 'menu-item menu-item-active' : 'menu-item' }}"
-                            href="/projects">
+                            href="/projects" wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -133,7 +133,7 @@
                     <li>
                         <a title="Servers"
                             class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
-                            href="/servers">
+                            href="/servers" wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -152,7 +152,7 @@
                     <li>
                         <a title="Sources"
                             class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('source.all') }}">
+                            href="{{ route('source.all') }}" wire:navigate.hover>
                             <svg class="icon" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="currentColor"
                                     d="m6.793 1.207l.353.354l-.353-.354ZM1.207 6.793l-.353-.354l.353.354Zm0 1.414l.354-.353l-.354.353Zm5.586 5.586l-.354.353l.354-.353Zm1.414 0l-.353-.354l.353.354Zm5.586-5.586l.353.354l-.353-.354Zm0-1.414l-.354.353l.354-.353ZM8.207 1.207l.354-.353l-.354.353ZM6.44.854L.854 6.439l.707.707l5.585-5.585L6.44.854ZM.854 8.56l5.585 5.585l.707-.707l-5.585-5.585l-.707.707Zm7.707 5.585l5.585-5.585l-.707-.707l-5.585 5.585l.707.707Zm5.585-7.707L8.561.854l-.707.707l5.585 5.585l.707-.707Zm0 2.122a1.5 1.5 0 0 0 0-2.122l-.707.707a.5.5 0 0 1 0 .708l.707.707ZM6.44 14.146a1.5 1.5 0 0 0 2.122 0l-.707-.707a.5.5 0 0 1-.708 0l-.707.707ZM.854 6.44a1.5 1.5 0 0 0 0 2.122l.707-.707a.5.5 0 0 1 0-.708L.854 6.44Zm6.292-4.878a.5.5 0 0 1 .708 0L8.56.854a1.5 1.5 0 0 0-2.122 0l.707.707Zm-2 1.293l1 1l.708-.708l-1-1l-.708.708ZM7.5 5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 6V5Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 4.5H8ZM7.5 4a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 3v1Zm0-1A1.5 1.5 0 0 0 6 4.5h1a.5.5 0 0 1 .5-.5V3Zm.646 2.854l1.5 1.5l.707-.708l-1.5-1.5l-.707.708ZM10.5 8a.5.5 0 0 1-.5-.5H9A1.5 1.5 0 0 0 10.5 9V8Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 12 7.5h-1Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 10.5 6v1Zm0-1A1.5 1.5 0 0 0 9 7.5h1a.5.5 0 0 1 .5-.5V6ZM7 5.5v4h1v-4H7Zm.5 5.5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 12v-1Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 10.5H8Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 9v1Zm0-1A1.5 1.5 0 0 0 6 10.5h1a.5.5 0 0 1 .5-.5V9Z" />
@@ -163,7 +163,7 @@
                     <li>
                         <a title="Destinations"
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('destination.index') }}">
+                            href="{{ route('destination.index') }}" wire:navigate.hover>
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -176,7 +176,7 @@
                     <li>
                         <a title="S3 Storages"
                             class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('storage.index') }}">
+                            href="{{ route('storage.index') }}" wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2">
@@ -191,7 +191,7 @@
                     <li>
                         <a title="Shared variables"
                             class="{{ request()->is('shared-variables*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('shared-variables.index') }}">
+                            href="{{ route('shared-variables.index') }}" wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2">
@@ -206,7 +206,7 @@
                     <li>
                         <a title="Notifications"
                             class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('notifications.email') }}">
+                            href="{{ route('notifications.email') }}" wire:navigate.hover>
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2"
@@ -218,7 +218,7 @@
                     <li>
                         <a title="Keys & Tokens"
                             class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('security.private-key.index') }}">
+                            href="{{ route('security.private-key.index') }}" wire:navigate.hover>
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2"
@@ -230,7 +230,7 @@
                     <li>
                         <a title="Tags"
                             class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('tags.show') }}">
+                            href="{{ route('tags.show') }}" wire:navigate.hover>
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2">
@@ -246,7 +246,7 @@
                         <li>
                             <a title="Terminal"
                                 class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                                href="{{ route('terminal') }}">
+                                href="{{ route('terminal') }}" wire:navigate.hover>
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                     stroke-linejoin="round">
@@ -261,7 +261,7 @@
                     <li>
                         <a title="Profile"
                             class="{{ request()->is('profile*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('profile') }}">
+                            href="{{ route('profile') }}" wire:navigate.hover>
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -276,7 +276,7 @@
                     <li>
                         <a title="Teams"
                             class="{{ request()->is('team*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('team.index') }}">
+                            href="{{ route('team.index') }}" wire:navigate.hover>
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -295,7 +295,7 @@
                         <li>
                             <a title="Subscription"
                                 class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                                href="{{ route('subscription.show') }}">
+                                href="{{ route('subscription.show') }}" wire:navigate.hover>
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                     <path fill="none" stroke="currentColor" stroke-linecap="round"
                                         stroke-linejoin="round" stroke-width="2"
@@ -310,7 +310,7 @@
 
                             <a title="Settings"
                                 class="{{ request()->is('settings*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                                href="/settings">
+                                href="/settings" wire:navigate.hover>
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                     stroke-linejoin="round">
@@ -327,7 +327,7 @@
                     @if (isCloud() || isDev())
                         @if (isInstanceAdmin() || session('impersonating'))
                             <li>
-                                <a title="Admin" class="menu-item" href="/admin">
+                                <a title="Admin" class="menu-item" href="/admin" wire:navigate.hover>
                                     <svg class="text-pink-500 icon" viewBox="0 0 256 256"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <path fill="currentColor"

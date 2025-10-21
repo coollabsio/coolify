@@ -36,7 +36,7 @@
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
                     <div class="relative gap-2 cursor-pointer box group">
-                        <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
+                        <a href="{{ $project->navigateTo() }}" class="absolute inset-0" wire:navigate.hover></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
                                 <div class="box-title">{{ $project->name }}</div>
@@ -51,14 +51,16 @@
                                             href="{{ route('project.resource.create', [
                                                 'project_uuid' => $project->uuid,
                                                 'environment_uuid' => $project->environments->first()->uuid,
-                                            ]) }}">
+                                            ]) }}"
+                                            wire:navigate.hover>
                                             + Add Resource
                                         </a>
                                     @endcan
                                 @endif
                                 @can('update', $project)
                                     <a class="hover:underline"
-                                        href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                        href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
+                                        wire:navigate.hover>
                                         Settings
                                     </a>
                                 @endcan
@@ -74,7 +76,8 @@
                     <x-modal-input buttonTitle="Add" title="New Project">
                         <livewire:project.add-empty />
                     </x-modal-input> your first project or
-                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a> page.
+                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}"
+                        wire:navigate.hover>onboarding</a> page.
                 </div>
             </div>
         @endif
@@ -106,7 +109,7 @@
                             'gap-2 border cursor-pointer box group',
                             'border-red-500' =>
                                 !$server->settings->is_reachable || $server->settings->force_disabled,
-                        ])>
+                        ]) wire:navigate.hover>
                         <div class="flex flex-col justify-center mx-6">
                             <div class="box-title">
                                 {{ $server->name }}
@@ -138,7 +141,8 @@
                             <livewire:security.private-key.create from="server" />
                         </x-modal-input> a private key
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}"
+                            wire:navigate.hover>onboarding</a>
                         page.
                     </div>
                 </div>
@@ -150,7 +154,8 @@
                             <livewire:server.create />
                         </x-modal-input> your first server
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}"
+                            wire:navigate.hover>onboarding</a>
                         page.
                     </div>
                 </div>

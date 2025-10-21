@@ -31,7 +31,7 @@
             @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
                 <div>You can't delete your last / personal team.</div>
             @elseif(currentTeam()->subscription)
-                <div>Please cancel your subscription <a class="underline dark:text-white"
+                <div>Please cancel your subscription <a wire:navigate.hover class="underline dark:text-white"
                         href="{{ route('subscription.show') }}">here</a> before deleting this team.</div>
             @else
                 @if (currentTeam()->isEmpty())

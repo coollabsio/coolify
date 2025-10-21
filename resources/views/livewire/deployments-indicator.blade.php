@@ -7,8 +7,8 @@
             <button @click="expanded = !expanded"
                 class="flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all duration-200 dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 hover:shadow-xl">
                 <!-- Animated spinner -->
-                <svg class="w-4 h-4 text-coollabs dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
-                    viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-coollabs dark:text-warning animate-spin" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                         stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
@@ -40,7 +40,8 @@
                 <div class="p-4 space-y-3">
                     @foreach ($this->deployments as $deployment)
                         <a href="{{ $deployment->deployment_url }}"
-                            class="flex items-start gap-3 p-3 rounded-lg dark:bg-coolgray-200 bg-gray-50 transition-all duration-200 hover:ring-2 hover:ring-coollabs dark:hover:ring-warning cursor-pointer">
+                            class="flex items-start gap-3 p-3 rounded-lg dark:bg-coolgray-200 bg-gray-50 transition-all duration-200 hover:ring-2 hover:ring-coollabs dark:hover:ring-warning cursor-pointer"
+                            wire:navigate.hover>
                             <!-- Status indicator -->
                             <div class="flex-shrink-0 mt-1">
                                 @if ($deployment->status === 'in_progress')
@@ -68,7 +69,8 @@
                                     {{ $deployment->application_name }}
                                 </div>
                                 <p class="text-xs dark:text-neutral-400 text-gray-600 mt-1">
-                                    {{ $deployment->application?->environment?->project?->name }} / {{ $deployment->application?->environment?->name }}
+                                    {{ $deployment->application?->environment?->project?->name }} /
+                                    {{ $deployment->application?->environment?->name }}
                                 </p>
                                 <p class="text-xs dark:text-neutral-400 text-gray-600">
                                     {{ $deployment->server_name }}
@@ -80,8 +82,10 @@
                                 @endif
                                 <p class="text-xs mt-1 capitalize"
                                     :class="{
-                                        'text-coollabs dark:text-warning': '{{ $deployment->status }}' === 'in_progress',
-                                        'dark:text-neutral-400 text-gray-500': '{{ $deployment->status }}' === 'queued'
+                                        'text-coollabs dark:text-warning': '{{ $deployment->status }}'
+                                        === 'in_progress',
+                                        'dark:text-neutral-400 text-gray-500': '{{ $deployment->status }}'
+                                        === 'queued'
                                     }">
                                     {{ str_replace('_', ' ', $deployment->status) }}
                                 </p>

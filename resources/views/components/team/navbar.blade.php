@@ -8,16 +8,16 @@
     <div class="subtitle">Team wide configurations.</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 min-h-10">
-            <a class="{{ request()->routeIs('team.index') ? 'dark:text-white' : '' }}" href="{{ route('team.index') }}">
+            <a class="{{ request()->routeIs('team.index') ? 'dark:text-white' : '' }}" href="{{ route('team.index') }}" wire:navigate.hover>
                 General
             </a>
             <a class="{{ request()->routeIs('team.member.index') ? 'dark:text-white' : '' }}"
-                href="{{ route('team.member.index') }}">
+                href="{{ route('team.member.index') }}" wire:navigate.hover>
                 Members
             </a>
             @if (isInstanceAdmin())
                 <a class="{{ request()->routeIs('team.admin-view') ? 'dark:text-white' : '' }}"
-                    href="{{ route('team.admin-view') }}">
+                    href="{{ route('team.admin-view') }}" wire:navigate.hover>
                     Admin View
                 </a>
             @endif

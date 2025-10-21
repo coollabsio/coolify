@@ -11,16 +11,16 @@
     <div class="navbar-main" x-data">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.service.configuration', $parameters) }}">
+                href="{{ route('project.service.configuration', $parameters) }}" wire:navigate.hover>
                 <button>Configuration</button>
             </a>
             <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.service.logs', $parameters) }}">
+                href="{{ route('project.service.logs', $parameters) }}" wire:navigate.hover>
                 <button>Logs</button>
             </a>
             @can('canAccessTerminal')
                 <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.service.command', $parameters) }}">
+                    href="{{ route('project.service.command', $parameters) }}" wire:navigate.hover>
                     <button>Terminal</button>
                 </a>
             @endcan
@@ -128,7 +128,7 @@
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <div class="text-error">
                     Unable to deploy. <a class="underline font-bold cursor-pointer"
-                        href="{{ route('project.service.environment-variables', $parameters) }}">
+                        href="{{ route('project.service.environment-variables', $parameters) }}" wire:navigate.hover>
                         Required environment variables missing.</a>
                 </div>
             </div>

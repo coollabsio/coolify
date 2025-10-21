@@ -174,7 +174,7 @@
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap"><a
                                                                 class=""
-                                                                href="{{ $resource->link() }}">{{ $resource->name }}
+                                                                href="{{ $resource->link() }}" wire:navigate.hover>{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">

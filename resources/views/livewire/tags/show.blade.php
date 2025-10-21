@@ -9,7 +9,7 @@
         @forelse ($tags as $oneTag)
             <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs'"
                 class="min-w-32 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold dark:hover:bg-coollabs-100 flex justify-center items-center"
-                href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ data_get_str($oneTag, 'name')->limit(30) }}</a>
+                href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}" wire:navigate.hover>{{ data_get_str($oneTag, 'name')->limit(30) }}</a>
         @empty
             <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
         @endforelse
@@ -34,7 +34,7 @@
             <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 @if (isset($applications) && count($applications) > 0)
                     @foreach ($applications as $application)
-                        <a href="{{ $application->link() }}" class="box group">
+                        <a href="{{ $application->link() }}" class="box group" wire:navigate.hover>
                             <div class="flex flex-col justify-center">
                                 <div class="box-title">
                                     {{ $application->project()->name }}/{{ $application->environment->name }}
@@ -47,7 +47,7 @@
                 @endif
                 @if (isset($services) && count($services) > 0)
                     @foreach ($services as $service)
-                        <a href="{{ $service->link() }}" class="flex flex-col box group">
+                        <a href="{{ $service->link() }}" class="flex flex-col box group" wire:navigate.hover>
                             <div class="flex flex-col">
                                 <div class="box-title">
                                     {{ $service->project()->name }}/{{ $service->environment->name }}
@@ -74,7 +74,7 @@
                                 'gap-2 cursor-pointer box group border-l-2 border-dotted',
                                 'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
                                 'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                            ])>
+                            ]) wire:navigate.hover>
                                 <div class="flex flex-col mx-6">
                                     <div class="font-bold dark:text-white">
                                         {{ data_get($deployment, 'application_name') }}
