@@ -16,7 +16,7 @@
         @forelse ($privateKeys as $key)
             @can('view', $key)
                 {{-- Admin/Owner: Clickable link --}}
-                <a class="box group"
+                <a wire:navigate class="box group"
                     href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}">
                     <div class="flex flex-col justify-center mx-6">
                         <div class="box-title">

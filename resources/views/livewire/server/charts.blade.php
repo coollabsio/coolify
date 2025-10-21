@@ -288,7 +288,7 @@
                     </div>
                 </div>
             @else
-                <div>Metrics are disabled for this server. Enable them in <a class="underline dark:text-white"
+                <div>Metrics are disabled for this server. Enable them in <a wire:navigate class="underline dark:text-white"
                         href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}">General</a> settings.</div>
             @endif
         </div>

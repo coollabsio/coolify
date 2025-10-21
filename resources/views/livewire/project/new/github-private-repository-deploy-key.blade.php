@@ -38,7 +38,7 @@
                         <div>
                             No private keys found.
                         </div>
-                        <a href="{{ route('security.private-key.index') }}">
+                        <a wire:navigate href="{{ route('security.private-key.index') }}">
                             <x-forms.button>Create a new private key</x-forms.button>
                         </a>
                     </div>

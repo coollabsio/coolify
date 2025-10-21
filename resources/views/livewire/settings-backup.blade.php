@@ -42,7 +42,7 @@
                         Instance Backup is currently disabled because the localhost server is not properly validated.
                         Please validate your server to enable Instance Backup.
                     </div>
-                    <a href="{{ route('server.show', [$server->uuid]) }}"
+                    <a wire:navigate href="{{ route('server.show', [$server->uuid]) }}"
                         class="text-black hover:text-gray-700 dark:text-white dark:hover:text-gray-200 underline">
                         Go to Server Settings to Validate
                     </a>

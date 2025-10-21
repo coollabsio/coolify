@@ -137,7 +137,7 @@
             <div><span class="font-bold text-red-500">WARNING:</span> Your subscription is in over-due. If your
                 latest
                 payment is not paid within a week, all automations <span class="font-bold text-red-500">will
-                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
+                    be deactivated</span>. Visit <a wire:navigate href="{{ route('subscription.show') }}"
                     class="underline dark:text-white">/subscription</a> to check your subscription status or pay
                 your
                 invoice (or check your email for the invoice).
@@ -148,7 +148,7 @@
         <x-banner :closable=false>
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
                 covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
-                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
+                    be deactivated</span>. Visit <a wire:navigate href="{{ route('subscription.show') }}"
                     class="underline dark:text-white">/subscription</a> to update your subscription or remove some
                 servers.
             </div>
@@ -171,7 +171,7 @@
                     It is
                     highly recommended to enable at least
                     one
-                    notification channel to receive important alerts.<br>Visit <a
+                    notification channel to receive important alerts.<br>Visit <a wire:navigate
                         href="{{ route('notifications.email') }}" class="underline dark:text-white">/notification</a> to
                     enable notifications.</span>
         </x-slot:description>

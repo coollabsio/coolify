@@ -14,7 +14,7 @@
             <ol class="flex flex-wrap items-center gap-y-1">
                 <li class="inline-flex items-center">
                     <div class="flex items-center">
-                        <a class="text-xs truncate lg:text-sm"
+                        <a wire:navigate class="text-xs truncate lg:text-sm"
                             href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}">
                             {{ $project->name }}</a>
                         <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
@@ -27,7 +27,7 @@
                 </li>
                 <li>
                     <div class="flex items-center">
-                        <a class="text-xs truncate lg:text-sm"
+                        <a wire:navigate class="text-xs truncate lg:text-sm"
                             href="{{ route('project.resource.index', ['environment_uuid' => $environment->uuid, 'project_uuid' => $project->uuid]) }}">
                             {{ $environment->name }}
                         </a>

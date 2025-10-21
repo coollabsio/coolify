@@ -127,7 +127,7 @@
         @else
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <div class="text-error">
-                    Unable to deploy. <a class="underline font-bold cursor-pointer"
+                    Unable to deploy. <a wire:navigate class="underline font-bold cursor-pointer"
                         href="{{ route('project.service.environment-variables', $parameters) }}">
                         Required environment variables missing.</a>
                 </div>

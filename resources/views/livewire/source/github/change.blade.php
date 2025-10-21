@@ -35,7 +35,7 @@
                     </svg>
                     <span>You must complete this step before you can use this source!</span>
                 </div>
-                <a class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
+                <a wire:navigate class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
                     Install Repositories on GitHub
                 </a>
             @else
@@ -54,7 +54,7 @@
                                         <x-external-link />
                                     </x-forms.button>
                                 </a>
-                                <a href="{{ getInstallationPath($github_app) }}" class="w-fit">
+                                <a wire:navigate href="{{ getInstallationPath($github_app) }}" class="w-fit">
                                     <x-forms.button
                                         class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline whitespace-nowrap">
                                         Update Repositories
@@ -112,7 +112,7 @@
                         <h2 class="pt-4">Permissions</h2>
                         @can('view', $github_app)
                             <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                            <a href="{{ getPermissionsPath($github_app) }}">
+                            <a wire:navigate href="{{ getPermissionsPath($github_app) }}">
                                 <x-forms.button>
                                     Update
                                     <x-external-link />
