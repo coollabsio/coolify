@@ -1,81 +1,81 @@
 <nav class="flex flex-col flex-1 px-2 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base"
     x-data="{
         switchWidth() {
-                if (this.full === 'full') {
-                    localStorage.setItem('pageWidth', 'center');
-                } else {
-                    localStorage.setItem('pageWidth', 'full');
-                }
-                window.location.reload();
-            },
-            setZoom(zoom) {
-                localStorage.setItem('zoom', zoom);
-                window.location.reload();
-            },
-            init() {
-                this.full = localStorage.getItem('pageWidth');
-                this.zoom = localStorage.getItem('zoom');
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                    const userSettings = localStorage.getItem('theme');
-                    if (userSettings !== 'system') {
-                        return;
-                    }
-                    if (e.matches) {
-                        document.documentElement.classList.add('dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                    }
-                });
-                this.queryTheme();
-                this.checkZoom();
-            },
-            setTheme(type) {
-                this.theme = type;
-                localStorage.setItem('theme', type);
-                this.queryTheme();
-            },
-            queryTheme() {
-                const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const userSettings = localStorage.getItem('theme') || 'dark';
-                localStorage.setItem('theme', userSettings);
-                if (userSettings === 'dark') {
-                    document.documentElement.classList.add('dark');
-                    this.theme = 'dark';
-                } else if (userSettings === 'light') {
-                    document.documentElement.classList.remove('dark');
-                    this.theme = 'light';
-                } else if (darkModePreference) {
-                    this.theme = 'system';
-                    document.documentElement.classList.add('dark');
-                } else if (!darkModePreference) {
-                    this.theme = 'system';
-                    document.documentElement.classList.remove('dark');
-                }
-            },
-            checkZoom() {
-                if (this.zoom === null) {
-                    this.setZoom(100);
-                }
-                if (this.zoom === '90') {
-                    const style = document.createElement('style');
-                    style.textContent = `
-                                                                                                                html {
-                                                                                                                    font-size: 93.75%;
-                                                                                                                }
-
-                                                                                                                :root {
-                                                                                                                    --vh: 1vh;
-                                                                                                                }
-
-                                                                                                                @media (min-width: 1024px) {
-                                                                                                                    html {
-                                                                                                                        font-size: 87.5%;
-                                                                                                                    }
-                                                                                                                }
-                                                                                                            `;
-                    document.head.appendChild(style);
-                }
+            if (this.full === 'full') {
+                localStorage.setItem('pageWidth', 'center');
+            } else {
+                localStorage.setItem('pageWidth', 'full');
             }
+            window.location.reload();
+        },
+        setZoom(zoom) {
+            localStorage.setItem('zoom', zoom);
+            window.location.reload();
+        },
+        init() {
+            this.full = localStorage.getItem('pageWidth');
+            this.zoom = localStorage.getItem('zoom');
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+                const userSettings = localStorage.getItem('theme');
+                if (userSettings !== 'system') {
+                    return;
+                }
+                if (e.matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            });
+            this.queryTheme();
+            this.checkZoom();
+        },
+        setTheme(type) {
+            this.theme = type;
+            localStorage.setItem('theme', type);
+            this.queryTheme();
+        },
+        queryTheme() {
+            const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const userSettings = localStorage.getItem('theme') || 'dark';
+            localStorage.setItem('theme', userSettings);
+            if (userSettings === 'dark') {
+                document.documentElement.classList.add('dark');
+                this.theme = 'dark';
+            } else if (userSettings === 'light') {
+                document.documentElement.classList.remove('dark');
+                this.theme = 'light';
+            } else if (darkModePreference) {
+                this.theme = 'system';
+                document.documentElement.classList.add('dark');
+            } else if (!darkModePreference) {
+                this.theme = 'system';
+                document.documentElement.classList.remove('dark');
+            }
+        },
+        checkZoom() {
+            if (this.zoom === null) {
+                this.setZoom(100);
+            }
+            if (this.zoom === '90') {
+                const style = document.createElement('style');
+                style.textContent = `
+                    html {
+                        font-size: 93.75%;
+                    }
+
+                    :root {
+                        --vh: 1vh;
+                    }
+
+                    @media (min-width: 1024px) {
+                        html {
+                            font-size: 87.5%;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
     }">
     <div class="flex lg:pt-6 pt-4 pb-4 pl-2">
         <div class="flex flex-col w-full">
@@ -106,7 +106,8 @@
                 @if (isSubscribed() || !isCloud())
                     <li>
                         <a title="Dashboard" href="/"
-                            class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}" wire:navigate.hover>
+                            class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                            wire:navigate.hover>
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

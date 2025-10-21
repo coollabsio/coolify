@@ -10,6 +10,7 @@ use Spatie\Url\Url;
 class EditDomain extends Component
 {
     use SynchronizesModelData;
+
     public $applicationId;
 
     public ServiceApplication $application;
