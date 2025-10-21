@@ -10,7 +10,7 @@
         </div>
     </div>
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
-    <div x-data="searchResources()">
+    <div x-data="searchResources">
         @if ($current_step === 'type')
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-10 py-2">
                 <input autocomplete="off" x-ref="searchInput" class="input-sticky"
@@ -132,91 +132,94 @@
                     <div>No resources found.</div>
                 </div>
             </div>
-            <script>
-                function sortFn(a, b) {
-                    return a.name.localeCompare(b.name)
-                }
-
-                function searchResources() {
-                    return {
-                        search: '',
-                        loading: false,
-                        isSticky: false,
-                        selecting: false,
-                        services: [],
-                        gitBasedApplications: [],
-                        dockerBasedApplications: [],
-                        databases: [],
-                        setType(type) {
-                            if (this.selecting) return;
-                            this.selecting = true;
-                            this.$wire.setType(type);
-                        },
-                        async loadResources() {
-                            this.loading = true;
-                            const {
-                                services,
-                                gitBasedApplications,
-                                dockerBasedApplications,
-                                databases
-                            } = await this.$wire.loadServices();
-                            this.services = services;
-                            this.gitBasedApplications = gitBasedApplications;
-                            this.dockerBasedApplications = dockerBasedApplications;
-                            this.databases = databases;
-                            this.loading = false;
-                            this.$nextTick(() => {
-                                this.$refs.searchInput.focus();
-                            });
-                        },
-                        filterAndSort(items, isSort = true) {
-                            const searchLower = this.search.trim().toLowerCase();
-
-                            if (searchLower === '') {
-                                return isSort ? Object.values(items).sort(sortFn) : Object.values(items);
-                            }
-                            const filtered = Object.values(items).filter(item => {
-                                return (item.name?.toLowerCase().includes(searchLower) ||
-                                    item.description?.toLowerCase().includes(searchLower) ||
-                                    item.slogan?.toLowerCase().includes(searchLower))
-                            })
-                            return isSort ? filtered.sort(sortFn) : filtered;
-                        },
-                        get filteredGitBasedApplications() {
-                            if (this.gitBasedApplications.length === 0) {
-                                return [];
-                            }
-                            return [
-                                this.gitBasedApplications,
-                            ].flatMap((items) => this.filterAndSort(items, false));
-                        },
-                        get filteredDockerBasedApplications() {
-                            if (this.dockerBasedApplications.length === 0) {
-                                return [];
-                            }
-                            return [
-                                this.dockerBasedApplications,
-                            ].flatMap((items) => this.filterAndSort(items, false));
-                        },
-                        get filteredDatabases() {
-                            if (this.databases.length === 0) {
-                                return [];
-                            }
-                            return [
-                                this.databases,
-                            ].flatMap((items) => this.filterAndSort(items, false));
-                        },
-                        get filteredServices() {
-                            if (this.services.length === 0) {
-                                return [];
-                            }
-                            return [
-                                this.services,
-                            ].flatMap((items) => this.filterAndSort(items, true));
-                        }
+            @script
+                <script>
+                    function sortFn(a, b) {
+                        return a.name.localeCompare(b.name)
                     }
-                }
-            </script>
+
+                    // Register with Alpine for wire:navigate compatibility
+                    if (!window.Alpine.data('searchResources')) {
+                        window.Alpine.data('searchResources', () => ({
+                            search: '',
+                            loading: false,
+                            isSticky: false,
+                            selecting: false,
+                            services: [],
+                            gitBasedApplications: [],
+                            dockerBasedApplications: [],
+                            databases: [],
+                            setType(type) {
+                                if (this.selecting) return;
+                                this.selecting = true;
+                                this.$wire.setType(type);
+                            },
+                            async loadResources() {
+                                this.loading = true;
+                                const {
+                                    services,
+                                    gitBasedApplications,
+                                    dockerBasedApplications,
+                                    databases
+                                } = await this.$wire.loadServices();
+                                this.services = services;
+                                this.gitBasedApplications = gitBasedApplications;
+                                this.dockerBasedApplications = dockerBasedApplications;
+                                this.databases = databases;
+                                this.loading = false;
+                                this.$nextTick(() => {
+                                    this.$refs.searchInput.focus();
+                                });
+                            },
+                            filterAndSort(items, isSort = true) {
+                                const searchLower = this.search.trim().toLowerCase();
+
+                                if (searchLower === '') {
+                                    return isSort ? Object.values(items).sort(sortFn) : Object.values(items);
+                                }
+                                const filtered = Object.values(items).filter(item => {
+                                    return (item.name?.toLowerCase().includes(searchLower) ||
+                                        item.description?.toLowerCase().includes(searchLower) ||
+                                        item.slogan?.toLowerCase().includes(searchLower))
+                                })
+                                return isSort ? filtered.sort(sortFn) : filtered;
+                            },
+                            get filteredGitBasedApplications() {
+                                if (this.gitBasedApplications.length === 0) {
+                                    return [];
+                                }
+                                return [
+                                    this.gitBasedApplications,
+                                ].flatMap((items) => this.filterAndSort(items, false));
+                            },
+                            get filteredDockerBasedApplications() {
+                                if (this.dockerBasedApplications.length === 0) {
+                                    return [];
+                                }
+                                return [
+                                    this.dockerBasedApplications,
+                                ].flatMap((items) => this.filterAndSort(items, false));
+                            },
+                            get filteredDatabases() {
+                                if (this.databases.length === 0) {
+                                    return [];
+                                }
+                                return [
+                                    this.databases,
+                                ].flatMap((items) => this.filterAndSort(items, false));
+                            },
+                            get filteredServices() {
+                                if (this.services.length === 0) {
+                                    return [];
+                                }
+                                return [
+                                    this.services,
+                                ].flatMap((items) => this.filterAndSort(items, true));
+                            }
+                        }));
+                    }
+                </script>
+            @endscript
         @endif
     </div>
     @if ($current_step === 'servers')

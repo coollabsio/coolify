@@ -66,7 +66,7 @@
             </div>
         @endcan
     @else
-        <div x-data="searchComponent()">
+        <div x-data="searchComponent">
             <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
@@ -239,54 +239,57 @@
 
 </div>
 
-<script>
-    function sortFn(a, b) {
-        return a.name.localeCompare(b.name)
-    }
+@script
+    <script>
+        function sortFn(a, b) {
+            return a.name.localeCompare(b.name)
+        }
 
-    function searchComponent() {
-        return {
-            search: '',
-            applications: @js($applications),
-            postgresqls: @js($postgresqls),
-            redis: @js($redis),
-            mongodbs: @js($mongodbs),
-            mysqls: @js($mysqls),
-            mariadbs: @js($mariadbs),
-            keydbs: @js($keydbs),
-            dragonflies: @js($dragonflies),
-            clickhouses: @js($clickhouses),
-            services: @js($services),
-            filterAndSort(items) {
-                if (this.search === '') {
-                    return Object.values(items).sort(sortFn);
+        // Register with Alpine for wire:navigate compatibility
+        if (!window.Alpine.data('searchComponent')) {
+            window.Alpine.data('searchComponent', () => ({
+                search: '',
+                applications: @js($applications),
+                postgresqls: @js($postgresqls),
+                redis: @js($redis),
+                mongodbs: @js($mongodbs),
+                mysqls: @js($mysqls),
+                mariadbs: @js($mariadbs),
+                keydbs: @js($keydbs),
+                dragonflies: @js($dragonflies),
+                clickhouses: @js($clickhouses),
+                services: @js($services),
+                filterAndSort(items) {
+                    if (this.search === '') {
+                        return Object.values(items).sort(sortFn);
+                    }
+                    const searchLower = this.search.toLowerCase();
+                    return Object.values(items).filter(item => {
+                        return (item.name?.toLowerCase().includes(searchLower) ||
+                            item.fqdn?.toLowerCase().includes(searchLower) ||
+                            item.description?.toLowerCase().includes(searchLower) ||
+                            item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
+                    }).sort(sortFn);
+                },
+                get filteredApplications() {
+                    return this.filterAndSort(this.applications)
+                },
+                get filteredDatabases() {
+                    return [
+                        this.postgresqls,
+                        this.redis,
+                        this.mongodbs,
+                        this.mysqls,
+                        this.mariadbs,
+                        this.keydbs,
+                        this.dragonflies,
+                        this.clickhouses,
+                    ].flatMap((items) => this.filterAndSort(items))
+                },
+                get filteredServices() {
+                    return this.filterAndSort(this.services)
                 }
-                const searchLower = this.search.toLowerCase();
-                return Object.values(items).filter(item => {
-                    return (item.name?.toLowerCase().includes(searchLower) ||
-                        item.fqdn?.toLowerCase().includes(searchLower) ||
-                        item.description?.toLowerCase().includes(searchLower) ||
-                        item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
-                }).sort(sortFn);
-            },
-            get filteredApplications() {
-                return this.filterAndSort(this.applications)
-            },
-            get filteredDatabases() {
-                return [
-                    this.postgresqls,
-                    this.redis,
-                    this.mongodbs,
-                    this.mysqls,
-                    this.mariadbs,
-                    this.keydbs,
-                    this.dragonflies,
-                    this.clickhouses,
-                ].flatMap((items) => this.filterAndSort(items))
-            },
-            get filteredServices() {
-                return this.filterAndSort(this.services)
-            }
-        };
-    }
-</script>
+            }));
+        }
+    </script>
+@endscript
