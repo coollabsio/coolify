@@ -4,9 +4,11 @@
         @can('update', $resource)
             <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
                 @if ($resource->type() == 'application')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
+                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id"
+                        :containerNames="$containerNames" />
                 @elseif ($resource->type() == 'service')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
+                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id"
+                        :containerNames="$containerNames" />
                 @endif
             </x-modal-input>
         @endcan
@@ -14,7 +16,7 @@
     <div class="flex flex-col flex-wrap gap-2 pt-4">
         @forelse($resource->scheduled_tasks as $task)
             @if ($resource->type() == 'application')
-                <a wire:navigate class="box"
+                <a wire:navigate.hover class="box"
                     href="{{ route('project.application.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
                         <span class="text-lg font-bold">{{ $task->name }}
@@ -29,7 +31,7 @@
                     </span>
                 </a>
             @elseif ($resource->type() == 'service')
-                <a wire:navigate class="box"
+                <a wire:navigate.hover class="box"
                     href="{{ route('project.service.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
                         <span class="text-lg font-bold">{{ $task->name }}

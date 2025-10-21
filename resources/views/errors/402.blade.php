@@ -8,7 +8,7 @@
             <a href="{{ url()->previous() }}">
                 <x-forms.button>Go back</x-forms.button>
             </a>
-            <a href="{{ route('dashboard') }}" wire:navigate>
+            <a href="{{ route('dashboard') }}" wire:navigate.hover>
                 <x-forms.button>Dashboard</x-forms.button>
             </a>
             <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">Contact

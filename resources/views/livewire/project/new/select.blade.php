@@ -134,11 +134,7 @@
             </div>
             @script
                 <script>
-                    function sortFn(a, b) {
-                        return a.name.localeCompare(b.name)
-                    }
-
-                    // Register with Alpine for wire:navigate compatibility
+                    // Register with Alpine for wire:navigate.hover compatibility
                     if (!window.Alpine.data('searchResources')) {
                         window.Alpine.data('searchResources', () => ({
                             search: '',
@@ -149,6 +145,9 @@
                             gitBasedApplications: [],
                             dockerBasedApplications: [],
                             databases: [],
+                            sortFn(a, b) {
+                                return a.name.localeCompare(b.name)
+                            },
                             setType(type) {
                                 if (this.selecting) return;
                                 this.selecting = true;
@@ -175,14 +174,14 @@
                                 const searchLower = this.search.trim().toLowerCase();
 
                                 if (searchLower === '') {
-                                    return isSort ? Object.values(items).sort(sortFn) : Object.values(items);
+                                    return isSort ? Object.values(items).sort((a, b) => this.sortFn(a, b)) : Object.values(items);
                                 }
                                 const filtered = Object.values(items).filter(item => {
                                     return (item.name?.toLowerCase().includes(searchLower) ||
                                         item.description?.toLowerCase().includes(searchLower) ||
                                         item.slogan?.toLowerCase().includes(searchLower))
                                 })
-                                return isSort ? filtered.sort(sortFn) : filtered;
+                                return isSort ? filtered.sort((a, b) => this.sortFn(a, b)) : filtered;
                             },
                             get filteredGitBasedApplications() {
                                 if (this.gitBasedApplications.length === 0) {
@@ -228,7 +227,7 @@
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($onlyBuildServerAvailable)
                 <div> Only build servers are available, you need at least one server that is not set as build
-                    server. <a wire:navigate class="underline dark:text-white" href="/servers">
+                    server. <a wire:navigate.hover class="underline dark:text-white" href="/servers">
                         Go to servers page
                     </a> </div>
             @else
@@ -245,7 +244,7 @@
                 @empty
                     <div>
 
-                        <div>No validated & reachable servers found. <a wire:navigate class="underline dark:text-white"
+                        <div>No validated & reachable servers found. <a wire:navigate.hover class="underline dark:text-white"
                                 href="/servers">
                                 Go to servers page
                             </a></div>

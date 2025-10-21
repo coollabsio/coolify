@@ -54,7 +54,7 @@
                                         <x-external-link />
                                     </x-forms.button>
                                 </a>
-                                <a wire:navigate href="{{ getInstallationPath($github_app) }}" class="w-fit">
+                                <a wire:navigate.hover href="{{ getInstallationPath($github_app) }}" class="w-fit">
                                     <x-forms.button
                                         class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline whitespace-nowrap">
                                         Update Repositories
@@ -112,7 +112,7 @@
                         <h2 class="pt-4">Permissions</h2>
                         @can('view', $github_app)
                             <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                            <a wire:navigate href="{{ getPermissionsPath($github_app) }}">
+                            <a wire:navigate.hover href="{{ getPermissionsPath($github_app) }}">
                                 <x-forms.button>
                                     Update
                                     <x-external-link />
@@ -172,7 +172,7 @@
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource, 'environment.name') }}
                                                         </td>
-                                                        <td class="px-5 py-4 text-sm whitespace-nowrap"><a wire:navigate
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap"><a wire:navigate.hover
                                                                 class=""
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
