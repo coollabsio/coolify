@@ -2498,21 +2498,6 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
-    "minio": {
-        "documentation": "https://min.io/docs/minio/container/index.html?utm_source=coolify.io",
-        "slogan": "MinIO is a high performance object storage server compatible with Amazon S3 APIs.",
-        "compose": "c2VydmljZXM6CiAgbWluaW86CiAgICBpbWFnZTogJ3F1YXkuaW8vbWluaW8vbWluaW86bGF0ZXN0JwogICAgY29tbWFuZDogJ3NlcnZlciAvZGF0YSAtLWNvbnNvbGUtYWRkcmVzcyAiOjkwMDEiJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTUlOSU9fU0VSVkVSX1VSTD0kTUlOSU9fU0VSVkVSX1VSTAogICAgICAtIE1JTklPX0JST1dTRVJfUkVESVJFQ1RfVVJMPSRNSU5JT19CUk9XU0VSX1JFRElSRUNUX1VSTAogICAgICAtIE1JTklPX1JPT1RfVVNFUj0kU0VSVklDRV9VU0VSX01JTklPCiAgICAgIC0gTUlOSU9fUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9NSU5JTwogICAgdm9sdW1lczoKICAgICAgLSAnbWluaW8tZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBtYwogICAgICAgIC0gcmVhZHkKICAgICAgICAtIGxvY2FsCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
-        "tags": [
-            "object",
-            "storage",
-            "server",
-            "s3",
-            "api"
-        ],
-        "category": "storage",
-        "logo": "svgs/minio.svg",
-        "minversion": "0.0.0"
-    },
     "mixpost": {
         "documentation": "https://docs.mixpost.app/lite?utm_source=coolify.io",
         "slogan": "Mixpost is a robust and versatile social media management software, designed to streamline social media operations and enhance content marketing strategies.",
