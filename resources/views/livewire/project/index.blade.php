@@ -23,11 +23,11 @@
                     </div>
                     <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold"
                         x-show="project.canUpdate || project.canCreateResource">
-                        <a class="hover:underline" wire:click.stop x-show="project.addResourceRoute"
+                        <a class="hover:underline" wire:click.stop wire:navigate.hover x-show="project.addResourceRoute"
                             :href="project.addResourceRoute">
                             + Add Resource
                         </a>
-                        <a class="hover:underline" wire:click.stop x-show="project.canUpdate"
+                        <a class="hover:underline" wire:click.stop wire:navigate.hover x-show="project.canUpdate"
                             :href="`/project/${project.uuid}/edit`">
                             Settings
                         </a>

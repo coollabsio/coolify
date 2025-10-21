@@ -757,7 +757,7 @@
                                     </div>
                                 </template>
                                 <template x-for="(result, index) in searchResults" :key="index">
-                                    <a :href="result.link || '#'"
+                                    <a :href="result.link || '#'" wire:navigate.hover
                                         class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
                                         <div class="flex items-center justify-between gap-3">
                                             <div class="flex-1 min-w-0">

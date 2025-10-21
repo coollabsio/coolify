@@ -94,7 +94,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink" wire:navigate.hover>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -126,10 +126,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name" wire:navigate.hover>
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag" wire:navigate.hover>
                                 Add tag
                             </a>
                         </div>
@@ -143,7 +143,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink" wire:navigate.hover>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -175,10 +175,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name" wire:navigate.hover>
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag" wire:navigate.hover>
                                 Add tag
                             </a>
                         </div>
@@ -192,7 +192,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink" wire:navigate.hover>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -224,10 +224,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name" wire:navigate.hover>
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag" wire:navigate.hover>
                                 Add tag
                             </a>
                         </div>
