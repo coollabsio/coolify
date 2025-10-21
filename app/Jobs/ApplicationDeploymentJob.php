@@ -517,6 +517,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_image_names();
         $this->prepare_builder_image();
         $this->generate_compose_file();
+
+        // Save runtime environment variables (including empty .env file if no variables defined)
+        $this->save_runtime_environment_variables();
+
         $this->rolling_update();
     }
 
@@ -1222,9 +1226,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Handle empty environment variables
         if ($environment_variables->isEmpty()) {
-            // For Docker Compose, we need to create an empty .env file
+            // For Docker Compose and Docker Image, we need to create an empty .env file
             // because we always reference it in the compose file
-            if ($this->build_pack === 'dockercompose') {
+            if ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerimage') {
                 $this->application_deployment_queue->addLogEntry('Creating empty .env file (no environment variables defined).');
 
                 // Create empty .env file
