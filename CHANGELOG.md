@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.436] - 2025-10-17
+
 ### 🚀 Features
 
 - Implement TrustHosts middleware to handle FQDN and IP address trust logic
