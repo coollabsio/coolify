@@ -579,5 +579,6 @@ export function initializeTerminalComponent() {
         };
     }
 
+    // Register with Alpine - safe to call multiple times as it just overwrites
     window.Alpine.data('terminalData', terminalData);
 }
