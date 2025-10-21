@@ -20,7 +20,7 @@
         @else
             @forelse($database->scheduledBackups as $backup)
                 @if ($type == 'database')
-                    <a @class([
+                    <a wire:navigate @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
                         'border-blue-500/50 border-dashed' =>
                             $backup->latest_log &&

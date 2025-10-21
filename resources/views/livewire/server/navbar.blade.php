@@ -56,7 +56,7 @@
     <div class="navbar-main">
         <nav
             class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
-            <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
@@ -64,21 +64,21 @@
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
-                <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }}"
+                <a wire:navigate class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.proxy', [
                         'server_uuid' => data_get($server, 'uuid'),
                     ]) }}">
                     Proxy
                 </a>
             @endif
-            <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.resources', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
                 Resources
             </a>
             @can('canAccessTerminal')
-                <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
+                <a wire:navigate class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.command', [
                         'server_uuid' => data_get($server, 'uuid'),
                     ]) }}">
@@ -86,7 +86,7 @@
                 </a>
             @endcan
             @can('update', $server)
-                <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
+                <a wire:navigate class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
                     href="{{ route('server.security.patches', [
                         'server_uuid' => data_get($server, 'uuid'),
                     ]) }}">

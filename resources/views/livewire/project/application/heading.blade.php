@@ -2,21 +2,21 @@
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
-            <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.deployment.index', $parameters) }}">
                 Deployments
             </a>
-            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
                 Logs
             </a>
             @if (!$application->destination->server->isSwarm())
                 @can('canAccessTerminal')
-                    <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
+                    <a wire:navigate class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
                         href="{{ route('project.application.command', $parameters) }}">
                         Terminal
                     </a>

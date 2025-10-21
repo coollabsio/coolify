@@ -35,7 +35,7 @@
                     </svg>
                     <span>You must complete this step before you can use this source!</span>
                 </div>
-                <a wire:navigate class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
+                <a class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
                     Install Repositories on GitHub
                 </a>
             @else
@@ -172,7 +172,7 @@
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource, 'environment.name') }}
                                                         </td>
-                                                        <td class="px-5 py-4 text-sm whitespace-nowrap"><a
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap"><a wire:navigate
                                                                 class=""
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
