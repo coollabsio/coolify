@@ -132,7 +132,6 @@
                     <div>No resources found.</div>
                 </div>
             </div>
-            @script
                 <script>
                     // Register with Alpine for wire:navigate.hover compatibility
                     if (!window.Alpine.data('searchResources')) {
@@ -218,7 +217,6 @@
                         }));
                     }
                 </script>
-            @endscript
         @endif
     </div>
     @if ($current_step === 'servers')
