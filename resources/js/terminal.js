@@ -92,10 +92,6 @@ export function initializeTerminalComponent() {
                     }, { once: true });
                 });
 
-                window.onresize = () => {
-                    this.resizeTerminal()
-                };
-
                 // Set up ResizeObserver for more reliable terminal resizing
                 if (window.ResizeObserver) {
                     this.resizeObserver = new ResizeObserver(() => {
