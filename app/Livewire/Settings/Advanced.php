@@ -89,7 +89,7 @@ class Advanced extends Component
             $allowsFromAnywhere = false;
             if (empty($this->allowed_ips)) {
                 $allowsFromAnywhere = true;
-            } elseif ($this->allowed_ips === '0.0.0.0' || str_contains($this->allowed_ips, '0.0.0.0')) {
+            } elseif ($this->allowed_ips === '0.0.0.0' || in_array('0.0.0.0', array_map('trim', explode(',', $this->allowed_ips)))) {
                 $allowsFromAnywhere = true;
             }
 
