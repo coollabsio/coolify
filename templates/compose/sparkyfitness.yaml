@@ -56,7 +56,3 @@ services:
     volumes:
       - 'sparkyfitness-db-postgresql:/var/lib/postgresql/data'
 
-volumes:
-  sparkyfitness-server-backup:
-  sparkyfitness-server-uploads:
-  sparkyfitness-db-postgresql:
