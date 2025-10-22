@@ -8,7 +8,6 @@
 services:
   sparkyfitness-frontend:
     image: 'codewithcj/sparkyfitness:latest'
-    restart: always
     environment:
       - SERVICE_URL_SPARKYFITNESS_80
     depends_on:
