@@ -1804,7 +1804,9 @@ class Application extends BaseModel
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
         $dockerfile = str($dockerfile)->trim()->explode("\n");
-        if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
+        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+
+        if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();
             foreach ($lines as $line) {
@@ -1845,6 +1847,14 @@ class Application extends BaseModel
                     $this->save();
                 }
             }
+        } elseif (! $hasHealthcheck && $this->custom_healthcheck_found) {
+            // HEALTHCHECK was removed from Dockerfile, reset to defaults
+            $this->custom_healthcheck_found = false;
+            $this->health_check_interval = 5;
+            $this->health_check_timeout = 5;
+            $this->health_check_retries = 10;
+            $this->health_check_start_period = 5;
+            $this->save();
         }
     }
 
