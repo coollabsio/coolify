@@ -16,7 +16,6 @@ services:
 
   sparkyfitness-server:
     image: 'codewithcj/sparkyfitness_server:latest'
-    restart: always
     environment:
       SPARKY_FITNESS_LOG_LEVEL: '${SPARKY_FITNESS_LOG_LEVEL:-info}'
       SPARKY_FITNESS_DB_USER: '${SERVICE_USER_POSTGRES}'
