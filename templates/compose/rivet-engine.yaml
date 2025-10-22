@@ -1,7 +1,7 @@
 # documentation: https://www.rivet.dev/docs
-# slogan: Open-source visual AI programming environment for building AI agents with LLMs
-# category: ai
-# tags: ai, visual programming, llm, chatbot, agent, postgresql
+# slogan: Build and scale stateful workloads with long-lived processes
+# category: development
+# tags: stateful, actors, realtime, backend, serverless, postgresql
 # logo: svgs/rivet.svg
 # port: 6420
 
