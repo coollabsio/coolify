@@ -1,0 +1,42 @@
+# documentation: https://www.rivet.dev/docs
+# slogan: Open-source visual AI programming environment for building AI agents with LLMs
+# category: ai
+# tags: ai, visual programming, llm, chatbot, agent, postgresql
+# logo: svgs/rivet.svg
+# port: 6420
+
+services:
+  rivet-engine:
+    image: rivetkit/engine:25.8.0
+    platform: linux/amd64
+    environment:
+      - SERVICE_URL_RIVET_6420
+      - RIVET__POSTGRES__URL=postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE-rivet}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - http://127.0.0.1:6420/health
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  postgresql:
+    image: postgres:17-alpine
+    volumes:
+      - rivet-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE-rivet}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
