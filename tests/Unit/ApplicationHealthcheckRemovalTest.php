@@ -3,55 +3,79 @@
 /**
  * Tests for parseHealthcheckFromDockerfile method
  *
- * NOTE: These tests verify the logic for detecting when a HEALTHCHECK directive
- * is removed from a Dockerfile. The fix ensures that healthcheck removal is detected
- * regardless of the health_check_enabled setting.
+ * These tests verify the logic for detecting HEALTHCHECK directives in Dockerfiles,
+ * properly ignoring commented lines.
  */
-
-use App\Models\Application;
-
 it('detects when HEALTHCHECK is removed from dockerfile', function () {
-    // This test verifies the fix for the bug where Coolify doesn't detect
-    // when a HEALTHCHECK is removed from a Dockerfile, causing deployments to fail.
+    $dockerfile = "FROM nginx:latest\nCOPY . /app\nEXPOSE 80";
 
-    $dockerfile = str("FROM nginx:latest\nCOPY . /app\nEXPOSE 80")->trim()->explode("\n");
-
-    // The key fix: hasHealthcheck check happens BEFORE the isHealthcheckDisabled check
-    $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
-
-    // Simulate an application with custom_healthcheck_found = true
+    $hasHealthcheck = hasUncommentedHealthcheck($dockerfile);
     $customHealthcheckFound = true;
-
-    // The fixed logic: This condition should be true when HEALTHCHECK is removed
     $shouldReset = ! $hasHealthcheck && $customHealthcheckFound;
 
     expect($shouldReset)->toBeTrue()
-        ->and($hasHealthcheck)->toBeFalse()
-        ->and($customHealthcheckFound)->toBeTrue();
+        ->and($hasHealthcheck)->toBeFalse();
 });
 
-it('does not reset when HEALTHCHECK exists in dockerfile', function () {
-    $dockerfile = str("FROM nginx:latest\nHEALTHCHECK --interval=30s CMD curl\nEXPOSE 80")->trim()->explode("\n");
+it('detects uncommented HEALTHCHECK in dockerfile', function () {
+    $dockerfile = "FROM nginx:latest\nHEALTHCHECK --interval=30s CMD curl\nEXPOSE 80";
 
-    $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
-    $customHealthcheckFound = true;
+    $hasHealthcheck = hasUncommentedHealthcheck($dockerfile);
 
-    // When healthcheck exists, should not reset
-    $shouldReset = ! $hasHealthcheck && $customHealthcheckFound;
-
-    expect($shouldReset)->toBeFalse()
-        ->and($hasHealthcheck)->toBeTrue();
+    expect($hasHealthcheck)->toBeTrue();
 });
 
-it('does not reset when custom_healthcheck_found is false', function () {
-    $dockerfile = str("FROM nginx:latest\nCOPY . /app\nEXPOSE 80")->trim()->explode("\n");
+it('ignores commented HEALTHCHECK in dockerfile', function () {
+    $dockerfile = "FROM nginx:latest\n# HEALTHCHECK --interval=30s CMD curl\nEXPOSE 80";
 
-    $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
-    $customHealthcheckFound = false;
+    $hasHealthcheck = hasUncommentedHealthcheck($dockerfile);
 
-    // When custom_healthcheck_found is false, no need to reset
-    $shouldReset = ! $hasHealthcheck && $customHealthcheckFound;
-
-    expect($shouldReset)->toBeFalse()
-        ->and($customHealthcheckFound)->toBeFalse();
+    expect($hasHealthcheck)->toBeFalse();
 });
+
+it('detects HEALTHCHECK even with surrounding whitespace', function () {
+    $dockerfile = "FROM nginx:latest\n   HEALTHCHECK --interval=30s CMD curl\nEXPOSE 80";
+
+    $hasHealthcheck = hasUncommentedHealthcheck($dockerfile);
+
+    expect($hasHealthcheck)->toBeTrue();
+});
+
+it('ignores HEALTHCHECK in middle of line (must be at start)', function () {
+    $dockerfile = "FROM nginx:latest\nRUN echo HEALTHCHECK\nEXPOSE 80";
+
+    $hasHealthcheck = hasUncommentedHealthcheck($dockerfile);
+
+    expect($hasHealthcheck)->toBeFalse();
+});
+
+it('detects HEALTHCHECK when commented out then uncommented', function () {
+    $dockerfileCommented = "FROM nginx:latest\n# HEALTHCHECK --interval=30s CMD curl\nEXPOSE 80";
+    $dockerfileUncommented = "FROM nginx:latest\nHEALTHCHECK --interval=30s CMD curl\nEXPOSE 80";
+
+    $hasHealthcheckCommented = hasUncommentedHealthcheck($dockerfileCommented);
+    $hasHealthcheckUncommented = hasUncommentedHealthcheck($dockerfileUncommented);
+
+    expect($hasHealthcheckCommented)->toBeFalse()
+        ->and($hasHealthcheckUncommented)->toBeTrue();
+});
+
+// Helper function that mimics the logic in parseHealthcheckFromDockerfile
+function hasUncommentedHealthcheck(string $dockerfile): bool
+{
+    $lines = str($dockerfile)->trim()->explode("\n");
+
+    foreach ($lines as $line) {
+        $trimmedLine = trim($line);
+        // Skip empty lines and comments
+        if (empty($trimmedLine) || str_starts_with($trimmedLine, '#')) {
+            continue;
+        }
+        // Check if line starts with HEALTHCHECK (not commented)
+        if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
+            return true;
+        }
+    }
+
+    return false;
+}

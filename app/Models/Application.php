@@ -1804,7 +1804,21 @@ class Application extends BaseModel
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
         $dockerfile = str($dockerfile)->trim()->explode("\n");
-        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+
+        // Check if there's an uncommented HEALTHCHECK directive
+        $hasHealthcheck = false;
+        foreach ($dockerfile as $line) {
+            $trimmedLine = trim($line);
+            // Skip empty lines and comments
+            if (empty($trimmedLine) || str_starts_with($trimmedLine, '#')) {
+                continue;
+            }
+            // Check if line starts with HEALTHCHECK (not commented)
+            if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
+                $hasHealthcheck = true;
+                break;
+            }
+        }
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
@@ -1824,6 +1838,10 @@ class Application extends BaseModel
             $lines = $dockerfile->toArray();
             foreach ($lines as $line) {
                 $trimmedLine = trim($line);
+                // Skip comments
+                if (str_starts_with($trimmedLine, '#')) {
+                    continue;
+                }
                 if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
                     $healthcheckCommand .= trim($trimmedLine, '\\ ');
 
