@@ -14,7 +14,7 @@ services:
       - sparkyfitness-server
 
   sparkyfitness-server:
-    image: 'codewithcj/sparkyfitness_server:latest'
+    image: 'codewithcj/sparkyfitness_server:v0.15.7.3' # Released on Oct 18, 2025
     environment:
       - 'SPARKY_FITNESS_LOG_LEVEL=${SPARKY_FITNESS_LOG_LEVEL:-info}'
       - 'SPARKY_FITNESS_DB_USER=${SERVICE_USER_POSTGRES}'
