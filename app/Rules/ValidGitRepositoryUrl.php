@@ -92,7 +92,7 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             // Ensure any percent signs are valid percent-encodings like %20
-            if (! empty($path) && preg_match('/%(?![0-9A-Fa-f]{2})/', $path)) {
+            if (! empty($value) && preg_match('/%(?![0-9A-Fa-f]{2})/', $value)) {
                 $fail('The :attribute path contains invalid percent encoding.');
                 return;
             }
