@@ -41,7 +41,6 @@ services:
 
   sparkyfitness-db:
     image: 'postgres:15-alpine'
-    restart: always
     environment:
       POSTGRES_DB: '${SPARKY_FITNESS_DB_NAME:-sparkyfitness}'
       POSTGRES_USER: '${SERVICE_USER_POSTGRES}'
