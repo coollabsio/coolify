@@ -1297,7 +1297,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         return array_search($key, $customOrder);
     });
 
-    $resource->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $resource->docker_compose = $cleanedCompose;
+    // Also update docker_compose_raw to remove content: from volumes
+    // This prevents content from being reapplied on subsequent deployments
+    $resource->docker_compose_raw = $cleanedCompose;
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
@@ -2220,7 +2224,11 @@ function serviceParser(Service $resource): Collection
         return array_search($key, $customOrder);
     });
 
-    $resource->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $resource->docker_compose = $cleanedCompose;
+    // Also update docker_compose_raw to remove content: from volumes
+    // This prevents content from being reapplied on subsequent deployments
+    $resource->docker_compose_raw = $cleanedCompose;
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
