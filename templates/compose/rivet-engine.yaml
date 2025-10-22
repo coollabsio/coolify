@@ -10,6 +10,7 @@ services:
     image: rivetkit/engine:25.8.0
     environment:
       - SERVICE_URL_RIVET_6420
+      - 'RIVET__AUTH__ADMIN_TOKEN=${SERVICE_PASSWORD_RIVET}'
       - RIVET__POSTGRES__URL=postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE-rivet}
     depends_on:
       postgresql:
