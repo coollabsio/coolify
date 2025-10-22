@@ -1632,7 +1632,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             if ($this->application->custom_healthcheck_found) {
-                $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping default healthcheck.');
+                $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
             }
             if ($this->container_name) {
                 $counter = 1;
@@ -2356,16 +2356,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         ];
         // Always use .env file
         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
-        $docker_compose['services'][$this->container_name]['healthcheck'] = [
-            'test' => [
-                'CMD-SHELL',
-                $this->generate_healthcheck_commands(),
-            ],
-            'interval' => $this->application->health_check_interval.'s',
-            'timeout' => $this->application->health_check_timeout.'s',
-            'retries' => $this->application->health_check_retries,
-            'start_period' => $this->application->health_check_start_period.'s',
-        ];
+
+        // Only add Coolify healthcheck if no custom HEALTHCHECK found in Dockerfile
+        // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
+        // If healthcheck is disabled, no healthcheck will be added
+        if (! $this->application->custom_healthcheck_found && ! $this->application->isHealthcheckDisabled()) {
+            $docker_compose['services'][$this->container_name]['healthcheck'] = [
+                'test' => [
+                    'CMD-SHELL',
+                    $this->generate_healthcheck_commands(),
+                ],
+                'interval' => $this->application->health_check_interval.'s',
+                'timeout' => $this->application->health_check_timeout.'s',
+                'retries' => $this->application->health_check_retries,
+                'start_period' => $this->application->health_check_start_period.'s',
+            ];
+        }
 
         if (! is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
