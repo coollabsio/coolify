@@ -89,13 +89,8 @@ class Advanced extends Component
             $allowsFromAnywhere = false;
             if (empty($this->allowed_ips)) {
                 $allowsFromAnywhere = true;
-            } elseif ($this->allowed_ips === '0.0.0.0' || in_array('0.0.0.0', array_map('trim', explode(',', $this->allowed_ips)))) {
+            } elseif (in_array('0.0.0.0', array_map('trim', explode(',', $this->allowed_ips)))) {
                 $allowsFromAnywhere = true;
-            }
-
-            // Check if it's 0.0.0.0 (allow all) or empty
-            if ($this->allowed_ips === '0.0.0.0' || empty($this->allowed_ips)) {
-                // Keep as is - empty means no restriction, 0.0.0.0 means allow all
             } else {
                 // Validate and clean up the entries
                 $invalidEntries = [];
