@@ -7,7 +7,7 @@
 
 services:
   sparkyfitness-frontend:
-    image: 'codewithcj/sparkyfitness:latest'
+    image: 'codewithcj/sparkyfitness:v0.15.7.3' # Released on Oct 18, 2025
     environment:
       - SERVICE_URL_SPARKYFITNESS_80
     depends_on:
