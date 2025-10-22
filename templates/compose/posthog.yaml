@@ -1875,9 +1875,14 @@ services:
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     entrypoint: sh
-    command: -c 'mkdir -p /data/posthog && minio server --address ":19000" --console-address ":19001" /data'
+    command: -c 'mkdir -p /data/posthog && minio server --address ":9000" --console-address ":9001" /data'
     volumes:
       - object_storage:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   maildev:
     image: maildev/maildev:2.0.5

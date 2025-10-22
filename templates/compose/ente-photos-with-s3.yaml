@@ -96,11 +96,7 @@ services:
     volumes:
       - 'minio-data:/data'
     healthcheck:
-      test:
-        - CMD
-        - mc
-        - ready
-        - local
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 20s
       retries: 10

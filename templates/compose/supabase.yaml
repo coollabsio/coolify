@@ -1078,10 +1078,10 @@ services:
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     command: server --console-address ":9001" /data
     healthcheck:
-      test: sleep 5 && exit 0
-      interval: 2s
-      timeout: 10s
-      retries: 5
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
     volumes:
       - ./volumes/storage:/data
 

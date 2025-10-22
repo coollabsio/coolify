@@ -75,10 +75,10 @@ services:
       - MINIO_BROWSER=off
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
       timeout: 20s
-      retries: 3
+      retries: 10
 
   proxy-service:
     image: budibase/proxy
