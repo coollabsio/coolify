@@ -235,15 +235,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
-volumes:
-  pgdata:
-  redisdata:
-  uploads:
-  logs_api:
-  logs_worker:
-  logs_beat-worker:
-  logs_migrator:
-  rabbitmq_data:
-  proxy_config:
-  proxy_data:
