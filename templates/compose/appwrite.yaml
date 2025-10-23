@@ -139,12 +139,22 @@ services:
       - _APP_DATABASE_SHARED_NAMESPACE=${_APP_DATABASE_SHARED_NAMESPACE}
       - _APP_FUNCTIONS_CREATION_ABUSE_LIMIT=${_APP_FUNCTIONS_CREATION_ABUSE_LIMIT}
       - _APP_CUSTOM_DOMAIN_DENY_LIST=${_APP_CUSTOM_DOMAIN_DENY_LIST}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsI http://localhost:80 | head -n 1 | grep -E '^HTTP/.* 3[0-9]{2} ' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-console:
     image: appwrite/console:6.1.28
     container_name: appwrite-console
     environment:
       - SERVICE_URL_APPWRITE=/console
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsI http://localhost:80 | head -n 1 | grep -E '^HTTP/.* 3[0-9]{2} ' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-realtime:
     image: appwrite/appwrite:1.7.4
@@ -172,6 +182,11 @@ services:
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s localhost > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-audits:
     image: appwrite/appwrite:1.7.4
@@ -195,6 +210,12 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-audits' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   appwrite-worker-webhooks:
     image: appwrite/appwrite:1.7.4
@@ -221,6 +242,11 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_WEBHOOK_MAX_FAILED_ATTEMPTS=${_APP_WEBHOOK_MAX_FAILED_ATTEMPTS}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-webhooks' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-deletes:
     image: appwrite/appwrite:1.7.4
@@ -279,6 +305,11 @@ services:
       - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES}
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
       - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-deletes' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-databases:
     image: appwrite/appwrite:1.7.4
@@ -304,6 +335,12 @@ services:
       - _APP_WORKERS_NUM=${_APP_WORKERS_NUM}
       - _APP_QUEUE_NAME=${_APP_QUEUE_NAME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-databases' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   appwrite-worker-builds:
     image: appwrite/appwrite:1.7.4
@@ -371,6 +408,11 @@ services:
       - _APP_DOMAIN_SITES=${_APP_DOMAIN_SITES:-sites.$SERVICE_FQDN_APPWRITE}
       - _APP_BROWSER_HOST=${_APP_BROWSER_HOST}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-builds' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-certificates:
     image: appwrite/appwrite:1.7.4
@@ -405,6 +447,11 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-certificates' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-functions:
     image: appwrite/appwrite:1.7.4
@@ -442,6 +489,11 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-functions' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-mails:
     image: appwrite/appwrite:1.7.4
@@ -474,6 +526,12 @@ services:
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-mails' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   appwrite-worker-messaging:
     image: appwrite/appwrite:1.7.4
@@ -523,7 +581,12 @@ services:
       - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
-
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-messaging' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      
   appwrite-worker-migrations:
     image: appwrite/appwrite:1.7.4
     entrypoint: worker-migrations
@@ -556,6 +619,7 @@ services:
       - _APP_MIGRATIONS_FIREBASE_CLIENT_ID=${_APP_MIGRATIONS_FIREBASE_CLIENT_ID}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    exclude_from_hc: true
 
   appwrite-task-maintenance:
     image: appwrite/appwrite:1.7.4
@@ -593,6 +657,12 @@ services:
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
       - _APP_MAINTENANCE_START_TIME=${_APP_MAINTENANCE_START_TIME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[m]aintenance' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   appwrite-task-stats-resources:
     image: appwrite/appwrite:1.7.4
@@ -618,6 +688,11 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[s]tats-resources' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-stats-resources:
     image: appwrite/appwrite:1.7.4
@@ -642,6 +717,11 @@ services:
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-stats-resources' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-worker-stats-usage:
     image: appwrite/appwrite:1.7.4
@@ -667,6 +747,12 @@ services:
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-30}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[w]orker-stats-usage' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   appwrite-task-scheduler-functions:
     image: appwrite/appwrite:1.7.4
@@ -689,6 +775,11 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[s]chedule-functi' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-task-scheduler-executions:
     image: appwrite/appwrite:1.7.4
@@ -711,6 +802,11 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[s]chedule-execut' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-task-scheduler-messages:
     image: appwrite/appwrite:1.7.4
@@ -733,17 +829,33 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q '[s]chedule-messag' || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-assistant:
     image: appwrite/assistant:0.8.3
     container_name: appwrite-assistant
     environment:
       - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3003 || exit 0"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
 
   appwrite-browser:
     image: appwrite/browser:0.2.4
     container_name: appwrite-browser
     hostname: appwrite-browser
+    healthcheck:
+      test: ["CMD", "node", "-e", "import('http').then(http => http.get('http://localhost:3000', res => process.exit(0)).on('error', () => process.exit(1)))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
 
   openruntimes-executor:
     container_name: openruntimes-executor
@@ -805,6 +917,11 @@ services:
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
       - MARIADB_AUTO_UPGRADE=1
     command: 'mysqld --innodb-flush-method=fsync'
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
 
   appwrite-redis:
     image: redis:7.2.4-alpine
@@ -816,6 +933,11 @@ services:
       --maxmemory-samples    5
     volumes:
       - appwrite-redis:/data:rw
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
 
 networks:
   runtimes:
