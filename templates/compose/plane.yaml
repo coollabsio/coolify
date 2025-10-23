@@ -110,10 +110,11 @@ services:
   live:
     image: artifacts.plane.so/makeplane/plane-live:${APP_RELEASE:-v1.0.0}
     environment:
-      <<: [*live-env]
+      <<: [*live-env, *redis-env]
     depends_on:
       - api
       - web
+      - plane-redis
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
