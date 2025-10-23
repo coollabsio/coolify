@@ -125,16 +125,16 @@ services:
         target: /etc/pterodactyl/config.yml
         content: |-
           debug: false
-          uuid: REPLACE FROM CONFIG
-          token_id: REPLACE FROM CONFIG
-          token: REPLACE FROM CONFIG
+          uuid: REPLACE FROM CONFIG #example: abc9abc8-abc7-abc6-abc5-abc4abc3abc2
+          token_id: REPLACE FROM CONFIG #example: abc1abc2abc3abc4
+          token: REPLACE FROM CONFIG  #example: abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10abc11abc12abc13abc14abc15abc16
           api:
             host: 0.0.0.0
-            port: 8443
+            port: 8443 # use port 443 IN THE PANEL during node setup
             ssl:
               enabled: false
-              cert: REPLACE FROM CONFIG
-              key: REPLACE FROM CONFIG
+              cert: REPLACE FROM CONFIG #example: /etc/letsencrypt/live/wings-abcabcabcabcabc.example.com/fullchain.pem
+              key: REPLACE FROM CONFIG #example: /etc/letsencrypt/live/wings-abcabcabcabcabc.example.com/privkey.pem
             disable_remote_download: false
             upload_limit: 100
             trusted_proxies: []
@@ -225,6 +225,6 @@ services:
           allowed_mounts: []
           allowed_origins:
             - http://pterodactyl:80
-            - PANEL DOMAIN # 
+            - PANEL DOMAIN # example: https://pterodactyl-abcabcabcabcavc.example.com
           allow_cors_private_network: false
           ignore_panel_config_updates: false
