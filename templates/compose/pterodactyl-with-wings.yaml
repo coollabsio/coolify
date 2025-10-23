@@ -107,7 +107,7 @@ services:
       - MAIL_PASSWORD=$MAIL_PASSWORD
       - MAIL_ENCRYPTION=$MAIL_ENCRYPTION
   wings:
-    image: 'ghcr.io/pterodactyl/wings:latest'
+    image: 'ghcr.io/pterodactyl/wings:v1.11.13'
     restart: unless-stopped
     environment:
       - SERVICE_URL_WINGS_8443
