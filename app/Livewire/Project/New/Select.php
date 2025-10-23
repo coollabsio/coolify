@@ -102,6 +102,36 @@ class Select extends Component
                     : asset($default_logo),
             ] + (array) $service;
         })->all();
+
+        // Extract unique categories from services
+        $categories = collect($services)
+            ->pluck('category')
+            ->filter()
+            ->unique()
+            ->map(function ($category) {
+                // Handle multiple categories separated by comma
+                if (str_contains($category, ',')) {
+                    return collect(explode(',', $category))->map(fn ($cat) => trim($cat));
+                }
+
+                return [$category];
+            })
+            ->flatten()
+            ->unique()
+            ->map(function ($category) {
+                // Format common acronyms to uppercase
+                $acronyms = ['ai', 'api', 'ci', 'cd', 'cms', 'crm', 'erp', 'iot', 'vpn', 'vps', 'dns', 'ssl', 'tls', 'ssh', 'ftp', 'http', 'https', 'smtp', 'imap', 'pop3', 'sql', 'nosql', 'json', 'xml', 'yaml', 'csv', 'pdf', 'sms', 'mfa', '2fa', 'oauth', 'saml', 'jwt', 'rest', 'soap', 'grpc', 'graphql', 'websocket', 'webrtc', 'p2p', 'b2b', 'b2c', 'seo', 'sem', 'ppc', 'roi', 'kpi', 'ui', 'ux', 'ide', 'sdk', 'api', 'cli', 'gui', 'cdn', 'ddos', 'dos', 'xss', 'csrf', 'sqli', 'rce', 'lfi', 'rfi', 'ssrf', 'xxe', 'idor', 'owasp', 'gdpr', 'hipaa', 'pci', 'dss', 'iso', 'nist', 'cve', 'cwe', 'cvss'];
+                $lower = strtolower($category);
+
+                if (in_array($lower, $acronyms)) {
+                    return strtoupper($category);
+                }
+
+                return $category;
+            })
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
         $gitBasedApplications = [
             [
                 'id' => 'public',
@@ -202,6 +232,7 @@ class Select extends Component
 
         return [
             'services' => $services,
+            'categories' => $categories,
             'gitBasedApplications' => $gitBasedApplications,
             'dockerBasedApplications' => $dockerBasedApplications,
             'databases' => $databases,
