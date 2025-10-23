@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Redis;
 
 class CleanupRedis extends Command
 {
-    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup}';
+    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup} {--clear-locks : Clear stale WithoutOverlapping locks}';
 
-    protected $description = 'Cleanup Redis (Horizon jobs, metrics, overlapping queues, and related data)';
+    protected $description = 'Cleanup Redis (Horizon jobs, metrics, overlapping queues, cache locks, and related data)';
 
     public function handle()
     {
@@ -54,6 +54,13 @@ class CleanupRedis extends Command
             $this->info('Cleaning up overlapping queues...');
             $overlappingCleaned = $this->cleanupOverlappingQueues($redis, $prefix, $dryRun);
             $deletedCount += $overlappingCleaned;
+        }
+
+        // Clean up stale cache locks (WithoutOverlapping middleware)
+        if ($this->option('clear-locks')) {
+            $this->info('Cleaning up stale cache locks...');
+            $locksCleaned = $this->cleanupCacheLocks($dryRun);
+            $deletedCount += $locksCleaned;
         }
 
         if ($dryRun) {
@@ -269,6 +276,59 @@ class CleanupRedis extends Command
                     $cleanedCount += $duplicates;
                 }
             }
+        }
+
+        return $cleanedCount;
+    }
+
+    private function cleanupCacheLocks(bool $dryRun): int
+    {
+        $cleanedCount = 0;
+
+        // Use the default Redis connection (database 0) where cache locks are stored
+        $redis = Redis::connection('default');
+
+        // Get all keys matching WithoutOverlapping lock pattern
+        $allKeys = $redis->keys('*');
+        $lockKeys = [];
+
+        foreach ($allKeys as $key) {
+            // Match cache lock keys: they contain 'laravel-queue-overlap'
+            if (str_contains($key, 'laravel-queue-overlap')) {
+                $lockKeys[] = $key;
+            }
+        }
+
+        if (empty($lockKeys)) {
+            $this->info('  No cache locks found.');
+
+            return 0;
+        }
+
+        $this->info('  Found '.count($lockKeys).' cache lock(s)');
+
+        foreach ($lockKeys as $lockKey) {
+            // Check TTL to identify stale locks
+            $ttl = $redis->ttl($lockKey);
+
+            // TTL = -1 means no expiration (stale lock!)
+            // TTL = -2 means key doesn't exist
+            // TTL > 0 means lock is valid and will expire
+            if ($ttl === -1) {
+                if ($dryRun) {
+                    $this->warn("  Would delete STALE lock (no expiration): {$lockKey}");
+                } else {
+                    $redis->del($lockKey);
+                    $this->info("  ✓ Deleted STALE lock: {$lockKey}");
+                }
+                $cleanedCount++;
+            } elseif ($ttl > 0) {
+                $this->line("  Skipping active lock (expires in {$ttl}s): {$lockKey}");
+            }
+        }
+
+        if ($cleanedCount === 0) {
+            $this->info('  No stale locks found (all locks have expiration set)');
         }
 
         return $cleanedCount;
