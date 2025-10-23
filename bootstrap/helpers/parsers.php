@@ -358,6 +358,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
+    // Store original compose for later use to update docker_compose_raw with content removed
+    $originalCompose = $compose;
     if (! $compose) {
         return collect([]);
     }
@@ -1299,9 +1301,32 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
     $resource->docker_compose = $cleanedCompose;
-    // Also update docker_compose_raw to remove content: from volumes
-    // This prevents content from being reapplied on subsequent deployments
-    $resource->docker_compose_raw = $cleanedCompose;
+
+    // Update docker_compose_raw to remove content: from volumes only
+    // This keeps the original user input clean while preventing content reapplication
+    // Parse the original compose again to create a clean version without Coolify additions
+    try {
+        $originalYaml = Yaml::parse($originalCompose);
+        // Remove content, isDirectory, and is_directory from all volume definitions
+        if (isset($originalYaml['services'])) {
+            foreach ($originalYaml['services'] as $serviceName => &$service) {
+                if (isset($service['volumes'])) {
+                    foreach ($service['volumes'] as $key => &$volume) {
+                        if (is_array($volume)) {
+                            unset($volume['content']);
+                            unset($volume['isDirectory']);
+                            unset($volume['is_directory']);
+                        }
+                    }
+                }
+            }
+        }
+        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+    } catch (\Exception $e) {
+        // If parsing fails, keep the original docker_compose_raw unchanged
+        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
+    }
+
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
@@ -1313,6 +1338,8 @@ function serviceParser(Service $resource): Collection
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
+    // Store original compose for later use to update docker_compose_raw with content removed
+    $originalCompose = $compose;
     if (! $compose) {
         return collect([]);
     }
@@ -2226,9 +2253,32 @@ function serviceParser(Service $resource): Collection
 
     $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
     $resource->docker_compose = $cleanedCompose;
-    // Also update docker_compose_raw to remove content: from volumes
-    // This prevents content from being reapplied on subsequent deployments
-    $resource->docker_compose_raw = $cleanedCompose;
+
+    // Update docker_compose_raw to remove content: from volumes only
+    // This keeps the original user input clean while preventing content reapplication
+    // Parse the original compose again to create a clean version without Coolify additions
+    try {
+        $originalYaml = Yaml::parse($originalCompose);
+        // Remove content, isDirectory, and is_directory from all volume definitions
+        if (isset($originalYaml['services'])) {
+            foreach ($originalYaml['services'] as $serviceName => &$service) {
+                if (isset($service['volumes'])) {
+                    foreach ($service['volumes'] as $key => &$volume) {
+                        if (is_array($volume)) {
+                            unset($volume['content']);
+                            unset($volume['isDirectory']);
+                            unset($volume['is_directory']);
+                        }
+                    }
+                }
+            }
+        }
+        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+    } catch (\Exception $e) {
+        // If parsing fails, keep the original docker_compose_raw unchanged
+        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
+    }
+
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
