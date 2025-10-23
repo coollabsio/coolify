@@ -74,13 +74,13 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
-                                <x-slot:description>
-                                    <span x-html="window.sanitizeHTML(application.description)"></span>
-                                </x-slot>
-                                <x-slot:logo>
-                                    <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
-                                        :src="application.logo">
-                                </x-slot:logo>
+                                    <x-slot:description>
+                                        <span x-html="window.sanitizeHTML(application.description)"></span>
+                                        </x-slot>
+                                        <x-slot:logo>
+                                            <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                :src="application.logo">
+                                        </x-slot:logo>
                             </x-resource-view>
                         </div>
                     </template>
@@ -93,10 +93,10 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
-                                <x-slot:description><span x-text="application.description"></span></x-slot>
-                                <x-slot:logo> <img
-                                        class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10 "
-                                        :src="application.logo"></x-slot>
+                                    <x-slot:description><span x-text="application.description"></span></x-slot>
+                                        <x-slot:logo> <img
+                                                class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                :src="application.logo"></x-slot>
                             </x-resource-view>
                         </div>
                     </template>
@@ -109,12 +109,12 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="database.name"></span></x-slot>
-                                <x-slot:description><span x-text="database.description"></span></x-slot>
-                                <x-slot:logo>
-                                    <span x-show="database.logo">
-                                        <span x-html="database.logo"></span>
-                                    </span>
-                                </x-slot>
+                                    <x-slot:description><span x-text="database.description"></span></x-slot>
+                                        <x-slot:logo>
+                                            <span x-show="database.logo">
+                                                <span x-html="database.logo"></span>
+                                            </span>
+                                            </x-slot>
                             </x-resource-view>
                         </div>
                     </template>
@@ -141,33 +141,33 @@
                                         <template x-if="service.name">
                                             <span x-text="service.name"></span>
                                         </template>
-                                    </x-slot>
-                                    <x-slot:description>
-                                        <template x-if="service.slogan">
-                                            <span x-text="service.slogan"></span>
-                                        </template>
-                                    </x-slot>
-                                    <x-slot:logo>
-                                        <template x-if="service.logo">
-                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
-                                                :src='service.logo'
-                                                x-on:error.window="$event.target.src = service.logo_github_url"
-                                                onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                x-on:error="$event.target.src = '/coolify-logo.svg'"
-                                                :data-fallback='service.logo_github_url' />
-                                        </template>
-                                    </x-slot:logo>
-                                    <x-slot:documentation>
-                                        <template x-if="service.documentation">
-                                            <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
-                                                    onclick="event.stopPropagation()" :href="service.documentation"
-                                                    target="_blank">
-                                                    Docs
-                                                </a>
-                                            </div>
-                                        </template>
-                                    </x-slot:documentation>
+                                        </x-slot>
+                                        <x-slot:description>
+                                            <template x-if="service.slogan">
+                                                <span x-text="service.slogan"></span>
+                                            </template>
+                                            </x-slot>
+                                            <x-slot:logo>
+                                                <template x-if="service.logo">
+                                                    <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                        :src='service.logo'
+                                                        x-on:error.window="$event.target.src = service.logo_github_url"
+                                                        onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
+                                                        x-on:error="$event.target.src = '/coolify-logo.svg'"
+                                                        :data-fallback='service.logo_github_url' />
+                                                </template>
+                                            </x-slot:logo>
+                                            <x-slot:documentation>
+                                                <template x-if="service.documentation">
+                                                    <div class="flex items-center px-2" title="Read the documentation.">
+                                                        <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
+                                                            onclick="event.stopPropagation()" :href="service.documentation"
+                                                            target="_blank">
+                                                            Docs
+                                                        </a>
+                                                    </div>
+                                                </template>
+                                            </x-slot:documentation>
                                 </x-resource-view>
                             </div>
                         </template>
@@ -301,14 +301,14 @@
                                 {{ $server->name }}
                             </div>
                             <div class="box-description">
-                                {{ $server->description }}</div>
+                                {{ $server->description }}
+                            </div>
                         </div>
                     </div>
                 @empty
                     <div>
 
-                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
-                                href="/servers">
+                        <div>No validated & reachable servers found. <a class="underline dark:text-white" href="/servers">
                                 Go to servers page
                             </a></div>
                     </div>
@@ -368,8 +368,7 @@
 
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
-                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
                             Documentation
                         </a>
                     </div>
@@ -387,8 +386,7 @@
                     <div class="flex-1"></div>
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres" target="_blank">
                             Documentation
                         </a>
                     </div>
@@ -426,8 +424,7 @@
 
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector" target="_blank">
                             Documentation
                         </a>
                     </div>

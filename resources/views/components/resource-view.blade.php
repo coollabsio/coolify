@@ -4,7 +4,9 @@
     'hover:border-l-red-500 cursor-not-allowed' => $upgrade,
 ])>
     <div class="flex items-center">
-        {{ $logo }}
+        <div class="w-[4.5rem] h-[4.5rem] flex items-center justify-center text-black dark:text-white shrink-0">
+            {{ $logo }}
+        </div>
         <div class="flex flex-col pl-2 ">
             <div class="dark:text-white text-md">
                 {{ $title }}
