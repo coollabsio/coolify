@@ -7,7 +7,7 @@
 
 services:
   mariadb:
-    image: 'mariadb:10.5'
+    image: 'mariadb:11.8'
     healthcheck:
       test:
         - CMD-SHELL
