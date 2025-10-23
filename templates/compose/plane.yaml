@@ -225,7 +225,7 @@ services:
 
   # Comment this if you using any external s3 compatible storage
   plane-minio:
-    image: minio/minio:latest
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     command: server /export --console-address ":9090"
     environment:
       <<: *minio-env
