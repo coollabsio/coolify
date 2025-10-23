@@ -107,7 +107,7 @@ class Index extends Component
 
         if ($this->selectedServerType === 'remote') {
             if ($this->privateKeys->isEmpty()) {
-                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+                $this->privateKeys = PrivateKey::ownedAndOnlySShKeys(['name'])->where('id', '!=', 0)->get();
             }
             if ($this->servers->isEmpty()) {
                 $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
@@ -186,7 +186,7 @@ class Index extends Component
 
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
-            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            $this->privateKeys = PrivateKey::ownedAndOnlySShKeys(['name'])->where('id', '!=', 0)->get();
             // Auto-select first key if available for better UX
             if ($this->privateKeys->count() > 0) {
                 $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;

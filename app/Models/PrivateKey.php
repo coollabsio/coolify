@@ -88,6 +88,16 @@ class PrivateKey extends BaseModel
         return self::whereTeamId($teamId)->select($selectArray->all());
     }
 
+    public static function ownedAndOnlySShKeys(array $select = ['*'])
+    {
+        $teamId = currentTeam()->id;
+        $selectArray = collect($select)->concat(['id']);
+
+        return self::whereTeamId($teamId)
+            ->where('is_git_related', false)
+            ->select($selectArray->all());
+    }
+
     public static function validatePrivateKey($privateKey)
     {
         try {
