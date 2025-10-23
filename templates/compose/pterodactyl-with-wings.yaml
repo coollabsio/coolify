@@ -33,7 +33,7 @@ services:
       timeout: 1s
       retries: 3
   pterodactyl:
-    image: 'ghcr.io/pterodactyl/panel:latest'
+    image: 'ghcr.io/pterodactyl/panel:v1.11.11'
     volumes:
       - 'panel-var:/app/var/'
       - 'panel-nginx:/etc/nginx/http.d/'
