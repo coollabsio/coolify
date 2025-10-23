@@ -191,7 +191,7 @@
                                                 </div>
                                             </div>
                                         </x-slot:content>
-                                        <livewire:server.new.by-hetzner :private_keys="$this->privateKeys" :limit_reached="false" />
+                                        <livewire:server.new.by-hetzner :limit_reached="false" :from_onboarding="true" />
                                     </x-modal-input>
                                 @endif
                             @endcan
