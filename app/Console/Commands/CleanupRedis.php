@@ -294,11 +294,10 @@ class CleanupRedis extends Command
 
         foreach ($allKeys as $key) {
             // Match cache lock keys: they contain 'laravel-queue-overlap'
-            if (str_contains($key, 'laravel-queue-overlap')) {
+            if (preg_match('/overlap/i', $key)) {
                 $lockKeys[] = $key;
             }
         }
-
         if (empty($lockKeys)) {
             $this->info('  No cache locks found.');
 
