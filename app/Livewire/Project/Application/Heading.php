@@ -58,6 +58,11 @@ class Heading extends Component
         }
     }
 
+    public function manualCheckStatus()
+    {
+        $this->checkStatus();
+    }
+
     public function force_deploy_without_cache()
     {
         $this->authorize('deploy', $this->application);

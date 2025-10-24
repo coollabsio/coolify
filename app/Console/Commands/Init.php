@@ -73,7 +73,7 @@ class Init extends Command
         $this->cleanupUnusedNetworkFromCoolifyProxy();
 
         try {
-            $this->call('cleanup:redis');
+            $this->call('cleanup:redis', ['--clear-locks' => true]);
         } catch (\Throwable $e) {
             echo "Error in cleanup:redis command: {$e->getMessage()}\n";
         }
