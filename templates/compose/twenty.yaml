@@ -31,8 +31,8 @@ services:
       - PASSWORD_RESET_TOKEN_EXPIRES_IN=${PASSWORD_RESET_TOKEN_EXPIRES_IN:-5m}
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#workspace-cleaning
-      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=$WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION
-      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=$WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=7
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=21
 
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#captcha
       - STORAGE_TYPE=${STORAGE_TYPE:-local}
