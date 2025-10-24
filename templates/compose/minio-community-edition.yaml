@@ -1,5 +1,4 @@
-# ignore: true
-# documentation: https://min.io/docs/minio/container/index.html
+# documentation: https://github.com/coollabsio/minio?tab=readme-ov-file#minio-docker-images
 # slogan: MinIO is a high performance object storage server compatible with Amazon S3 APIs.
 # category: storage
 # tags: object, storage, server, s3, api
@@ -7,7 +6,7 @@
 
 services:
   minio:
-    image: quay.io/minio/minio:latest
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     command: server /data --console-address ":9001"
     environment:
       - MINIO_SERVER_URL=$MINIO_SERVER_URL

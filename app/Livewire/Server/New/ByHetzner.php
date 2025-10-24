@@ -74,12 +74,16 @@ class ByHetzner extends Component
     #[Locked]
     public Collection $saved_cloud_init_scripts;
 
+    public bool $from_onboarding = false;
+
     public function mount()
     {
         $this->authorize('viewAny', CloudProviderToken::class);
         $this->loadTokens();
         $this->loadSavedCloudInitScripts();
         $this->server_name = generate_random_name();
+        $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
+
         if ($this->private_keys->count() > 0) {
             $this->private_key_id = $this->private_keys->first()->id;
         }
@@ -131,7 +135,7 @@ class ByHetzner extends Component
     public function handlePrivateKeyCreated($keyId)
     {
         // Refresh private keys list
-        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
+        $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
 
         // Auto-select the new key
         $this->private_key_id = $keyId;
@@ -246,12 +250,6 @@ class ByHetzner extends Component
             // Get images and sort by name
             $images = $hetznerService->getImages();
 
-            ray('Raw images from Hetzner API', [
-                'total_count' => count($images),
-                'types' => collect($images)->pluck('type')->unique()->values(),
-                'sample' => array_slice($images, 0, 3),
-            ]);
-
             $this->images = collect($images)
                 ->filter(function ($image) {
                     // Only system images
@@ -269,20 +267,8 @@ class ByHetzner extends Component
                 ->sortBy('name')
                 ->values()
                 ->toArray();
-
-            ray('Filtered images', [
-                'filtered_count' => count($this->images),
-                'debian_images' => collect($this->images)->filter(fn ($img) => str_contains($img['name'] ?? '', 'debian'))->values(),
-            ]);
-
             // Load SSH keys from Hetzner
             $this->hetznerSshKeys = $hetznerService->getSshKeys();
-
-            ray('Hetzner SSH Keys', [
-                'total_count' => count($this->hetznerSshKeys),
-                'keys' => $this->hetznerSshKeys,
-            ]);
-
             $this->loading_data = false;
         } catch (\Throwable $e) {
             $this->loading_data = false;
@@ -299,9 +285,9 @@ class ByHetzner extends Component
         } elseif (str_starts_with($name, 'cpx')) {
             return 'AMD EPYC™';
         } elseif (str_starts_with($name, 'cx')) {
-            return 'Intel® Xeon®';
+            return 'Intel®/AMD';
         } elseif (str_starts_with($name, 'cax')) {
-            return 'Ampere® Altra®';
+            return 'Ampere®';
         }
 
         return null;
@@ -573,6 +559,11 @@ class ByHetzner extends Component
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
+
+            if ($this->from_onboarding) {
+                // When in onboarding, use wire:navigate for proper modal handling
+                return $this->redirect(route('server.show', $server->uuid));
+            }
 
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {

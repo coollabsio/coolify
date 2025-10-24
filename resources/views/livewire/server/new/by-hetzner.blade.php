@@ -61,6 +61,7 @@
 
                     <div>
                         <x-forms.select label="Server Type" id="selected_server_type" wire:model.live="selected_server_type"
+                            helper="Learn more about <a class='inline-block underline dark:text-white' href='https://www.hetzner.com/cloud/' target='_blank'>Hetzner server types</a>"
                             required :disabled="!$selected_location">
                             <option value="">
                                 {{ $selected_location ? 'Select a server type...' : 'Select a location first' }}

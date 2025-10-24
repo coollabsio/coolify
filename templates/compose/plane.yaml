@@ -211,7 +211,7 @@ services:
 
   plane-minio:
     <<: *app-env
-    image: minio/minio:latest
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     command: server /export --console-address ":9090"
     volumes:
       - uploads:/export

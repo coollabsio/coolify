@@ -49,21 +49,30 @@
         localStorage.setItem('theme', userSettings);
 
         const themeMetaTag = document.querySelector('meta[name=theme-color]');
+        let isDark = false;
 
         if (userSettings === 'dark') {
             document.documentElement.classList.add('dark');
-            themeMetaTag.setAttribute('content', this.darkColorContent);
             this.theme = 'dark';
+            isDark = true;
         } else if (userSettings === 'light') {
             document.documentElement.classList.remove('dark');
-            themeMetaTag.setAttribute('content', this.whiteColorContent);
             this.theme = 'light';
-        } else if (darkModePreference) {
+            isDark = false;
+        } else if (userSettings === 'system') {
             this.theme = 'system';
-            document.documentElement.classList.add('dark');
-        } else if (!darkModePreference) {
-            this.theme = 'system';
-            document.documentElement.classList.remove('dark');
+            if (darkModePreference) {
+                document.documentElement.classList.add('dark');
+                isDark = true;
+            } else {
+                document.documentElement.classList.remove('dark');
+                isDark = false;
+            }
+        }
+
+        // Update theme-color meta tag
+        if (themeMetaTag) {
+            themeMetaTag.setAttribute('content', isDark ? '#101010' : '#ffffff');
         }
     },
     mounted() {
