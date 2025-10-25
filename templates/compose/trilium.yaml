@@ -10,4 +10,14 @@ services:
     environment:
       - SERVICE_URL_TRILIUM_8080
     volumes:
-      - trilium-data:/home/node/trilium-data
+      - 'trilium-data:/home/node/trilium-data'
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '--quiet'
+        - 'http://127.0.0.1:8080/setup'
+      interval: 2s
+      timeout: 10s
+      retries: 5
