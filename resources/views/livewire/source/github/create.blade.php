@@ -14,9 +14,11 @@
                     <x-forms.checkbox id="is_system_wide" label="System Wide"
                         helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
                 </div>
-                <div x-show="showWarning" x-transition style="display: none;" class="max-w-full">
-                    <x-callout type="warning" title="Not Recommended" class="break-words">
-                        System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
+                <div x-show="showWarning" x-transition style="display: none;" class="w-full max-w-2xl">
+                    <x-callout type="warning" title="Not Recommended">
+                        <div class="whitespace-normal break-words">
+                            System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
+                        </div>
                     </x-callout>
                 </div>
             </div>
