@@ -72,6 +72,11 @@
                                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                                 instantSave id="isSystemWide" />
                         </div>
+                        @if ($isSystemWide)
+                            <x-callout type="warning" title="Not Recommended">
+                                System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
+                            </x-callout>
+                        @endif
                     @endif
                     <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl" label="HTML Url" />
