@@ -77,6 +77,8 @@ services:
       timeout: 1s
       retries: 3
     environment:
+      - HASHIDS_SALT=$SERVICE_PASSWORD_HASHIDS
+      - HASHIDS_LENGTH=8
       - SERVICE_URL_PTERODACTYL_80
       - 'ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}'
       - 'ADMIN_USERNAME=${SERVICE_USER_ADMIN}'
