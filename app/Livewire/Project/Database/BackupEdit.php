@@ -85,6 +85,7 @@ class BackupEdit extends Component
     public function mount()
     {
         try {
+            $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
         } catch (Exception $e) {
@@ -208,7 +209,7 @@ class BackupEdit extends Component
 
         // Validate that disable_local_backup can only be true when S3 backup is enabled
         if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
-            throw new \Exception('Local backup can only be disabled when S3 backup is enabled.');
+            $this->backup->disable_local_backup = $this->disableLocalBackup = false;
         }
 
         $isValid = validate_cron_expression($this->backup->frequency);

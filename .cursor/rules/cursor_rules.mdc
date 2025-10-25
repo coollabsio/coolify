@@ -4,6 +4,12 @@ globs: .cursor/rules/*.mdc
 alwaysApply: true
 ---
 
+# Cursor Rules Maintenance Guide
+
+> **Important**: These rules in `.cursor/rules/` are shared between Cursor IDE and other AI assistants. Changes here should be reflected in **[CLAUDE.md](mdc:CLAUDE.md)** when they affect core workflows or patterns.
+>
+> **Synchronization Guide**: See **[.AI_INSTRUCTIONS_SYNC.md](mdc:.AI_INSTRUCTIONS_SYNC.md)** for detailed guidelines on maintaining consistency between CLAUDE.md and .cursor/rules/.
+
 - **Required Rule Structure:**
   ```markdown
   ---

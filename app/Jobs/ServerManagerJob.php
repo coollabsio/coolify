@@ -28,6 +28,8 @@ class ServerManagerJob implements ShouldQueue
 
     private string $instanceTimezone;
 
+    private string $checkFrequency = '* * * * *';
+
     /**
      * Create a new job instance.
      */
@@ -40,7 +42,9 @@ class ServerManagerJob implements ShouldQueue
     {
         // Freeze the execution time at the start of the job
         $this->executionTime = Carbon::now();
-
+        if (isCloud()) {
+            $this->checkFrequency = '*/5 * * * *';
+        }
         $this->settings = instanceSettings();
         $this->instanceTimezone = $this->settings->instance_timezone ?: config('app.timezone');
 
@@ -75,10 +79,7 @@ class ServerManagerJob implements ShouldQueue
     private function dispatchConnectionChecks(Collection $servers): void
     {
 
-        $checkFrequency = isCloud() ? '*/2 * * * *' : '* * * * *'; // Every 2 min for cloud, every minute for self-hosted
-        $cron = new CronExpression($checkFrequency);
-
-        if ($cron->isDue($this->executionTime)) {
+        if ($this->shouldRunNow($this->checkFrequency)) {
             $servers->each(function (Server $server) {
                 try {
                     ServerConnectionCheckJob::dispatch($server);
@@ -110,11 +111,6 @@ class ServerManagerJob implements ShouldQueue
 
     private function processServerTasks(Server $server): void
     {
-        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
-        if (validate_timezone($serverTimezone) === false) {
-            $serverTimezone = config('app.timezone');
-        }
-
         // Check if we should run sentinel-based checks
         $lastSentinelUpdate = $server->sentinel_updated_at;
         $waitTime = $server->waitBeforeDoingSshCheck();
@@ -122,10 +118,7 @@ class ServerManagerJob implements ShouldQueue
 
         if ($sentinelOutOfSync) {
             // Dispatch jobs if Sentinel is out of sync
-            $checkFrequency = isCloud() ? '*/5 * * * *' : '* * * * *'; // Every 5 min for cloud, every minute for self-hosted
-            $cron = new CronExpression($checkFrequency);
-
-            if ($cron->isDue($this->executionTime)) {
+            if ($this->shouldRunNow($this->checkFrequency)) {
                 ServerCheckJob::dispatch($server);
             }
 
@@ -134,22 +127,16 @@ class ServerManagerJob implements ShouldQueue
             if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
                 $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
             }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
+            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency);
 
             if ($shouldRunStorageCheck) {
                 ServerStorageCheckJob::dispatch($server);
             }
         }
 
-        // Dispatch DockerCleanupJob if due
-        $dockerCleanupFrequency = data_get($server->settings, 'docker_cleanup_frequency', '0 * * * *');
-        if (isset(VALID_CRON_STRINGS[$dockerCleanupFrequency])) {
-            $dockerCleanupFrequency = VALID_CRON_STRINGS[$dockerCleanupFrequency];
-        }
-        $shouldRunDockerCleanup = $this->shouldRunNow($dockerCleanupFrequency, $serverTimezone);
-
-        if ($shouldRunDockerCleanup) {
-            DockerCleanupJob::dispatch($server, false, $server->settings->delete_unused_volumes, $server->settings->delete_unused_networks);
+        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+        if (validate_timezone($serverTimezone) === false) {
+            $serverTimezone = config('app.timezone');
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
@@ -170,13 +157,13 @@ class ServerManagerJob implements ShouldQueue
         }
     }
 
-    private function shouldRunNow(string $frequency, string $timezone): bool
+    private function shouldRunNow(string $frequency, ?string $timezone = null): bool
     {
         $cron = new CronExpression($frequency);
 
         // Use the frozen execution time, not the current time
         $baseTime = $this->executionTime ?? Carbon::now();
-        $executionTime = $baseTime->copy()->setTimezone($timezone);
+        $executionTime = $baseTime->copy()->setTimezone($timezone ?? config('app.timezone'));
 
         return $cron->isDue($executionTime);
     }

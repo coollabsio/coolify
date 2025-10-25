@@ -1,29 +1,36 @@
+<style>
+    .compose-editor-container .coolify-monaco-editor>div>div>div {
+        height: 512px !important;
+        min-height: 512px !important;
+    }
+</style>
 <div x-data="{ raw: true, showNormalTextarea: false }">
     <div class="pb-4">Volume names are updated upon save. The service UUID will be added as a prefix to all volumes, to
         prevent
         name collision. <br>To see the actual volume names, check the Deployable Compose file, or go to Storage
         menu.</div>
 
-    <div x-cloak x-show="raw" class="font-mono">
-        <div x-cloak x-show="showNormalTextarea">
-            <x-forms.textarea rows="20" id="service.docker_compose_raw">
+    <div class="compose-editor-container">
+        <div x-cloak x-show="raw" class="font-mono">
+            <div x-cloak x-show="showNormalTextarea">
+                <x-forms.textarea rows="25" id="dockerComposeRaw">
+                </x-forms.textarea>
+            </div>
+            <div x-cloak x-show="!showNormalTextarea">
+                <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" id="dockerComposeRaw">
+                </x-forms.textarea>
+            </div>
+        </div>
+        <div x-cloak x-show="raw === false" class="font-mono">
+            <x-forms.textarea rows="25" readonly id="dockerCompose">
             </x-forms.textarea>
         </div>
-        <div x-cloak x-show="!showNormalTextarea">
-            <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" rows="20"
-                id="service.docker_compose_raw">
-            </x-forms.textarea>
-        </div>
-    </div>
-    <div x-cloak x-show="raw === false" class="font-mono">
-        <x-forms.textarea rows="20" readonly id="service.docker_compose">
-        </x-forms.textarea>
     </div>
     <div class="pt-2 flex gap-2">
         <div class="flex flex-col gap-2">
             <x-forms.checkbox label="Escape special characters in labels?"
                 helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
-                id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                id="isContainerLabelEscapeEnabled" instantSave></x-forms.checkbox>
             <x-forms.checkbox label="Show Normal Textarea" x-model="showNormalTextarea"></x-forms.checkbox>
         </div>
 

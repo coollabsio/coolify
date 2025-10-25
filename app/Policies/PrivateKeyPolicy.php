@@ -20,7 +20,18 @@ class PrivateKeyPolicy
      */
     public function view(User $user, PrivateKey $privateKey): bool
     {
-        return $user->teams()->get()->firstWhere('id', $privateKey->team_id) !== null;
+        // Handle null team_id
+        if ($privateKey->team_id === null) {
+            return false;
+        }
+
+        // System resource (team_id=0): Only root team admins/owners can access
+        if ($privateKey->team_id === 0) {
+            return $user->canAccessSystemResources();
+        }
+
+        // Regular resource: Check team membership
+        return $user->teams->contains('id', $privateKey->team_id);
     }
 
     /**
@@ -28,6 +39,8 @@ class PrivateKeyPolicy
      */
     public function create(User $user): bool
     {
+        // Only admins/owners can create private keys
+        // Members should not be able to create SSH keys that could be used for deployments
         return $user->isAdmin();
     }
 
@@ -36,7 +49,19 @@ class PrivateKeyPolicy
      */
     public function update(User $user, PrivateKey $privateKey): bool
     {
-        return $user->isAdmin() && $user->teams()->get()->firstWhere('id', $privateKey->team_id) !== null;
+        // Handle null team_id
+        if ($privateKey->team_id === null) {
+            return false;
+        }
+
+        // System resource (team_id=0): Only root team admins/owners can update
+        if ($privateKey->team_id === 0) {
+            return $user->canAccessSystemResources();
+        }
+
+        // Regular resource: Must be admin/owner of the team
+        return $user->isAdminOfTeam($privateKey->team_id)
+            && $user->teams->contains('id', $privateKey->team_id);
     }
 
     /**
@@ -44,7 +69,19 @@ class PrivateKeyPolicy
      */
     public function delete(User $user, PrivateKey $privateKey): bool
     {
-        return $user->isAdmin() && $user->teams()->get()->firstWhere('id', $privateKey->team_id) !== null;
+        // Handle null team_id
+        if ($privateKey->team_id === null) {
+            return false;
+        }
+
+        // System resource (team_id=0): Only root team admins/owners can delete
+        if ($privateKey->team_id === 0) {
+            return $user->canAccessSystemResources();
+        }
+
+        // Regular resource: Must be admin/owner of the team
+        return $user->isAdminOfTeam($privateKey->team_id)
+            && $user->teams->contains('id', $privateKey->team_id);
     }
 
     /**

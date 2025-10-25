@@ -13,9 +13,55 @@
     <div x-data="searchResources()">
         @if ($current_step === 'type')
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-10 py-2">
-                <input autocomplete="off" x-ref="searchInput" class="input-sticky"
-                    :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
-                    @keydown.window.slash.prevent="$refs.searchInput.focus()">
+                <div class="flex gap-2 items-start">
+                    <input autocomplete="off" x-ref="searchInput" class="input-sticky flex-1"
+                        :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
+                        @keydown.window.slash.prevent="$refs.searchInput.focus()">
+                    <!-- Category Filter Dropdown -->
+                    <div class="relative" x-data="{ openCategoryDropdown: false, categorySearch: '' }" @click.outside="openCategoryDropdown = false">
+                        <!-- Loading/Disabled State -->
+                        <div x-show="loading || categories.length === 0"
+                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-neutral-100 dark:bg-coolgray-200 cursor-not-allowed whitespace-nowrap opacity-50">
+                            <span class="text-sm text-neutral-400 dark:text-neutral-600">Filter by category</span>
+                            <svg class="w-4 h-4 text-neutral-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        <!-- Active State -->
+                        <div x-show="!loading && categories.length > 0"
+                            @click="openCategoryDropdown = !openCategoryDropdown; $nextTick(() => { if (openCategoryDropdown) $refs.categorySearchInput.focus() })"
+                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-pointer hover:ring-coolgray-400 transition-all whitespace-nowrap">
+                            <span class="text-sm truncate" x-text="selectedCategory === '' ? 'Filter by category' : selectedCategory" :class="selectedCategory === '' ? 'text-neutral-400 dark:text-neutral-600' : 'capitalize text-black dark:text-white'"></span>
+                            <svg class="w-4 h-4 transition-transform text-neutral-400 shrink-0" :class="{ 'rotate-180': openCategoryDropdown }" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        <!-- Dropdown Menu -->
+                        <div x-show="openCategoryDropdown" x-transition
+                            class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg overflow-hidden">
+                            <div class="sticky top-0 p-2 bg-white dark:bg-coolgray-100 border-b border-neutral-300 dark:border-coolgray-400">
+                                <input type="text" x-ref="categorySearchInput" x-model="categorySearch" placeholder="Search categories..."
+                                    class="w-full px-2 py-1 text-sm rounded border border-neutral-300 dark:border-coolgray-400 bg-white dark:bg-coolgray-200 focus:outline-none focus:ring-2 focus:ring-coolgray-400"
+                                    @click.stop>
+                            </div>
+                            <div class="max-h-60 overflow-auto scrollbar">
+                                <div @click="selectedCategory = ''; categorySearch = ''; openCategoryDropdown = false"
+                                    class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200"
+                                    :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selectedCategory === '' }">
+                                    <span class="text-sm">All Categories</span>
+                                </div>
+                                <template x-for="category in categories.filter(cat => categorySearch === '' || cat.toLowerCase().includes(categorySearch.toLowerCase()))" :key="category">
+                                    <div @click="selectedCategory = category; categorySearch = ''; openCategoryDropdown = false"
+                                        class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 capitalize"
+                                        :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selectedCategory === category }">
+                                        <span class="text-sm" x-text="category"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div x-show="loading">Loading...</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
@@ -28,13 +74,13 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
-                                <x-slot:description>
-                                    <span x-html="window.sanitizeHTML(application.description)"></span>
-                                </x-slot>
-                                <x-slot:logo>
-                                    <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
-                                        :src="application.logo">
-                                </x-slot:logo>
+                                    <x-slot:description>
+                                        <span x-html="window.sanitizeHTML(application.description)"></span>
+                                        </x-slot>
+                                        <x-slot:logo>
+                                            <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                :src="application.logo">
+                                        </x-slot:logo>
                             </x-resource-view>
                         </div>
                     </template>
@@ -47,10 +93,10 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
-                                <x-slot:description><span x-text="application.description"></span></x-slot>
-                                <x-slot:logo> <img
-                                        class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10 "
-                                        :src="application.logo"></x-slot>
+                                    <x-slot:description><span x-text="application.description"></span></x-slot>
+                                        <x-slot:logo> <img
+                                                class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                :src="application.logo"></x-slot>
                             </x-resource-view>
                         </div>
                     </template>
@@ -63,12 +109,12 @@
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="database.name"></span></x-slot>
-                                <x-slot:description><span x-text="database.description"></span></x-slot>
-                                <x-slot:logo>
-                                    <span x-show="database.logo">
-                                        <span x-html="database.logo"></span>
-                                    </span>
-                                </x-slot>
+                                    <x-slot:description><span x-text="database.description"></span></x-slot>
+                                        <x-slot:logo>
+                                            <span x-show="database.logo">
+                                                <span x-html="database.logo"></span>
+                                            </span>
+                                            </x-slot>
                             </x-resource-view>
                         </div>
                     </template>
@@ -95,33 +141,33 @@
                                         <template x-if="service.name">
                                             <span x-text="service.name"></span>
                                         </template>
-                                    </x-slot>
-                                    <x-slot:description>
-                                        <template x-if="service.slogan">
-                                            <span x-text="service.slogan"></span>
-                                        </template>
-                                    </x-slot>
-                                    <x-slot:logo>
-                                        <template x-if="service.logo">
-                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
-                                                :src='service.logo'
-                                                x-on:error.window="$event.target.src = service.logo_github_url"
-                                                onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                x-on:error="$event.target.src = '/coolify-logo.svg'"
-                                                :data-fallback='service.logo_github_url' />
-                                        </template>
-                                    </x-slot:logo>
-                                    <x-slot:documentation>
-                                        <template x-if="service.documentation">
-                                            <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
-                                                    onclick="event.stopPropagation()" :href="service.documentation"
-                                                    target="_blank">
-                                                    Docs
-                                                </a>
-                                            </div>
-                                        </template>
-                                    </x-slot:documentation>
+                                        </x-slot>
+                                        <x-slot:description>
+                                            <template x-if="service.slogan">
+                                                <span x-text="service.slogan"></span>
+                                            </template>
+                                            </x-slot>
+                                            <x-slot:logo>
+                                                <template x-if="service.logo">
+                                                    <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                        :src='service.logo'
+                                                        x-on:error.window="$event.target.src = service.logo_github_url"
+                                                        onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
+                                                        x-on:error="$event.target.src = '/coolify-logo.svg'"
+                                                        :data-fallback='service.logo_github_url' />
+                                                </template>
+                                            </x-slot:logo>
+                                            <x-slot:documentation>
+                                                <template x-if="service.documentation">
+                                                    <div class="flex items-center px-2" title="Read the documentation.">
+                                                        <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
+                                                            onclick="event.stopPropagation()" :href="service.documentation"
+                                                            target="_blank">
+                                                            Docs
+                                                        </a>
+                                                    </div>
+                                                </template>
+                                            </x-slot:documentation>
                                 </x-resource-view>
                             </div>
                         </template>
@@ -140,6 +186,8 @@
                 function searchResources() {
                     return {
                         search: '',
+                        selectedCategory: '',
+                        categories: [],
                         loading: false,
                         isSticky: false,
                         selecting: false,
@@ -156,11 +204,13 @@
                             this.loading = true;
                             const {
                                 services,
+                                categories,
                                 gitBasedApplications,
                                 dockerBasedApplications,
                                 databases
                             } = await this.$wire.loadServices();
                             this.services = services;
+                            this.categories = categories || [];
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
                             this.databases = databases;
@@ -171,15 +221,30 @@
                         },
                         filterAndSort(items, isSort = true) {
                             const searchLower = this.search.trim().toLowerCase();
+                            let filtered = Object.values(items);
 
-                            if (searchLower === '') {
-                                return isSort ? Object.values(items).sort(sortFn) : Object.values(items);
+                            // Filter by category if selected
+                            if (this.selectedCategory !== '') {
+                                const selectedCategoryLower = this.selectedCategory.toLowerCase();
+                                filtered = filtered.filter(item => {
+                                    if (!item.category) return false;
+                                    // Handle comma-separated categories
+                                    const categories = item.category.includes(',')
+                                        ? item.category.split(',').map(c => c.trim().toLowerCase())
+                                        : [item.category.toLowerCase()];
+                                    return categories.includes(selectedCategoryLower);
+                                });
                             }
-                            const filtered = Object.values(items).filter(item => {
-                                return (item.name?.toLowerCase().includes(searchLower) ||
-                                    item.description?.toLowerCase().includes(searchLower) ||
-                                    item.slogan?.toLowerCase().includes(searchLower))
-                            })
+
+                            // Filter by search term
+                            if (searchLower !== '') {
+                                filtered = filtered.filter(item => {
+                                    return (item.name?.toLowerCase().includes(searchLower) ||
+                                        item.description?.toLowerCase().includes(searchLower) ||
+                                        item.slogan?.toLowerCase().includes(searchLower))
+                                });
+                            }
+
                             return isSort ? filtered.sort(sortFn) : filtered;
                         },
                         get filteredGitBasedApplications() {
@@ -236,14 +301,14 @@
                                 {{ $server->name }}
                             </div>
                             <div class="box-description">
-                                {{ $server->description }}</div>
+                                {{ $server->description }}
+                            </div>
                         </div>
                     </div>
                 @empty
                     <div>
 
-                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
-                                href="/servers">
+                        <div>No validated & reachable servers found. <a class="underline dark:text-white" href="/servers">
                                 Go to servers page
                             </a></div>
                     </div>
@@ -303,8 +368,7 @@
 
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
-                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
                             Documentation
                         </a>
                     </div>
@@ -322,8 +386,7 @@
                     <div class="flex-1"></div>
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres" target="_blank">
                             Documentation
                         </a>
                     </div>
@@ -361,8 +424,7 @@
 
                     <div class="flex items-center px-2" title="Read the documentation.">
                         <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
-                            target="_blank">
+                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector" target="_blank">
                             Documentation
                         </a>
                     </div>

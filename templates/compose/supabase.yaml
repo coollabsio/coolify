@@ -1072,16 +1072,16 @@ services:
     command: >
       sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
   supabase-minio:
-    image: minio/minio
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     command: server --console-address ":9001" /data
     healthcheck:
-      test: sleep 5 && exit 0
-      interval: 2s
-      timeout: 10s
-      retries: 5
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
     volumes:
       - ./volumes/storage:/data
 

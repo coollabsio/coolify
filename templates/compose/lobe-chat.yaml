@@ -1,0 +1,22 @@
+# documentation: https://github.com/lobehub/lobe-chat?tab=readme-ov-file#b-deploying-with-docker
+# slogan: An open-source, modern-design AI chat framework.
+# category: ai
+# tags: ai, chat, openai, llm, chatbot
+# logo: svgs/lobe-chat.png
+# port: 3210
+
+services:
+  lobe-chat:
+    image: "lobehub/lobe-chat:1.135.5"
+    environment:
+      - SERVICE_URL_LOBECHAT_3210
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_PROXY_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - ACCESS_CODE=${SERVICE_PASSWORD_ACCESSCODE}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://localhost:3210/ || exit 1"
+      interval: 5s
+      timeout: 20s
+      retries: 10

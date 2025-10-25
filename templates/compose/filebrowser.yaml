@@ -29,8 +29,3 @@ services:
             "address": "0.0.0.0",
             "port": 80
           }
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
-      interval: 2s
-      timeout: 10s
-      retries: 15

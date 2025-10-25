@@ -4,11 +4,14 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Uri;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public string $name;
 
     public string $description;
@@ -94,6 +97,8 @@ class Create extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', S3Storage::class);
+
             $this->validate();
             $this->storage = new S3Storage;
             $this->storage->name = $this->name;

@@ -16,10 +16,350 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * Validates a Docker Compose YAML string for command injection vulnerabilities.
+ * This should be called BEFORE saving to database to prevent malicious data from being stored.
+ *
+ * @param  string  $composeYaml  The raw Docker Compose YAML content
+ *
+ * @throws \Exception If the compose file contains command injection attempts
+ */
+function validateDockerComposeForInjection(string $composeYaml): void
+{
+    try {
+        $parsed = Yaml::parse($composeYaml);
+    } catch (\Exception $e) {
+        throw new \Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
+    }
+
+    if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
+        throw new \Exception('Docker Compose file must contain a "services" section');
+    }
+    // Validate service names
+    foreach ($parsed['services'] as $serviceName => $serviceConfig) {
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.',
+                0,
+                $e
+            );
+        }
+
+        // Validate volumes in this service (both string and array formats)
+        if (isset($serviceConfig['volumes']) && is_array($serviceConfig['volumes'])) {
+            foreach ($serviceConfig['volumes'] as $volume) {
+                if (is_string($volume)) {
+                    // String format: "source:target" or "source:target:mode"
+                    validateVolumeStringForInjection($volume);
+                } elseif (is_array($volume)) {
+                    // Array format: {type: bind, source: ..., target: ...}
+                    if (isset($volume['source'])) {
+                        $source = $volume['source'];
+                        if (is_string($source)) {
+                            // Allow simple env vars and env vars with defaults (validated in parseDockerVolumeString)
+                            $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
+                            $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
+
+                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault) {
+                                try {
+                                    validateShellSafePath($source, 'volume source');
+                                } catch (\Exception $e) {
+                                    throw new \Exception(
+                                        'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                        ' Please use safe path names without shell metacharacters.',
+                                        0,
+                                        $e
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    if (isset($volume['target'])) {
+                        $target = $volume['target'];
+                        if (is_string($target)) {
+                            try {
+                                validateShellSafePath($target, 'volume target');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.',
+                                    0,
+                                    $e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Validates a Docker volume string (format: "source:target" or "source:target:mode")
+ *
+ * @param  string  $volumeString  The volume string to validate
+ *
+ * @throws \Exception If the volume string contains command injection attempts
+ */
+function validateVolumeStringForInjection(string $volumeString): void
+{
+    // Canonical parsing also validates and throws on unsafe input
+    parseDockerVolumeString($volumeString);
+}
+
+function parseDockerVolumeString(string $volumeString): array
+{
+    $volumeString = trim($volumeString);
+    $source = null;
+    $target = null;
+    $mode = null;
+
+    // First, check if the source contains an environment variable with default value
+    // This needs to be done before counting colons because ${VAR:-value} contains a colon
+    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
+    $hasEnvVarWithDefault = false;
+    $envVarEndPos = 0;
+
+    if (preg_match($envVarPattern, $volumeString, $matches)) {
+        $hasEnvVarWithDefault = true;
+        $envVarEndPos = strlen($matches[0]);
+    }
+
+    // Count colons, but exclude those inside environment variables
+    $effectiveVolumeString = $volumeString;
+    if ($hasEnvVarWithDefault) {
+        // Temporarily replace the env var to count colons correctly
+        $effectiveVolumeString = substr($volumeString, $envVarEndPos);
+        $colonCount = substr_count($effectiveVolumeString, ':');
+    } else {
+        $colonCount = substr_count($volumeString, ':');
+    }
+
+    if ($colonCount === 0) {
+        // Named volume without target (unusual but valid)
+        // Example: "myvolume"
+        $source = $volumeString;
+        $target = $volumeString;
+    } elseif ($colonCount === 1) {
+        // Simple volume mapping
+        // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
+        if ($hasEnvVarWithDefault) {
+            $source = substr($volumeString, 0, $envVarEndPos);
+            $remaining = substr($volumeString, $envVarEndPos);
+            if (strlen($remaining) > 0 && $remaining[0] === ':') {
+                $target = substr($remaining, 1);
+            } else {
+                $target = $remaining;
+            }
+        } else {
+            $parts = explode(':', $volumeString);
+            $source = $parts[0];
+            $target = $parts[1];
+        }
+    } elseif ($colonCount === 2) {
+        // Volume with mode OR Windows path OR env var with mode
+        // Handle env var with mode first
+        if ($hasEnvVarWithDefault) {
+            // ${VAR:-default}:/path:mode
+            $source = substr($volumeString, 0, $envVarEndPos);
+            $remaining = substr($volumeString, $envVarEndPos);
+
+            if (strlen($remaining) > 0 && $remaining[0] === ':') {
+                $remaining = substr($remaining, 1);
+                $lastColon = strrpos($remaining, ':');
+
+                if ($lastColon !== false) {
+                    $possibleMode = substr($remaining, $lastColon + 1);
+                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                    if (in_array($possibleMode, $validModes)) {
+                        $mode = $possibleMode;
+                        $target = substr($remaining, 0, $lastColon);
+                    } else {
+                        $target = $remaining;
+                    }
+                } else {
+                    $target = $remaining;
+                }
+            }
+        } elseif (preg_match('/^[A-Za-z]:/', $volumeString)) {
+            // Windows path as source (C:/, D:/, etc.)
+            // Find the second colon which is the real separator
+            $secondColon = strpos($volumeString, ':', 2);
+            if ($secondColon !== false) {
+                $source = substr($volumeString, 0, $secondColon);
+                $target = substr($volumeString, $secondColon + 1);
+            } else {
+                // Malformed, treat as is
+                $source = $volumeString;
+                $target = $volumeString;
+            }
+        } else {
+            // Not a Windows path, check for mode
+            $lastColon = strrpos($volumeString, ':');
+            $possibleMode = substr($volumeString, $lastColon + 1);
+
+            // Check if the last part is a valid Docker volume mode
+            $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+            if (in_array($possibleMode, $validModes)) {
+                // It's a mode
+                // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
+                $mode = $possibleMode;
+                $volumeWithoutMode = substr($volumeString, 0, $lastColon);
+                $colonPos = strpos($volumeWithoutMode, ':');
+
+                if ($colonPos !== false) {
+                    $source = substr($volumeWithoutMode, 0, $colonPos);
+                    $target = substr($volumeWithoutMode, $colonPos + 1);
+                } else {
+                    // Shouldn't happen for valid volume strings
+                    $source = $volumeWithoutMode;
+                    $target = $volumeWithoutMode;
+                }
+            } else {
+                // The last colon is part of the path
+                // For now, treat the first occurrence of : as the separator
+                $firstColon = strpos($volumeString, ':');
+                $source = substr($volumeString, 0, $firstColon);
+                $target = substr($volumeString, $firstColon + 1);
+            }
+        }
+    } else {
+        // More than 2 colons - likely Windows paths or complex cases
+        // Use a heuristic: find the most likely separator colon
+        // Look for patterns like "C:" at the beginning (Windows drive)
+        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
+            // Windows path as source
+            // Find the next colon after the drive letter
+            $secondColon = strpos($volumeString, ':', 2);
+            if ($secondColon !== false) {
+                $source = substr($volumeString, 0, $secondColon);
+                $remaining = substr($volumeString, $secondColon + 1);
+
+                // Check if there's a mode at the end
+                $lastColon = strrpos($remaining, ':');
+                if ($lastColon !== false) {
+                    $possibleMode = substr($remaining, $lastColon + 1);
+                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                    if (in_array($possibleMode, $validModes)) {
+                        $mode = $possibleMode;
+                        $target = substr($remaining, 0, $lastColon);
+                    } else {
+                        $target = $remaining;
+                    }
+                } else {
+                    $target = $remaining;
+                }
+            } else {
+                // Malformed, treat as is
+                $source = $volumeString;
+                $target = $volumeString;
+            }
+        } else {
+            // Try to parse normally, treating first : as separator
+            $firstColon = strpos($volumeString, ':');
+            $source = substr($volumeString, 0, $firstColon);
+            $remaining = substr($volumeString, $firstColon + 1);
+
+            // Check for mode at the end
+            $lastColon = strrpos($remaining, ':');
+            if ($lastColon !== false) {
+                $possibleMode = substr($remaining, $lastColon + 1);
+                $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                if (in_array($possibleMode, $validModes)) {
+                    $mode = $possibleMode;
+                    $target = substr($remaining, 0, $lastColon);
+                } else {
+                    $target = $remaining;
+                }
+            } else {
+                $target = $remaining;
+            }
+        }
+    }
+
+    // Handle environment variable expansion in source
+    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
+    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
+        $varContent = $matches[1];
+
+        // Check if there's a default value with :-
+        if (strpos($varContent, ':-') !== false) {
+            $parts = explode(':-', $varContent, 2);
+            $varName = $parts[0];
+            $defaultValue = isset($parts[1]) ? $parts[1] : '';
+
+            // If there's a non-empty default value, use it for source
+            if ($defaultValue !== '') {
+                $source = $defaultValue;
+            } else {
+                // Empty default value, keep the variable reference for env resolution
+                $source = '${'.$varName.'}';
+            }
+        }
+        // Otherwise keep the variable as-is for later expansion (no default value)
+    }
+
+    // Validate source path for command injection attempts
+    // We validate the final source value after environment variable processing
+    if ($source !== null) {
+        // Allow simple environment variables like ${VAR_NAME} or ${VAR}
+        // but validate everything else for shell metacharacters
+        $sourceStr = is_string($source) ? $source : $source;
+
+        // Skip validation for simple environment variable references
+        // Pattern: ${WORD_CHARS} with no special characters inside
+        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
+
+        if (! $isSimpleEnvVar) {
+            try {
+                validateShellSafePath($sourceStr, 'volume source');
+            } catch (\Exception $e) {
+                // Re-throw with more context about the volume string
+                throw new \Exception(
+                    'Invalid Docker volume definition: '.$e->getMessage().
+                    ' Please use safe path names without shell metacharacters.'
+                );
+            }
+        }
+    }
+
+    // Also validate target path
+    if ($target !== null) {
+        $targetStr = is_string($target) ? $target : $target;
+        // Target paths in containers are typically absolute paths, so we validate them too
+        // but they're less likely to be dangerous since they're not used in host commands
+        // Still, defense in depth is important
+        try {
+            validateShellSafePath($targetStr, 'volume target');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker volume definition: '.$e->getMessage().
+                ' Please use safe path names without shell metacharacters.'
+            );
+        }
+    }
+
+    return [
+        'source' => $source !== null ? str($source) : null,
+        'target' => $target !== null ? str($target) : null,
+        'mode' => $mode !== null ? str($mode) : null,
+    ];
+}
+
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
+    // Store original compose for later use to update docker_compose_raw with content removed
+    $originalCompose = $compose;
     if (! $compose) {
         return collect([]);
     }
@@ -62,6 +402,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
+        // Validate service name for command injection
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.'
+            );
+        }
+
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
         $environment = collect(data_get($service, 'environment', []));
@@ -139,7 +489,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
@@ -152,7 +501,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
@@ -170,7 +518,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
                     $originalFqdnFor = str($fqdnFor)->replace('_', '-');
                     if (str($fqdnFor)->contains('-')) {
-                        $fqdnFor = str($fqdnFor)->replace('-', '_');
+                        $fqdnFor = str($fqdnFor)->replace('-', '_')->replace('.', '_');
                     }
                     // Generated FQDN & URL
                     $fqdn = generateFqdn(server: $server, random: "$originalFqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -181,32 +529,44 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                     if ($resource->build_pack === 'dockercompose') {
-                        $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                        $domainExists = data_get($domains->get($fqdnFor), 'domain');
-                        $envExists = $resource->environment_variables()->where('key', $key->value())->first();
-                        if (str($domainExists)->replace('http://', '')->replace('https://', '')->value() !== $envExists->value) {
-                            $envExists->update([
-                                'value' => $url,
-                            ]);
+                        // Check if a service with this name actually exists
+                        $serviceExists = false;
+                        foreach ($services as $serviceName => $service) {
+                            $transformedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+                            if ($transformedServiceName === $fqdnFor) {
+                                $serviceExists = true;
+                                break;
+                            }
                         }
-                        if (is_null($domainExists)) {
-                            // Put URL in the domains array instead of FQDN
-                            $domains->put((string) $fqdnFor, [
-                                'domain' => $url,
-                            ]);
-                            $resource->docker_compose_domains = $domains->toJson();
-                            $resource->save();
+
+                        // Only add domain if the service exists
+                        if ($serviceExists) {
+                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
+                            $domainExists = data_get($domains->get($fqdnFor), 'domain');
+                            $envExists = $resource->environment_variables()->where('key', $key->value())->first();
+                            if (str($domainExists)->replace('http://', '')->replace('https://', '')->value() !== $envExists->value) {
+                                $envExists->update([
+                                    'value' => $url,
+                                ]);
+                            }
+                            if (is_null($domainExists)) {
+                                // Put URL in the domains array instead of FQDN
+                                $domains->put((string) $fqdnFor, [
+                                    'domain' => $url,
+                                ]);
+                                $resource->docker_compose_domains = $domains->toJson();
+                                $resource->save();
+                            }
                         }
                     }
                 } elseif ($command->value() === 'URL') {
                     $urlFor = $key->after('SERVICE_URL_')->lower()->value();
                     $originalUrlFor = str($urlFor)->replace('_', '-');
                     if (str($urlFor)->contains('-')) {
-                        $urlFor = str($urlFor)->replace('-', '_');
+                        $urlFor = str($urlFor)->replace('-', '_')->replace('.', '_');
                     }
                     $url = generateUrl(server: $server, random: "$originalUrlFor-$uuid");
                     $resource->environment_variables()->firstOrCreate([
@@ -215,24 +575,36 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                     if ($resource->build_pack === 'dockercompose') {
-                        $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                        $domainExists = data_get($domains->get($urlFor), 'domain');
-                        $envExists = $resource->environment_variables()->where('key', $key->value())->first();
-                        if ($domainExists !== $envExists->value) {
-                            $envExists->update([
-                                'value' => $url,
-                            ]);
+                        // Check if a service with this name actually exists
+                        $serviceExists = false;
+                        foreach ($services as $serviceName => $service) {
+                            $transformedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+                            if ($transformedServiceName === $urlFor) {
+                                $serviceExists = true;
+                                break;
+                            }
                         }
-                        if (is_null($domainExists)) {
-                            $domains->put((string) $urlFor, [
-                                'domain' => $url,
-                            ]);
-                            $resource->docker_compose_domains = $domains->toJson();
-                            $resource->save();
+
+                        // Only add domain if the service exists
+                        if ($serviceExists) {
+                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
+                            $domainExists = data_get($domains->get($urlFor), 'domain');
+                            $envExists = $resource->environment_variables()->where('key', $key->value())->first();
+                            if ($domainExists !== $envExists->value) {
+                                $envExists->update([
+                                    'value' => $url,
+                                ]);
+                            }
+                            if (is_null($domainExists)) {
+                                $domains->put((string) $urlFor, [
+                                    'domain' => $url,
+                                ]);
+                                $resource->docker_compose_domains = $domains->toJson();
+                                $resource->save();
+                            }
                         }
                     }
                 } else {
@@ -243,12 +615,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
             }
         }
+    }
+
+    // generate SERVICE_NAME variables for docker compose services
+    $serviceNameEnvironments = collect([]);
+    if ($resource->build_pack === 'dockercompose') {
+        $serviceNameEnvironments = generateDockerComposeServiceName($services, $pullRequestId);
     }
 
     // Parse the rest of the services
@@ -304,8 +681,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $source = str($volume)->beforeLast(':');
-                    $target = str($volume)->afterLast(':');
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                    // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
@@ -329,6 +708,33 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
+                    // Validate source and target for command injection (array/long syntax)
+                    if ($source !== null && ! empty($source->value())) {
+                        $sourceValue = $source->value();
+                        // Allow simple environment variable references
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
+                        if (! $isSimpleEnvVar) {
+                            try {
+                                validateShellSafePath($sourceValue, 'volume source');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.'
+                                );
+                            }
+                        }
+                    }
+                    if ($target !== null && ! empty($target->value())) {
+                        try {
+                            validateShellSafePath($target->value(), 'volume target');
+                        } catch (\Exception $e) {
+                            throw new \Exception(
+                                'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                ' Please use safe path names without shell metacharacters.'
+                            );
+                        }
+                    }
+
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if ($foundConfig) {
                         $contentNotNull_temp = data_get($foundConfig, 'content');
@@ -346,8 +752,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 if ($type->value() === 'bind') {
                     if ($source->value() === '/var/run/docker.sock') {
                         $volume = $source->value().':'.$target->value();
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                         $volume = $source->value().':'.$target->value();
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
@@ -356,7 +768,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
                         if ($isPullRequest) {
-                            $source = $source."-pr-$pullRequestId";
+                            $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                         }
                         LocalFileVolume::updateOrCreate(
                             [
@@ -381,6 +793,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             }
                         }
                         $volume = "$source:$target";
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     }
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
@@ -396,13 +811,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $name = "{$uuid}_{$slugWithoutUuid}";
 
                     if ($isPullRequest) {
-                        $name = "{$name}-pr-$pullRequestId";
+                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                     }
                     if (is_string($volume)) {
-                        $source = str($volume)->beforeLast(':');
-                        $target = str($volume)->afterLast(':');
+                        $parsed = parseDockerVolumeString($volume);
+                        $source = $parsed['source'];
+                        $target = $parsed['target'];
                         $source = $name;
                         $volume = "$source:$target";
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } elseif (is_array($volume)) {
                         data_set($volume, 'source', $name);
                     }
@@ -433,11 +852,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $newDependsOn = collect([]);
                 $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
                     if (is_numeric($condition)) {
-                        $dependency = "$dependency-pr-$pullRequestId";
+                        $dependency = addPreviewDeploymentSuffix($dependency, $pullRequestId);
 
                         $newDependsOn->put($condition, $dependency);
                     } else {
-                        $condition = "$condition-pr-$pullRequestId";
+                        $condition = addPreviewDeploymentSuffix($condition, $pullRequestId);
                         $newDependsOn->put($condition, $dependency);
                     }
                 });
@@ -536,7 +955,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
 
@@ -553,7 +971,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
             } else {
@@ -589,7 +1006,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'is_build_time' => false,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
@@ -604,7 +1020,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
-                        'is_build_time' => false,
                         'is_preview' => false,
                         'is_required' => $isRequired,
                     ]);
@@ -640,12 +1055,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack !== 'dockercompose') {
             $domains = collect([]);
         }
-        $fqdns = data_get($domains, "$serviceName.domain");
+        $changedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+        $fqdns = data_get($domains, "$changedServiceName.domain");
         // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
                 $parsedDomain = data_get($domain, 'domain');
-                $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_');
+                $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
 
                 if (filled($parsedDomain)) {
                     $parsedDomain = str($parsedDomain)->explode(',')->first();
@@ -653,24 +1069,22 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_'), $coolifyUrl->__toString());
-                    $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_'), $coolifyFqdn);
+                    $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyUrl->__toString());
+                    $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyFqdn);
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_'),
+                        'key' => 'SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
                     ], [
                         'value' => $coolifyUrl->__toString(),
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_'),
+                        'key' => 'SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
                     ], [
                         'value' => $coolifyFqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 } else {
@@ -696,7 +1110,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $preview = $resource->previews()->find($preview_id);
                 $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
                 if ($docker_compose_domains->count() > 0) {
-                    $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                    $found_fqdn = data_get($docker_compose_domains, "$changedServiceName.domain");
                     if ($found_fqdn) {
                         $fqdns = collect($found_fqdn);
                     } else {
@@ -863,7 +1277,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $payload['volumes'] = $volumesParsed;
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
-            $payload['environment'] = $environment->merge($coolifyEnvironments);
+            $payload['environment'] = $environment->merge($coolifyEnvironments)->merge($serviceNameEnvironments);
         }
         if ($logging) {
             $payload['logging'] = $logging;
@@ -872,7 +1286,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $payload['depends_on'] = $depends_on;
         }
         if ($isPullRequest) {
-            $serviceName = "{$serviceName}-pr-{$pullRequestId}";
+            $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
 
         $parsedServices->put($serviceName, $payload);
@@ -885,7 +1299,34 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         return array_search($key, $customOrder);
     });
 
-    $resource->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $resource->docker_compose = $cleanedCompose;
+
+    // Update docker_compose_raw to remove content: from volumes only
+    // This keeps the original user input clean while preventing content reapplication
+    // Parse the original compose again to create a clean version without Coolify additions
+    try {
+        $originalYaml = Yaml::parse($originalCompose);
+        // Remove content, isDirectory, and is_directory from all volume definitions
+        if (isset($originalYaml['services'])) {
+            foreach ($originalYaml['services'] as $serviceName => &$service) {
+                if (isset($service['volumes'])) {
+                    foreach ($service['volumes'] as $key => &$volume) {
+                        if (is_array($volume)) {
+                            unset($volume['content']);
+                            unset($volume['isDirectory']);
+                            unset($volume['is_directory']);
+                        }
+                    }
+                }
+            }
+        }
+        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+    } catch (\Exception $e) {
+        // If parsing fails, keep the original docker_compose_raw unchanged
+        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
+    }
+
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
@@ -897,6 +1338,8 @@ function serviceParser(Service $resource): Collection
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
+    // Store original compose for later use to update docker_compose_raw with content removed
+    $originalCompose = $compose;
     if (! $compose) {
         return collect([]);
     }
@@ -932,28 +1375,44 @@ function serviceParser(Service $resource): Collection
 
     $parsedServices = collect([]);
 
+    // Generate SERVICE_NAME variables for docker compose services
+    $serviceNameEnvironments = generateDockerComposeServiceName($services);
+
     $allMagicEnvironments = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
+        // Validate service name for command injection
+        try {
+            validateShellSafePath($serviceName, 'service name');
+        } catch (\Exception $e) {
+            throw new \Exception(
+                'Invalid Docker Compose service name: '.$e->getMessage().
+                ' Service names must not contain shell metacharacters.'
+            );
+        }
+
         $image = data_get_str($service, 'image');
         $isDatabase = isDatabaseImage($image, $service);
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
+        }
+        // Update image if it changed
+        if ($savedService->image !== $image) {
+            $savedService->image = $image;
+            $savedService->save();
         }
     }
     foreach ($services as $serviceName => $service) {
@@ -1118,7 +1577,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                     $resource->environment_variables()->updateOrCreate([
@@ -1127,7 +1585,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
@@ -1139,7 +1596,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                     $resource->environment_variables()->updateOrCreate([
@@ -1148,7 +1604,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
@@ -1178,7 +1633,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
 
@@ -1198,7 +1652,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
 
@@ -1210,7 +1663,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
@@ -1278,20 +1730,18 @@ function serviceParser(Service $resource): Collection
         }
 
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
         }
@@ -1311,8 +1761,10 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $source = str($volume)->beforeLast(':');
-                    $target = str($volume)->afterLast(':');
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                    // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
@@ -1336,6 +1788,33 @@ function serviceParser(Service $resource): Collection
                     $content = data_get($volume, 'content');
                     $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
 
+                    // Validate source and target for command injection (array/long syntax)
+                    if ($source !== null && ! empty($source->value())) {
+                        $sourceValue = $source->value();
+                        // Allow simple environment variable references
+                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
+                        if (! $isSimpleEnvVar) {
+                            try {
+                                validateShellSafePath($sourceValue, 'volume source');
+                            } catch (\Exception $e) {
+                                throw new \Exception(
+                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                    ' Please use safe path names without shell metacharacters.'
+                                );
+                            }
+                        }
+                    }
+                    if ($target !== null && ! empty($target->value())) {
+                        try {
+                            validateShellSafePath($target->value(), 'volume target');
+                        } catch (\Exception $e) {
+                            throw new \Exception(
+                                'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+                                ' Please use safe path names without shell metacharacters.'
+                            );
+                        }
+                    }
+
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if ($foundConfig) {
                         $contentNotNull_temp = data_get($foundConfig, 'content');
@@ -1353,8 +1832,14 @@ function serviceParser(Service $resource): Collection
                 if ($type->value() === 'bind') {
                     if ($source->value() === '/var/run/docker.sock') {
                         $volume = $source->value().':'.$target->value();
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                         $volume = $source->value().':'.$target->value();
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
                             $mainDirectory = str(base_configuration_dir().'/services/'.$uuid);
@@ -1385,6 +1870,9 @@ function serviceParser(Service $resource): Collection
                             }
                         }
                         $volume = "$source:$target";
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     }
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
@@ -1400,10 +1888,14 @@ function serviceParser(Service $resource): Collection
                     $name = "{$uuid}_{$slugWithoutUuid}";
 
                     if (is_string($volume)) {
-                        $source = str($volume)->beforeLast(':');
-                        $target = str($volume)->afterLast(':');
+                        $parsed = parseDockerVolumeString($volume);
+                        $source = $parsed['source'];
+                        $target = $parsed['target'];
                         $source = $name;
                         $volume = "$source:$target";
+                        if (isset($parsed['mode']) && $parsed['mode']) {
+                            $volume .= ':'.$parsed['mode']->value();
+                        }
                     } elseif (is_array($volume)) {
                         data_set($volume, 'source', $name);
                     }
@@ -1514,7 +2006,6 @@ function serviceParser(Service $resource): Collection
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
 
@@ -1531,7 +2022,6 @@ function serviceParser(Service $resource): Collection
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
             } else {
@@ -1567,7 +2057,6 @@ function serviceParser(Service $resource): Collection
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'is_build_time' => false,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
@@ -1582,7 +2071,6 @@ function serviceParser(Service $resource): Collection
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
-                        'is_build_time' => false,
                         'is_preview' => false,
                         'is_required' => $isRequired,
                     ]);
@@ -1744,7 +2232,7 @@ function serviceParser(Service $resource): Collection
             $payload['volumes'] = $volumesParsed;
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
-            $payload['environment'] = $environment->merge($coolifyEnvironments);
+            $payload['environment'] = $environment->merge($coolifyEnvironments)->merge($serviceNameEnvironments);
         }
         if ($logging) {
             $payload['logging'] = $logging;
@@ -1763,7 +2251,34 @@ function serviceParser(Service $resource): Collection
         return array_search($key, $customOrder);
     });
 
-    $resource->docker_compose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
+    $resource->docker_compose = $cleanedCompose;
+
+    // Update docker_compose_raw to remove content: from volumes only
+    // This keeps the original user input clean while preventing content reapplication
+    // Parse the original compose again to create a clean version without Coolify additions
+    try {
+        $originalYaml = Yaml::parse($originalCompose);
+        // Remove content, isDirectory, and is_directory from all volume definitions
+        if (isset($originalYaml['services'])) {
+            foreach ($originalYaml['services'] as $serviceName => &$service) {
+                if (isset($service['volumes'])) {
+                    foreach ($service['volumes'] as $key => &$volume) {
+                        if (is_array($volume)) {
+                            unset($volume['content']);
+                            unset($volume['isDirectory']);
+                            unset($volume['is_directory']);
+                        }
+                    }
+                }
+            }
+        }
+        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+    } catch (\Exception $e) {
+        // If parsing fails, keep the original docker_compose_raw unchanged
+        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
+    }
+
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();

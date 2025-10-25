@@ -12,9 +12,11 @@
                         <div class="flex gap-2">
                             <h2>Dynamic Configurations</h2>
                             <x-forms.button wire:click="loadDynamicConfigurations">Reload</x-forms.button>
-                            <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
-                                <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />
-                            </x-modal-input>
+                            @can('update', $server)
+                                <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
+                                    <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />
+                                </x-modal-input>
+                            @endcan
                         </div>
                         <div class='pb-4'>You can add dynamic proxy configurations here.</div>
                     </div>
@@ -38,7 +40,7 @@
                                         wire:model="contents.{{ $fileName }}" rows="5" />
                                 @else
                                     <livewire:server.proxy.dynamic-configuration-navbar :server_id="$server->id"
-                                        :fileName="$fileName" :value="$value ?? ''" :newFile="false"
+                                        :server="$server" :fileName="$fileName" :value="$value ?? ''" :newFile="false"
                                         wire:key="{{ $fileName }}-{{ $loop->index }}" />
                                     <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
                                         rows="10" />

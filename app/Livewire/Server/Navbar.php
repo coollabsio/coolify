@@ -32,7 +32,7 @@ class Navbar extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            'refreshServerShow' => '$refresh',
+            'refreshServerShow' => 'refreshServer',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
         ];
     }
@@ -118,20 +118,40 @@ class Navbar extends Component
 
     public function showNotification()
     {
+        $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
-        $forceStop = $this->server->proxy->force_stop ?? false;
 
         switch ($this->proxyStatus) {
             case 'running':
                 $this->loadProxyConfiguration();
+                $this->dispatch('success', 'Proxy is running.');
                 break;
             case 'restarting':
                 $this->dispatch('info', 'Initiating proxy restart.');
                 break;
+            case 'exited':
+                $this->dispatch('info', 'Proxy has exited.');
+                break;
+            case 'stopping':
+                $this->dispatch('info', 'Proxy is stopping.');
+                break;
+            case 'starting':
+                $this->dispatch('info', 'Proxy is starting.');
+                break;
+            case 'unknown':
+                $this->dispatch('info', 'Proxy status is unknown.');
+                break;
             default:
+                $this->dispatch('info', 'Proxy status updated.');
                 break;
         }
 
+    }
+
+    public function refreshServer()
+    {
+        $this->server->refresh();
+        $this->server->load('settings');
     }
 
     public function render()

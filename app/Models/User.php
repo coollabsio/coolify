@@ -56,6 +56,22 @@ class User extends Authenticatable implements SendsEmail
         'email_change_code_expires_at' => 'datetime',
     ];
 
+    /**
+     * Set the email attribute to lowercase.
+     */
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Set the pending_email attribute to lowercase.
+     */
+    public function setPendingEmailAttribute($value)
+    {
+        $this->attributes['pending_email'] = $value ? strtolower($value) : null;
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -320,6 +336,39 @@ class User extends Authenticatable implements SendsEmail
         $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
         return data_get($user, 'pivot.role');
+    }
+
+    /**
+     * Check if the user is an admin or owner of a specific team
+     */
+    public function isAdminOfTeam(int $teamId): bool
+    {
+        $team = $this->teams->where('id', $teamId)->first();
+
+        if (! $team) {
+            return false;
+        }
+
+        $role = $team->pivot->role ?? null;
+
+        return $role === 'admin' || $role === 'owner';
+    }
+
+    /**
+     * Check if the user can access system resources (team_id=0)
+     * Must be admin/owner of root team
+     */
+    public function canAccessSystemResources(): bool
+    {
+        // Check if user is member of root team
+        $rootTeam = $this->teams->where('id', 0)->first();
+
+        if (! $rootTeam) {
+            return false;
+        }
+
+        // Check if user is admin or owner of root team
+        return $this->isAdminOfTeam(0);
     }
 
     public function requestEmailChange(string $newEmail): void

@@ -131,6 +131,7 @@ EOD;
         if (is_null($resource)) {
             abort(404);
         }
+        $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
         $this->container = $this->resource->uuid;
@@ -176,6 +177,7 @@ EOD;
             return;
         }
         try {
+            $this->importRunning = true;
             $this->importCommands = [];
             if (filled($this->customLocation)) {
                 $backupFileName = '/tmp/restore_'.$this->resource->uuid;

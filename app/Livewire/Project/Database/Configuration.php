@@ -3,10 +3,13 @@
 namespace App\Livewire\Project\Database;
 
 use Auth;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Configuration extends Component
 {
+    use AuthorizesRequests;
+
     public $currentRoute;
 
     public $database;
@@ -41,6 +44,8 @@ class Configuration extends Component
             $database = $environment->databases()
                 ->where('uuid', request()->route('database_uuid'))
                 ->firstOrFail();
+
+            $this->authorize('view', $database);
 
             $this->database = $database;
             $this->project = $project;

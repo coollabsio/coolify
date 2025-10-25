@@ -37,7 +37,12 @@ class AddEmpty extends Component
                 'uuid' => (string) new Cuid2,
             ]);
 
-            return redirect()->route('project.show', $project->uuid);
+            $productionEnvironment = $project->environments()->where('name', 'production')->first();
+
+            return redirect()->route('project.resource.index', [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $productionEnvironment->uuid,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

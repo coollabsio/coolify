@@ -32,8 +32,8 @@
                 <x-forms.checkbox instantSave id="is_api_enabled" label="API Access"
                     helper="If enabled, the API will be enabled. If disabled, the API will be disabled." />
                 <x-forms.input id="allowed_ips" label="Allowed IPs for API Access"
-                    helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
-                    placeholder="1.1.1.1,8.8.8.8" />
+                    helper="Allowed IP addresses or subnets for API access.<br>Supports single IPs (192.168.1.100) and CIDR notation (192.168.1.0/24).<br>Use comma to separate multiple entries.<br>Use 0.0.0.0 or leave empty to allow from anywhere."
+                    placeholder="192.168.1.100,10.0.0.0/8,203.0.113.0/24" />
                 <h4 class="pt-4">Confirmation Settings</h4>
                 <div class="md:w-96 pb-1">
                     <x-forms.checkbox instantSave id="is_sponsorship_popup_enabled" label="Show Sponsorship Popup"
@@ -66,12 +66,10 @@
                             confirmationLabel="Please type the confirmation text to disable two step confirmation."
                             shortConfirmationLabel="Confirmation text" />
                     </div>
-                    <div class="w-full px-4 py-2 mb-4 text-white rounded-xs border-l-4 border-red-500 bg-error">
-                        <p class="font-bold">Warning!</p>
-                        <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and
-                            increases
-                            the risk of accidental actions. This is not recommended for production servers.</p>
-                    </div>
+                    <x-callout type="danger" title="Warning!" class="mb-4">
+                        Disabling two step confirmation reduces security (as anyone can easily delete anything) and
+                        increases the risk of accidental actions. This is not recommended for production servers.
+                    </x-callout>
                 @endif
             </div>
         </form>

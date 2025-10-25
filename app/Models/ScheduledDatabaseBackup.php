@@ -10,6 +10,21 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    public static function ownedByCurrentTeam()
+    {
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', $teamId)->orderBy('created_at', 'desc');
+    }
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
     public function database(): MorphTo
     {
         return $this->morphTo();

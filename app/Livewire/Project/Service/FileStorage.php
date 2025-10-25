@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
@@ -15,12 +16,15 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class FileStorage extends Component
 {
+    use AuthorizesRequests, SynchronizesModelData;
+
     public LocalFileVolume $fileStorage;
 
     public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
@@ -31,12 +35,18 @@ class FileStorage extends Component
 
     public bool $permanently_delete = true;
 
+    public bool $isReadOnly = false;
+
+    public ?string $content = null;
+
+    public bool $isBasedOnGit = false;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
-        'fileStorage.content' => 'nullable',
-        'fileStorage.is_based_on_git' => 'required|boolean',
+        'content' => 'nullable',
+        'isBasedOnGit' => 'required|boolean',
     ];
 
     public function mount()
@@ -49,11 +59,24 @@ class FileStorage extends Component
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
+
+        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->syncFromModel();
+    }
+
+    protected function getModelBindings(): array
+    {
+        return [
+            'content' => 'fileStorage.content',
+            'isBasedOnGit' => 'fileStorage.is_based_on_git',
+        ];
     }
 
     public function convertToDirectory()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
@@ -70,7 +93,10 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->loadStorageOnServer();
+            $this->syncFromModel();
             $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -82,6 +108,8 @@ class FileStorage extends Component
     public function convertToFile()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
             $this->fileStorage->content = null;
@@ -99,6 +127,8 @@ class FileStorage extends Component
 
     public function delete($password)
     {
+        $this->authorize('update', $this->resource);
+
         if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
@@ -127,18 +157,22 @@ class FileStorage extends Component
 
     public function submit()
     {
+        $this->authorize('update', $this->resource);
+
         $original = $this->fileStorage->getOriginal();
         try {
             $this->validate();
             if ($this->fileStorage->is_directory) {
-                $this->fileStorage->content = null;
+                $this->content = null;
             }
+            $this->syncToModel();
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
+            $this->syncFromModel();
 
             return handleError($e, $this);
         }

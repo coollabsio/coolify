@@ -37,6 +37,8 @@ class Danger extends Component
 
     public string $resourceDomain = '';
 
+    public bool $canDelete = false;
+
     public function mount()
     {
         $parameters = get_route_parameters();
@@ -80,6 +82,13 @@ class Danger extends Component
             'service-database' => $this->resource->name ?? 'Service Database',
             default => 'Unknown Resource',
         };
+
+        // Check if user can delete this resource
+        try {
+            $this->canDelete = auth()->user()->can('delete', $this->resource);
+        } catch (\Exception $e) {
+            $this->canDelete = false;
+        }
     }
 
     public function delete($password)
