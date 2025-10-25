@@ -12,4 +12,13 @@ services:
     - SB_USER=${SERVICE_USER_SILVERBULLET}:${SERVICE_PASSWORD_SILVERBULLET}
     volumes:
       - sb_space:/space
-    
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '--quiet'
+        - 'http://127.0.0.1:3000'
+      interval: 2s
+      timeout: 10s
+      retries: 5
