@@ -1,7 +1,7 @@
 <div>
     @if (data_get($github_app, 'app_id'))
         <form wire:submit='submit'>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <h1>GitHub App</h1>
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
@@ -40,8 +40,8 @@
                 </a>
             @else
                 <div class="flex flex-col gap-2">
-                    <div class="flex gap-2">
-                        <div class="flex items-end gap-2 w-full">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2 w-full">
                             <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App Name" />
                             <x-forms.button canGate="update" :canResource="$github_app" wire:click.prevent="updateGithubAppName">
                                 Sync Name
@@ -73,23 +73,23 @@
                                 instantSave id="isSystemWide" />
                         </div>
                     @endif
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl" label="HTML Url" />
                         <x-forms.input canGate="update" :canResource="$github_app" id="apiUrl" label="API Url" />
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input canGate="update" :canResource="$github_app" id="customUser" label="User"
                             required />
                         <x-forms.input canGate="update" :canResource="$github_app" type="number" id="customPort"
                             label="Port" required />
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
                             label="App Id" required />
                         <x-forms.input canGate="update" :canResource="$github_app" type="number"
                             id="installationId" label="Installation Id" required />
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input canGate="update" :canResource="$github_app" id="clientId" label="Client Id"
                             type="password" required />
                         <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
@@ -108,7 +108,7 @@
                             @endforeach
                         </x-forms.select>
                     </div>
-                    <div class="flex items-end gap-2 ">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2">
                         <h2 class="pt-4">Permissions</h2>
                         @can('view', $github_app)
                             <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
@@ -120,7 +120,7 @@
                             </a>
                         @endcan
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <x-forms.input id="contents" helper="read - mandatory." label="Content" readonly
                             placeholder="N/A" />
                         <x-forms.input id="metadata" helper="read - mandatory." label="Metadata" readonly
@@ -193,7 +193,7 @@
             </div>
         @endif
     @else
-        <div class="flex items-center gap-2 pb-4">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
                 @can('delete', $github_app)
@@ -228,7 +228,7 @@
                 <div class="pb-10">
                     @can('create', $github_app)
                         @if (!isCloud() || isDev())
-                            <div class="flex items-end gap-2">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2">
                                 <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
                                     helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
                                     @if ($ipv4)
@@ -250,7 +250,7 @@
                                 </x-forms.button>
                             </div>
                         @else
-                            <div class="flex gap-2">
+                            <div class="flex flex-col sm:flex-row gap-2">
                                 <h2>Register a GitHub App</h2>
                                 <x-forms.button isHighlighted
                                     x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
@@ -261,11 +261,11 @@
                         @endif
 
                         <div class="flex flex-col gap-2 pt-4 w-96">
-                            <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
+                            <x-forms.checkbox disabled id="default_permissions" label="Mandatory"
                                 helper="Contents: read<br>Metadata: read<br>Email: read" />
-                            <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
+                            <x-forms.checkbox id="preview_deployment_permissions" label="Preview Deployments "
                                 helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
-                            {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
+                            {{-- <x-forms.checkbox id="administration" label="Administration (for Github Runners)"
                             helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
                         </div>
                     @else
