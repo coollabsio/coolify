@@ -8,6 +8,6 @@ services:
   trilium:
     image: zadam/trilium:0.60-latest
     environment:
-      - SERVICE_FQDN_TRILIUM_8080
+      - SERVICE_URL_TRILIUM_8080
     volumes:
       - trilium-data:/home/node/trilium-data
