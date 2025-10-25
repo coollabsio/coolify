@@ -73,9 +73,11 @@
                                 instantSave id="isSystemWide" />
                         </div>
                         @if ($isSystemWide)
-                            <x-callout type="warning" title="Not Recommended">
-                                System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
-                            </x-callout>
+                            <div class="max-w-full">
+                                <x-callout type="warning" title="Not Recommended" class="break-words">
+                                    System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
+                                </x-callout>
+                            </div>
                         @endif
                     @endif
                     <div class="flex flex-col sm:flex-row gap-2">
