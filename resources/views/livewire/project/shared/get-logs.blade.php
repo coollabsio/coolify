@@ -46,8 +46,8 @@
                 <x-loading wire:poll.2000ms='getLogs(true)' />
             @endif
         </div>
-        <form wire:submit='getLogs(true)' class="flex gap-2 items-end">
-            <div class="w-96">
+        <form wire:submit='getLogs(true)' class="flex flex-col gap-4 sm:flex-row sm:gap-2 sm:items-end">
+            <div class="w-full sm:w-96">
                 <x-forms.input label="Only Show Number of Lines" placeholder="100" type="number" required
                     id="numberOfLines" :readonly="$streamLogs"></x-forms.input>
             </div>
