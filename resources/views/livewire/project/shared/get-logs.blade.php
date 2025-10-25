@@ -58,7 +58,7 @@
             </div>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
-            <div class="flex overflow-y-auto overflow-x-hidden flex-col-reverse px-4 py-2 w-full bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300 border-neutral-200"
+            <div class="flex overflow-y-auto overflow-x-hidden flex-col-reverse px-4 py-2 w-full min-w-0 bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300 border-neutral-200"
                 :class="fullscreen ? '' : 'max-h-96 border border-solid rounded-sm'">
                 <div :class="fullscreen ? 'fixed top-4 right-4' : 'absolute top-6 right-0'">
                     <div class="flex justify-end gap-4" :class="fullscreen ? 'fixed' : ''"
@@ -100,9 +100,9 @@
                     </div>
                 </div>
                 @if ($outputs)
-                    <pre id="logs" class="font-mono whitespace-pre-wrap break-words overflow-wrap-anywhere">{{ $outputs }}</pre>
+                    <pre id="logs" class="font-mono whitespace-pre-wrap break-all max-w-full">{{ $outputs }}</pre>
                 @else
-                    <pre id="logs" class="font-mono whitespace-pre-wrap break-words">Refresh to get the logs...</pre>
+                    <pre id="logs" class="font-mono whitespace-pre-wrap break-all max-w-full">Refresh to get the logs...</pre>
                 @endif
             </div>
         </div>
