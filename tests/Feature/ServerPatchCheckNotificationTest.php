@@ -3,26 +3,49 @@
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Notifications\Server\ServerPatchCheck;
-use Mockery;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    // Create a real InstanceSettings record in the test database
+    // This avoids Mockery alias/overload issues that pollute global state
+    $this->setInstanceSettings = function ($fqdn = null, $publicIpv4 = null, $publicIpv6 = null) {
+        InstanceSettings::query()->delete();
+        InstanceSettings::create([
+            'id' => 0,
+            'fqdn' => $fqdn,
+            'public_ipv4' => $publicIpv4,
+            'public_ipv6' => $publicIpv6,
+        ]);
+    };
+
+    $this->createMockServer = function ($uuid, $name = 'Test Server') {
+        $mockServer = Mockery::mock(Server::class);
+        $mockServer->shouldReceive('getAttribute')
+            ->with('uuid')
+            ->andReturn($uuid);
+        $mockServer->shouldReceive('getAttribute')
+            ->with('name')
+            ->andReturn($name);
+        $mockServer->shouldReceive('setAttribute')->andReturnSelf();
+        $mockServer->shouldReceive('getSchemalessAttributes')->andReturn([]);
+        $mockServer->uuid = $uuid;
+        $mockServer->name = $name;
+
+        return $mockServer;
+    };
+});
 
 afterEach(function () {
     Mockery::close();
 });
 
 it('generates url using base_url instead of APP_URL', function () {
-    // Mock InstanceSettings to return a specific FQDN
-    InstanceSettings::shouldReceive('get')
-        ->andReturn((object) [
-            'fqdn' => 'https://coolify.example.com',
-            'public_ipv4' => null,
-            'public_ipv6' => null,
-        ]);
+    // Set InstanceSettings to return a specific FQDN
+    ($this->setInstanceSettings)('https://coolify.example.com');
 
-    $mockServer = Mockery::mock(Server::class);
-    $mockServer->shouldReceive('getAttribute')
-        ->with('uuid')
-        ->andReturn('test-server-uuid');
-    $mockServer->uuid = 'test-server-uuid';
+    $mockServer = ($this->createMockServer)('test-server-uuid');
 
     $patchData = [
         'total_updates' => 5,
@@ -38,19 +61,10 @@ it('generates url using base_url instead of APP_URL', function () {
 });
 
 it('falls back to public_ipv4 with port when fqdn is not set', function () {
-    // Mock InstanceSettings to return public IPv4
-    InstanceSettings::shouldReceive('get')
-        ->andReturn((object) [
-            'fqdn' => null,
-            'public_ipv4' => '192.168.1.100',
-            'public_ipv6' => null,
-        ]);
+    // Set InstanceSettings to return public IPv4
+    ($this->setInstanceSettings)(null, '192.168.1.100');
 
-    $mockServer = Mockery::mock(Server::class);
-    $mockServer->shouldReceive('getAttribute')
-        ->with('uuid')
-        ->andReturn('test-server-uuid');
-    $mockServer->uuid = 'test-server-uuid';
+    $mockServer = ($this->createMockServer)('test-server-uuid');
 
     $patchData = [
         'total_updates' => 3,
@@ -66,22 +80,9 @@ it('falls back to public_ipv4 with port when fqdn is not set', function () {
 });
 
 it('includes server url in all notification channels', function () {
-    InstanceSettings::shouldReceive('get')
-        ->andReturn((object) [
-            'fqdn' => 'https://coolify.test',
-            'public_ipv4' => null,
-            'public_ipv6' => null,
-        ]);
+    ($this->setInstanceSettings)('https://coolify.test');
 
-    $mockServer = Mockery::mock(Server::class);
-    $mockServer->shouldReceive('getAttribute')
-        ->with('uuid')
-        ->andReturn('abc-123');
-    $mockServer->shouldReceive('getAttribute')
-        ->with('name')
-        ->andReturn('Test Server');
-    $mockServer->uuid = 'abc-123';
-    $mockServer->name = 'Test Server';
+    $mockServer = ($this->createMockServer)('abc-123', 'Test Server');
 
     $patchData = [
         'total_updates' => 10,
@@ -122,22 +123,9 @@ it('includes server url in all notification channels', function () {
 });
 
 it('uses correct url in error notifications', function () {
-    InstanceSettings::shouldReceive('get')
-        ->andReturn((object) [
-            'fqdn' => 'https://coolify.production.com',
-            'public_ipv4' => null,
-            'public_ipv6' => null,
-        ]);
+    ($this->setInstanceSettings)('https://coolify.production.com');
 
-    $mockServer = Mockery::mock(Server::class);
-    $mockServer->shouldReceive('getAttribute')
-        ->with('uuid')
-        ->andReturn('error-server-uuid');
-    $mockServer->shouldReceive('getAttribute')
-        ->with('name')
-        ->andReturn('Error Server');
-    $mockServer->uuid = 'error-server-uuid';
-    $mockServer->name = 'Error Server';
+    $mockServer = ($this->createMockServer)('error-server-uuid', 'Error Server');
 
     $patchData = [
         'error' => 'Failed to connect to package manager',
