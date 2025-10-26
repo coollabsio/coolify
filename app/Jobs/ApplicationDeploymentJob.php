@@ -3762,14 +3762,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->transitionToStatus(ApplicationDeploymentStatus::FAILED);
     }
 
-    /**
-     * @deprecated Use transitionToStatus(), completeDeployment(), or failDeployment() instead.
-     */
-    private function next(string $status): void
-    {
-        $this->transitionToStatus(ApplicationDeploymentStatus::from($status));
-    }
-
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
