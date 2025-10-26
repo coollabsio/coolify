@@ -46,7 +46,7 @@
                         placeholder="192.168.1.100,10.0.0.0/8,203.0.113.0/24" />
                     @if (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? ''))))
                         <x-callout type="warning" title="Warning" class="mt-2">
-                            Using 0.0.0.0 allows API access from anywhere. This is not recommended for production
+                            Using 0.0.0.0 (or empty) allows API access from anywhere. This is not recommended for production
                             environments!
                         </x-callout>
                     @endif
