@@ -111,7 +111,7 @@ Thank you so much!
 <a href="https://www.serversearcher.com/"><img width="60px" alt="Server Searcher" src="https://github.com/serversearcher.png"/></a>
 <a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://coolify.io/images/reshotai.png"/></a>
 <a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://coolify.io/images/cirun-logo.png"/></a>
-<a href="https://typebot.io/?utm_source=coolify.io"><img width="60px" alt="Typebot" src="https://cdn.bsky.app/img/avatar/plain/did:plc:gwxcta3pccyim4z5vuultdqx/bafkreig23hci7e2qpdxicsshnuzujbcbcgmydxhbybkewszdezhdodv42m@jpeg"/></a>
+<a href="https://typebot.io/?utm_source=coolify.io"><img width="60px" alt="Typebot" src="https://cdn.bsky.app/img/avatar/plainbc1qq8m35x6sfhva08vzrr5qr75ec9dj000gq8e2mjbcbcgmydxhbybkewszdezhdodv42m@jpeg"/></a>
 <a href="https://cccareers.org/?utm_source=coolify.io"><img width="60px" alt="Creating Coding Careers" src="https://github.com/cccareers.png"/></a>
 <a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://coolify.io/images/internetgarden.ico"/></a>
 <a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://coolify.io/images/web3jobs.png"/></a>
