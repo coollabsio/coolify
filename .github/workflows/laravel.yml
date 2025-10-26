@@ -1,0 +1,299 @@
+name: Laravel
+
+on:
+  push:
+    branches: [ "v4.x" ]
+  pull_request:
+    branches: [ "v4.x" ]
+
+jobs:
+  laravel-tests:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
+      with:
+        php-version: '8.0'
+    - uses: actions/checkout@v4
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+    - name: Generate key
+      run: php artisan key:generate
+    - name: Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+    - name: Create Database
+      run: |
+        mkdir -p database
+        touch database/database.sqlite
+    - name: Execute tests (Unit and Feature tests) via PHPUnit/Pest
+      env:
+        DB_CONNECTION: sqlite
+        DB_DATABASE: database/database.sqlite
+      run: php artisan test
+BTC=# zk-SNARK & MerkleTree Proof of Solvency
+
+This project aims to explore encrypted technology based on zk-SNARK and MerkleTree to achieve the goal of bringing digital currency exchanges closer to decentralization. This idea comes from an article "[Secure CEX: Proof of Solvency](https://vitalik.ca/general/2022/11/19/proof_of_solvency.html)" by Vitalik Buterin, the co-founder of Ethereum.
+
+## Project Introduction
+
+The project involves the use of zk-SNARK, which is a powerful cryptographic technology. We first place all users' deposits into a Merkle tree and then use zk-SNARK to prove that all the balances in the tree are non-negative and their sum equals a claimed value. If the assets of the exchange that are publicly available on-chain exceed this value, it means that the exchange is 100% solvent.
+
+By combining zk-SNARK with Merkle Tree, both the integrity and consistency of the data can be validated, while preserving transaction privacy. The prover can use zk-SNARK to prove that they know a Merkle proof that meets specific conditions without revealing the contents of the proof. This allows digital currency exchanges to prove they have sufficient funds to meet all their debts while protecting the privacy of their customers.
+
+
+## Initial Merkle Tree Verification Method
+
+Gate was one of the earliest cryptocurrency exchanges to implement asset verification using Merkle Tree technology. Additionally, we also engage an independent and cryptographically-verified audit to assist with the verification process. For more details, please refer to the **[merkle-proof](https://github.com/gateio/proof-of-reserves/tree/merkle-proof)** branch.
+
+
+## Preparations
+
+### Install databases
+
+1. Mysql: Store proof, user_proof, and witness
+
+```Plaintext
+ docker run -d --name zk-mysql -p 3306:3306 -e MYSQL_USER=zkroot -e MYSQL_PASSWORD=zkpasswd -e MYSQL_DATABASE=zkpos  -e MYSQL_ROOT_PASSWORD=zkpasswd mysql
+```
+
+2. Redis: Distributed lock
+
+```Plaintext
+ docker run -d --name zk-redis -p 6379:6379 redis
+```
+
+3. Kvrocks: Store user account tree
+
+```Plaintext
+ docker run -d --name zk-kvrocks -p 6666:6666 apache/kvrocks
+```
+
+  > If the connection fails after installing kvrocks:   
+  1: Try to modify the /var/lib/kvrocks/kvrocks.conf file in the docker, change it to `bind 0.0.0.0`, and restart the instance Solution  
+  2: Install the service using the [source code](https://github.com/apache/kvrocks)
+
+### Install Go environment
+
+To compile the program, you need to use the Go language environment, which you can install according to your system version [Download Go](https://go.dev/dl/).
+
+### Export exchange's user asset data
+
+The exported exchange user asset .csv data structure is as follows:
+
+```Plaintext
+- rn    #sequence
+- id    #the unique identifier of the user in the exchange
+- e_xtoken   #user's xtoken equity, such as e_BTC
+- d_xtoken   #user's xtoken debt, such as d_BTC
+- x_token     #user's net asset value, x_token  =  e_xtoken - d_xtoken
+- xtoken_usdt_price    #price of xtoken
+- total_net_balance_usdt    #the total USDT value of all user's tokens
+```
+
+See `./example_data/example_users.csv` for details.
+
+### Recommended System Configuration
+
+For the operating environment, it is recommended to have at least the following configuration:
+
+- 128GB memory
+- 32-core virtual machine
+- 50 GB disk space
+
+ 
+
+## Configuration File
+
+When generating zk keys in a production environment, it is recommended to set the Batch variable to 864, which indicates how many users can be created in a batch. The larger the value, the longer it takes to generate the zk key and proof.
+
+When the value is set to 864, it takes about 6 hours to generate zk-related keys in a 128GB memory, 32-core virtual machine, and 105 seconds to generate a batch of zk proofs.
+
+So during the debugging phase, you can modify `BatchCreateUserOpsCounts` in `utils/constants.go` to `4` and recompile. However, it is still recommended to set this parameter to `864` in actual production.
+
+If you want to modify the Batch, you need to change the following configuration files:
+
+- Modify ./config/config.json `"ZkKeyName": "./zkpor864"` => `"ZkKeyName": "./zkpor4"`
+- Modify ./config/cex_config.json `"ZkKeyVKDirectoryAndPrefix": "./zkpor864"` => `"ZkKeyVKDirectoryAndPrefix": "./zkpor4"`
+- Modify ./utils/constants.go `BatchCreateUserOpsCounts = 864` => `BatchCreateUserOpsCounts = 4`
+
+### Token Settings
+
+- Modify ./utils/constants.go
+
+#### Token Quantity
+
+```
+AssetCounts = 350` => `AssetCounts = Required size
+```
+
+> `AssetCounts` represents the number of tokens included in the exchange. The actual number cannot be lower than the set value. For example, if there are 420 tokens, you can modify it to 500. Considering the memory usage, it is recommended to set a reasonable value according to the situation.
+
+#### Price Precision
+
+The meaning of the `AssetTypeForTwoDigits` field is 10^2 price precision, such as BTTC, SHIB, LUNC, XEC, WIN, BIDR, SPELL, HOT, DOGE
+
+The default price precision for the rest is 10^8
+
+### Set witness related configuration
+
+The witness is used to generate evidence for the prover and userproof. The config.json configuration is as follows:
+
+```Plaintext
+{
+  "MysqlDataSource" : "zkroot:zkpasswd@tcp(127.0.0.1:3306)/zkpos?parseTime=true",
+  "DbSuffix": "202307",
+  "UserDataFile": "./example_data/",
+  "TreeDB": {
+    "Driver": "redis",
+    "Option": {
+      "Addr": "127.0.0.1:6666"
+    }
+  },
+  "Redis": {
+    "Host": "127.0.0.1:6379",
+    "Type": "node"
+  },
+  "ZkKeyName": "./zkpor864"
+}
+```
+
+- `MysqlDataSource`: Mysql database link
+- `DbSuffix`: The suffix of the table generated by Mysql. For example, if you enter the time 202307, it will generate witness202307. **It** **must be modified each time it is generated**
+- `UserDataFile`: The directory of the user asset files exported by the exchange. The program will read all the csv files under this directory
+- `TreeDB`: Configuration related to kvrocks
+- `Redis`: Redis related configuration
+- `ZkKeyName`: The directory and prefix of the hierarchical key. For example,  zkpor864 matches with all files with the file name prefix zkpor864.*
+
+> The `DbSuffix` field is the suffix of the table. It must be changed every time. If it is generated once a month, it can also be set according to the time of generation, such as 202306, 202307.
+
+## Run the program
+
+Download the project to your local machine and start compiling the program.
+
+### Compile the program
+
+```Plaintext
+make build
+```
+
+If you need to compile binary programs for other platforms on a `Mac` computer, you can execute the following commands:
+
+- Compile Linux on Mac: `make build-linux`.
+- Compile Windows on Mac: `make build-windows`.
+
+### Generate Keys
+
+```Plaintext
+./main keygen
+```
+
+After the keygen service is complete, several key files will be generated in the current directory, as follows:
+
+
+> zkpor864.ccs.ct.save  
+> zkpor864.ccs.save  
+> zkpor864.pk.A.save  
+> zkpor864.pk.B1.save  
+> zkpor864.pk.B2.save  
+> zkpor864.pk.E.save  
+> zkpor864.pk.K.save  
+> zkpor864.vk.save  
+> zkpor864.pk.Z.save  
+
+If the Batch is set to 4, it will be `zkpor4.*.save`.
+
+This step takes a long time to run. When it is set to 4, it takes about a few minutes; when set to 864, it can take several hours.
+
+**Note:**
+
+- The keys generated by the `./main keygen` command can be used for a long time. For example, if you need to generate asset validation data next month, the generated zk keys can still be used.
+- In subsequent user validation processes, the `zkpor864.vk.save` file is required. Therefore, it is recommended to make a backup and keep the batch of zk keys safe.
+
+### Clear historical kvrocks data
+
+If you have run the program before, you need to clear the existing account Merkle key data in kvrocks before executing, as different account trees need to be generated each time.
+
+```Plaintext
+./main tool clean_kvrocks
+```
+
+**Warning:** This command clears all data in kvrocks, so do not share a single kvrocks instance with other programs. After the previous data is cleared, you can start generating proofs.
+
+### Start witness service
+
+```Plaintext
+./main witness
+```
+
+> After the operation is completed, a table with the witness+suffix will be created in the Mysql database (according to the `DbSuffix` in `config.json`). The table contains the witness proof data in batches, and the data in the table will play a role in the subsequent generation of zk proof and user proof.
+
+### Generate zk proof
+
+The Prover service is used to generate zk proofs and supports parallel operation. It reads witnesses from the witness table in mysql.
+
+Run the following command to generate zk proof data:
+
+```Plaintext
+./main prover
+```
+
+> This command supports parallel operation. You need to copy the main file and other related files such as zkpor864 to other machines and ensure that the configuration in the `config.json` file is the same. In this way, Redis can be used as a distributed lock to run at the same time.
+
+You can run the following command to query the execution status:
+
+```Plaintext
+./main tool check_prover_status
+```
+
+When the operation is finished, it will return:
+
+```Plaintext
+Total witness item 50, Published item 0, Pending item 0, Finished item 50
+```
+
+Make sure all the witness items are in the finished state, which means the prover operation is completed.
+
+> After the prover service is executed, there will be an additional table in the Mysql database with the proof+suffix (according to the `DbSuffix` in `config.json`). The data in the table needs to be made public to users so that they can verify the exchange's assets later. In the verify stage, it will be explained in detail how to do this.
+
+### Generate user proof
+
+The userproof service is used to generate and persist user Merkle proofs.
+
+Run the following command to generate user proof data:
+
+```Plaintext
+./main userproof
+```
+
+Performance: Generates about 10k proofs per second for users in a 128GB memory and 32-core virtual machine.
+
+> After running the userproof command, a table named userproof+suffix (based on `config.json` in `DbSuffix`) will be generated in the mysql database. The data in this table contains the user's asset information and can be configured with permissions as needed. This table needs to be opened to designated users for download, in order to make a proof of their account assets. The specific instructions will be explained in the verify section below.
+
+## Provide verification data
+
+Here we need to provide users with two verification options:
+
+- Verify the exchange's assets
+- Verify the user's own assets
+
+We need to compile the binary executable files (mac ubuntu windows) in advance for each phase to provide to users for download. Refer to the Release attachment for details.
+
+### Data and format required to verify exchange assets
+
+In addition to providing users with binary files for verifying exchange assets, we also need to provide the following three configuration data:
+
+1. Download `proof.csv`: Export the previously generated proof table as a CSV file (including headers) in advance, such as proof202307.csv, and provide it to users for download.
+2. `zkpor864.vk.save`: We need to provide users with the previously generated verify key file for zk864.
+3. `Exchange's assets`: After the above Proof file is generated, you can use the following command to query the sum of the user's asset table provided by the exchange:
+
+```Plaintext
+ ./main tool query_cex_assets
+```
+
+A result like the following will be returned:
+
+```Plaintext
+ [{"TotalEquity":10049232946,"TotalDebt":0,"BasePrice":3960000000,"Symbol":"1inch","Index":0},{"TotalEquity":421836,"TotalDebt":0,"BasePrice":564000000000,"Symbol":"aave","Index":1},{"TotalEquity":0,"TotalDebt":0,"BasePrice":79800000,"Symbol":"ach","Index":2},{"TotalEquity":3040000,"TotalDebt":0,"BasePrice":25460000000,"Symbol":"acm","Index":3},{"TotalEquity":17700050162640,"TotalDebt":0,"BasePrice":2784000000,"Symbol":"ada","Index":4},{"TotalEquity":485400000,"TotalDebt":0,"BasePrice":1182000000,"Symbol":"adx","Index":5},{"TotalEquity":0,"TotalDebt":0,"BasePrice":907000000,"Symbol":"aergo","Index":6},{"TotalEquity":0,"TotalDebt":0,"BasePrice":2720000000,"Symbol":"agld","Index":7},{"TotalEquity":1969000000,"TotalDebt":0,"BasePrice":30500000,"Symbol":"akro","Index":8},{"TotalEquity":0,"TotalDebt":0,"BasePrice":141000000000,"Symbol":"alcx","Index":9},{"TotalEquity":15483340912,"TotalDebt":0,"BasePrice":1890000000,"Symbol":"algo","Index":10},{"TotalEquity":3187400,"TotalDebt":0,"BasePrice":11350000000,"Symbol":"alice","Index":11},{"TotalEquity":1760000,"TotalDebt":0,"BasePrice":2496000000,"Symbol":"alpaca","Index":12},{"TotalEquity":84596857600,"TotalDebt":0,"BasePrice":785000000,"Symbol":"alpha","Index":13},{"TotalEquity":3672090936,"TotalDebt":0,"BasePrice":20849000000,"Symbol":"alpine","Index":14},{"TotalEquity":198200000,"TotalDebt":0,"BasePrice":132600000,"Symbol":"amb","Index":15},{"TotalEquity":53800000,"TotalDebt":0,"BasePrice":32200000,"Symbol":"amp","Index":16},{"TotalEquity":3291606210,"TotalDebt":0,"BasePrice":340300000,"Symbol":"anc","Index":17},{"TotalEquity":192954000,"TotalDebt":0,"BasePrice":166000000,"Symbol":"ankr","Index":18},{"TotalEquity":2160000,"TotalDebt":0,"BasePrice":20940000000,"Symbol":"ant","Index":19},{"TotalEquity":5995002000,"TotalDebt":0,"BasePrice":40370000000,"Symbol":"ape","Index":20},{"TotalEquity":0,"TotalDebt":0,"BasePrice":11110000000,"Symbol":"api3","Index":21},{"TotalEquity":53728000,"TotalDebt":0,"BasePrice":38560000000,"Symbol":"apt","Index":22},{"TotalEquity":0,"TotalDebt":0,"BasePrice":68500000000,"Symbol":"ar","Index":23},{"TotalEquity":55400000,"TotalDebt":0,"BasePrice":667648400,"Symbol":"ardr","Index":24},{"TotalEquity":8320000,"TotalDebt":0,"BasePrice":266200000,"Symbol":"arpa","Index":25},{"TotalEquity":18820000,"TotalDebt":0,"BasePrice":401000000,"Symbol":"astr","Index":26},{"TotalEquity":13205405410,"TotalDebt":0,"BasePrice":934000000,"Symbol":"ata","Index":27},{"TotalEquity":7016230960,"TotalDebt":0,"BasePrice":102450000000,"Symbol":"atom","Index":28},{"TotalEquity":2619441828,"TotalDebt":0,"BasePrice":40900000000,"Symbol":"auction","Index":29},{"TotalEquity":9640198,"TotalDebt":0,"BasePrice":1432000000,"Symbol":"audio","Index":30},{"TotalEquity":0,"TotalDebt":0,"BasePrice":2306000000000,"Symbol":"auto","Index":31},{"TotalEquity":886400,"TotalDebt":0,"BasePrice":5390000000,"Symbol":"ava","Index":32},{"TotalEquity":2883562350,"TotalDebt":0,"BasePrice":117800000000,"Symbol":"avax","Index":33},{"TotalEquity":1864300912,"TotalDebt":0,"BasePrice":68200000000,"Symbol":"axs","Index":34},{"TotalEquity":843870,"TotalDebt":0,"BasePrice":23700000000,"Symbol":"badger","Index":35},{"TotalEquity":114869291528,"TotalDebt":0,"BasePrice":1379000000,"Symbol":"bake","Index":36},{"TotalEquity":95400,"TotalDebt":0,"BasePrice":54110000000,"Symbol":"bal","Index":37},{"TotalEquity":123113880,"TotalDebt":0,"BasePrice":14610000000,"Symbol":"band","Index":38},{"TotalEquity":0,"TotalDebt":0,"BasePrice":37100000000,"Symbol":"bar","Index":39},{"TotalEquity":73090049578,"TotalDebt":0,"BasePrice":1774000000,"Symbol":"bat","Index":40},{"TotalEquity":28891300,"TotalDebt":0,"BasePrice":1017000000000,"Symbol":"bch","Index":41},{"TotalEquity":19889623294,"TotalDebt":0,"BasePrice":4130000000,"Symbol":"bel","Index":42},{"TotalEquity":374840602180,"TotalDebt":0,"BasePrice":699700000,"Symbol":"beta","Index":43},{"TotalEquity":270294580,"TotalDebt":0,"BasePrice":12290900000000,"Symbol":"beth","Index":44},{"TotalEquity":35692901600,"TotalDebt":0,"BasePrice":2730000000,"Symbol":"bico","Index":45},{"TotalEquity":0,"TotalDebt":0,"BasePrice":639000,"Symbol":"bidr","Index":46},{"TotalEquity":240200000,"TotalDebt":0,"BasePrice":538000000,"Symbol":"blz","Index":47},{"TotalEquity":83614634622,"TotalDebt":0,"BasePrice":2599000000000,"Symbol":"bnb","Index":48},{"TotalEquity":0,"TotalDebt":0,"BasePrice":3490000000,"Symbol":"bnt","Index":49},{"TotalEquity":1560,"TotalDebt":0,"BasePrice":592000000000,"Symbol":"bnx","Index":50},{"TotalEquity":2076000,"TotalDebt":0,"BasePrice":32630000000,"Symbol":"bond","Index":51},{"TotalEquity":44699589660,"TotalDebt":0,"BasePrice":1768000000,"Symbol":"bsw","Index":52},{"TotalEquity":291716078,"TotalDebt":0,"BasePrice":169453900000000,"Symbol":"btc","Index":53},{"TotalEquity":15500321300000000,"TotalDebt":0,"BasePrice":6300,"Symbol":"bttc","Index":54},{"TotalEquity":70771546756,"TotalDebt":0,"BasePrice":5240000000,"Symbol":"burger","Index":55},{"TotalEquity":12058907297354,"TotalDebt":1476223055432,"BasePrice":10000000000,"Symbol":"busd","Index":56},{"TotalEquity":34716440000,"TotalDebt":0,"BasePrice":1647000000,"Symbol":"c98","Index":57},{"TotalEquity":1541723702,"TotalDebt":0,"BasePrice":33140000000,"Symbol":"cake","Index":58},{"TotalEquity":2112000,"TotalDebt":0,"BasePrice":5200000000,"Symbol":"celo","Index":59},{"TotalEquity":317091540000,"TotalDebt":0,"BasePrice":101000000,"Symbol":"celr","Index":60},{"TotalEquity":137111365560,"TotalDebt":0,"BasePrice":228000000,"Symbol":"cfx","Index":61},{"TotalEquity":0,"TotalDebt":0,"BasePrice":1820000000,"Symbol":"chess","Index":62},{"TotalEquity":258540000,"TotalDebt":0,"BasePrice":1140000000,"Symbol":"chr","Index":63},{"TotalEquity":289172288882,"TotalDebt":0,"BasePrice":1099000000,"Symbol":"chz","Index":64},{"TotalEquity":0,"TotalDebt":0,"BasePrice":25100000,"Symbol":"ckb","Index":65},{"TotalEquity":1851135024806,"TotalDebt":0,"BasePrice":535500000,"Symbol":"clv","Index":66},{"TotalEquity":155010000,"TotalDebt":0,"BasePrice":5202000000,"Symbol":"cocos","Index":67},{"TotalEquity":52093390,"TotalDebt":0,"BasePrice":335800000000,"Symbol":"comp","Index":68},{"TotalEquity":13991592000,"TotalDebt":0,"BasePrice":44500000,"Symbol":"cos","Index":69},{"TotalEquity":51240788068,"TotalDebt":0,"BasePrice":557000000,"Symbol":"coti","Index":70},{"TotalEquity":0,"TotalDebt":0,"BasePrice":107900000000,"Symbol":"cream","Index":71},{"TotalEquity":15940224,"TotalDebt":0,"BasePrice":5470000000,"Symbol":"crv","Index":72},{"TotalEquity":2336000,"TotalDebt":0,"BasePrice":7450000000,"Symbol":"ctk","Index":73},{"TotalEquity":88860000,"TotalDebt":0,"BasePrice":1059000000,"Symbol":"ctsi","Index":74},{"TotalEquity":440400000,"TotalDebt":0,"BasePrice":1763000000,"Symbol":"ctxc","Index":75},{"TotalEquity":0,"TotalDebt":0,"BasePrice":3375000000,"Symbol":"cvp","Index":76},{"TotalEquity":176202,"TotalDebt":0,"BasePrice":30810000000,"Symbol":"cvx","Index":77},{"TotalEquity":0,"TotalDebt":0,"BasePrice":9999000100,"Symbol":"dai","Index":78},{"TotalEquity":90702266836,"TotalDebt":0,"BasePrice":1293500000,"Symbol":"dar","Index":79},{"TotalEquity":29386961406,"TotalDebt":0,"BasePrice":458300000000,"Symbol":"dash","Index":80},{"TotalEquity":1628888000,"TotalDebt":0,"BasePrice":235500000,"Symbol":"data","Index":81},{"TotalEquity":0,"TotalDebt":0,"BasePrice":186229836100,"Symbol":"dcr","Index":82},{"TotalEquity":0,"TotalDebt":0,"BasePrice":15920000000,"Symbol":"dego","Index":83},{"TotalEquity":26105549312822,"TotalDebt":0,"BasePrice":6830000,"Symbol":"dent","Index":84},{"TotalEquity":670658000,"TotalDebt":0,"BasePrice":24000000000,"Symbol":"dexe","Index":85},{"TotalEquity":517372774000,"TotalDebt":0,"BasePrice":82200000,"Symbol":"dgb","Index":86},{"TotalEquity":1120000,"TotalDebt":0,"BasePrice":2970000000,"Symbol":"dia","Index":87},{"TotalEquity":0,"TotalDebt":0,"BasePrice":151800000,"Symbol":"dock","Index":88},{"TotalEquity":19453393384,"TotalDebt":0,"BasePrice":987000000,"Symbol":"dodo","Index":89},{"TotalEquity":25526548451614,"TotalDebt":0,"BasePrice":723900000,"Symbol":"doge","Index":90},{"TotalEquity":466049240950,"TotalDebt":0,"BasePrice":46820000000,"Symbol":"dot","Index":91},{"TotalEquity":69200000,"TotalDebt":0,"BasePrice":3138000000,"Symbol":"drep","Index":92},{"TotalEquity":0,"TotalDebt":0,"BasePrice":870000000,"Symbol":"dusk","Index":93},{"TotalEquity":45675816000,"TotalDebt":0,"BasePrice":12120000000,"Symbol":"dydx","Index":94},{"TotalEquity":241920370,"TotalDebt":0,"BasePrice":3434000
