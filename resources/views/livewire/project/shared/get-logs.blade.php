@@ -34,7 +34,9 @@
         }
     }">
         <div class="flex gap-2 items-center">
-            @if ($resource?->type() === 'application' || str($resource?->type())->startsWith('standalone'))
+            @if ($displayName)
+                <h4>{{ $displayName }}</h4>
+            @elseif ($resource?->type() === 'application' || str($resource?->type())->startsWith('standalone'))
                 <h4>{{ $container }}</h4>
             @else
                 <h4>{{ str($container)->beforeLast('-')->headline() }}</h4>

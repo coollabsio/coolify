@@ -33,6 +33,8 @@ class GetLogs extends Component
 
     public ?string $container = null;
 
+    public ?string $displayName = null;
+
     public ?string $pull_request = null;
 
     public ?bool $streamLogs = false;

@@ -29,7 +29,16 @@ class SettingsOauth extends Component
             return redirect()->route('home');
         }
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
-            $carry[$setting->provider] = $setting;
+            $carry[$setting->provider] = [
+                'id' => $setting->id,
+                'provider' => $setting->provider,
+                'enabled' => $setting->enabled,
+                'client_id' => $setting->client_id,
+                'client_secret' => $setting->client_secret,
+                'redirect_uri' => $setting->redirect_uri,
+                'tenant' => $setting->tenant,
+                'base_url' => $setting->base_url,
+            ];
 
             return $carry;
         }, []);
@@ -38,16 +47,48 @@ class SettingsOauth extends Component
     private function updateOauthSettings(?string $provider = null)
     {
         if ($provider) {
-            $oauth = $this->oauth_settings_map[$provider];
+            $oauthData = $this->oauth_settings_map[$provider];
+            $oauth = OauthSetting::find($oauthData['id']);
+
+            $oauth->fill([
+                'enabled' => $oauthData['enabled'],
+                'client_id' => $oauthData['client_id'],
+                'client_secret' => $oauthData['client_secret'],
+                'redirect_uri' => $oauthData['redirect_uri'],
+                'tenant' => $oauthData['tenant'],
+                'base_url' => $oauthData['base_url'],
+            ]);
+
             if (! $oauth->couldBeEnabled()) {
                 $oauth->update(['enabled' => false]);
                 throw new \Exception('OAuth settings are not complete for '.$oauth->provider.'.<br/>Please fill in all required fields.');
             }
             $oauth->save();
+
+            // Update the array with fresh data
+            $this->oauth_settings_map[$provider] = [
+                'id' => $oauth->id,
+                'provider' => $oauth->provider,
+                'enabled' => $oauth->enabled,
+                'client_id' => $oauth->client_id,
+                'client_secret' => $oauth->client_secret,
+                'redirect_uri' => $oauth->redirect_uri,
+                'tenant' => $oauth->tenant,
+                'base_url' => $oauth->base_url,
+            ];
+
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
         } else {
-            foreach (array_values($this->oauth_settings_map) as &$setting) {
-                $setting->save();
+            foreach (array_values($this->oauth_settings_map) as $settingData) {
+                $oauth = OauthSetting::find($settingData['id']);
+                $oauth->update([
+                    'enabled' => $settingData['enabled'],
+                    'client_id' => $settingData['client_id'],
+                    'client_secret' => $settingData['client_secret'],
+                    'redirect_uri' => $settingData['redirect_uri'],
+                    'tenant' => $settingData['tenant'],
+                    'base_url' => $settingData['base_url'],
+                ]);
             }
         }
     }
