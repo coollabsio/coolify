@@ -1,3 +1,11 @@
+# ignore: true
+# documentation: https://docs.twenty.com
+# slogan: Twenty is a CRM designed to fit your unique business needs.
+# category: cms
+# tags: crm, self-hosted, dashboard
+# logo: svgs/twenty.svg
+# port: 3000
+
 services:
   twenty:
     image: 'twentycrm/twenty:latest'
