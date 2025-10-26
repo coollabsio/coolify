@@ -192,7 +192,7 @@ When working on Coolify, keep the following in mind:
    docker exec -it coolify php artisan migrate:fresh --seed
    ```
 
-3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
+3. **Troubleshooting**:BTC =bc1qq8m35x6sfhva08vzrr5qr75ec9dj000gq8e2mjIf you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
 
 > [!IMPORTANT]
 > Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
