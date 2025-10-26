@@ -14,7 +14,7 @@
                     <x-forms.checkbox id="is_system_wide" label="System Wide"
                         helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
                 </div>
-                <div x-show="showWarning" x-transition style="display: none;" class="w-full max-w-2xl mx-auto pt-2">
+                <div x-show="showWarning" x-transition x-cloak class="w-full max-w-2xl mx-auto pt-2">
                     <x-callout type="warning" title="Not Recommended">
                         <div class="whitespace-normal break-words">
                             System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team
