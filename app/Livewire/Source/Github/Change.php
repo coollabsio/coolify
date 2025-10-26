@@ -47,19 +47,19 @@ class Change extends Component
 
     public int $customPort;
 
-    public int $appId;
+    public ?int $appId = null;
 
-    public int $installationId;
+    public ?int $installationId = null;
 
-    public string $clientId;
+    public ?string $clientId = null;
 
-    public string $clientSecret;
+    public ?string $clientSecret = null;
 
-    public string $webhookSecret;
+    public ?string $webhookSecret = null;
 
     public bool $isSystemWide;
 
-    public int $privateKeyId;
+    public ?int $privateKeyId = null;
 
     public ?string $contents = null;
 
@@ -78,16 +78,16 @@ class Change extends Component
         'htmlUrl' => 'required|string',
         'customUser' => 'required|string',
         'customPort' => 'required|int',
-        'appId' => 'required|int',
-        'installationId' => 'required|int',
-        'clientId' => 'required|string',
-        'clientSecret' => 'required|string',
-        'webhookSecret' => 'required|string',
+        'appId' => 'nullable|int',
+        'installationId' => 'nullable|int',
+        'clientId' => 'nullable|string',
+        'clientSecret' => 'nullable|string',
+        'webhookSecret' => 'nullable|string',
         'isSystemWide' => 'required|bool',
         'contents' => 'nullable|string',
         'metadata' => 'nullable|string',
         'pullRequests' => 'nullable|string',
-        'privateKeyId' => 'required|int',
+        'privateKeyId' => 'nullable|int',
     ];
 
     public function boot()
@@ -148,46 +148,47 @@ class Change extends Component
         try {
             $this->authorize('view', $this->github_app);
 
+            // Validate required fields before attempting to fetch permissions
+            $missingFields = [];
+
+            if (! $this->github_app->app_id) {
+                $missingFields[] = 'App ID';
+            }
+
+            if (! $this->github_app->private_key_id) {
+                $missingFields[] = 'Private Key';
+            }
+
+            if (! empty($missingFields)) {
+                $fieldsList = implode(', ', $missingFields);
+                $this->dispatch('error', "Cannot fetch permissions. Please set the following required fields first: {$fieldsList}");
+
+                return;
+            }
+
+            // Verify the private key exists and is accessible
+            if (! $this->github_app->privateKey) {
+                $this->dispatch('error', 'Private Key not found. Please select a valid private key.');
+
+                return;
+            }
+
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
+            // Provide better error message for unsupported key formats
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
+                str_contains($errorMessage, 'parse your key')) {
+                $this->dispatch('error', 'The selected private key format is not supported for GitHub Apps. <br><br>Please use an RSA private key in PEM format (BEGIN RSA PRIVATE KEY). <br><br>OpenSSH format keys (BEGIN OPENSSH PRIVATE KEY) are not supported.');
+
+                return;
+            }
+
             return handleError($e, $this);
         }
     }
-
-    // public function check()
-    // {
-
-    // Need administration:read:write permission
-    // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
-
-    //     $github_access_token = generateGithubInstallationToken($this->github_app);
-    //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
-    //     $runners_by_repository = collect([]);
-    //     $repositories = $repositories->json()['repositories'];
-    //     foreach ($repositories as $repository) {
-    //         $runners_downloads = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/downloads");
-    //         $runners = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners");
-    //         $token = Http::withHeaders([
-    //             'Authorization' => "Bearer $github_access_token",
-    //             'Accept' => 'application/vnd.github+json'
-    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/registration-token");
-    //         $token = $token->json();
-    //         $remove_token = Http::withHeaders([
-    //             'Authorization' => "Bearer $github_access_token",
-    //             'Accept' => 'application/vnd.github+json'
-    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/remove-token");
-    //         $remove_token = $remove_token->json();
-    //         $runners_by_repository->put($repository['full_name'], [
-    //             'token' => $token,
-    //             'remove_token' => $remove_token,
-    //             'runners' => $runners->json(),
-    //             'runners_downloads' => $runners_downloads->json()
-    //         ]);
-    //     }
-
-    // }
 
     public function mount()
     {
@@ -340,10 +341,13 @@ class Change extends Component
         $this->authorize('update', $this->github_app);
 
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-        $this->github_app->app_id = '1234567890';
-        $this->github_app->installation_id = '1234567890';
+        $this->github_app->app_id = 1234567890;
+        $this->github_app->installation_id = 1234567890;
         $this->github_app->save();
-        $this->dispatch('success', 'Github App updated.');
+
+        // Redirect to avoid Livewire morphing issues when view structure changes
+        return redirect()->route('source.github.show', ['github_app_uuid' => $this->github_app->uuid])
+            ->with('success', 'Github App updated. You can now configure the details.');
     }
 
     public function instantSave()

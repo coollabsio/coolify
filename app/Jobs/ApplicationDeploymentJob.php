@@ -459,7 +459,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function post_deployment()
     {
         GetContainersStatus::dispatch($this->server);
-        $this->next(ApplicationDeploymentStatus::FINISHED->value);
+        $this->completeDeployment();
         if ($this->pull_request_id !== 0) {
             if ($this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
@@ -1008,7 +1008,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
         $this->should_skip_build();
-        $this->next(ApplicationDeploymentStatus::FINISHED->value);
+        $this->completeDeployment();
     }
 
     private function should_skip_build()
@@ -3023,9 +3023,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->application_deployment_queue->addLogEntry('----------------------------------------');
             }
             $this->application_deployment_queue->addLogEntry('New container is not healthy, rolling back to the old container.');
-            $this->application_deployment_queue->update([
-                'status' => ApplicationDeploymentStatus::FAILED->value,
-            ]);
+            $this->failDeployment();
             $this->graceful_shutdown_container($this->container_name);
         }
     }
@@ -3659,42 +3657,116 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
-    private function next(string $status)
+    /**
+     * Transition deployment to a new status with proper validation and side effects.
+     * This is the single source of truth for status transitions.
+     */
+    private function transitionToStatus(ApplicationDeploymentStatus $status): void
     {
-        // Refresh to get latest status
-        $this->application_deployment_queue->refresh();
-
-        // Never allow changing status from FAILED or CANCELLED_BY_USER to anything else
-        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
-
+        if ($this->isInTerminalState()) {
             return;
         }
+
+        $this->updateDeploymentStatus($status);
+        $this->handleStatusTransition($status);
+        queue_next_deployment($this->application);
+    }
+
+    /**
+     * Check if deployment is in a terminal state (FAILED or CANCELLED).
+     * Terminal states cannot be changed.
+     */
+    private function isInTerminalState(): bool
+    {
+        $this->application_deployment_queue->refresh();
+
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
+            return true;
+        }
+
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-            // Job was cancelled, stop execution
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
             throw new \RuntimeException('Deployment cancelled by user', 69420);
         }
 
+        return false;
+    }
+
+    /**
+     * Update the deployment status in the database.
+     */
+    private function updateDeploymentStatus(ApplicationDeploymentStatus $status): void
+    {
         $this->application_deployment_queue->update([
-            'status' => $status,
+            'status' => $status->value,
         ]);
+    }
 
-        queue_next_deployment($this->application);
+    /**
+     * Execute status-specific side effects (events, notifications, additional deployments).
+     */
+    private function handleStatusTransition(ApplicationDeploymentStatus $status): void
+    {
+        match ($status) {
+            ApplicationDeploymentStatus::FINISHED => $this->handleSuccessfulDeployment(),
+            ApplicationDeploymentStatus::FAILED => $this->handleFailedDeployment(),
+            default => null,
+        };
+    }
 
-        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            event(new ApplicationConfigurationChanged($this->application->team()->id));
+    /**
+     * Handle side effects when deployment succeeds.
+     */
+    private function handleSuccessfulDeployment(): void
+    {
+        event(new ApplicationConfigurationChanged($this->application->team()->id));
 
-            if (! $this->only_this_server) {
-                $this->deploy_to_additional_destinations();
-            }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+        if (! $this->only_this_server) {
+            $this->deploy_to_additional_destinations();
         }
+
+        $this->sendDeploymentNotification(DeploymentSuccess::class);
+    }
+
+    /**
+     * Handle side effects when deployment fails.
+     */
+    private function handleFailedDeployment(): void
+    {
+        $this->sendDeploymentNotification(DeploymentFailed::class);
+    }
+
+    /**
+     * Send deployment status notification to the team.
+     */
+    private function sendDeploymentNotification(string $notificationClass): void
+    {
+        $this->application->environment->project->team?->notify(
+            new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
+        );
+    }
+
+    /**
+     * Complete deployment successfully.
+     * Sends success notification and triggers additional deployments if needed.
+     */
+    private function completeDeployment(): void
+    {
+        $this->transitionToStatus(ApplicationDeploymentStatus::FINISHED);
+    }
+
+    /**
+     * Fail the deployment.
+     * Sends failure notification and queues next deployment.
+     */
+    private function failDeployment(): void
+    {
+        $this->transitionToStatus(ApplicationDeploymentStatus::FAILED);
     }
 
     public function failed(Throwable $exception): void
     {
-        $this->next(ApplicationDeploymentStatus::FAILED->value);
+        $this->failDeployment();
         $this->application_deployment_queue->addLogEntry('Oops something is not okay, are you okay? 😢', 'stderr');
         if (str($exception->getMessage())->isNotEmpty()) {
             $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
