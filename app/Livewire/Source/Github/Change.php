@@ -341,8 +341,8 @@ class Change extends Component
         $this->authorize('update', $this->github_app);
 
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-        $this->github_app->app_id = '1234567890';
-        $this->github_app->installation_id = '1234567890';
+        $this->github_app->app_id = 1234567890;
+        $this->github_app->installation_id = 1234567890;
         $this->github_app->save();
 
         // Redirect to avoid Livewire morphing issues when view structure changes
