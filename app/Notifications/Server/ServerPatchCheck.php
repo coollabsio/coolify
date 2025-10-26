@@ -17,9 +17,6 @@ class ServerPatchCheck extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->serverUrl = base_url().'/server/'.$this->server->uuid.'/security/patches';
-        if (isDev()) {
-            $this->serverUrl = 'https://staging-but-dev.coolify.io/server/'.$this->server->uuid.'/security/patches';
-        }
     }
 
     public function via(object $notifiable): array
