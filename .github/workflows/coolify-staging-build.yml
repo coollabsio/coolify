@@ -74,8 +74,10 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-${{ matrix.arch }}
             ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-${{ matrix.arch }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=build-${{ matrix.arch }}
+            type=registry,ref=${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
 
   merge-manifest:
     runs-on: ubuntu-24.04
