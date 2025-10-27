@@ -243,10 +243,14 @@ class StandaloneClickhouse extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->clickhouse_db}";
                 }
 
                 return null;
