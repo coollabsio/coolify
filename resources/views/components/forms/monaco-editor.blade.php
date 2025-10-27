@@ -30,12 +30,22 @@
             document.getElementById(this.monacoId).dispatchEvent(new CustomEvent('monaco-editor-focused', { detail: { monacoId: this.monacoId } }));
         },
         monacoEditorAddLoaderScriptToHead() {
-            let script = document.createElement('script');
-            script.src = `/js/monaco-editor-${this.monacoVersion}/min/vs/loader.js`;
-            document.head.appendChild(script);
+            // Use a global flag to prevent duplicate script loading
+            if (!window.__coolifyMonacoLoaderAdding && typeof _amdLoaderGlobal === 'undefined') {
+                window.__coolifyMonacoLoaderAdding = true;
+                let script = document.createElement('script');
+                script.src = `/js/monaco-editor-${this.monacoVersion}/min/vs/loader.js`;
+                script.onload = () => {
+                    window.__coolifyMonacoLoaderAdding = false;
+                };
+                script.onerror = () => {
+                    window.__coolifyMonacoLoaderAdding = false;
+                };
+                document.head.appendChild(script);
+            }
         }
     }" x-modelable="monacoContent">
-        <div x-cloak x-init="if (typeof _amdLoaderGlobal == 'undefined') {
+        <div x-cloak x-init="if (typeof _amdLoaderGlobal == 'undefined' && !window.__coolifyMonacoLoaderAdding) {
             monacoEditorAddLoaderScriptToHead();
         }
         checkTheme();

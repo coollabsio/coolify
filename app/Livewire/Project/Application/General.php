@@ -438,6 +438,11 @@ class General extends Component
 
             // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
             $this->application->refresh();
+
+            // Sync the docker_compose_raw from the model to the component property
+            // This ensures the Monaco editor displays the loaded compose file
+            $this->syncFromModel();
+
             $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
             // Convert service names with dots and dashes to use underscores for HTML form binding
             $sanitizedDomains = [];
