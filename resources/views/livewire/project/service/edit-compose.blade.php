@@ -45,11 +45,11 @@
         </div>
         <div class="flex-1"></div>
         @if (blank($service->service_type))
-            <x-forms.button class="w-28" wire:click.prevent='validateCompose'>
+            <x-forms.button class="w-28" @click="$wire.validateCompose()">
                 Validate
             </x-forms.button>
         @endif
-        <x-forms.button class="w-28" wire:click.prevent='saveEditedCompose'>
+        <x-forms.button class="w-28" @click="$wire.saveEditedCompose()">
             Save
         </x-forms.button>
     </div>

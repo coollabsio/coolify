@@ -8,7 +8,9 @@
             <x-forms.button canGate="update" :canResource="$service" wire:target='submit' type="submit">Save</x-forms.button>
             @can('update', $service)
                 <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
-                    <livewire:project.service.edit-compose wire:key="edit-compose-{{ $service->id }}" :serviceId="$service->id" />
+                    <div>
+                        <livewire:project.service.edit-compose :key="'edit-compose-modal-' . $service->id" :serviceId="$service->id" />
+                    </div>
                 </x-modal-input>
             @endcan
         </div>
