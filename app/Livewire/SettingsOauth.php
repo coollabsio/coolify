@@ -50,6 +50,10 @@ class SettingsOauth extends Component
             $oauthData = $this->oauth_settings_map[$provider];
             $oauth = OauthSetting::find($oauthData['id']);
 
+            if (!$oauth) {
+                throw new \Exception('OAuth setting for '.$provider.' not found. It may have been deleted.');
+            }
+
             $oauth->fill([
                 'enabled' => $oauthData['enabled'],
                 'client_id' => $oauthData['client_id'],
