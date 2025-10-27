@@ -50,7 +50,7 @@ class SettingsOauth extends Component
             $oauthData = $this->oauth_settings_map[$provider];
             $oauth = OauthSetting::find($oauthData['id']);
 
-            if (!$oauth) {
+            if (! $oauth) {
                 throw new \Exception('OAuth setting for '.$provider.' not found. It may have been deleted.');
             }
 
@@ -83,9 +83,17 @@ class SettingsOauth extends Component
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
         } else {
+            $errors = [];
             foreach (array_values($this->oauth_settings_map) as $settingData) {
                 $oauth = OauthSetting::find($settingData['id']);
-                $oauth->update([
+
+                if (! $oauth) {
+                    $errors[] = "OAuth setting for provider '{$settingData['provider']}' not found. It may have been deleted.";
+
+                    continue;
+                }
+
+                $oauth->fill([
                     'enabled' => $settingData['enabled'],
                     'client_id' => $settingData['client_id'],
                     'client_secret' => $settingData['client_secret'],
@@ -93,6 +101,29 @@ class SettingsOauth extends Component
                     'tenant' => $settingData['tenant'],
                     'base_url' => $settingData['base_url'],
                 ]);
+
+                if ($settingData['enabled'] && ! $oauth->couldBeEnabled()) {
+                    $oauth->enabled = false;
+                    $errors[] = "OAuth settings are incomplete for '{$oauth->provider}'. Required fields are missing. The provider has been disabled.";
+                }
+
+                $oauth->save();
+
+                // Update the array with fresh data
+                $this->oauth_settings_map[$oauth->provider] = [
+                    'id' => $oauth->id,
+                    'provider' => $oauth->provider,
+                    'enabled' => $oauth->enabled,
+                    'client_id' => $oauth->client_id,
+                    'client_secret' => $oauth->client_secret,
+                    'redirect_uri' => $oauth->redirect_uri,
+                    'tenant' => $oauth->tenant,
+                    'base_url' => $oauth->base_url,
+                ];
+            }
+
+            if (! empty($errors)) {
+                $this->dispatch('error', implode('<br/>', $errors));
             }
         }
     }
