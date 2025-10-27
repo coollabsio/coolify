@@ -5,21 +5,24 @@
             @if (isDev())
                 <div>{{ $service->compose_parsing_version }}</div>
             @endif
-            <x-forms.button canGate="update" :canResource="$service" wire:target='submit' type="submit">Save</x-forms.button>
+            <x-forms.button canGate="update" :canResource="$service" wire:target='submit'
+                type="submit">Save</x-forms.button>
             @can('update', $service)
                 <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
-                    <livewire:project.service.edit-compose :key="'edit-compose-'.$service->id" serviceId="{{ $service->id }}" />
+                    <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                 </x-modal-input>
             @endcan
         </div>
         <div>Configuration</div>
     </div>
     <div class="flex gap-2">
-        <x-forms.input canGate="update" :canResource="$service" id="name" required label="Service Name" placeholder="My super WordPress site" />
+        <x-forms.input canGate="update" :canResource="$service" id="name" required label="Service Name"
+            placeholder="My super WordPress site" />
         <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
     </div>
     <div class="w-96">
-        <x-forms.checkbox canGate="update" :canResource="$service" instantSave id="connectToDockerNetwork" label="Connect To Predefined Network"
+        <x-forms.checkbox canGate="update" :canResource="$service" instantSave id="connectToDockerNetwork"
+            label="Connect To Predefined Network"
             helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
     </div>
     @if ($fields->count() > 0)
@@ -36,7 +39,8 @@
                         <x-helper helper="Variable name: {{ $serviceName }}" />
                     @endif
                 </div>
-                <x-forms.input canGate="update" :canResource="$service" type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
+                <x-forms.input canGate="update" :canResource="$service"
+                    type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}"
                     required="{{ str(data_get($field, 'rules'))?->contains('required') }}"
                     id="fields.{{ $serviceName }}.value"></x-forms.input>
             @endforeach
