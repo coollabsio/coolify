@@ -104,7 +104,7 @@
         }, 5);" :id="monacoId">
         </div>
         <div class="relative z-10 w-full h-full">
-            <div x-ref="monacoEditorElement" class="w-full h-[calc(100vh-20rem)] min-h-96 text-md {{ $readonly ? 'opacity-65' : '' }}"></div>
+            <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 300px;"></div>
             <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder" @click="monacoEditorFocus()"
                 :style="'font-size: ' + monacoFontSize"
                 class="w-full text-sm font-mono absolute z-50 text-gray-500 ml-14 -translate-x-0.5 mt-0.5 left-0 top-0"
