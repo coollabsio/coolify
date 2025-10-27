@@ -32,9 +32,9 @@ services:
           fi
 
           apk add --no-cache apache2-utils
-          mkdir -p /auth
-          chmod 755 /auth
-          htpasswd -Bbc $REGISTRY_AUTH_HTPASSWD_PATH "$USERNAME" "$PASSWORD"
+          mkdir -p "$(dirname "$REGISTRY_AUTH_HTPASSWD_PATH")"
+          chmod 755 "$(dirname "$REGISTRY_AUTH_HTPASSWD_PATH")"
+          htpasswd -Bbc "$REGISTRY_AUTH_HTPASSWD_PATH" "$USERNAME" "$PASSWORD"
           registry serve /etc/docker/registry/config.yml
       - type: bind
         source: ./config/config.yml
