@@ -4527,7 +4527,7 @@
             "web",
             "admin"
         ],
-        "category": "vps",
+        "category": "vpn",
         "logo": "svgs/wireguard.svg",
         "minversion": "0.0.0",
         "port": "8000"
