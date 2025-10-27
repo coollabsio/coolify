@@ -23,50 +23,22 @@ env:
   IMAGE_NAME: "coollabsio/coolify"
 
 jobs:
-  amd64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Sanitize branch name for Docker tag
-        id: sanitize
-        run: |
-          # Replace slashes and other invalid characters with dashes
-          SANITIZED_NAME=$(echo "${{ github.ref_name }}" | sed 's/[\/]/-/g')
-          echo "tag=${SANITIZED_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Login to ${{ env.GITHUB_REGISTRY }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.GITHUB_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN  }}
-
-      - name: Login to ${{ env.DOCKER_REGISTRY }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Build and Push Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/production/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}
-
-  aarch64:
-    runs-on: [self-hosted, arm64]
+  build-push:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Sanitize branch name for Docker tag
         id: sanitize
@@ -74,6 +46,9 @@ jobs:
           # Replace slashes and other invalid characters with dashes
           SANITIZED_NAME=$(echo "${{ github.ref_name }}" | sed 's/[\/]/-/g')
           echo "tag=${SANITIZED_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to ${{ env.GITHUB_REGISTRY }}
         uses: docker/login-action@v3
@@ -89,25 +64,27 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and Push Image
+      - name: Build and Push Image (${{ matrix.arch }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/production/Dockerfile
-          platforms: linux/aarch64
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-${{ matrix.arch }}
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-${{ matrix.arch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   merge-manifest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    needs: build-push
     permissions:
       contents: read
       packages: write
-    needs: [amd64, aarch64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Sanitize branch name for Docker tag
         id: sanitize
@@ -135,13 +112,15 @@ jobs:
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
          docker buildx imagetools create \
-         --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64 \
+         ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-amd64 \
+         ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64 \
          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         run: |
           docker buildx imagetools create \
-          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64 \
+          ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-amd64 \
+          ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}-aarch64 \
           --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sanitize.outputs.tag }}
 
       - uses: sarisia/actions-status-discord@v1
