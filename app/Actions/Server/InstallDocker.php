@@ -145,7 +145,7 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
