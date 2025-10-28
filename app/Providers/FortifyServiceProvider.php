@@ -139,7 +139,7 @@ class FortifyServiceProvider extends ServiceProvider
             // server('REMOTE_ADDR') gives the actual connecting IP before proxy headers
             $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
 
-            return Limit::perMinute(5)->by($email.$realIp);
+            return Limit::perMinute(5)->by($email.'|'.$realIp);
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
