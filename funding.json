@@ -1,0 +1,74 @@
+{
+  "version": "1.0.0",
+  "entity": {
+    "type": "organisation",
+    "role": "owner",
+    "name": "Coollabs",
+    "email": "hi@coolify.io",
+    "description": "Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel. It helps you manage your servers, applications, and databases on your own hardware with just an SSH connection. We are a self-funded company that depends on community support to sustain the project and keep it completely free and open-source with no features behind a paywall.",
+    "webpageUrl": "https://coolify.io"
+  },
+  "projects": [
+    {
+      "guid": "coolify",
+      "name": "Coolify",
+      "description": "An open-source & self-hostable alternative to Heroku / Netlify / Vercel. Manage your servers, applications, and databases on your own hardware.",
+      "webpageUrl": "https://coolify.io",
+      "repositoryUrl": "https://github.com/coollabsio/coolify",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "tags": [
+        "deployment",
+        "self-hosted",
+        "devops",
+        "docker",
+        "paas",
+        "heroku-alternative",
+        "open-source"
+      ]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "type": "github",
+        "address": "https://github.com/sponsors/coollabsio"
+      },
+      {
+        "type": "open_collective",
+        "address": "https://opencollective.com/coollabsio"
+      },
+      {
+        "type": "custom",
+        "address": "https://coolify.io/sponsorships"
+      }
+    ],
+    "plans": [
+      {
+        "status": "active",
+        "name": "Small Sponsor",
+        "description": "Support Coolify's development with a small monthly contribution. Get your small logo and link featured on our README and on our website.",
+        "amount": 40,
+        "currency": "USD",
+        "frequency": "monthly"
+      },
+      {
+        "status": "active",
+        "name": "Large Sponsor",
+        "description": "Support Coolify's development with a larger monthly contribution. Get your large logo and link featured prominently on our README and website.",
+        "amount": 200,
+        "currency": "USD",
+        "frequency": "monthly"
+      },
+      {
+        "status": "active",
+        "name": "One-time Donation",
+        "description": "Make a one-time contribution to support Coolify's development.",
+        "amount": 0,
+        "currency": "USD",
+        "frequency": "once"
+      }
+    ]
+  }
+}
