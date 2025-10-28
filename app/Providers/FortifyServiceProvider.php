@@ -127,13 +127,19 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('forgot-password', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            // Use real client IP (not spoofable forwarded headers)
+            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
+
+            return Limit::perMinute(5)->by($realIp);
         });
 
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->email;
+            // Use email + real client IP (not spoofable forwarded headers)
+            // server('REMOTE_ADDR') gives the actual connecting IP before proxy headers
+            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
 
-            return Limit::perMinute(5)->by($email.$request->ip());
+            return Limit::perMinute(5)->by($email.$realIp);
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
