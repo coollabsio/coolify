@@ -11,8 +11,8 @@
         </div>
 
         <div class="flex items-end gap-2 pb-6">
-            <x-forms.input id="team.name" label="Name" required canGate="update" :canResource="$team" />
-            <x-forms.input id="team.description" label="Description" canGate="update" :canResource="$team" />
+            <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
+            <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
             @can('update', $team)
                 <x-forms.button type="submit">
                     Save

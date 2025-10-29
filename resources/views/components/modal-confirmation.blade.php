@@ -114,7 +114,7 @@
         }
     }
 }"
-    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
@@ -177,7 +177,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
             <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
@@ -186,8 +186,8 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
-                <div class="flex justify-between items-center pb-3">
+                class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                <div class="flex justify-between items-center py-6 px-7 shrink-0">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
                         class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
@@ -197,13 +197,10 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative w-auto">
+                <div class="relative w-auto overflow-y-auto px-7 pb-6" style="-webkit-overflow-scrolling: touch;">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
-                            <div class="flex justify-between items-center">
-                                <h4>Actions</h4>
-                            </div>
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
@@ -227,11 +224,9 @@
 
                     <!-- Step 2: Confirm deletion -->
                     <div x-show="step === 2">
-                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
-                            <p class="font-bold">Warning</p>
-                            <p>{!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
-                            </p>
-                        </div>
+                        <x-callout type="danger" title="Warning" class="mb-4">
+                            {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
+                        </x-callout>
                         <div class="mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
@@ -255,6 +250,18 @@
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
+                                @if (isset($checkbox['default_warning']))
+                                    <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
+                                        <li class="flex items-center text-red-500">
+                                            <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                            <span>{{ $checkbox['default_warning'] }}</span>
+                                        </li>
+                                    </template>
+                                @endif
                             @endforeach
                         </ul>
                         @if (!$disableTwoStepConfirmation)
@@ -325,10 +332,9 @@
                     <!-- Step 3: Password confirmation -->
                     @if (!$disableTwoStepConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
-                            <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
-                                <p class="font-bold">Final Confirmation</p>
-                                <p>Please enter your password to confirm this destructive action.</p>
-                            </div>
+                            <x-callout type="danger" title="Final Confirmation" class="mb-4">
+                                Please enter your password to confirm this destructive action.
+                            </x-callout>
                             <div class="flex flex-col gap-2 mb-4">
                                 @php
                                     $passwordConfirm = Str::uuid();

@@ -12,12 +12,12 @@ class ScheduledDatabaseBackup extends BaseModel
 
     public static function ownedByCurrentTeam()
     {
-        return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('name');
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ScheduledDatabaseBackup::whereRelation('team', 'id', $teamId)->orderBy('name');
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', $teamId)->orderBy('created_at', 'desc');
     }
 
     public function team()

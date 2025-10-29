@@ -26,7 +26,7 @@
                     <div class="pb-6 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
-                            id="server.settings.generate_exact_labels"
+                            id="generateExactLabels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave="instantSaveRedirect"
                             id="redirectEnabled" label="Override default request handler"
@@ -119,10 +119,9 @@
                         </x-forms.button> --}}
                     </div>
                 @else
-                    <div
-                        class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                    <x-callout type="warning" title="Permission Required" class="mb-4">
                         You don't have permission to configure proxy settings for this server.
-                    </div>
+                    </x-callout>
                 @endcan
             </div>
     @endif

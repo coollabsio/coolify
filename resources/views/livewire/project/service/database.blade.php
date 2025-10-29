@@ -23,16 +23,16 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$database" label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
-                <x-forms.input canGate="update" :canResource="$database" label="Description" id="database.description"></x-forms.input>
+                <x-forms.input canGate="update" :canResource="$database" label="Name" id="humanName" placeholder="Name"></x-forms.input>
+                <x-forms.input canGate="update" :canResource="$database" label="Description" id="description"></x-forms.input>
                 <x-forms.input canGate="update" :canResource="$database" required
                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
-                    label="Image" id="database.image"></x-forms.input>
+                    label="Image" id="image"></x-forms.input>
             </div>
             <div class="flex items-end gap-2">
-                <x-forms.input canGate="update" :canResource="$database" placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
+                <x-forms.input canGate="update" :canResource="$database" placeholder="5432" disabled="{{ $database->is_public }}" id="publicPort"
                     label="Public Port" />
-                <x-forms.checkbox canGate="update" :canResource="$database" instantSave id="database.is_public" label="Make it publicly available" />
+                <x-forms.checkbox canGate="update" :canResource="$database" instantSave id="isPublic" label="Make it publicly available" />
             </div>
             @if ($db_url_public)
                 <x-forms.input label="Database IP:PORT (public)"
@@ -44,9 +44,9 @@
         <div class="w-96">
             <x-forms.checkbox canGate="update" :canResource="$database" instantSave="instantSaveExclude" label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
-                id="database.exclude_from_status"></x-forms.checkbox>
+                id="excludeFromStatus"></x-forms.checkbox>
             <x-forms.checkbox canGate="update" :canResource="$database" helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveLogDrain" id="database.is_log_drain_enabled" label="Drain Logs" />
+                instantSave="instantSaveLogDrain" id="isLogDrainEnabled" label="Drain Logs" />
         </div>
     </form>
 </div>

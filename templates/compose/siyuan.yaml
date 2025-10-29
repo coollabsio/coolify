@@ -1,0 +1,29 @@
+# documentation: https://github.com/siyuan-note/siyuan
+# slogan: A privacy-first, self-hosted, fully open source personal knowledge management software, written in typescript and golang.
+# tags: note-taking,markdown,pkm
+# category: documentation
+# logo: svgs/siyuan.svg
+# port: 6806
+
+services:
+  siyuan:
+    image: b3log/siyuan:v3.3.5
+    volumes:
+      - 'siyuan_workspace:/siyuan/workspace'
+    environment:
+      - SERVICE_URL_SIYUAN_6806
+      - TZ=${TZ:-UTC}
+      - PUID=1000
+      - PGID=1000
+      - 'SIYUAN_ACCESS_AUTH_CODE=${SERVICE_PASSWORD_SIYUAN}'
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '--quiet'
+        - 'http://127.0.0.1:6806/api/system/version'
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s

@@ -7,7 +7,7 @@
     </div>
     <div class="subtitle">Set Team / Project / Environment wide variables.</div>
 
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-2 -mt-1">
         <a class="box group" href="{{ route('shared-variables.team.index') }}">
             <div class="flex flex-col justify-center mx-6">
                 <div class="box-title">Team wide</div>

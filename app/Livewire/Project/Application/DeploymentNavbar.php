@@ -50,6 +50,28 @@ class DeploymentNavbar extends Component
         }
     }
 
+    public function copyLogsToClipboard(): string
+    {
+        $logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+
+        if (! $logs) {
+            return '';
+        }
+
+        $markdown = "# Deployment Logs\n\n";
+        $markdown .= "```\n";
+
+        foreach ($logs as $log) {
+            if (isset($log['output'])) {
+                $markdown .= $log['output']."\n";
+            }
+        }
+
+        $markdown .= "```\n";
+
+        return $markdown;
+    }
+
     public function cancel()
     {
         $deployment_uuid = $this->application_deployment_queue->deployment_uuid;

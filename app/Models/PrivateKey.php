@@ -82,9 +82,20 @@ class PrivateKey extends BaseModel
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
+        $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
-        return self::whereTeamId(currentTeam()->id)->select($selectArray->all());
+        return self::whereTeamId($teamId)->select($selectArray->all());
+    }
+
+    public static function ownedAndOnlySShKeys(array $select = ['*'])
+    {
+        $teamId = currentTeam()->id;
+        $selectArray = collect($select)->concat(['id']);
+
+        return self::whereTeamId($teamId)
+            ->where('is_git_related', false)
+            ->select($selectArray->all());
     }
 
     public static function validatePrivateKey($privateKey)
@@ -284,6 +295,17 @@ class PrivateKey extends BaseModel
             $key = PublicKeyLoader::load($privateKey);
 
             return $key->getPublicKey()->getFingerprint('sha256');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public static function generateMd5Fingerprint($privateKey)
+    {
+        try {
+            $key = PublicKeyLoader::load($privateKey);
+
+            return $key->getPublicKey()->getFingerprint('md5');
         } catch (\Throwable $e) {
             return null;
         }

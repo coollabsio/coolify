@@ -8,7 +8,7 @@
     <div class="flex items-center">
         <div wire:loading.delay.longer wire:target="checkProxy(true)" class="badge badge-warning"></div>
         <div wire:loading.remove.delay.longer wire:target="checkProxy(true)" class="badge badge-success"></div>
-        <div class="pl-2 pr-1 text-xs font-bold tracking-wider text-success"
+        <div class="pl-2 pr-1 text-xs font-bold text-success"
             @if ($title) title="{{ $title }}" @endif>
             @if ($lastDeploymentLink)
                 <a href="{{ $lastDeploymentLink }}" target="_blank" class="underline cursor-pointer">

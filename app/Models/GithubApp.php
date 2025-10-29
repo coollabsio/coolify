@@ -12,6 +12,7 @@ class GithubApp extends BaseModel
 
     protected $casts = [
         'is_public' => 'boolean',
+        'is_system_wide' => 'boolean',
         'type' => 'string',
     ];
 

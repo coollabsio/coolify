@@ -547,6 +547,21 @@ class Service extends BaseModel
                     }
                     $fields->put('Grafana', $data->toArray());
                     break;
+                case $image->contains('elasticsearch'):
+                    $data = collect([]);
+                    $elastic_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ELASTICSEARCH')->first();
+                    if ($elastic_password) {
+                        $data = $data->merge([
+                            'Password (default user: elastic)' => [
+                                'key' => data_get($elastic_password, 'key'),
+                                'value' => data_get($elastic_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Elasticsearch', $data->toArray());
+                    break;
                 case $image->contains('directus'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
@@ -1231,9 +1246,9 @@ class Service extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
                     ELSE 3
                 END,
                 LOWER(key) ASC
@@ -1263,6 +1278,21 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
         $commands[] = 'rm -f .env || true';
 
+        $envs = collect([]);
+
+        // Generate SERVICE_NAME_* environment variables from docker-compose services
+        if ($this->docker_compose) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $services = data_get($dockerCompose, 'services', []);
+                foreach ($services as $serviceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                }
+            } catch (\Exception $e) {
+                ray($e->getMessage());
+            }
+        }
+
         $envs_from_coolify = $this->environment_variables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
@@ -1274,7 +1304,6 @@ class Service extends BaseModel
 
             return 3;
         });
-        $envs = collect([]);
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$env->real_value}");
         }

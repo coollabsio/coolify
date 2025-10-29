@@ -41,11 +41,9 @@ class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
 
-    public function application(): Attribute
+    public function application()
     {
-        return Attribute::make(
-            get: fn () => Application::find($this->application_id),
-        );
+        return $this->belongsTo(Application::class);
     }
 
     public function server(): Attribute
