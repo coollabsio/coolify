@@ -561,7 +561,12 @@ class ByHetzner extends Component
             $server->save();
 
             if ($this->from_onboarding) {
-                // When in onboarding, use wire:navigate for proper modal handling
+                // Complete the boarding when server is successfully created via Hetzner
+                currentTeam()->update([
+                    'show_boarding' => false,
+                ]);
+                refreshSession();
+
                 return $this->redirect(route('server.show', $server->uuid));
             }
 

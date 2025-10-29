@@ -33,7 +33,7 @@
                 </div>
             @endif
 
-            <x-forms.button type="submit">Validate & Add Token</x-forms.button>
+            <x-forms.button type="submit" wire:target="addToken">Validate & Add Token</x-forms.button>
         @else
             {{-- Full page layout: horizontal, spacious --}}
             <div class="flex gap-2 items-end flex-wrap">
@@ -64,7 +64,7 @@
                     </div>
                 @endif
             </div>
-            <x-forms.button type="submit">Validate & Add Token</x-forms.button>
+            <x-forms.button type="submit" wire:target="addToken">Validate & Add Token</x-forms.button>
         @endif
     </form>
 </div>
