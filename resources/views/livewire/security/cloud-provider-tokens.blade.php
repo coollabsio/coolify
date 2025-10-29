@@ -20,16 +20,24 @@
                 </div>
                 <div class="text-sm">Created: {{ $savedToken->created_at->diffForHumans() }}</div>
 
-                @can('delete', $savedToken)
-                    <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete Token"
-                        submitAction="deleteToken({{ $savedToken->id }})" :actions="[
-                            'This cloud provider token will be permanently deleted.',
-                            'Any servers using this token will need to be reconfigured.',
-                        ]"
-                        confirmationText="{{ $savedToken->name }}"
-                        confirmationLabel="Please confirm the deletion by entering the token name below"
-                        shortConfirmationLabel="Token Name" :confirmWithPassword="false" step2ButtonText="Delete Token" />
-                @endcan
+                <div class="flex gap-2 pt-2">
+                    @can('view', $savedToken)
+                        <x-forms.button wire:click="validateToken({{ $savedToken->id }})" type="button">
+                            Validate Token
+                        </x-forms.button>
+                    @endcan
+
+                    @can('delete', $savedToken)
+                        <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete Token"
+                            submitAction="deleteToken({{ $savedToken->id }})" :actions="[
+                                'This cloud provider token will be permanently deleted.',
+                                'Any servers using this token will need to be reconfigured.',
+                            ]"
+                            confirmationText="{{ $savedToken->name }}"
+                            confirmationLabel="Please confirm the deletion by entering the token name below"
+                            shortConfirmationLabel="Token Name" :confirmWithPassword="false" step2ButtonText="Delete Token" />
+                    @endcan
+                </div>
             </div>
         @empty
             <div>
