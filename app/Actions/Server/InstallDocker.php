@@ -11,9 +11,11 @@ class InstallDocker
 {
     use AsAction;
 
+    private string $dockerVersion;
+
     public function handle(Server $server)
     {
-        $dockerVersion = config('constants.docker.minimum_required_version');
+        $this->dockerVersion = config('constants.docker.minimum_required_version');
         $supported_os_type = $server->validateOS();
         if (! $supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
@@ -99,7 +101,19 @@ class InstallDocker
             }
             $command = $command->merge([
                 "echo 'Installing Docker Engine...'",
-                "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$dockerVersion}",
+            ]);
+
+            if ($supported_os_type->contains('debian')) {
+                $command = $command->merge([$this->getDebianDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('rhel')) {
+                $command = $command->merge([$this->getRhelDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('sles')) {
+                $command = $command->merge([$this->getSuseDockerInstallCommand()]);
+            } else {
+                $command = $command->merge([$this->getGenericDockerInstallCommand()]);
+            }
+
+            $command = $command->merge([
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
                 'test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json "/etc/docker/daemon.json.original-$(date +"%Y%m%d-%H%M%S")"',
                 "test ! -s /etc/docker/daemon.json && echo '{$config}' | base64 -d | tee /etc/docker/daemon.json > /dev/null",
@@ -127,5 +141,44 @@ class InstallDocker
 
             return remote_process($command, $server);
         }
+    }
+
+    private function getDebianDockerInstallCommand(): string
+    {
+        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'install -m 0755 -d /etc/apt/keyrings && '.
+            'curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && '.
+            'chmod a+r /etc/apt/keyrings/docker.asc && '.
+            '. /etc/os-release && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'apt-get update && '.
+            'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
+            ')';
+    }
+
+    private function getRhelDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
+            'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
+            'systemctl start docker && '.
+            'systemctl enable docker'.
+            ')';
+    }
+
+    private function getSuseDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && '.
+            'zypper refresh && '.
+            'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
+            'systemctl start docker && '.
+            'systemctl enable docker'.
+            ')';
+    }
+
+    private function getGenericDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
     }
 }

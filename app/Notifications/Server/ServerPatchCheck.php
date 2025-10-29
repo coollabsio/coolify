@@ -16,10 +16,7 @@ class ServerPatchCheck extends CustomEmailNotification
     public function __construct(public Server $server, public array $patchData)
     {
         $this->onQueue('high');
-        $this->serverUrl = route('server.security.patches', ['server_uuid' => $this->server->uuid]);
-        if (isDev()) {
-            $this->serverUrl = 'https://staging-but-dev.coolify.io/server/'.$this->server->uuid.'/security/patches';
-        }
+        $this->serverUrl = base_url().'/server/'.$this->server->uuid.'/security/patches';
     }
 
     public function via(object $notifiable): array

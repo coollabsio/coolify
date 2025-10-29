@@ -23,7 +23,7 @@
             </div>
             @can('update', $this->env)
                 <div class="flex flex-col w-full gap-3">
-                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                    <div class="flex flex-wrap w-full items-center gap-4">
                         @if (!$is_redis_credential)
                             @if ($type === 'service')
                                 <x-forms.checkbox instantSave id="is_buildtime"
@@ -69,7 +69,7 @@
                 </div>
             @else
                 <div class="flex flex-col w-full gap-3">
-                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                    <div class="flex flex-wrap w-full items-center gap-4">
                         @if (!$is_redis_credential)
                             @if ($type === 'service')
                                 <x-forms.checkbox disabled id="is_buildtime"
@@ -145,7 +145,7 @@
             @endcan
             @can('update', $this->env)
                 <div class="flex flex-col w-full gap-3">
-                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                    <div class="flex flex-wrap w-full items-center gap-4">
                         @if (!$is_redis_credential)
                             @if ($type === 'service')
                                 <x-forms.checkbox instantSave id="is_buildtime"
@@ -213,7 +213,7 @@
                 </div>
             @else
                 <div class="flex flex-col w-full gap-3">
-                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                    <div class="flex flex-wrap w-full items-center gap-4">
                         @if (!$is_redis_credential)
                             @if ($type === 'service')
                                 <x-forms.checkbox disabled id="is_buildtime"

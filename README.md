@@ -66,7 +66,7 @@ Thank you so much!
 * [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
 * [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
 * [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
-* [Darweb](https://darweb.nl/?ref=coolify.io) - Design. Develop. Deliver. Specialized in 3D CPQ Solutions
+* [Dade2](https://dade2.net/?ref=coolify.io) - IT Consulting, Cloud Solutions & System Integration
 * [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
 * [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
 * [Gozunga](https://gozunga.com?ref=coolify.io) - Seriously Simple Cloud Infrastructure

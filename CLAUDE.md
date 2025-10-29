@@ -146,6 +146,7 @@ class MyComponent extends Component
 - State management handled on the server
 - Use wire:model for two-way data binding
 - Dispatch events for component communication
+- **CRITICAL**: Livewire component views **MUST** have exactly ONE root element. ALL content must be contained within this single root element. Placing ANY elements (`<style>`, `<script>`, `<div>`, comments, or any other HTML) outside the root element will break Livewire's component tracking and cause `wire:click` and other directives to fail silently.
 
 ### Code Organization Patterns
 - **Actions Pattern**: Use Actions for complex business logic (`app/Actions/`)

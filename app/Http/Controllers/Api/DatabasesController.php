@@ -2133,7 +2133,6 @@ class DatabasesController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -2149,10 +2148,10 @@ class DatabasesController extends Controller
 
         DeleteResourceJob::dispatch(
             resource: $database,
-            deleteVolumes: $request->query->get('delete_volumes', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
-            deleteConfigurations: $request->query->get('delete_configurations', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true)
+            deleteVolumes: $request->boolean('delete_volumes', true),
+            deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
+            deleteConfigurations: $request->boolean('delete_configurations', true),
+            dockerCleanup: $request->boolean('docker_cleanup', true)
         );
 
         return response()->json([
@@ -2243,7 +2242,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Backup configuration not found.'], 404);
         }
 
-        $deleteS3 = filter_var($request->query->get('delete_s3', false), FILTER_VALIDATE_BOOLEAN);
+        $deleteS3 = $request->boolean('delete_s3', false);
 
         try {
             DB::beginTransaction();
@@ -2376,7 +2375,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Backup execution not found.'], 404);
         }
 
-        $deleteS3 = filter_var($request->query->get('delete_s3', false), FILTER_VALIDATE_BOOLEAN);
+        $deleteS3 = $request->boolean('delete_s3', false);
 
         try {
             if ($execution->filename) {

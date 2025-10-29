@@ -47,7 +47,7 @@
 
             <div class="sticky top-0 z-40 flex items-center justify-between px-4 py-4 gap-x-6 sm:px-6 lg:hidden bg-white/95 dark:bg-base/95 backdrop-blur-sm border-b border-neutral-300/50 dark:border-coolgray-200/50">
                 <div class="flex items-center gap-3 flex-shrink-0">
-                    <div class="text-xl font-bold tracking-wide dark:text-white">Coolify</div>
+                    <a href="/" class="text-xl font-bold tracking-wide dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
                     <livewire:switch-team />
                 </div>
                 <button type="button" class="-m-2.5 p-2.5 dark:text-warning" x-on:click="open = !open">

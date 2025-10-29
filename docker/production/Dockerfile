@@ -27,7 +27,8 @@ RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
 
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
+RUN --mount=type=cache,target=/tmp/cache \
+    COMPOSER_CACHE_DIR=/tmp/cache composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
 USER www-data
 
@@ -38,7 +39,8 @@ FROM node:24-alpine AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 COPY . .
 RUN npm run build
 
@@ -72,8 +74,9 @@ RUN apk add --no-cache gnupg && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
 # Install system dependencies
-RUN apk upgrade
-RUN apk add --no-cache \
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk upgrade && \
+    apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     openssh-client \
     git \
