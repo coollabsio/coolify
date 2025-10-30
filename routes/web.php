@@ -193,6 +193,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
         Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
+        Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');

@@ -10,7 +10,11 @@
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">General</a>
-            <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
+            @if ($application->build_pack !== 'dockercompose')
+                <a class='menu-item' wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.domains', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Domains</a>
+            @endif
+            <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.application.advanced', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Advanced</a>
             @if ($application->destination->server->isSwarm())
                 <a class="menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
@@ -79,6 +83,8 @@
         <div class="w-full">
             @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
+            @elseif ($currentRoute === 'project.application.domains' && $application->build_pack !== 'dockercompose')
+                <livewire:project.application.domains :application="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')

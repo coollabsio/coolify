@@ -353,6 +353,138 @@ This file contains high-level guidelines for Claude Code. For **more detailed, t
 - Use `gap` utilities for spacing, not margins
 
 
+## UI Components
+
+### Available Blade Components
+
+#### Callout Component
+Use `x-callout` for alert/warning/info messages:
+
+```html
+<x-callout type="warning" title="Warning Title">
+    Your message here
+</x-callout>
+```
+
+**Available types**: `warning`, `danger`, `info`, `success`
+
+**DO NOT use**: `x-forms.alert` (does not exist)
+
+**Example usage**:
+```html
+<x-callout type="warning" title="Note" class="mb-4">
+    This view is for simple applications only.
+</x-callout>
+```
+
+The callout component is located at `resources/views/components/callout.blade.php` and provides:
+- Automatic icon selection based on type
+- Color-coded styling (yellow for warning, red for danger, blue for info, green for success)
+- Dark mode support
+- Consistent padding and border styling
+
+#### Datalist Component (Searchable Dropdown)
+Use `x-forms.datalist` for searchable dropdowns with custom input capability:
+
+```html
+<x-forms.datalist wire:model="scheme" label="Scheme" placeholder="Select or type" required
+    helper="Select from options or type a custom value">
+    <option value="https">HTTPS</option>
+    <option value="http">HTTP</option>
+    <option value="wss">WSS (WebSocket Secure)</option>
+    <option value="ws">WS (WebSocket)</option>
+</x-forms.datalist>
+```
+
+**Key Features**:
+- **Searchable**: Filter options by typing
+- **Custom input**: Users can type values not in the list
+- **Single or multiple**: Set `:multiple="true"` for multi-select
+- **Keyboard navigation**: Full keyboard support
+- **Visual feedback**: Shows selected state and loading indicators
+- **Dark mode support**: Automatic theming
+
+**When to use**:
+- ✅ User needs to search through many options (e.g., server selection, SSH keys)
+- ✅ Custom input is allowed/encouraged (e.g., protocol schemes: http, https, custom protocols)
+- ✅ Multi-select functionality needed
+- ❌ Simple yes/no or 2-3 options → use `x-forms.select` instead
+
+**DO NOT use**: HTML5 `<datalist>` directly or `list=""` attribute on inputs. Always use `x-forms.datalist` component.
+
+**Example - Protocol scheme selector**:
+```html
+{{-- Provides common schemes but allows custom (tcp, grpc, ftp, etc.) --}}
+<x-forms.datalist wire:model="scheme" label="Scheme" placeholder="Select or type a scheme" required
+    helper="Select from common schemes or type a custom one (e.g., tcp, grpc, ftp)">
+    <option value="https">HTTPS</option>
+    <option value="http">HTTP</option>
+    <option value="wss">WSS (WebSocket Secure)</option>
+    <option value="ws">WS (WebSocket)</option>
+</x-forms.datalist>
+```
+
+**Example - Multi-select SSH keys**:
+```html
+<x-forms.datalist label="Additional SSH Keys" wire:model="selectedSshKeyIds"
+    :multiple="true" placeholder="Select SSH keys...">
+    @foreach ($sshKeys as $key)
+        <option value="{{ $key->id }}">{{ $key->name }}</option>
+    @endforeach
+</x-forms.datalist>
+```
+
+The datalist component is located at `resources/views/components/forms/datalist.blade.php` and provides:
+- Alpine.js-powered search and filtering
+- Livewire integration with `@entangle` for reactive state
+- Visual tags for multi-select mode
+- Dropdown with hover effects
+- Handles both string and integer values
+- Required/readonly/disabled states
+
+## Domain Management
+
+### Application Domains
+- Domains are stored as **comma-separated strings** in the `applications.fqdn` column (type: `longText`, nullable)
+- The `Application` model has an `fqdns()` accessor that converts the comma-separated string to an array
+- Example: `"http://app.coolify.io,https://cloud.coolify.io/dashboard"`
+
+### New Domains View (Simple Applications)
+A dedicated Domains management view is available for non-Docker Compose applications:
+- **Route**: `/domains` under application configuration
+- **Component**: `App\Livewire\Project\Application\Domains`
+- **View**: `resources/views/livewire/project/application/domains.blade.php`
+- **Sidebar**: Only shown when `$application->build_pack !== 'dockercompose'`
+
+**Features**:
+- List-based domain management (add/remove individual domains)
+- Generate random domain functionality
+- DNS validation per domain
+- Domain conflict detection
+- Redirect settings (www/non-www)
+- Authorization using `AuthorizesRequests` trait
+- **Three-field domain input**: Scheme (searchable dropdown), Domain (text), Port (optional number)
+  - Scheme uses `x-forms.datalist` component for searchable dropdown with custom input
+  - Supports common protocols (http, https, ws, wss) and custom protocols (tcp, grpc, ftp, ssh, etc.)
+  - Backend stores as single URL string: `scheme://domain:port`
+
+**Domain Add/Edit Components**:
+- **DomainAdd**: `App\Livewire\Project\Application\DomainAdd`
+  - Properties: `$scheme`, `$domain`, `$port`
+  - Combines fields into full URL: `$scheme . '://' . $domain . ':' . $port`
+  - Validation: `alpha_dash` for scheme (allows any alphanumeric + dash/underscore)
+  - Uses modal pattern with `x-modal-input` component
+
+- **DomainEdit**: `App\Livewire\Project\Application\DomainEdit`
+  - Parses existing URL using PHP's `parse_url()`
+  - Extracts scheme, host (with path), and port into separate fields
+  - Updates domain at specific index in array
+
+**General View Changes**:
+- Domain fields in General view are now read-only for simple applications
+- Displays current domains with a "Manage domains →" link to the new Domains view
+- Docker Compose applications continue to manage domains per service in the General view
+
 Random other things you should remember:
 - App\Models\Application::team must return a relationship instance., always use team()
 - Always use `Model::ownedByCurrentTeamCached()` instead of `Model::ownedByCurrentTeam()->get()` for team-scoped queries to avoid duplicate database queries
