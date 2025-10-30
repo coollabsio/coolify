@@ -68,6 +68,8 @@ class DeploymentSuccess extends CustomEmailNotification
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,
             'pull_request_id' => $pull_request_id,
+            'project' => data_get($this->application, 'environment.project.name'),
+            'environment' => $this->environment_name,
         ]);
 
         return $mail;
@@ -130,6 +132,8 @@ class DeploymentSuccess extends CustomEmailNotification
                 ];
             }
         }
+        $message .= "\nProject: ".data_get($this->application, 'environment.project.name');
+        $message .= "\nEnvironment: {$this->environment_name}";
         $buttons[] = [
             'text' => 'Deployment logs',
             'url' => $this->deployment_url,
@@ -164,6 +168,8 @@ class DeploymentSuccess extends CustomEmailNotification
                 ];
             }
         }
+        $message .= "\nProject: ".data_get($this->application, 'environment.project.name');
+        $message .= "\nEnvironment: {$this->environment_name}";
         $buttons[] = [
             'text' => 'Deployment logs',
             'url' => $this->deployment_url,
