@@ -1282,6 +1282,73 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
+        summary: 'Create (Valkey)',
+        description: 'Create a new Valkey database.',
+        path: '/databases/valkey',
+        operationId: 'create-database-valkey',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'destination_uuid' => ['type' => 'string', 'description' => 'UUID of the destination if the server has multiple destinations'],
+                        'valkey_password' => ['type' => 'string', 'description' => 'Valkey password'],
+                        'valkey_conf' => ['type' => 'string', 'description' => 'Valkey conf'],
+                        'name' => ['type' => 'string', 'description' => 'Name of the database'],
+                        'description' => ['type' => 'string', 'description' => 'Description of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
+                        'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
+                        'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
+                        'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
+                        'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation of the database'],
+                        'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit of the database'],
+                        'limits_cpuset' => ['type' => 'string', 'description' => 'CPU set of the database'],
+                        'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares of the database'],
+                        'instant_deploy' => ['type' => 'boolean', 'description' => 'Instant deploy the database'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_database_valkey(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::VALKEY);
+    }
+
+    #[OA\Post(
         summary: 'Create (KeyDB)',
         description: 'Create a new KeyDB database.',
         path: '/databases/keydb',

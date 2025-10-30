@@ -19,6 +19,8 @@ class Index extends Component
 
     public Collection $redis;
 
+    public Collection $valkeys;
+
     public Collection $mongodbs;
 
     public Collection $mysqls;
@@ -37,7 +39,7 @@ class Index extends Component
 
     public function mount()
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->valkeys = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -53,6 +55,7 @@ class Index extends Component
         $this->environment = $environment->loadCount([
             'applications',
             'redis',
+            'valkeys',
             'postgresqls',
             'mysqls',
             'keydbs',
@@ -85,6 +88,7 @@ class Index extends Component
         $databaseTypes = [
             'postgresqls' => 'postgresqls',
             'redis' => 'redis',
+            'valkeys' => 'valkeys',
             'mongodbs' => 'mongodbs',
             'mysqls' => 'mysqls',
             'mariadbs' => 'mariadbs',

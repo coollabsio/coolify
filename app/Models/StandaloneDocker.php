@@ -38,6 +38,11 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneRedis::class, 'destination');
     }
 
+    public function valkeys()
+    {
+        return $this->morphMany(StandaloneValkey::class, 'destination');
+    }
+
     public function mongodbs()
     {
         return $this->morphMany(StandaloneMongodb::class, 'destination');

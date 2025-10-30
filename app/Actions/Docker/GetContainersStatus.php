@@ -80,6 +80,7 @@ class GetContainersStatus
             }
         }
         $databases = $this->server->databases();
+        ray($databases);
         $services = $this->server->services()->get();
         $previews = $this->server->previews();
         $foundApplications = [];

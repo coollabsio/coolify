@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneValkey;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Visus\Cuid2\Cuid2;
@@ -68,6 +69,39 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
         'key' => 'REDIS_USERNAME',
         'value' => 'default',
         'resourceable_type' => StandaloneRedis::class,
+        'resourceable_id' => $database->id,
+        'is_shared' => false,
+    ]);
+
+    return $database;
+}
+
+function create_standalone_valkey($environment_id, $destination_uuid, ?array $otherData = null): StandaloneValkey
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
+    $database = new StandaloneValkey;
+    $database->uuid = (new Cuid2);
+    $database->name = 'valkey-database-'.$database->uuid;
+
+    $valkey_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    if ($otherData && isset($otherData['valkey_password'])) {
+        $valkey_password = $otherData['valkey_password'];
+        unset($otherData['valkey_password']);
+    }
+
+    $database->valkey_password = $valkey_password;
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    EnvironmentVariable::create([
+        'key' => 'VALKEY_PASSWORD',
+        'value' => $valkey_password,
+        'resourceable_type' => StandaloneValkey::class,
         'resourceable_id' => $database->id,
         'is_shared' => false,
     ]);

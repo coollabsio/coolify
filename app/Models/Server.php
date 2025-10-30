@@ -765,6 +765,7 @@ $schema://$host {
         return $this->destinations()->map(function ($standaloneDocker) {
             $postgresqls = data_get($standaloneDocker, 'postgresqls', collect([]));
             $redis = data_get($standaloneDocker, 'redis', collect([]));
+            $valkeys = data_get($standaloneDocker, 'valkeys', collect([]));
             $mongodbs = data_get($standaloneDocker, 'mongodbs', collect([]));
             $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
             $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
@@ -772,7 +773,7 @@ $schema://$host {
             $dragonflies = data_get($standaloneDocker, 'dragonflies', collect([]));
             $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
 
-            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+            return $postgresqls->concat($redis)->concat($valkeys)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
         })->flatten()->filter(function ($item) {
             return data_get($item, 'name') !== 'coolify-db';
         });

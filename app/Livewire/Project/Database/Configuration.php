@@ -39,6 +39,7 @@ class Configuration extends Component
                 ->firstOrFail();
             $environment = $project->environments()
                 ->select('id', 'name', 'project_id', 'uuid')
+                ->with(['postgresqls', 'redis', 'valkeys', 'mongodbs', 'mysqls', 'mariadbs', 'keydbs', 'dragonflies', 'clickhouses'])
                 ->where('uuid', request()->route('environment_uuid'))
                 ->firstOrFail();
             $database = $environment->databases()

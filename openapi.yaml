@@ -2982,6 +2982,98 @@ paths:
       security:
         -
           bearerAuth: []
+  /databases/valkey:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (Valkey)'
+      description: 'Create a new Valkey database.'
+      operationId: create-database-valkey
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+              properties:
+                server_uuid:
+                  type: string
+                  description: 'UUID of the server'
+                project_uuid:
+                  type: string
+                  description: 'UUID of the project'
+                environment_name:
+                  type: string
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                destination_uuid:
+                  type: string
+                  description: 'UUID of the destination if the server has multiple destinations'
+                valkey_password:
+                  type: string
+                  description: 'Valkey password'
+                valkey_conf:
+                  type: string
+                  description: 'Valkey conf'
+                name:
+                  type: string
+                  description: 'Name of the database'
+                description:
+                  type: string
+                  description: 'Description of the database'
+                image:
+                  type: string
+                  description: 'Docker Image of the database'
+                is_public:
+                  type: boolean
+                  description: 'Is the database public?'
+                public_port:
+                  type: integer
+                  description: 'Public port of the database'
+                limits_memory:
+                  type: string
+                  description: 'Memory limit of the database'
+                limits_memory_swap:
+                  type: string
+                  description: 'Memory swap limit of the database'
+                limits_memory_swappiness:
+                  type: integer
+                  description: 'Memory swappiness of the database'
+                limits_memory_reservation:
+                  type: string
+                  description: 'Memory reservation of the database'
+                limits_cpus:
+                  type: string
+                  description: 'CPU limit of the database'
+                limits_cpuset:
+                  type: string
+                  description: 'CPU set of the database'
+                limits_cpu_shares:
+                  type: integer
+                  description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Instant deploy the database'
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /databases/keydb:
     post:
       tags:

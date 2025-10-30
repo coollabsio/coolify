@@ -273,6 +273,9 @@ This file contains high-level guidelines for Claude Code. For **more detailed, t
 - [Form Components](.cursor/rules/form-components.mdc) - Enhanced form components with authorization
 - [Testing Patterns](.cursor/rules/testing-patterns.mdc) - Testing strategies and examples
 
+### Implementation Guides
+- [Adding a New Database Type](.cursor/rules/adding-new-database.mdc) - Complete guide to integrating a new standalone database (with Valkey as reference)
+
 ### Project Information
 - [Project Overview](.cursor/rules/project-overview.mdc) - High-level project structure
 - [Technology Stack](.cursor/rules/technology-stack.mdc) - Detailed tech stack information

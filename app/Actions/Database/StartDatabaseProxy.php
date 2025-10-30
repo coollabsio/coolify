@@ -11,6 +11,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneValkey;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -20,7 +21,7 @@ class StartDatabaseProxy
 
     public string $jobQueue = 'high';
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
+    public function handle(StandaloneRedis|StandaloneValkey|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
@@ -39,14 +40,14 @@ class StartDatabaseProxy
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,
             'standalone-postgresql', 'standalone-supabase/postgres' => 5432,
-            'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
+            'standalone-redis', 'standalone-valkey', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
             'standalone-mongodb' => 27017,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };
         if ($isSSLEnabled) {
             $internalPort = match ($databaseType) {
-                'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6380,
+                'standalone-redis', 'standalone-valkey', 'standalone-keydb', 'standalone-dragonfly' => 6380,
                 default => $internalPort,
             };
         }

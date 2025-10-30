@@ -54,6 +54,8 @@ class Create extends Component
                     $database = create_standalone_dragonfly($environment->id, $destination_uuid);
                 } elseif ($type->value() === 'clickhouse') {
                     $database = create_standalone_clickhouse($environment->id, $destination_uuid);
+                } elseif ($type->value() === 'valkey') {
+                    $database = create_standalone_valkey($environment->id, $destination_uuid);
                 }
 
                 return redirect()->route('project.database.configuration', [

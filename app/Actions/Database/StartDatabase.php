@@ -10,6 +10,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneValkey;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartDatabase
@@ -18,7 +19,7 @@ class StartDatabase
 
     public string $jobQueue = 'high';
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
+    public function handle(StandaloneRedis|StandaloneValkey|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = $database->destination->server;
         if (! $server->isFunctional()) {
@@ -30,6 +31,9 @@ class StartDatabase
                 break;
             case \App\Models\StandaloneRedis::class:
                 $activity = StartRedis::run($database);
+                break;
+            case \App\Models\StandaloneValkey::class:
+                $activity = StartValkey::run($database);
                 break;
             case \App\Models\StandaloneMongodb::class:
                 $activity = StartMongodb::run($database);

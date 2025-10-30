@@ -44,6 +44,8 @@
                     <livewire:project.database.postgresql.general :database="$database" />
                 @elseif ($database->type() === 'standalone-redis')
                     <livewire:project.database.redis.general :database="$database" />
+                @elseif ($database->type() === 'standalone-valkey')
+                    <livewire:project.database.valkey.general :database="$database" />
                 @elseif ($database->type() === 'standalone-mongodb')
                     <livewire:project.database.mongodb.general :database="$database" />
                 @elseif ($database->type() === 'standalone-mysql')

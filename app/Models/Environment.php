@@ -44,6 +44,7 @@ class Environment extends BaseModel
     {
         return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
+            $this->valkeys()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
             $this->keydbs()->count() == 0 &&
@@ -72,6 +73,11 @@ class Environment extends BaseModel
     public function redis()
     {
         return $this->hasMany(StandaloneRedis::class);
+    }
+
+    public function valkeys()
+    {
+        return $this->hasMany(StandaloneValkey::class);
     }
 
     public function mongodbs()
@@ -108,6 +114,7 @@ class Environment extends BaseModel
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
+        $valkeys = $this->valkeys;
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
@@ -115,7 +122,7 @@ class Environment extends BaseModel
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($valkeys)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function project()

@@ -23,6 +23,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneValkey;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -546,6 +547,10 @@ function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
     if ($redis && $redis->team()->id == $teamId) {
         return $redis->unsetRelation('environment');
     }
+    $valkey = StandaloneValkey::whereUuid($uuid)->first();
+    if ($valkey && $valkey->team()->id == $teamId) {
+        return $valkey->unsetRelation('environment');
+    }
     $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
     if ($mongodb && $mongodb->team()->id == $teamId) {
         return $mongodb->unsetRelation('environment');
@@ -591,6 +596,10 @@ function queryResourcesByUuid(string $uuid)
     $redis = StandaloneRedis::whereUuid($uuid)->first();
     if ($redis) {
         return $redis;
+    }
+    $valkey = StandaloneValkey::whereUuid($uuid)->first();
+    if ($valkey) {
+        return $valkey;
     }
     $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
     if ($mongodb) {
@@ -2789,7 +2798,7 @@ function isAssociativeArray($array)
  *
  *  Theses variables are added in place to the $where_to_add array.
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function add_coolify_default_environment_variables(\App\Models\StandaloneRedis|\App\Models\StandaloneValkey|\App\Models\StandalonePostgresql|\App\Models\StandaloneMongodb|\App\Models\StandaloneMysql|\App\Models\StandaloneMariadb|\App\Models\StandaloneKeydb|\App\Models\StandaloneDragonfly|\App\Models\StandaloneClickhouse|\App\Models\Application|\App\Models\Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
     // Currently disabled
     return;

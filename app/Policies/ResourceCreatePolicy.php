@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneValkey;
 use App\Models\User;
 
 class ResourceCreatePolicy
@@ -22,6 +23,7 @@ class ResourceCreatePolicy
     public const CREATABLE_RESOURCES = [
         StandalonePostgresql::class,
         StandaloneRedis::class,
+        StandaloneValkey::class,
         StandaloneMongodb::class,
         StandaloneMysql::class,
         StandaloneMariadb::class,

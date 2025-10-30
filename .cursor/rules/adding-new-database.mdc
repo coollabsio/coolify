@@ -1,0 +1,1062 @@
+# Adding a New Database Type to Coolify
+
+This guide documents the complete process for adding a new standalone database type to Coolify, using the Valkey integration as a reference example.
+
+## Overview
+
+Coolify supports multiple standalone database types (PostgreSQL, MySQL, MariaDB, MongoDB, Redis, Keydb, Dragonfly, Clickhouse, and Valkey). Each database type requires:
+
+- A model class
+- A start action for Docker Compose generation
+- Livewire components and views for the UI
+- Database migrations
+- Helper functions
+- Authorization policies
+- Routes and API endpoints
+- Integration into existing models and services
+
+This guide covers all necessary steps to add a new database type.
+
+## Step 1: Create the Model
+
+**File:** `app/Models/Standalone{DatabaseName}.php`
+
+### Model Template
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Standalone{DatabaseName} extends BaseModel
+{
+    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+
+    protected $guarded = [];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    protected static function booted()
+    {
+        static::created(function ($database) {
+            LocalPersistentVolume::create([
+                'name' => '{database-name}-data-'.$database->uuid,
+                'mount_path' => '/data',
+                'host_path' => null,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+        });
+
+        static::forceDeleting(function ($database) {
+            $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
+            $database->environment_variables()->delete();
+            $database->tags()->detach();
+        });
+
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->forceFill(['last_online_at' => now()]);
+            }
+        });
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return Standalone{DatabaseName}::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
+    }
+
+    public function isConfigurationChanged(bool $save = false): bool
+    {
+        $newConfigHash = $this->image.$this->ports_mappings.$this->{database_name}_conf;
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash = md5($newConfigHash);
+        $oldConfigHash = data_get($this, 'config_hash');
+
+        if ($oldConfigHash === null) {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+            return true;
+        }
+
+        if ($oldConfigHash === $newConfigHash) {
+            return false;
+        }
+
+        if ($save) {
+            $this->config_hash = $newConfigHash;
+            $this->save();
+        }
+        return true;
+    }
+
+    public function isRunning(): bool
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
+    public function isExited(): bool
+    {
+        return (bool) str($this->status)->startsWith('exited');
+    }
+
+    public function workdir(): string
+    {
+        return database_configuration_dir().\"/{$this->uuid}\";
+    }
+
+    public function deleteConfigurations(): void
+    {
+        $server = data_get($this, 'destination.server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function deleteVolumes(): void
+    {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process([\"docker volume rm -f $storage->name\"], $server, false);
+        }
+    }
+
+    public function realStatus(): mixed
+    {
+        return $this->getRawOriginal('status');
+    }
+
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+                return \"$status:$health\";
+            },
+            get: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+                return \"$status:$health\";
+            },
+        );
+    }
+
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
+
+    public function project()
+    {
+        return data_get($this, 'environment.project');
+    }
+
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
+
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
+    public function link(): ?string
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.database.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
+                'database_uuid' => data_get($this, 'uuid'),
+            ]);
+        }
+        return null;
+    }
+
+    public function isLogDrainEnabled(): bool
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
+
+    public function portsMappings(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === '' ? null : $value,
+        );
+    }
+
+    public function portsMappingsArray(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->ports_mappings)
+                ? []
+                : explode(',', $this->ports_mappings),
+        );
+    }
+
+    public function type(): string
+    {
+        return 'standalone-{database-name}';
+    }
+
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $encodedPass = rawurlencode($this->{database_name}_password);
+                $scheme = $this->enable_ssl ? '{database-name}+ssl' : '{database-name}';
+                $port = $this->enable_ssl ? 6380 : 6379; // Adjust port as needed
+                $url = \"{$scheme}://{$encodedPass}@{$this->uuid}:{$port}/0\";
+
+                if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                    $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                }
+
+                return $url;
+            }
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
+                    $encodedPass = rawurlencode($this->{database_name}_password);
+                    $scheme = $this->enable_ssl ? '{database-name}+ssl' : '{database-name}';
+                    $url = \"{$scheme}://{$encodedPass}@{$serverIp}:{$this->public_port}/0\";
+
+                    if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                        $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                    }
+
+                    return $url;
+                }
+                return null;
+            }
+        );
+    }
+
+    public function get{DatabaseName}Version(): string
+    {
+        $image_parts = explode(':', $this->image);
+        return $image_parts[1] ?? '0.0';
+    }
+
+    public function environment()
+    {
+        return $this->belongsTo(Environment::class);
+    }
+
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    public function destination()
+    {
+        return $this->morphTo();
+    }
+
+    public function runtime_environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderByRaw(\"
+                CASE
+                    WHEN LOWER(key) LIKE 'service_%' THEN 1
+                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            \");
+    }
+
+    public function isBackupSolutionAvailable(): bool
+    {
+        return true; // Set to false if backups are not supported
+    }
+
+    public function {database_name}Password(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $password = $this->runtime_environment_variables()->where('key', '{DATABASE_NAME}_PASSWORD')->first();
+                if (! $password) {
+                    return null;
+                }
+                return $password->value;
+            },
+        );
+    }
+}
+```
+
+### Key Model Requirements
+
+- **Traits:** ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes
+- **Guarded:** `protected $guarded = []` (allow mass assignment)
+- **Appends:** Include 'internal_db_url', 'external_db_url', 'database_type', 'server_status'
+- **Lifecycle Hooks:**
+  - `created()` - Create persistent volume
+  - `forceDeleting()` - Clean up relationships
+  - `saving()` - Track last_online_at
+- **Methods:** type(), relationships, URL generators, status checks, configuration management
+
+## Step 2: Create the Migration
+
+**File:** `database/migrations/YYYY_MM_DD_HHMMSS_create_standalone_{database_name}s_table.php`
+
+### Complete Migration Template
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('standalone_{database_name}s', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->unique();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->text('{database_name}_password');
+            $table->longText('{database_name}_conf')->nullable();
+            $table->string('status')->default('exited');
+            $table->string('image')->default('eniteo/{database_name}:latest'); // Adjust image
+
+            // Network configuration
+            $table->boolean('is_public')->default(false);
+            $table->integer('public_port')->nullable();
+            $table->text('ports_mappings')->nullable();
+
+            // Resource limits
+            $table->string('limits_memory')->nullable();
+            $table->string('limits_memory_swap')->nullable();
+            $table->integer('limits_memory_swappiness')->nullable();
+            $table->string('limits_memory_reservation')->nullable();
+            $table->string('limits_cpus')->nullable();
+            $table->string('limits_cpuset')->nullable();
+            $table->integer('limits_cpu_shares')->nullable();
+
+            // SSL/TLS configuration
+            $table->boolean('enable_ssl')->default(false);
+            $table->enum('ssl_mode', ['allow', 'prefer', 'require', 'verify-ca', 'verify-full'])->default('prefer')->nullable();
+
+            // Docker configuration
+            $table->text('custom_docker_run_options')->nullable();
+
+            // Configuration tracking
+            $table->string('config_hash')->nullable();
+
+            // Status tracking
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('last_online_at')->nullable();
+
+            // Multi-tenancy and relationships
+            $table->morphs('destination');
+            $table->foreignId('environment_id')->nullable()->constrained()->cascadeOnDelete();
+
+            // Soft deletes
+            $table->softDeletes();
+
+            // Timestamps
+            $table->timestamps();
+        });
+
+        // Add foreign key to environment_variables table
+        Schema::table('environment_variables', function (Blueprint $table) {
+            if (!Schema::hasColumn('environment_variables', 'standalone_{database_name}_id')) {
+                $table->foreignId('standalone_{database_name}_id')->nullable()->constrained('standalone_{database_name}s')->cascadeOnDelete();
+            }
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('standalone_{database_name}s');
+    }
+};
+```
+
+### Important Migration Notes
+
+**Use ONE comprehensive migration** instead of splitting into multiple migrations. Include all columns from the start:
+- Basic properties (name, description)
+- Database-specific password/config
+- Network configuration (ports, public access)
+- Resource limits (memory, CPU)
+- SSL/TLS fields (if necessary)
+- Docker options
+- Configuration hash tracking
+- Status tracking (started_at, last_online_at)
+- Soft deletes
+
+This approach is cleaner and easier to manage than the 7-8 migrations used in the Valkey integration.
+
+## Step 3: Create the Start Action
+
+**File:** `app/Actions/Database/Start{DatabaseName}.php`
+
+### Action Template
+
+```php
+<?php
+
+namespace App\Actions\Database;
+
+use App\Actions\Docker\GetContainersStatus;
+use App\Helpers\SslHelper;
+use App\Models\SslCertificate;
+use App\Models\Standalone{DatabaseName};
+use Illuminate\Support\Facades\Storage;
+use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Yaml;
+
+class Start{DatabaseName}
+{
+    use AsAction;
+
+    public Standalone{DatabaseName} $database;
+
+    public array $commands = [];
+
+    public string $configuration_dir;
+
+    private ?SslCertificate $ssl_certificate = null;
+
+    public function handle(Standalone{DatabaseName} $database)
+    {
+        $this->database = $database;
+
+        $container_name = $this->database->uuid;
+        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+
+        $this->commands = [
+            \"echo 'Starting database.'\",
+            \"echo 'Creating directories.'\",
+            \"mkdir -p $this->configuration_dir\",
+            \"echo 'Directories created successfully.'\",
+        ];
+
+        // Handle SSL configuration
+        if (!$this->database->enable_ssl) {
+            $this->commands[] = \"rm -rf $this->configuration_dir/ssl\";
+            $this->database->sslCertificates()->delete();
+        } else {
+            $this->setupSsl();
+        }
+
+        // Generate persistent volumes, environment variables, etc.
+        $persistent_storages = $this->generate_local_persistent_volumes();
+        $persistent_file_volumes = $this->database->fileStorages()->get();
+        $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
+        $environment_variables = $this->generate_environment_variables();
+
+        // Build Docker Compose configuration
+        $docker_compose = $this->buildDockerCompose(
+            $container_name,
+            $persistent_storages,
+            $persistent_file_volumes,
+            $volume_names,
+            $environment_variables
+        );
+
+        $docker_compose_yaml = Yaml::dump($docker_compose, 10);
+        $docker_compose_base64 = base64_encode($docker_compose_yaml);
+
+        $this->commands[] = \"echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null\";
+        $this->commands[] = \"echo 'Pulling {$database->image} image.'\";
+        $this->commands[] = \"docker compose -f $this->configuration_dir/docker-compose.yml pull\";
+        $this->commands[] = \"docker stop --timeout=10 $container_name 2>/dev/null || true\";
+        $this->commands[] = \"docker rm -f $container_name 2>/dev/null || true\";
+        $this->commands[] = \"docker compose -f $this->configuration_dir/docker-compose.yml up -d\";
+        $this->commands[] = \"echo 'Database started.'\";
+
+        $activity = remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+
+        GetContainersStatus::dispatch($database->destination->server);
+
+        return $activity;
+    }
+
+    private function setupSsl(): void
+    {
+        $this->commands[] = \"echo 'Setting up SSL for this database.'\";
+        $this->commands[] = \"mkdir -p $this->configuration_dir/ssl\";
+
+        $server = $this->database->destination->server;
+        $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
+
+        if (!$caCert) {
+            $server->generateCaCertificate();
+            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
+        }
+
+        if (!$caCert) {
+            $this->dispatch('error', 'No CA certificate found for this database.');
+            return;
+        }
+
+        $this->ssl_certificate = $this->database->sslCertificates()->first();
+
+        if (!$this->ssl_certificate) {
+            $this->commands[] = \"echo 'Generating new SSL certificate.'\";
+            $this->ssl_certificate = SslHelper::generateSslCertificate(
+                commonName: $this->database->uuid,
+                resourceType: $this->database->getMorphClass(),
+                resourceId: $this->database->id,
+                serverId: $server->id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+                configurationDir: $this->configuration_dir,
+                mountPath: '/etc/{database-name}/certs',
+            );
+        }
+    }
+
+    private function generate_local_persistent_volumes(): array
+    {
+        $local_persistent_volumes = [];
+        foreach ($this->database->persistentStorages as $persistentStorage) {
+            if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
+                $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
+            } else {
+                $volume_name = $persistentStorage->name;
+                $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
+            }
+        }
+        return $local_persistent_volumes;
+    }
+
+    private function generate_local_persistent_volumes_only_volume_names(): array
+    {
+        $local_persistent_volumes_names = [];
+        foreach ($this->database->persistentStorages as $persistentStorage) {
+            if ($persistentStorage->host_path) {
+                continue;
+            }
+            $name = $persistentStorage->name;
+            $local_persistent_volumes_names[$name] = [
+                'name' => $name,
+                'external' => false,
+            ];
+        }
+        return $local_persistent_volumes_names;
+    }
+
+    private function generate_environment_variables(): array
+    {
+        $environment_variables = collect();
+
+        foreach ($this->database->runtime_environment_variables as $env) {
+            if ($env->is_shared) {
+                $environment_variables->push(\"$env->key=$env->real_value\");
+            } else {
+                $environment_variables->push(\"$env->key=$env->real_value\");
+            }
+        }
+
+        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+
+        return $environment_variables->all();
+    }
+
+    private function buildDockerCompose(
+        string $container_name,
+        array $persistent_storages,
+        $persistent_file_volumes,
+        array $volume_names,
+        array $environment_variables
+    ): array
+    {
+        $docker_compose = [
+            'services' => [
+                $container_name => [
+                    'image' => $this->database->image,
+                    'container_name' => $container_name,
+                    'environment' => $environment_variables,
+                    'restart' => RESTART_MODE,
+                    'networks' => [$this->database->destination->network],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
+                    'healthcheck' => [
+                        'test' => ['CMD-SHELL', '{database-name}-cli ping'],
+                        'interval' => '5s',
+                        'timeout' => '5s',
+                        'retries' => 10,
+                        'start_period' => '5s',
+                    ],
+                    'mem_limit' => $this->database->limits_memory,
+                    'memswap_limit' => $this->database->limits_memory_swap,
+                    'mem_swappiness' => $this->database->limits_memory_swappiness,
+                    'mem_reservation' => $this->database->limits_memory_reservation,
+                    'cpus' => (float) $this->database->limits_cpus,
+                    'cpu_shares' => $this->database->limits_cpu_shares,
+                ],
+            ],
+            'networks' => [
+                $this->database->destination->network => [
+                    'external' => true,
+                    'name' => $this->database->destination->network,
+                    'attachable' => true,
+                ],
+            ],
+        ];
+
+        // Add optional configurations
+        if (!is_null($this->database->limits_cpuset)) {
+            data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
+        }
+
+        if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
+            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+        }
+
+        if (count($this->database->ports_mappings_array) > 0) {
+            $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
+        }
+
+        // Add volumes
+        $docker_compose['services'][$container_name]['volumes'] ??= [];
+
+        if (count($persistent_storages) > 0) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_storages
+            );
+        }
+
+        if (count($persistent_file_volumes) > 0) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $persistent_file_volumes->map(fn ($item) => \"$item->fs_path:$item->mount_path\")->toArray()
+            );
+        }
+
+        if (count($volume_names) > 0) {
+            $docker_compose['volumes'] = $volume_names;
+        }
+
+        // Add custom Docker options
+        $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
+        $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
+        return $docker_compose;
+    }
+}
+```
+
+## Step 4: Create Livewire Component
+
+**File:** `app/Livewire/Project/Database/{DatabaseName}/General.php`
+
+Create a Livewire component that extends `Livewire\Component` and includes:
+- AuthorizesRequests trait
+- Properties for all database configuration fields
+- Rules and messages for validation
+- Methods: mount(), syncData(), submit(), instantSave*()
+- Event listeners for real-time updates
+
+Reference the Valkey General.php for a complete example.
+
+## Step 5: Create Blade View
+
+**File:** `resources/views/livewire/project/database/{database_name}/general.blade.php`
+
+Create the UI with:
+- A single root element (Livewire requirement)
+- Form components using `<x-forms.*>` components
+- Authorization gates using `canGate="update"` and `:canResource="$database"`
+- Sections for: basic config, credentials, network, SSL, advanced settings
+
+## Step 6: Create Helper Function
+
+**File:** `bootstrap/helpers/databases.php`
+
+Add a function to create the database instance:
+
+```php
+function create_standalone_{database_name}($environment_id, $destination_uuid)
+{
+    $server = StandaloneDocker::where('uuid', $destination_uuid)->first()->server;
+
+    $database = Standalone{DatabaseName}::create([
+        'name' => 'my-{database-name}-' . str()->random(5),
+        'image' => 'eniteo/{database-name}:latest', // Adjust as needed
+        'environment_id' => $environment_id,
+        'destination_id' => StandaloneDocker::where('uuid', $destination_uuid)->first()->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    ${database_name}_password = str()->password(16);
+
+    EnvironmentVariable::create([
+        'key' => '{DATABASE_NAME}_PASSWORD',
+        'value' => ${database_name}_password,
+        'resourceable_type' => Standalone{DatabaseName}::class,
+        'resourceable_id' => $database->id,
+        'is_shared' => false,
+    ]);
+
+    return $database;
+}
+```
+
+## Step 7: Create Seeder (Optional)
+
+**File:** `database/seeders/Standalone{DatabaseName}Seeder.php`
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Standalone{DatabaseName};
+use Illuminate\Database\Seeder;
+
+class Standalone{DatabaseName}Seeder extends Seeder
+{
+    public function run(): void
+    {
+        Standalone{DatabaseName}::factory(5)->create();
+    }
+}
+```
+
+## Step 8: Update Enums
+
+### `app/Enums/NewDatabaseTypes.php`
+
+```php
+case {DATABASE_NAME} = '{database-name}';
+```
+
+### `app/Enums/NewResourceTypes.php`
+
+```php
+case {DATABASE_NAME} = '{database-name}';
+```
+
+## Step 9: Update Constants
+
+### `bootstrap/helpers/constants.php`
+
+Add to `DATABASE_TYPES` array:
+
+```php
+const DATABASE_TYPES = [
+    'postgresql',
+    'redis',
+    'valkey',
+    'mongodb',
+    'mysql',
+    'mariadb',
+    'keydb',
+    'dragonfly',
+    'clickhouse',
+    '{database-name}', // Add here
+];
+```
+
+## Step 10: Update Models
+
+### `app/Models/Environment.php`
+
+Add relationship:
+
+```php
+public function {database_name}s()
+{
+    return $this->hasMany(Standalone{DatabaseName}::class);
+}
+```
+
+Update `databases()` method to include the new database type.
+
+### `app/Models/Project.php`
+
+Add relationship:
+
+```php
+public function {database_name}s()
+{
+    return $this->hasManyThrough(Standalone{DatabaseName}::class, Environment::class);
+}
+```
+
+### `app/Models/StandaloneDocker.php`
+
+Add morphMany relationship:
+
+```php
+public function {database_name}s()
+{
+    return $this->morphMany(Standalone{DatabaseName}::class, 'destination');
+}
+```
+
+## Step 11: Update Database Actions
+
+Add `Standalone{DatabaseName}` to type unions and implement handling in:
+
+- `app/Actions/Database/StartDatabase.php`
+- `app/Actions/Database/StopDatabase.php`
+- `app/Actions/Database/RestartDatabase.php`
+- `app/Actions/Database/StartDatabaseProxy.php`
+- `app/Actions/Database/StopDatabaseProxy.php`
+
+Example:
+
+```php
+public function handle(
+    StandalonePostgresql|StandaloneRedis|Standalone{DatabaseName}|... $database
+)
+{
+    match ($database::class) {
+        StandalonePostgresql::class => StartPostgresql::run($database),
+        Standalone{DatabaseName}::class => Start{DatabaseName}::run($database),
+        // ... other cases
+    };
+}
+```
+
+## Step 12: Update Jobs
+
+### `app/Jobs/DeleteResourceJob.php`
+
+Add `Standalone{DatabaseName}` to:
+- Import statement
+- Constructor type union
+- Case statement in switch
+- `$isDatabase` instanceof check
+
+```php
+use App\Models\Standalone{DatabaseName};
+
+public function __construct(
+    public Application|...|Standalone{DatabaseName} $resource,
+    ...
+) { }
+
+// In handle()
+case 'standalone-{database-name}':
+    StopDatabase::run($this->resource, ...);
+    break;
+
+// In $isDatabase check
+|| $this->resource instanceof Standalone{DatabaseName}
+```
+
+## Step 13: Update API Controller
+
+### `app/Http/Controllers/Api/DatabasesController.php`
+
+Add method:
+
+```php
+public function create_database_{database_name}(Request $request)
+{
+    return $this->create_database($request, NewDatabaseTypes::{DATABASE_NAME});
+}
+```
+
+## Step 14: Update Routes
+
+### `routes/api.php`
+
+Add route:
+
+```php
+Route::post('/databases/{database-name}', [DatabasesController::class, 'create_database_{database_name}'])
+    ->middleware(['api.ability:write']);
+```
+
+## Step 15: Update Policies
+
+### `app/Policies/ResourceCreatePolicy.php`
+
+Add to `CREATABLE_RESOURCES` array:
+
+```php
+Standalone{DatabaseName}::class,
+```
+
+## Step 16: Update Livewire Components
+
+Add `Standalone{DatabaseName}` imports and type checks to:
+
+- `app/Livewire/Project/Database/Configuration.php` - load relationship in mount
+- `app/Livewire/Project/Resource/Create.php` - add creation logic
+- `app/Livewire/Project/New/Select.php` - add to database selection UI
+- `app/Livewire/Project/Resource/Index.php` - add to resource listing
+- `app/Livewire/Project/Shared/ConfigurationChecker.php` - add type union
+- `app/Livewire/Project/Shared/GetLogs.php` - add type union
+- `app/Livewire/Project/Service/FileStorage.php` - add type union
+- `app/Livewire/Project/Database/Import.php` - add to unsupported check if not supporting backups
+- `app/Livewire/Project/Shared/Logs.php` - add type union
+
+## Step 17: Update Helper Functions
+
+### `bootstrap/helpers/databases.php`
+
+Add import at top:
+
+```php
+use App\Models\Standalone{DatabaseName};
+```
+
+Update `create_database()` function to handle new type.
+
+### `bootstrap/helpers/shared.php`
+
+Add import and update helper functions to include new database type in queries.
+
+## Complete Checklist
+
+### Create Files (7 items)
+- [ ] Model: `app/Models/Standalone{DatabaseName}.php`
+- [ ] Action: `app/Actions/Database/Start{DatabaseName}.php`
+- [ ] Livewire: `app/Livewire/Project/Database/{DatabaseName}/General.php`
+- [ ] View: `resources/views/livewire/project/database/{database-name}/general.blade.php`
+- [ ] Migration: `database/migrations/YYYY_MM_DD_HHMMSS_create_standalone_{database_name}s_table.php`
+- [ ] Seeder: `database/seeders/Standalone{DatabaseName}Seeder.php`
+- [ ] Helper function in `bootstrap/helpers/databases.php`
+
+### Modify Files (20+ items)
+- [ ] `app/Enums/NewDatabaseTypes.php` - Add enum case
+- [ ] `app/Enums/NewResourceTypes.php` - Add enum case
+- [ ] `bootstrap/helpers/constants.php` - Add to DATABASE_TYPES array
+- [ ] `app/Models/Environment.php` - Add relationship and update methods
+- [ ] `app/Models/Project.php` - Add relationship
+- [ ] `app/Models/StandaloneDocker.php` - Add morphMany relationship
+- [ ] `app/Actions/Database/StartDatabase.php` - Update type union and case
+- [ ] `app/Actions/Database/StopDatabase.php` - Update type union
+- [ ] `app/Actions/Database/RestartDatabase.php` - Update type union
+- [ ] `app/Actions/Database/StartDatabaseProxy.php` - Update type union
+- [ ] `app/Actions/Database/StopDatabaseProxy.php` - Update type union and import
+- [ ] `app/Jobs/DeleteResourceJob.php` - Update type union, case, and instanceof check
+- [ ] `app/Http/Controllers/Api/DatabasesController.php` - Add create method
+- [ ] `routes/api.php` - Add POST route
+- [ ] `app/Policies/ResourceCreatePolicy.php` - Add to CREATABLE_RESOURCES
+- [ ] `app/Livewire/Project/Database/Configuration.php` - Update relationships
+- [ ] `app/Livewire/Project/Resource/Create.php` - Add creation logic
+- [ ] `app/Livewire/Project/New/Select.php` - Add to database selection
+- [ ] `app/Livewire/Project/Shared/ConfigurationChecker.php` - Update type union
+- [ ] `app/Livewire/Project/Shared/GetLogs.php` - Update type union
+- [ ] `app/Livewire/Project/Service/FileStorage.php` - Update type union
+- [ ] `app/Livewire/Project/Database/Import.php` - Add to unsupported (if needed)
+- [ ] `app/Livewire/Project/Shared/Logs.php` - Update type union
+- [ ] `bootstrap/helpers/databases.php` - Add import and helper function
+- [ ] `bootstrap/helpers/shared.php` - Add import and update functions
+
+## Testing
+
+After adding a new database type:
+
+1. **Migrate:** Run `php artisan migrate`
+2. **Test Creation:** Create a new database via the UI
+3. **Test Configuration:** Update database settings
+4. **Test Starting:** Start the database container
+5. **Test Logs:** Access database logs
+6. **Test Terminal:** Access database terminal
+7. **Test Deletion:** Delete the database
+8. **Run Tests:** Execute Pest test suite to ensure no regressions
+
+## Common Issues
+
+### Type Union Mismatch
+**Error:** `Argument #1 must be of type X|Y, given Z`
+**Solution:** Add your new database model to all type unions in affected files. Use full namespace qualification: `\App\Models\Standalone{DatabaseName}`
+
+### Database Relationship Not Found
+**Error:** "Unknown relation 'valkeys' on model X"
+**Solution:** Ensure you've added the morphMany relationship to StandaloneDocker and hasMany to Environment/Project
+
+### Missing Import
+**Error:** "Class not found: Standalone{DatabaseName}"
+**Solution:** Add `use App\Models\Standalone{DatabaseName};` at the top of the file
+
+### Container Not Starting
+**Common Causes:**
+- Invalid Docker image URL
+- Missing healthcheck command
+- Incorrect port mappings
+- Resource limits too restrictive
+
+## Reference
+
+For complete examples, refer to the Valkey implementation in the codebase:
+- Model: `app/Models/StandaloneValkey.php`
+- Action: `app/Actions/Database/StartValkey.php`
+- Livewire: `app/Livewire/Project/Database/Valkey/General.php`
+- View: `resources/views/livewire/project/database/valkey/general.blade.php`

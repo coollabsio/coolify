@@ -15,6 +15,7 @@ enum NewResourceTypes: string
     case MYSQL = 'mysql';
     case MONGODB = 'mongodb';
     case REDIS = 'redis';
+    case VALKEY = 'valkey';
     case MARIADB = 'mariadb';
     case KEYDB = 'keydb';
     case DRAGONFLY = 'dragonfly';

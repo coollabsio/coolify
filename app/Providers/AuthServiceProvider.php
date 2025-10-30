@@ -35,6 +35,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\StandaloneMariadb::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneMongodb::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneRedis::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneValkey::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneKeydb::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneDragonfly::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneClickhouse::class => \App\Policies\DatabasePolicy::class,

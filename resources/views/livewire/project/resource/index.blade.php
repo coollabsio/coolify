@@ -250,6 +250,7 @@
             applications: @js($applications),
             postgresqls: @js($postgresqls),
             redis: @js($redis),
+            valkeys: @js($valkeys),
             mongodbs: @js($mongodbs),
             mysqls: @js($mysqls),
             mariadbs: @js($mariadbs),
@@ -276,6 +277,7 @@
                 return [
                     this.postgresqls,
                     this.redis,
+                    this.valkeys,
                     this.mongodbs,
                     this.mysqls,
                     this.mariadbs,

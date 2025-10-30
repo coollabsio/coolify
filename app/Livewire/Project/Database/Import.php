@@ -141,6 +141,7 @@ EOD;
 
         if (
             $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneValkey::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
