@@ -202,11 +202,6 @@ class BackupExecutions extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup-executions', [
-            'checkboxes' => [
-                ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'],
-                // ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently from SFTP Storage'],
-            ],
-        ]);
+        return view('livewire.project.database.backup-executions');
     }
 }

@@ -13,6 +13,7 @@ use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -55,7 +56,7 @@ use Visus\Cuid2\Cuid2;
 
 class Server extends BaseModel
 {
-    use HasFactory, SchemalessAttributesTrait, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -135,6 +136,7 @@ class Server extends BaseModel
                 $destination->delete();
             });
             $server->settings()->delete();
+            $server->sslCertificates()->delete();
         });
     }
 
@@ -160,7 +162,11 @@ class Server extends BaseModel
         'user',
         'description',
         'private_key_id',
+        'cloud_provider_token_id',
         'team_id',
+        'hetzner_server_id',
+        'hetzner_server_status',
+        'is_validating',
     ];
 
     protected $guarded = [];
@@ -888,6 +894,16 @@ $schema://$host {
         return $this->belongsTo(PrivateKey::class);
     }
 
+    public function cloudProviderToken()
+    {
+        return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function sslCertificates()
+    {
+        return $this->hasMany(SslCertificate::class);
+    }
+
     public function muxFilename()
     {
         return 'mux_'.$this->uuid;
@@ -1259,13 +1275,13 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel(bool $async = true)
+    public function restartSentinel(?string $customImage = null, bool $async = true)
     {
         try {
             if ($async) {
-                StartSentinel::dispatch($this, true);
+                StartSentinel::dispatch($this, true, null, $customImage);
             } else {
-                StartSentinel::run($this, true);
+                StartSentinel::run($this, true, null, $customImage);
             }
         } catch (\Throwable $e) {
             return handleError($e);
@@ -1326,7 +1342,7 @@ $schema://$host {
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;

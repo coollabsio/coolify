@@ -85,19 +85,8 @@ class Advanced extends Component
             // Handle allowed IPs with subnet support and 0.0.0.0 special case
             $this->allowed_ips = str($this->allowed_ips)->replaceEnd(',', '')->trim();
 
-            // Check if user entered 0.0.0.0 or left field empty (both allow access from anywhere)
-            $allowsFromAnywhere = false;
-            if (empty($this->allowed_ips)) {
-                $allowsFromAnywhere = true;
-            } elseif ($this->allowed_ips === '0.0.0.0' || str_contains($this->allowed_ips, '0.0.0.0')) {
-                $allowsFromAnywhere = true;
-            }
-
-            // Check if it's 0.0.0.0 (allow all) or empty
-            if ($this->allowed_ips === '0.0.0.0' || empty($this->allowed_ips)) {
-                // Keep as is - empty means no restriction, 0.0.0.0 means allow all
-            } else {
-                // Validate and clean up the entries
+            // Only validate and clean up if we have IPs and it's not 0.0.0.0 (allow all)
+            if (! empty($this->allowed_ips) && ! in_array('0.0.0.0', array_map('trim', explode(',', $this->allowed_ips)))) {
                 $invalidEntries = [];
                 $validEntries = str($this->allowed_ips)->trim()->explode(',')->map(function ($entry) use (&$invalidEntries) {
                     $entry = str($entry)->trim()->toString();
@@ -133,7 +122,6 @@ class Advanced extends Component
                     return;
                 }
 
-                // Also check if we have no valid entries after filtering
                 if ($validEntries->isEmpty()) {
                     $this->dispatch('error', 'No valid IP addresses or subnets provided');
 
@@ -144,14 +132,6 @@ class Advanced extends Component
             }
 
             $this->instantSave();
-
-            // Show security warning if allowing access from anywhere
-            if ($allowsFromAnywhere) {
-                $message = empty($this->allowed_ips)
-                    ? 'Empty IP allowlist allows API access from anywhere.<br><br>This is not recommended for production environments!'
-                    : 'Using 0.0.0.0 allows API access from anywhere.<br><br>This is not recommended for production environments!';
-                $this->dispatch('warning', $message);
-            }
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

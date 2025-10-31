@@ -13,7 +13,7 @@
         @endif
     </div>
     <div class="subtitle">Network endpoints to deploy your resources.</div>
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($servers as $server)
             @forelse ($server->destinations() as $destination)
                 @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')

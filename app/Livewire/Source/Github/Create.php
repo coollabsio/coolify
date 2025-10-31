@@ -50,11 +50,9 @@ class Create extends Component
                 'html_url' => $this->html_url,
                 'custom_user' => $this->custom_user,
                 'custom_port' => $this->custom_port,
+                'is_system_wide' => $this->is_system_wide,
                 'team_id' => currentTeam()->id,
             ];
-            if (isCloud()) {
-                $payload['is_system_wide'] = $this->is_system_wide;
-            }
             $github_app = GithubApp::create($payload);
             if (session('from')) {
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);

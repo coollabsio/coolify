@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CheckHelperImageJob;
 use App\Models\InstanceSettings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -44,5 +45,6 @@ class Dev extends Command
         } else {
             echo "Instance already initialized.\n";
         }
+        CheckHelperImageJob::dispatch();
     }
 }

@@ -7,7 +7,7 @@
         <x-server.sidebar :server="$server" activeMenu="metrics" />
         <div class="w-full">
             <h2>Metrics</h2>
-            <div class="pb-4">Basic metrics for your container.</div>
+            <div class="pb-4">Basic metrics for your server.</div>
             @if ($server->isMetricsEnabled())
                 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
                     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
@@ -19,7 +19,7 @@
                         <option value="10080">1 week</option>
                         <option value="43200">30 days</option>
                     </x-forms.select>
-                    <h4 class="pt-4">CPU (%)</h4>
+                    <h4 class="pt-4">CPU Usage</h4>
                     <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
                     <script>
@@ -27,6 +27,7 @@
                         const optionsServerCpu = {
                             stroke: {
                                 curve: 'straight',
+                                width: 2,
                             },
                             chart: {
                                 height: '150px',
@@ -45,7 +46,7 @@
                                     },
                                 },
                                 animations: {
-                                    enabled: false,
+                                    enabled: true,
                                 },
                             },
                             fill: {
@@ -61,16 +62,16 @@
                                     enabled: false,
                                 }
                             },
-                            grid: {
-                                show: true,
-                                borderColor: '',
-                            },
-                            colors: [baseColor],
-                            xaxis: {
-                                type: 'datetime',
-                            },
-                            series: [{
-                                name: 'CPU %',
+                             grid: {
+                                 show: true,
+                                 borderColor: '',
+                             },
+                             colors: [cpuColor],
+                             xaxis: {
+                                 type: 'datetime',
+                             },
+                             series: [{
+                                 name: 'CPU %',
                                 data: []
                             }],
                             noData: {
@@ -79,12 +80,27 @@
                                     color: textColor,
                                 }
                             },
-                            tooltip: {
-                                enabled: true,
-                                marker: {
-                                    show: false,
-                                }
-                            },
+                             tooltip: {
+                                 enabled: true,
+                                 marker: {
+                                     show: false,
+                                 },
+                                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                     const value = series[seriesIndex][dataPointIndex];
+                                     const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                     const date = new Date(timestamp);
+                                     const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
+                                         String(date.getUTCMinutes()).padStart(2, '0') + ':' +
+                                         String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
+                                         date.getUTCFullYear() + '-' +
+                                         String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                                         String(date.getUTCDate()).padStart(2, '0');
+                                     return '<div class="apexcharts-tooltip-custom">' +
+                                         '<div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                         '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
+                                         '</div>';
+                                 }
+                             },
                             legend: {
                                 show: false
                             }
@@ -95,11 +111,11 @@
                         document.addEventListener('livewire:init', () => {
                             Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
                                 checkTheme();
-                                serverCpuChart.updateOptions({
-                                    series: [{
-                                        data: chartData[0].seriesData,
-                                    }],
-                                    colors: [baseColor],
+                                 serverCpuChart.updateOptions({
+                                     series: [{
+                                         data: chartData[0].seriesData,
+                                     }],
+                                     colors: [cpuColor],
                                     xaxis: {
                                         type: 'datetime',
                                         labels: {
@@ -109,15 +125,18 @@
                                             }
                                         }
                                     },
-                                    yaxis: {
-                                        show: true,
-                                        labels: {
-                                            show: true,
-                                            style: {
-                                                colors: textColor,
-                                            }
-                                        }
-                                    },
+                                     yaxis: {
+                                         show: true,
+                                         labels: {
+                                             show: true,
+                                             style: {
+                                                 colors: textColor,
+                                             },
+                                             formatter: function(value) {
+                                                 return Math.round(value) + ' %';
+                                             }
+                                         }
+                                     },
                                     noData: {
                                         text: 'Loading...',
                                         style: {
@@ -130,7 +149,7 @@
                     </script>
 
                     <div>
-                        <h4>Memory (%)</h4>
+                        <h4>Memory Usage</h4>
                         <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
                         <script>
@@ -138,6 +157,7 @@
                             const optionsServerMemory = {
                                 stroke: {
                                     curve: 'straight',
+                                    width: 2,
                                 },
                                 chart: {
                                     height: '150px',
@@ -156,7 +176,7 @@
                                         },
                                     },
                                     animations: {
-                                        enabled: false,
+                                        enabled: true,
                                     },
                                 },
                                 fill: {
@@ -172,15 +192,15 @@
                                         enabled: false,
                                     }
                                 },
-                                grid: {
-                                    show: true,
-                                    borderColor: '',
-                                },
-                                colors: [baseColor],
-                                xaxis: {
-                                    type: 'datetime',
-                                    labels: {
-                                        show: true,
+                                 grid: {
+                                     show: true,
+                                     borderColor: '',
+                                 },
+                                 colors: [ramColor],
+                                 xaxis: {
+                                     type: 'datetime',
+                                     labels: {
+                                         show: true,
                                         style: {
                                             colors: textColor,
                                         }
@@ -196,12 +216,27 @@
                                         color: textColor,
                                     }
                                 },
-                                tooltip: {
-                                    enabled: true,
-                                    marker: {
-                                        show: false,
-                                    }
-                                },
+                                 tooltip: {
+                                     enabled: true,
+                                     marker: {
+                                         show: false,
+                                     },
+                                     custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                         const value = series[seriesIndex][dataPointIndex];
+                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                         const date = new Date(timestamp);
+                                         const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
+                                             String(date.getUTCMinutes()).padStart(2, '0') + ':' +
+                                             String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
+                                             date.getUTCFullYear() + '-' +
+                                             String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                                             String(date.getUTCDate()).padStart(2, '0');
+                                         return '<div class="apexcharts-tooltip-custom">' +
+                                             '<div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                             '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
+                                             '</div>';
+                                     }
+                                 },
                                 legend: {
                                     show: false
                                 }
@@ -212,11 +247,11 @@
                             document.addEventListener('livewire:init', () => {
                                 Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
                                     checkTheme();
-                                    serverMemoryChart.updateOptions({
-                                        series: [{
-                                            data: chartData[0].seriesData,
-                                        }],
-                                        colors: [baseColor],
+                                     serverMemoryChart.updateOptions({
+                                         series: [{
+                                             data: chartData[0].seriesData,
+                                         }],
+                                         colors: [ramColor],
                                         xaxis: {
                                             type: 'datetime',
                                             labels: {
@@ -226,16 +261,19 @@
                                                 }
                                             }
                                         },
-                                        yaxis: {
-                                            min: 0,
-                                            show: true,
-                                            labels: {
-                                                show: true,
-                                                style: {
-                                                    colors: textColor,
-                                                }
-                                            }
-                                        },
+                                         yaxis: {
+                                             min: 0,
+                                             show: true,
+                                             labels: {
+                                                 show: true,
+                                                 style: {
+                                                     colors: textColor,
+                                                 },
+                                                  formatter: function(value) {
+                                                      return Math.round(value) + ' %';
+                                                  }
+                                             }
+                                         },
                                         noData: {
                                             text: 'Loading...',
                                             style: {

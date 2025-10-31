@@ -61,6 +61,10 @@ class Index extends Component
 
     public function updatedSelectedUuid()
     {
+        if ($this->selected_uuid === 'default') {
+            // When cleared to default, do nothing (no error message)
+            return;
+        }
         $this->connectToContainer();
     }
 

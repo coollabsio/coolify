@@ -20,7 +20,11 @@
         @if (count($containers) === 0)
             <div>No containers are running or terminal access is disabled on this server.</div>
         @else
-            <form class="w-full flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')">
+            <form class="w-96 min-w-fit flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')"
+                x-data="{ autoConnected: false }" x-init="if ({{ count($containers) }} === 1 && !autoConnected) {
+                    autoConnected = true;
+                    $nextTick(() => $wire.dispatchSelf('connectToContainer'));
+                }">
                 <x-forms.select label="Container" id="container" required wire:model.live="selected_container">
                     @foreach ($containers as $container)
                         @if ($loop->first)

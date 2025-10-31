@@ -1,11 +1,19 @@
 <!DOCTYPE html>
 <html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-
+<script>
+    // Immediate theme application - runs before any rendering
+    (function() {
+        const t = localStorage.theme || 'dark';
+        const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList[d ? 'add' : 'remove']('dark');
+    })();
+</script>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#101010" id="theme-color-meta" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -35,12 +43,18 @@
     @endphp
     <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
-        <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
+        <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
     @else
-        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/x-icon" />
+        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
+    <script>
+        // Update theme-color meta tag (non-critical, can run async)
+        const t = localStorage.theme || 'dark';
+        const isDark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.getElementById('theme-color-meta')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+    </script>
     <style>
         [x-cloak] {
             display: none !important;
@@ -108,7 +122,7 @@
                                 }
                             });
                         }
-                        
+
                         // Existing link sanitization
                         if (node.nodeName === 'A' && node.hasAttribute('href')) {
                             const href = node.getAttribute('href') || '';
@@ -123,22 +137,14 @@
                 return DOMPurify.sanitize(html, config);
             };
 
+            // Initialize theme if not set
             if (!('theme' in localStorage)) {
                 localStorage.theme = 'dark';
-                document.documentElement.classList.add('dark')
-            } else if (localStorage.theme === 'dark') {
-                document.documentElement.classList.add('dark')
-            } else if (localStorage.theme === 'light') {
-                document.documentElement.classList.remove('dark')
-            } else {
-                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    document.documentElement.classList.add('dark')
-                } else {
-                    document.documentElement.classList.remove('dark')
-                }
             }
+
             let theme = localStorage.theme
-            let baseColor = '#FCD452'
+            let cpuColor = '#1e90ff'
+            let ramColor = '#00ced1'
             let textColor = '#ffffff'
             let editorBackground = '#181818'
             let editorTheme = 'blackboard'
@@ -149,12 +155,14 @@
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
                 }
                 if (theme == 'dark') {
-                    baseColor = '#FCD452'
+                    cpuColor = '#1e90ff'
+                    ramColor = '#00ced1'
                     textColor = '#ffffff'
                     editorBackground = '#181818'
                     editorTheme = 'blackboard'
                 } else {
-                    baseColor = 'black'
+                    cpuColor = '#1e90ff'
+                    ramColor = '#00ced1'
                     textColor = '#000000'
                     editorBackground = '#ffffff'
                     editorTheme = null
