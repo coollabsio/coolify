@@ -39,19 +39,18 @@ services:
     user: "0"
     environment:
       SMTP_AUTH_USERNAME: ${SMTP_USERNAME:-usesend}
-      USESEND_BASE_URL: "${SERVICE_FQDN_USESEND}"
-      USESEND_API_CERT_PATH: "${TLS_CERT}"
-      USESEND_API_KEY_PATH: "${TLS_KEY}"
+      USESEND_BASE_URL: ${SERVICE_FQDN_USESEND}
+      UNSEND_API_KEY_PATH: /data/certs/key.pem
+      UNSEND_API_CERT_PATH: /data/certs/cert.pem
     ports:
       - "25:25" # Standard SMTP
       - "587:587" # SMTP with STARTTLS
       - "2587:2587" # Alternative SMTP port
       - "465:465" # SMTP over SSL/TLS
-      - "2465:2465" # Alternative SMTPS port
+      - "2465:2465" # Alternative SMTP port
     volumes:
-      - type: bind
-        source: /etc/letsencrypt
-        target: /certs
+      - /data/coolify/certs/${SERVICE_FQDN_UNSEND_PROXY}/key.pem:/data/certs/key.pem:ro
+      - /data/coolify/certs/${SERVICE_FQDN_UNSEND_PROXY}/cert.pem:/data/certs/cert.pem:ro
     depends_on:
       - usesend
 
@@ -83,3 +82,12 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+
+  traefik-certs-dumper:
+    image: ghcr.io/kereis/traefik-certs-dumper:1.8.12
+    environment:
+      DOMAIN: ${SERVICE_FQDN_UNSEND_PROXY}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /data/coolify/proxy:/traefik:ro
+      - /data/coolify/certs:/output
