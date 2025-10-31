@@ -1028,6 +1028,13 @@ All notable changes to this project will be documented in this file.
 - Add onboarding guide link to global search no results state
 - Add category filter dropdown to service selection
 - Display service logos in original colors with consistent sizing
+- Add warnings for system-wide GitHub Apps
+- Show message when no resources use GitHub App
+- Add dynamic viewport-based height for compose editor
+- Add funding information for Coollabs including sponsorship plans and channels
+- Update Evolution API slogan to better reflect its capabilities
+- *(templates)* Update plane compose to v1.0.0
+- Add token validation functionality for Hetzner and DigitalOcean providers
 
 ### 🐛 Bug Fixes
 
@@ -3886,6 +3893,35 @@ All notable changes to this project will be documented in this file.
 - Improve proxy logs form layout for better responsive behavior
 - Prevent horizontal overflow in log text
 - Use break-all to force line wrapping in logs
+- Ensure deployment failure notifications are sent reliably
+- GitHub source creation and configuration issues
+- Make system-wide warning reactive in Create view
+- Prevent system-wide warning callout from making modal too wide
+- Constrain callout width with max-w-2xl and wrap text properly
+- Center system-wide warning callout in modal
+- Left-align callout on regular view, keep centered in modal
+- Allow callout to take full width in regular view
+- Change app_id and installation_id to integer values in createGithubAppManually method
+- Use x-cloak instead of inline style to prevent FOUC
+- Clarify warning message for allowed IPs configuration
+- Server URL generation in ServerPatchCheck notification
+- Monaco editor empty for docker compose applications
+- Update sponsor link from Darweb to Dade2 in README
+- *(database)* Prevent malformed URLs when server IP is empty
+- Optimize caching in Dockerfile and GitHub Actions workflow
+- Remove wire:ignore from modal and add wire:key to EditCompose component
+- Add wire:ignore directive to modal component for improved functionality
+- Clean up formatting and remove unnecessary key binding in stack form component
+- Add null checks and validation to OAuth bulk update method
+- *(docs)* Update documentation URL to version 2 in evolution-api.yaml
+- *(templates)* Remove volumes from Plane's compose
+- *(templates)* Add redis env to live service in Plane
+- *(templates)* Update minio image to use coollabsio fork in Plane
+- Prevent login rate limit bypass via spoofed headers
+- Correct login rate limiter key format to include IP address
+- Change SMTP port input type to number for better validation
+- Remove unnecessary step attribute from maximum storage input fields
+- Update boarding flow logic to complete onboarding when server is created
 
 ### 💼 Other
 
@@ -4298,6 +4334,7 @@ All notable changes to this project will be documented in this file.
 - Remove content from docker_compose_raw to prevent file overwrites
 - *(templates)* Metamcp app
 - Preserve clean docker_compose_raw without Coolify additions
+- *(deps-dev)* Bump vite from 6.3.6 to 6.4.1
 
 ### 🚜 Refactor
 
@@ -4858,6 +4895,13 @@ All notable changes to this project will be documented in this file.
 - Preserve exception chain in validation error handling
 - Harden and deduplicate validateShellSafePath
 - Replace random ID generation with Cuid2 for unique HTML IDs in form components
+- Remove deprecated next() method
+- Replace allowed IPs validation logic with regex
+- Remove redundant
+- Streamline allowed IPs validation and enhance UI warnings for API access
+- Remove staging URL logic from ServerPatchCheck constructor
+- Streamline Docker build process with matrix strategy for multi-architecture support
+- Simplify project data retrieval and enhance OAuth settings handling
 
 ### 📚 Documentation
 
@@ -4976,6 +5020,8 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
+- Add service & database deployment logging plan
 
 ### 🎨 Styling
 
@@ -4997,6 +5043,8 @@ All notable changes to this project will be documented in this file.
 - Setup database for upcoming tests
 - Improve Git ls-remote parsing tests with uppercase SHA and negative cases
 - Add coverage for newline and tab rejection in volume strings
+- Add unit tests for ServerPatchCheck notification URL generation
+- Fix ServerPatchCheckNotification tests to avoid global state pollution
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -5668,6 +5716,8 @@ All notable changes to this project will be documented in this file.
 - *(signoz)* Bump version to 0.78.1
 - Add category field to siyuan.yaml
 - Update siyuan category in service templates
+- Add spacing and format callout text in modal
+- Update version numbers to 4.0.0-beta.439 and 4.0.0-beta.440
 
 ### ◀️ Revert
 
