@@ -35,7 +35,7 @@ services:
       retries: 20
 
   usesend:
-    image: usesend/usesend:latest
+    image: usesend/usesend:v1.7.1
     expose:
       - 3000
     environment:
@@ -58,7 +58,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://usesend:3000 || exit 1" ]
+      test: ["CMD-SHELL", "wget -qO- http://usesend:3000 || exit 1"]
       interval: 5s
       retries: 10
       timeout: 2s
