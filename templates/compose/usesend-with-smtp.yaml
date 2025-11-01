@@ -37,11 +37,10 @@ services:
   usesend-proxy:
     image: "usesend/smtp-proxy:v1.7.1"
     user: "0"
-    environment:
-      SMTP_AUTH_USERNAME: ${SMTP_USERNAME:-usesend}
-      USESEND_BASE_URL: ${SERVICE_FQDN_USESEND}
-      UNSEND_API_KEY_PATH: /data/certs/key.pem
-      UNSEND_API_CERT_PATH: /data/certs/cert.pem
+    environment: SMTP_AUTH_USERNAME=${SMTP_USERNAME:-usesend}
+      USESEND_BASE_URL=${SERVICE_FQDN_USESEND}
+      UNSEND_API_KEY_PATH=/data/certs/key.pem
+      UNSEND_API_CERT_PATH=/data/certs/cert.pem
     ports:
       - "25:25" # Standard SMTP
       - "587:587" # SMTP with STARTTLS
@@ -85,8 +84,7 @@ services:
 
   traefik-certs-dumper:
     image: ghcr.io/kereis/traefik-certs-dumper:1.8.12
-    environment:
-      DOMAIN: ${SERVICE_FQDN_UNSEND_PROXY}
+    environment: DOMAIN=${SERVICE_FQDN_UNSEND_PROXY}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /data/coolify/proxy:/traefik:ro
