@@ -120,7 +120,6 @@ class Application extends BaseModel
     protected $appends = ['server_status'];
 
     protected $casts = [
-        'custom_network_aliases' => 'array',
         'http_basic_auth_password' => 'encrypted',
     ];
 
@@ -249,6 +248,30 @@ class Application extends BaseModel
                 return empty($value) ? null : json_encode($value);
             },
             get: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                if (is_string($value) && $this->isJson($value)) {
+                    $decoded = json_decode($value, true);
+
+                    // Return as comma-separated string, not array
+                    return is_array($decoded) ? implode(',', $decoded) : $value;
+                }
+
+                return $value;
+            }
+        );
+    }
+
+    /**
+     * Get custom_network_aliases as an array
+     */
+    public function customNetworkAliasesArray(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $value = $this->getRawOriginal('custom_network_aliases');
                 if (is_null($value)) {
                     return null;
                 }
@@ -957,7 +980,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels.$this->settings->use_build_secrets);
+        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels.$this->settings->use_build_secrets);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
