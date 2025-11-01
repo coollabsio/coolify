@@ -2320,7 +2320,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
         $custom_network_aliases = [];
-        if (is_array($this->application->custom_network_aliases_array) && count($this->application->custom_network_aliases_array) > 0) {
+        if (! empty($this->application->custom_network_aliases_array)) {
             $custom_network_aliases = $this->application->custom_network_aliases_array;
         }
         $docker_compose = [

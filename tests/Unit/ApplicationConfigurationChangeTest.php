@@ -4,46 +4,106 @@ use App\Models\Application;
 
 /**
  * Unit test to verify that custom_network_aliases is included in configuration change detection.
- * These tests verify the hash calculation includes the field by checking the behavior.
+ * Tests exercise the real Application::isConfigurationChanged() method.
  */
-it('custom_network_aliases affects configuration hash', function () {
-    // Test helper to calculate hash like isConfigurationChanged does
-    $calculateHash = function ($customNetworkAliases) {
-        return md5(base64_encode(
-            'example.com'. // fqdn
-            'https://github.com/example/repo'. // git_repository
-            'main'. // git_branch
-            'abc123'. // git_commit_sha
-            'nixpacks'. // build_pack
-            null. // static_image
-            'npm install'. // install_command
-            'npm run build'. // build_command
-            'npm start'. // start_command
-            '3000'. // ports_exposes
-            null. // ports_mappings
-            $customNetworkAliases. // custom_network_aliases (THIS IS THE KEY LINE)
-            '/'. // base_directory
-            null. // publish_directory
-            null. // dockerfile
-            'Dockerfile'. // dockerfile_location
-            null. // custom_labels
-            null. // custom_docker_run_options
-            null. // dockerfile_target_build
-            null. // redirect
-            null. // custom_nginx_configuration
-            null. // custom_labels (duplicate)
-            false // use_build_secrets
-        ));
-    };
+it('detects custom_network_aliases change as configuration change', function () {
+    // Create a partial mock of Application with environment_variables mocked
+    $app = \Mockery::mock(Application::class)->makePartial();
+    // Mock environment_variables to return an empty collection that supports get()
+    $emptyCollection = collect([])->makeHidden([]);
+    $app->shouldReceive('environment_variables')->andReturn(\Mockery::mock(function ($mock) {
+        $mock->shouldReceive('get')->andReturn(collect([]));
+    }));
 
-    // Different custom_network_aliases should produce different hashes
-    $hash1 = $calculateHash('api.internal,api.local');
-    $hash2 = $calculateHash('api.internal,api.local,api.staging');
-    $hash3 = $calculateHash(null);
+    // Set attributes for initial configuration
+    $app->fqdn = 'example.com';
+    $app->git_repository = 'https://github.com/example/repo';
+    $app->git_branch = 'main';
+    $app->git_commit_sha = 'abc123';
+    $app->build_pack = 'nixpacks';
+    $app->static_image = null;
+    $app->install_command = 'npm install';
+    $app->build_command = 'npm run build';
+    $app->start_command = 'npm start';
+    $app->ports_exposes = '3000';
+    $app->ports_mappings = null;
+    $app->custom_network_aliases = 'api.internal,api.local';
+    $app->base_directory = '/';
+    $app->publish_directory = null;
+    $app->dockerfile = null;
+    $app->dockerfile_location = 'Dockerfile';
+    $app->custom_labels = null;
+    $app->custom_docker_run_options = null;
+    $app->dockerfile_target_build = null;
+    $app->redirect = null;
+    $app->custom_nginx_configuration = null;
+    $app->pull_request_id = 0;
 
-    expect($hash1)->not->toBe($hash2)
-        ->and($hash1)->not->toBe($hash3)
-        ->and($hash2)->not->toBe($hash3);
+    // Mock the settings relationship
+    $settings = \Mockery::mock();
+    $settings->use_build_secrets = false;
+    $app->setRelation('settings', $settings);
+
+    // Get the initial configuration hash
+    $app->isConfigurationChanged(true);
+    $initialHash = $app->config_hash;
+    expect($initialHash)->not->toBeNull();
+
+    // Change custom_network_aliases
+    $app->custom_network_aliases = 'api.internal,api.local,api.staging';
+
+    // Verify configuration is detected as changed
+    $isChanged = $app->isConfigurationChanged(false);
+    expect($isChanged)->toBeTrue();
+});
+
+it('does not detect change when custom_network_aliases stays the same', function () {
+    // Create a partial mock of Application with environment_variables mocked
+    $app = \Mockery::mock(Application::class)->makePartial();
+    // Mock environment_variables to return an empty collection that supports get()
+    $app->shouldReceive('environment_variables')->andReturn(\Mockery::mock(function ($mock) {
+        $mock->shouldReceive('get')->andReturn(collect([]));
+    }));
+
+    // Set attributes for initial configuration
+    $app->fqdn = 'example.com';
+    $app->git_repository = 'https://github.com/example/repo';
+    $app->git_branch = 'main';
+    $app->git_commit_sha = 'abc123';
+    $app->build_pack = 'nixpacks';
+    $app->static_image = null;
+    $app->install_command = 'npm install';
+    $app->build_command = 'npm run build';
+    $app->start_command = 'npm start';
+    $app->ports_exposes = '3000';
+    $app->ports_mappings = null;
+    $app->custom_network_aliases = 'api.internal,api.local';
+    $app->base_directory = '/';
+    $app->publish_directory = null;
+    $app->dockerfile = null;
+    $app->dockerfile_location = 'Dockerfile';
+    $app->custom_labels = null;
+    $app->custom_docker_run_options = null;
+    $app->dockerfile_target_build = null;
+    $app->redirect = null;
+    $app->custom_nginx_configuration = null;
+    $app->pull_request_id = 0;
+
+    // Mock the settings relationship
+    $settings = \Mockery::mock();
+    $settings->use_build_secrets = false;
+    $app->setRelation('settings', $settings);
+
+    // Get the initial configuration hash
+    $app->isConfigurationChanged(true);
+    $initialHash = $app->config_hash;
+
+    // Keep custom_network_aliases the same
+    $app->custom_network_aliases = 'api.internal,api.local';
+
+    // Verify configuration is NOT detected as changed
+    $isChanged = $app->isConfigurationChanged(false);
+    expect($isChanged)->toBeFalse();
 });
 
 it('custom_network_aliases is in the configuration hash fields', function () {
