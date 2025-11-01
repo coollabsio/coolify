@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "onWorktreeCreate": "cp $GCOOL_ROOT_PATH/.env .",
+    "run": "clean && spin up"
+  }
+}
