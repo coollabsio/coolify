@@ -78,10 +78,22 @@
                     </div>
                     @if(isDev())
                     <div class="flex gap-2 md:flex-row flex-col w-full">
-                        <x-forms.input id="dev_helper_version" label="Dev Helper Version (Development Only)"
-                            helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
-                            placeholder="{{ config('constants.coolify.helper_version') }}" />
+                        <div class="flex-1">
+                            <x-forms.input id="dev_helper_version" label="Dev Helper Version (Development Only)"
+                                helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
+                                placeholder="{{ config('constants.coolify.helper_version') }}" />
+                        </div>
+                        <div class="flex items-end">
+                            <x-forms.button wire:click="buildHelperImage" type="button">
+                                Build Image
+                            </x-forms.button>
+                        </div>
                     </div>
+                    @if($buildActivityId)
+                    <div class="w-full mt-4">
+                        <livewire:activity-monitor header="Building Helper Image" :activityId="$buildActivityId" :fullHeight="false" />
+                    </div>
+                    @endif
                     @endif
                 </div>
             </div>
