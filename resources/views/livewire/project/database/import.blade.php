@@ -138,25 +138,28 @@
                         </x-forms.button>
                     </div>
 
-                    <div x-show="s3FileSize && !s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
-                        <div class="text-sm">File found in S3 ({{ formatBytes($s3FileSize ?? 0) }})</div>
-                        <div class="flex gap-2 pt-2">
-                            <x-forms.button class="w-full" wire:click='downloadFromS3'>
-                                Download & Prepare for Restore
-                            </x-forms.button>
+                    @if ($s3FileSize && !$s3DownloadedFile && !$s3DownloadInProgress)
+                        <div class="pt-2">
+                            <div class="text-sm">File found in S3 ({{ formatBytes($s3FileSize ?? 0) }})</div>
+                            <div class="flex gap-2 pt-2">
+                                <x-forms.button class="w-full" wire:click='downloadFromS3'>
+                                    Download & Prepare for Restore
+                                </x-forms.button>
+                            </div>
                         </div>
-                    </div>
+                    @endif
 
-                    <div x-show="s3DownloadInProgress" class="pt-2">
-                        <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
-                            backups.</div>
-                        @if ($s3DownloadInProgress)
+                    @if ($s3DownloadInProgress)
+                        <div class="pt-2">
+                            <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
+                                backups.</div>
                             <livewire:activity-monitor wire:key="s3-download-{{ $resource->uuid }}" header="S3 Download Progress"
                                 :showWaiting="false" />
-                        @endif
-                    </div>
+                        </div>
+                    @endif
 
-                    <div x-show="s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
+                    @if ($s3DownloadedFile && !$s3DownloadInProgress)
+                        <div class="pt-2">
                         <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
                         <div class="flex gap-2 pt-2">
                             <x-forms.button class="w-full" wire:click='restoreFromS3'>
@@ -166,7 +169,8 @@
                                 Cancel
                             </x-forms.button>
                         </div>
-                    </div>
+                        </div>
+                    @endif
                 </div>
             @endif
 
