@@ -151,7 +151,8 @@
                         <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
                             backups.</div>
                         @if ($s3DownloadInProgress)
-                            <livewire:activity-monitor wire:key="s3-download-{{ $resource->uuid }}" header="S3 Download Progress" :showWaiting="false" />
+                            <livewire:activity-monitor wire:key="s3-download-{{ $resource->uuid }}" header="S3 Download Progress"
+                                :showWaiting="false" />
                         @endif
                     </div>
 
@@ -176,7 +177,8 @@
             </div>
             @if ($importRunning)
                 <div class="container w-full mx-auto">
-                    <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Database Restore Output" :showWaiting="false" />
+                    <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Database Restore Output"
+                        :showWaiting="false" />
                 </div>
             @endif
         @else

@@ -78,9 +78,16 @@ class Import extends Component
         ];
     }
 
-    public function handleS3DownloadFinished(): void
+    public function handleS3DownloadFinished($data): void
     {
         $this->s3DownloadInProgress = false;
+
+        // Set the downloaded file path from the event data
+        $downloadPath = data_get($data, 'downloadPath');
+        if (filled($downloadPath)) {
+            $this->s3DownloadedFile = $downloadPath;
+            $this->filename = $downloadPath;
+        }
     }
 
     public function mount()
@@ -407,9 +414,6 @@ EOD;
                 'serverId' => $this->server->id,
                 'resourceUuid' => $this->resource->uuid,
             ]);
-
-            $this->s3DownloadedFile = $downloadPath;
-            $this->filename = $downloadPath;
 
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('info', 'Downloading file from S3. This may take a few minutes for large backups...');

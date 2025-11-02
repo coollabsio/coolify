@@ -15,6 +15,8 @@ class S3DownloadFinished implements ShouldBroadcast
 
     public int|string|null $userId = null;
 
+    public ?string $downloadPath = null;
+
     public function __construct($teamId, $data = null)
     {
         if (is_null($data)) {
@@ -23,6 +25,7 @@ class S3DownloadFinished implements ShouldBroadcast
 
         // Get userId from event data (the user who triggered the download)
         $this->userId = data_get($data, 'userId');
+        $this->downloadPath = data_get($data, 'downloadPath');
 
         $containerName = data_get($data, 'containerName');
         $serverId = data_get($data, 'serverId');
@@ -44,6 +47,13 @@ class S3DownloadFinished implements ShouldBroadcast
 
         return [
             new PrivateChannel("user.{$this->userId}"),
+        ];
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'downloadPath' => $this->downloadPath,
         ];
     }
 }
