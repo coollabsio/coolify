@@ -147,25 +147,25 @@
                         </div>
                     </div>
 
-                    @if ($s3DownloadInProgress)
-                        <div class="pt-2">
-                            <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
-                                backups.</div>
+                    <div x-show="s3DownloadInProgress" class="pt-2">
+                        <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
+                            backups.</div>
+                        @if ($s3DownloadInProgress)
                             <livewire:activity-monitor wire:key="s3-download-{{ $resource->uuid }}" header="S3 Download Progress" :showWaiting="false" />
+                        @endif
+                    </div>
+
+                    <div x-show="s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
+                        <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
+                        <div class="flex gap-2 pt-2">
+                            <x-forms.button class="w-full" wire:click='restoreFromS3'>
+                                Restore Database from S3
+                            </x-forms.button>
+                            <x-forms.button class="w-full" wire:click='cancelS3Download'>
+                                Cancel
+                            </x-forms.button>
                         </div>
-                    @elseif ($s3DownloadedFile)
-                        <div class="pt-2">
-                            <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
-                            <div class="flex gap-2 pt-2">
-                                <x-forms.button class="w-full" wire:click='restoreFromS3'>
-                                    Restore Database from S3
-                                </x-forms.button>
-                                <x-forms.button class="w-full" wire:click='cancelS3Download'>
-                                    Cancel
-                                </x-forms.button>
-                            </div>
-                        </div>
-                    @endif
+                    </div>
                 </div>
             @endif
 
