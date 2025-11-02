@@ -401,6 +401,7 @@ EOD;
 
             // Execute download commands
             $activity = remote_process($commands, $this->server, ignore_errors: false, callEventOnFinish: 'S3DownloadFinished', callEventData: [
+                'userId' => Auth::id(),
                 'downloadPath' => $downloadPath,
                 'containerName' => $containerName,
                 'serverId' => $this->server->id,

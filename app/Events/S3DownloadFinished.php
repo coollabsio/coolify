@@ -3,7 +3,6 @@
 namespace App\Events;
 
 use App\Models\Server;
-use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -18,16 +17,12 @@ class S3DownloadFinished implements ShouldBroadcast
 
     public function __construct($teamId, $data = null)
     {
-        // Get the first user from the team to broadcast to
-        $user = User::whereHas('teams', function ($query) use ($teamId) {
-            $query->where('teams.id', $teamId);
-        })->first();
-
-        $this->userId = $user?->id;
-
         if (is_null($data)) {
             return;
         }
+
+        // Get userId from event data (the user who triggered the download)
+        $this->userId = data_get($data, 'userId');
 
         $containerName = data_get($data, 'containerName');
         $serverId = data_get($data, 'serverId');
