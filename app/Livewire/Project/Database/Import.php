@@ -300,14 +300,7 @@ EOD;
         }
 
         try {
-            $s3Storage = S3Storage::findOrFail($this->s3StorageId);
-
-            // Verify S3 belongs to current team
-            if ($s3Storage->team_id !== currentTeam()->id) {
-                $this->dispatch('error', 'You do not have permission to access this S3 storage.');
-
-                return;
-            }
+            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
 
             // Test connection
             $s3Storage->testConnection();
@@ -363,14 +356,7 @@ EOD;
         try {
             $this->s3DownloadInProgress = true;
 
-            $s3Storage = S3Storage::findOrFail($this->s3StorageId);
-
-            // Verify S3 belongs to current team
-            if ($s3Storage->team_id !== currentTeam()->id) {
-                $this->dispatch('error', 'You do not have permission to access this S3 storage.');
-
-                return;
-            }
+            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
 
             $key = $s3Storage->key;
             $secret = $s3Storage->secret;

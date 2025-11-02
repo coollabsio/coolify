@@ -6,52 +6,53 @@
     progress: $wire.entangle('progress'),
     s3DownloadInProgress: $wire.entangle('s3DownloadInProgress'),
     s3DownloadedFile: $wire.entangle('s3DownloadedFile'),
-    s3FileSize: $wire.entangle('s3FileSize')
+    s3FileSize: $wire.entangle('s3FileSize'),
+    s3StorageId: $wire.entangle('s3StorageId'),
+    s3Path: $wire.entangle('s3Path')
 }">
     <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
     @script
-        <script data-navigate-once>
-            Dropzone.options.myDropzone = {
-                chunking: true,
-                method: "POST",
-                maxFilesize: 1000000000,
-                chunkSize: 10000000,
-                createImageThumbnails: false,
-                disablePreviews: true,
-                parallelChunkUploads: false,
-                init: function() {
-                    let button = this.element.querySelector('button');
-                    button.innerText = 'Select or drop a backup file here.'
-                    this.on('sending', function(file, xhr, formData) {
-                        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                        formData.append("_token", token);
-                    });
-                    this.on("addedfile", file => {
-                        $wire.isUploading = true;
-                    });
-                    this.on('uploadprogress', function(file, progress, bytesSent) {
-                        $wire.progress = progress;
-                    });
-                    this.on('complete', function(file) {
-                        $wire.filename = file.name;
-                        $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
-                        $wire.isUploading = false;
-                    });
-                    this.on('error', function(file, message) {
-                        $wire.error = true;
-                        $wire.$dispatch('error', message.error)
-                    });
-                }
-            };
-        </script>
+    <script data-navigate-once>
+        Dropzone.options.myDropzone = {
+            chunking: true,
+            method: "POST",
+            maxFilesize: 1000000000,
+            chunkSize: 10000000,
+            createImageThumbnails: false,
+            disablePreviews: true,
+            parallelChunkUploads: false,
+            init: function () {
+                let button = this.element.querySelector('button');
+                button.innerText = 'Select or drop a backup file here.'
+                this.on('sending', function (file, xhr, formData) {
+                    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    formData.append("_token", token);
+                });
+                this.on("addedfile", file => {
+                    $wire.isUploading = true;
+                });
+                this.on('uploadprogress', function (file, progress, bytesSent) {
+                    $wire.progress = progress;
+                });
+                this.on('complete', function (file) {
+                    $wire.filename = file.name;
+                    $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
+                    $wire.isUploading = false;
+                });
+                this.on('error', function (file, message) {
+                    $wire.error = true;
+                    $wire.$dispatch('error', message.error)
+                });
+            }
+        };
+    </script>
     @endscript
     <h2>Import Backup</h2>
     @if ($unsupported)
         <div>Database restore is not supported.</div>
     @else
         <div class="pt-2 rounded-sm alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
-                viewBox="0 0 24 24">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -71,8 +72,7 @@
                     </div>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases"
-                        wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @elseif ($resource->type() === 'standalone-mysql')
                 @if ($dumpAll)
@@ -82,8 +82,7 @@
                     <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases"
-                        wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @elseif ($resource->type() === 'standalone-mariadb')
                 @if ($dumpAll)
@@ -93,14 +92,13 @@
                     <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases"
-                        wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @endif
             <h3 class="pt-6">Backup File</h3>
             <form class="flex gap-2 items-end">
-                <x-forms.input label="Location of the backup file on the server"
-                    placeholder="e.g. /home/user/backup.sql.gz" wire:model='customLocation'></x-forms.input>
+                <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
+                    wire:model='customLocation'></x-forms.input>
                 <x-forms.button class="w-full" wire:click='checkFile'>Check File</x-forms.button>
             </form>
             <div class="pt-2 text-center text-xl font-bold">
@@ -135,8 +133,7 @@
                         placeholder="/backups/database-backup.gz" wire:model='s3Path'></x-forms.input>
 
                     <div class="flex gap-2">
-                        <x-forms.button class="w-full" wire:click='checkS3File'
-                            :disabled="!$s3StorageId || !$s3Path">
+                        <x-forms.button class="w-full" wire:click='checkS3File' x-bind:disabled="!s3StorageId || !s3Path">
                             Check File
                         </x-forms.button>
                     </div>
