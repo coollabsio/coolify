@@ -3036,8 +3036,8 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         switch ($source->getMorphClass()) {
             case \App\Models\GithubApp::class:
             case \App\Models\GitlabApp::class:
-                if ($source->custom_port !== 22) {
-                    $providerInfo['port'] = $source->custom_port;
+                if ($source->custom_port !== null && (int) $source->custom_port !== 22) {
+                    $providerInfo['port'] = (int) $source->custom_port;
                 }
                 break;
         }
@@ -3050,7 +3050,7 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
             case \App\Models\GithubApp::class:
             case \App\Models\GitlabApp::class:
                 $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
-                $providerInfo['port'] = $source->custom_port;
+                $providerInfo['port'] = $source->custom_port ?? 22;
                 $providerInfo['user'] = $source->custom_user;
                 break;
         }
