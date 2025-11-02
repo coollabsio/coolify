@@ -1,4 +1,13 @@
-<div x-data="{ error: $wire.entangle('error'), filesize: $wire.entangle('filesize'), filename: $wire.entangle('filename'), isUploading: $wire.entangle('isUploading'), progress: $wire.entangle('progress') }">
+<div x-data="{
+    error: $wire.entangle('error'),
+    filesize: $wire.entangle('filesize'),
+    filename: $wire.entangle('filename'),
+    isUploading: $wire.entangle('isUploading'),
+    progress: $wire.entangle('progress'),
+    s3DownloadInProgress: $wire.entangle('s3DownloadInProgress'),
+    s3DownloadedFile: $wire.entangle('s3DownloadedFile'),
+    s3FileSize: $wire.entangle('s3FileSize')
+}">
     <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
     @script
         <script data-navigate-once>
@@ -103,7 +112,65 @@
             <div x-show="isUploading">
                 <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
             </div>
-            <h3 class="pt-6" x-show="filename && !error">File Information</h3>
+
+            @if ($availableS3Storages->count() > 0)
+                <div class="pt-2 text-center text-xl font-bold">
+                    Or
+                </div>
+                <h3 class="pt-4">Restore from S3</h3>
+                <div class="flex flex-col gap-2">
+                    <x-forms.select label="S3 Storage" wire:model="s3StorageId">
+                        <option value="">Select S3 Storage</option>
+                        @foreach ($availableS3Storages as $storage)
+                            <option value="{{ $storage->id }}">{{ $storage->name }}
+                                @if ($storage->description)
+                                    - {{ $storage->description }}
+                                @endif
+                            </option>
+                        @endforeach
+                    </x-forms.select>
+
+                    <x-forms.input label="S3 File Path (within bucket)"
+                        helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
+                        placeholder="/backups/database-backup.gz" wire:model='s3Path'></x-forms.input>
+
+                    <div class="flex gap-2">
+                        <x-forms.button class="w-full" wire:click='checkS3File'
+                            :disabled="!$s3StorageId || !$s3Path">
+                            Check File
+                        </x-forms.button>
+                    </div>
+
+                    <div x-show="s3FileSize && !s3DownloadedFile" class="pt-2">
+                        <div class="text-sm">File found in S3 ({{ formatBytes($s3FileSize ?? 0) }})</div>
+                        <div class="flex gap-2 pt-2">
+                            <x-forms.button class="w-full" wire:click='downloadFromS3'>
+                                Download & Prepare for Restore
+                            </x-forms.button>
+                        </div>
+                    </div>
+
+                    <div x-show="s3DownloadInProgress" class="pt-2">
+                        <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
+                            backups.</div>
+                        <livewire:activity-monitor header="S3 Download Progress" :showWaiting="false" />
+                    </div>
+
+                    <div x-show="s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
+                        <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
+                        <div class="flex gap-2 pt-2">
+                            <x-forms.button class="w-full" wire:click='restoreFromS3'>
+                                Restore Database from S3
+                            </x-forms.button>
+                            <x-forms.button class="w-full" wire:click='cancelS3Download'>
+                                Cancel
+                            </x-forms.button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <h3 class="pt-6" x-show="filename && !error && !s3DownloadedFile">File Information</h3>
             <div x-show="filename && !error">
                 <div>Location: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>

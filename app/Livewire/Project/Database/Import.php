@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\S3Storage;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +55,19 @@ class Import extends Component
 
     public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
+    // S3 Restore properties
+    public $availableS3Storages = [];
+
+    public ?int $s3StorageId = null;
+
+    public string $s3Path = '';
+
+    public ?string $s3DownloadedFile = null;
+
+    public ?int $s3FileSize = null;
+
+    public bool $s3DownloadInProgress = false;
+
     public function getListeners()
     {
         $userId = Auth::id();
@@ -70,6 +84,7 @@ class Import extends Component
         }
         $this->parameters = get_route_parameters();
         $this->getContainers();
+        $this->loadAvailableS3Storages();
     }
 
     public function updatedDumpAll($value)
@@ -256,5 +271,265 @@ EOD;
             $this->filename = null;
             $this->importCommands = [];
         }
+    }
+
+    public function loadAvailableS3Storages()
+    {
+        try {
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
+                ->where('is_usable', true)
+                ->get();
+        } catch (\Throwable $e) {
+            $this->availableS3Storages = collect();
+            ray($e);
+        }
+    }
+
+    public function checkS3File()
+    {
+        if (! $this->s3StorageId) {
+            $this->dispatch('error', 'Please select an S3 storage.');
+
+            return;
+        }
+
+        if (blank($this->s3Path)) {
+            $this->dispatch('error', 'Please provide an S3 path.');
+
+            return;
+        }
+
+        try {
+            $s3Storage = S3Storage::findOrFail($this->s3StorageId);
+
+            // Verify S3 belongs to current team
+            if ($s3Storage->team_id !== currentTeam()->id) {
+                $this->dispatch('error', 'You do not have permission to access this S3 storage.');
+
+                return;
+            }
+
+            // Test connection
+            $s3Storage->testConnection();
+
+            // Build S3 disk configuration
+            $disk = Storage::build([
+                'driver' => 's3',
+                'region' => $s3Storage->region,
+                'key' => $s3Storage->key,
+                'secret' => $s3Storage->secret,
+                'bucket' => $s3Storage->bucket,
+                'endpoint' => $s3Storage->endpoint,
+                'use_path_style_endpoint' => true,
+            ]);
+
+            // Clean the path (remove leading slash if present)
+            $cleanPath = ltrim($this->s3Path, '/');
+
+            // Check if file exists
+            if (! $disk->exists($cleanPath)) {
+                $this->dispatch('error', 'File not found in S3. Please check the path.');
+
+                return;
+            }
+
+            // Get file size
+            $this->s3FileSize = $disk->size($cleanPath);
+
+            $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
+        } catch (\Throwable $e) {
+            $this->s3FileSize = null;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function downloadFromS3()
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! $this->s3StorageId || blank($this->s3Path)) {
+            $this->dispatch('error', 'Please select S3 storage and provide a path first.');
+
+            return;
+        }
+
+        if (is_null($this->s3FileSize)) {
+            $this->dispatch('error', 'Please check the file first by clicking "Check File".');
+
+            return;
+        }
+
+        try {
+            $this->s3DownloadInProgress = true;
+
+            $s3Storage = S3Storage::findOrFail($this->s3StorageId);
+
+            // Verify S3 belongs to current team
+            if ($s3Storage->team_id !== currentTeam()->id) {
+                $this->dispatch('error', 'You do not have permission to access this S3 storage.');
+
+                return;
+            }
+
+            $key = $s3Storage->key;
+            $secret = $s3Storage->secret;
+            $bucket = $s3Storage->bucket;
+            $endpoint = $s3Storage->endpoint;
+
+            // Clean the path
+            $cleanPath = ltrim($this->s3Path, '/');
+
+            // Create temporary download directory
+            $downloadDir = "/tmp/s3-restore-{$this->resource->uuid}";
+            $downloadPath = "{$downloadDir}/".basename($cleanPath);
+
+            // Get helper image
+            $helperImage = config('constants.coolify.helper_image');
+            $latestVersion = instanceSettings()->helper_version;
+            $fullImageName = "{$helperImage}:{$latestVersion}";
+
+            // Prepare download commands
+            $commands = [];
+
+            // Create download directory on server
+            $commands[] = "mkdir -p {$downloadDir}";
+
+            // Check if container exists and remove it
+            $containerName = "s3-restore-{$this->resource->uuid}";
+            $containerExists = instant_remote_process(["docker ps -a -q -f name={$containerName}"], $this->server, false);
+            if (filled($containerExists)) {
+                instant_remote_process(["docker rm -f {$containerName}"], $this->server, false);
+            }
+
+            // Run MinIO client container to download file
+            $commands[] = "docker run -d --name {$containerName} --rm -v {$downloadDir}:{$downloadDir} {$fullImageName} sleep 30";
+            $commands[] = "docker exec {$containerName} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
+            $commands[] = "docker exec {$containerName} mc cp temporary/{$bucket}/{$cleanPath} {$downloadPath}";
+
+            // Execute download commands
+            $activity = remote_process($commands, $this->server, ignore_errors: false, callEventOnFinish: 'S3DownloadFinished', callEventData: [
+                'downloadPath' => $downloadPath,
+                'containerName' => $containerName,
+                'serverId' => $this->server->id,
+                'resourceUuid' => $this->resource->uuid,
+            ]);
+
+            $this->s3DownloadedFile = $downloadPath;
+            $this->filename = $downloadPath;
+
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('info', 'Downloading file from S3. This may take a few minutes for large backups...');
+        } catch (\Throwable $e) {
+            $this->s3DownloadInProgress = false;
+            $this->s3DownloadedFile = null;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function restoreFromS3()
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! $this->s3DownloadedFile) {
+            $this->dispatch('error', 'Please download the file from S3 first.');
+
+            return;
+        }
+
+        try {
+            $this->importRunning = true;
+            $this->importCommands = [];
+
+            // Use the downloaded file path
+            $backupFileName = '/tmp/restore_'.$this->resource->uuid;
+            $this->importCommands[] = "docker cp {$this->s3DownloadedFile} {$this->container}:{$backupFileName}";
+            $tmpPath = $backupFileName;
+
+            // Copy the restore command to a script file
+            $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
+
+            switch ($this->resource->getMorphClass()) {
+                case \App\Models\StandaloneMariadb::class:
+                    $restoreCommand = $this->mariadbRestoreCommand;
+                    if ($this->dumpAll) {
+                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
+                    } else {
+                        $restoreCommand .= " < {$tmpPath}";
+                    }
+                    break;
+                case \App\Models\StandaloneMysql::class:
+                    $restoreCommand = $this->mysqlRestoreCommand;
+                    if ($this->dumpAll) {
+                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
+                    } else {
+                        $restoreCommand .= " < {$tmpPath}";
+                    }
+                    break;
+                case \App\Models\StandalonePostgresql::class:
+                    $restoreCommand = $this->postgresqlRestoreCommand;
+                    if ($this->dumpAll) {
+                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
+                    } else {
+                        $restoreCommand .= " {$tmpPath}";
+                    }
+                    break;
+                case \App\Models\StandaloneMongodb::class:
+                    $restoreCommand = $this->mongodbRestoreCommand;
+                    if ($this->dumpAll === false) {
+                        $restoreCommand .= "{$tmpPath}";
+                    }
+                    break;
+            }
+
+            $restoreCommandBase64 = base64_encode($restoreCommand);
+            $this->importCommands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
+            $this->importCommands[] = "chmod +x {$scriptPath}";
+            $this->importCommands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
+
+            $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
+            $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
+
+            if (! empty($this->importCommands)) {
+                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
+                    'scriptPath' => $scriptPath,
+                    'tmpPath' => $tmpPath,
+                    'container' => $this->container,
+                    'serverId' => $this->server->id,
+                    's3DownloadedFile' => $this->s3DownloadedFile,
+                    'resourceUuid' => $this->resource->uuid,
+                ]);
+                $this->dispatch('activityMonitor', $activity->id);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->importCommands = [];
+        }
+    }
+
+    public function cancelS3Download()
+    {
+        if ($this->s3DownloadedFile) {
+            try {
+                // Cleanup downloaded file and directory
+                $downloadDir = "/tmp/s3-restore-{$this->resource->uuid}";
+                instant_remote_process(["rm -rf {$downloadDir}"], $this->server, false);
+
+                // Cleanup container if exists
+                $containerName = "s3-restore-{$this->resource->uuid}";
+                instant_remote_process(["docker rm -f {$containerName}"], $this->server, false);
+
+                $this->dispatch('success', 'S3 download cancelled and temporary files cleaned up.');
+            } catch (\Throwable $e) {
+                ray($e);
+            }
+        }
+
+        // Reset S3 download state
+        $this->s3DownloadedFile = null;
+        $this->s3DownloadInProgress = false;
+        $this->filename = null;
     }
 }

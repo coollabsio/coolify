@@ -70,32 +70,32 @@
                         </div>
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             @if ($backup->latest_log)
-                                Started:
-                                {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}
-                                @if (data_get($backup->latest_log, 'status') !== 'running')
-                                    <br>Ended:
-                                    {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}
-                                    <br>Duration:
-                                    {{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }}
-                                    <br>Finished
-                                    {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
-                                @endif
-                                @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
+                                @if (data_get($backup->latest_log, 'status') === 'running')
+                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
+                                        Running for {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
+                                    </span>
+                                @else
+                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
+                                        {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
+                                        ({{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }})
+                                        • {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
+                                    </span>
                                 @endif
                                 @if (data_get($backup->latest_log, 'status') === 'success')
                                     @php
                                         $size = data_get($backup->latest_log, 'size', 0);
-                                        $sizeFormatted =
-                                            $size > 0 ? number_format($size / 1024 / 1024, 2) . ' MB' : 'Unknown';
                                     @endphp
-                                    <br>Last Backup Size: {{ $sizeFormatted }}
+                                    @if ($size > 0)
+                                        • Size: {{ formatBytes($size) }}
+                                    @endif
+                                @endif
+                                @if ($backup->save_s3)
+                                    • S3: Enabled
                                 @endif
                             @else
-                                Last Run: Never
-                                <br>Total Executions: 0
+                                Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
+                                    • S3: Enabled
                                 @endif
                             @endif
                         </div>
@@ -154,27 +154,36 @@
                         </div>
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             @if ($backup->latest_log)
-                                Started:
-                                {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}
-                                @if (data_get($backup->latest_log, 'status') !== 'running')
-                                    <br>Ended:
-                                    {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}
-                                    <br>Duration:
-                                    {{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }}
-                                    <br>Finished
-                                    {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
+                                @if (data_get($backup->latest_log, 'status') === 'running')
+                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
+                                        Running for {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
+                                    </span>
+                                @else
+                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
+                                        {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
+                                        ({{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }})
+                                        • {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
+                                    </span>
                                 @endif
-                                <br><br>Total Executions: {{ $backup->executions()->count() }}
+                                @if (data_get($backup->latest_log, 'status') === 'success')
+                                    @php
+                                        $size = data_get($backup->latest_log, 'size', 0);
+                                    @endphp
+                                    @if ($size > 0)
+                                        • Size: {{ formatBytes($size) }}
+                                    @endif
+                                @endif
                                 @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
+                                    • S3: Enabled
                                 @endif
+                                <br>Total Executions: {{ $backup->executions()->count() }}
                                 @php
                                     $successCount = $backup->executions()->where('status', 'success')->count();
                                     $totalCount = $backup->executions()->count();
                                     $successRate = $totalCount > 0 ? round(($successCount / $totalCount) * 100) : 0;
                                 @endphp
                                 @if ($totalCount > 0)
-                                    <br>Success Rate: <span @class([
+                                    • Success Rate: <span @class([
                                         'font-medium',
                                         'text-green-600' => $successRate >= 80,
                                         'text-yellow-600' => $successRate >= 50 && $successRate < 80,
@@ -182,19 +191,10 @@
                                     ])>{{ $successRate }}%</span>
                                     ({{ $successCount }}/{{ $totalCount }})
                                 @endif
-                                @if (data_get($backup->latest_log, 'status') === 'success')
-                                    @php
-                                        $size = data_get($backup->latest_log, 'size', 0);
-                                        $sizeFormatted =
-                                            $size > 0 ? number_format($size / 1024 / 1024, 2) . ' MB' : 'Unknown';
-                                    @endphp
-                                    <br>Last Backup Size: {{ $sizeFormatted }}
-                                @endif
                             @else
-                                Last Run: Never
-                                <br>Total Executions: 0
+                                Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
+                                    • S3: Enabled
                                 @endif
                             @endif
                         </div>
