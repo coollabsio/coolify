@@ -52,14 +52,6 @@ class ActivityMonitor extends Component
         $this->activity = Activity::find($this->activityId);
     }
 
-    public function updatedActivityId($value)
-    {
-        if ($value) {
-            $this->hydrateActivity();
-            $this->isPollingActive = true;
-        }
-    }
-
     public function polling()
     {
         $this->hydrateActivity();

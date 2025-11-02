@@ -68,8 +68,6 @@ class Import extends Component
 
     public bool $s3DownloadInProgress = false;
 
-    public ?int $currentActivityId = null;
-
     public function getListeners()
     {
         $userId = Auth::id();
@@ -271,7 +269,7 @@ EOD;
                     'container' => $this->container,
                     'serverId' => $this->server->id,
                 ]);
-                $this->currentActivityId = $activity->id;
+                $this->dispatch('activityMonitor', $activity->id);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -411,8 +409,8 @@ EOD;
 
             $this->s3DownloadedFile = $downloadPath;
             $this->filename = $downloadPath;
-            $this->currentActivityId = $activity->id;
 
+            $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('info', 'Downloading file from S3. This may take a few minutes for large backups...');
         } catch (\Throwable $e) {
             $this->s3DownloadInProgress = false;
@@ -494,7 +492,7 @@ EOD;
                     's3DownloadedFile' => $this->s3DownloadedFile,
                     'resourceUuid' => $this->resource->uuid,
                 ]);
-                $this->currentActivityId = $activity->id;
+                $this->dispatch('activityMonitor', $activity->id);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -524,7 +522,6 @@ EOD;
         // Reset S3 download state
         $this->s3DownloadedFile = null;
         $this->s3DownloadInProgress = false;
-        $this->currentActivityId = null;
         $this->filename = null;
     }
 }

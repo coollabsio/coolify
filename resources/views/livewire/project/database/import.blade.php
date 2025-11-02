@@ -8,8 +8,7 @@
     s3DownloadedFile: $wire.entangle('s3DownloadedFile'),
     s3FileSize: $wire.entangle('s3FileSize'),
     s3StorageId: $wire.entangle('s3StorageId'),
-    s3Path: $wire.entangle('s3Path'),
-    importRunning: $wire.entangle('importRunning')
+    s3Path: $wire.entangle('s3Path')
 }">
     <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
     @script
@@ -148,23 +147,25 @@
                         </div>
                     </div>
 
-                    <div x-show="s3DownloadInProgress" class="pt-2">
-                        <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
-                            backups.</div>
-                        <livewire:activity-monitor :activityId="$currentActivityId" header="S3 Download Progress" :showWaiting="false" />
-                    </div>
-
-                    <div x-show="s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
-                        <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
-                        <div class="flex gap-2 pt-2">
-                            <x-forms.button class="w-full" wire:click='restoreFromS3'>
-                                Restore Database from S3
-                            </x-forms.button>
-                            <x-forms.button class="w-full" wire:click='cancelS3Download'>
-                                Cancel
-                            </x-forms.button>
+                    @if ($s3DownloadInProgress)
+                        <div class="pt-2">
+                            <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
+                                backups.</div>
+                            <livewire:activity-monitor wire:key="s3-download-{{ $resource->uuid }}" header="S3 Download Progress" :showWaiting="false" />
                         </div>
-                    </div>
+                    @elseif ($s3DownloadedFile)
+                        <div class="pt-2">
+                            <div class="text-sm text-success">File downloaded successfully and ready for restore.</div>
+                            <div class="flex gap-2 pt-2">
+                                <x-forms.button class="w-full" wire:click='restoreFromS3'>
+                                    Restore Database from S3
+                                </x-forms.button>
+                                <x-forms.button class="w-full" wire:click='cancelS3Download'>
+                                    Cancel
+                                </x-forms.button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -173,9 +174,11 @@
                 <div>Location: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
-            <div class="container w-full mx-auto" x-show="importRunning">
-                <livewire:activity-monitor :activityId="$currentActivityId" header="Database Restore Output" :showWaiting="false" />
-            </div>
+            @if ($importRunning)
+                <div class="container w-full mx-auto">
+                    <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Database Restore Output" :showWaiting="false" />
+                </div>
+            @endif
         @else
             <div>Database must be running to restore a backup.</div>
         @endif
