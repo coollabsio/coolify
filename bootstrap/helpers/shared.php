@@ -2906,7 +2906,8 @@ function getHelperVersion(): string
         return $settings->dev_helper_version;
     }
 
-    return config('constants.coolify.helper_version');
+    // In production or when dev_helper_version is not set, use the configured helper_version
+    return $settings->helper_version ?? config('constants.coolify.helper_version');
 }
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
