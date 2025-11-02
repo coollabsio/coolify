@@ -263,7 +263,7 @@ EOD;
                     'container' => $this->container,
                     'serverId' => $this->server->id,
                 ]);
-                $this->dispatch('activityMonitor', $activity->id);
+                $this->dispatch('activityMonitor', $activity->id)->to('database-restore-monitor');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -404,7 +404,7 @@ EOD;
             $this->s3DownloadedFile = $downloadPath;
             $this->filename = $downloadPath;
 
-            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('activityMonitor', $activity->id)->to('s3-download-monitor');
             $this->dispatch('info', 'Downloading file from S3. This may take a few minutes for large backups...');
         } catch (\Throwable $e) {
             $this->s3DownloadInProgress = false;
@@ -486,7 +486,7 @@ EOD;
                     's3DownloadedFile' => $this->s3DownloadedFile,
                     'resourceUuid' => $this->resource->uuid,
                 ]);
-                $this->dispatch('activityMonitor', $activity->id);
+                $this->dispatch('activityMonitor', $activity->id)->to('database-restore-monitor');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
