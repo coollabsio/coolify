@@ -29,11 +29,11 @@
     @else
         <form wire:submit='submit' class="flex flex-col gap-2">
             @can('update', $environment)
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                <x-forms.textarea rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
                     label="Environment Shared Variables"></x-forms.textarea>
                 <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
             @else
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                <x-forms.textarea rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
                     label="Environment Shared Variables" disabled></x-forms.textarea>
             @endcan
         </form>
