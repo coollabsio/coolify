@@ -80,7 +80,9 @@ class Import extends Component
 
     public function handleS3DownloadFinished(): void
     {
+        ray('S3DownloadFinished event received!');
         $this->s3DownloadInProgress = false;
+        ray('s3DownloadInProgress set to false', $this->s3DownloadInProgress);
     }
 
     public function mount()
