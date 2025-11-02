@@ -394,12 +394,9 @@ EOD;
             // Create download directory on server
             $commands[] = "mkdir -p {$downloadDir}";
 
-            // Check if container exists and remove it
+            // Check if container exists and remove it (done in the command queue to avoid blocking)
             $containerName = "s3-restore-{$this->resource->uuid}";
-            $containerExists = instant_remote_process(["docker ps -a -q -f name={$containerName}"], $this->server, false);
-            if (filled($containerExists)) {
-                instant_remote_process(["docker rm -f {$containerName}"], $this->server, false);
-            }
+            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
 
             // Run MinIO client container to download file
             $commands[] = "docker run -d --name {$containerName} --rm -v {$downloadDir}:{$downloadDir} {$fullImageName} sleep 30";

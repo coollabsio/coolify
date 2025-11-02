@@ -138,7 +138,7 @@
                         </x-forms.button>
                     </div>
 
-                    <div x-show="s3FileSize && !s3DownloadedFile" class="pt-2">
+                    <div x-show="s3FileSize && !s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
                         <div class="text-sm">File found in S3 ({{ formatBytes($s3FileSize ?? 0) }})</div>
                         <div class="flex gap-2 pt-2">
                             <x-forms.button class="w-full" wire:click='downloadFromS3'>
