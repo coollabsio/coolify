@@ -150,7 +150,7 @@
                     <div x-show="s3DownloadInProgress" class="pt-2">
                         <div class="text-sm text-warning">Downloading from S3... This may take a few minutes for large
                             backups.</div>
-                        <livewire:activity-monitor key="s3-download-monitor" header="S3 Download Progress" :showWaiting="false" />
+                        <livewire:activity-monitor header="S3 Download Progress" :showWaiting="false" />
                     </div>
 
                     <div x-show="s3DownloadedFile && !s3DownloadInProgress" class="pt-2">
@@ -173,7 +173,7 @@
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
             <div class="container w-full mx-auto" x-show="$wire.importRunning">
-                <livewire:activity-monitor key="database-restore-monitor" header="Database Restore Output" :showWaiting="false" />
+                <livewire:activity-monitor header="Database Restore Output" :showWaiting="false" />
             </div>
         @else
             <div>Database must be running to restore a backup.</div>
