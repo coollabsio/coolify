@@ -74,15 +74,7 @@ class Import extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'S3DownloadFinished' => 'handleS3DownloadFinished',
         ];
-    }
-
-    public function handleS3DownloadFinished(): void
-    {
-        ray('S3DownloadFinished event received!');
-        $this->s3DownloadInProgress = false;
-        ray('s3DownloadInProgress set to false', $this->s3DownloadInProgress);
     }
 
     public function mount()
@@ -402,7 +394,7 @@ EOD;
             $commands[] = "docker exec {$containerName} mc cp temporary/{$bucket}/{$cleanPath} {$downloadPath}";
 
             // Execute download commands
-            $activity = remote_process($commands, $this->server, ignore_errors: false, callEventOnFinish: 'S3DownloadFinished', callEventData: [
+            $activity = remote_process($commands, $this->server, ignore_errors: false, callEventOnFinish: 'App\\Events\\S3DownloadFinished', callEventData: [
                 'downloadPath' => $downloadPath,
                 'containerName' => $containerName,
                 'serverId' => $this->server->id,
@@ -486,7 +478,7 @@ EOD;
             $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
             if (! empty($this->importCommands)) {
-                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
+                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'App\\Events\\S3RestoreJobFinished', callEventData: [
                     'scriptPath' => $scriptPath,
                     'tmpPath' => $tmpPath,
                     'container' => $this->container,
