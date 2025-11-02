@@ -76,7 +76,13 @@ class Import extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'S3DownloadFinished' => 'handleS3DownloadFinished',
         ];
+    }
+
+    public function handleS3DownloadFinished(): void
+    {
+        $this->s3DownloadInProgress = false;
     }
 
     public function mount()
