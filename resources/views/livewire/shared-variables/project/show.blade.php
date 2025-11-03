@@ -9,9 +9,7 @@
                 <livewire:project.shared.environment-variable.add :shared="true" />
             </x-modal-input>
         @endcan
-        @can('update', $project)
-            <x-forms.button wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
-        @endcan
+        <x-forms.button canGate="update" :canResource="$project" wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
     </div>
     <div class="flex flex-wrap gap-1 subtitle">
         <div>You can use these variables anywhere with</div>
@@ -30,14 +28,9 @@
         </div>
     @else
         <form wire:submit='submit' class="flex flex-col gap-2">
-            @can('update', $project)
-                <x-forms.textarea rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
-                    label="Project Shared Variables"></x-forms.textarea>
-                <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
-            @else
-                <x-forms.textarea rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
-                    label="Project Shared Variables" disabled></x-forms.textarea>
-            @endcan
+            <x-forms.textarea canGate="update" :canResource="$project" rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                label="Project Shared Variables"></x-forms.textarea>
+            <x-forms.button canGate="update" :canResource="$project" type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
         </form>
     @endif
 </div>

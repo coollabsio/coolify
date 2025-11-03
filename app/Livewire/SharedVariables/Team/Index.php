@@ -4,6 +4,7 @@ namespace App\Livewire\SharedVariables\Team;
 
 use App\Models\Team;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Index extends Component
@@ -89,23 +90,26 @@ class Index extends Component
     private function handleBulkSubmit()
     {
         $variables = parseEnvFormatToArray($this->variables);
-        $changesMade = false;
 
-        // Delete removed variables
-        $deletedCount = $this->deleteRemovedVariables($variables);
-        if ($deletedCount > 0) {
-            $changesMade = true;
-        }
+        DB::transaction(function () use ($variables) {
+            $changesMade = false;
 
-        // Update or create variables
-        $updatedCount = $this->updateOrCreateVariables($variables);
-        if ($updatedCount > 0) {
-            $changesMade = true;
-        }
+            // Delete removed variables
+            $deletedCount = $this->deleteRemovedVariables($variables);
+            if ($deletedCount > 0) {
+                $changesMade = true;
+            }
 
-        if ($changesMade) {
-            $this->dispatch('success', 'Environment variables updated.');
-        }
+            // Update or create variables
+            $updatedCount = $this->updateOrCreateVariables($variables);
+            if ($updatedCount > 0) {
+                $changesMade = true;
+            }
+
+            if ($changesMade) {
+                $this->dispatch('success', 'Environment variables updated.');
+            }
+        });
     }
 
     private function deleteRemovedVariables($variables)
