@@ -76,6 +76,13 @@
                             helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
                             placeholder="2001:db8::1" autocomplete="new-password" />
                     </div>
+                    @if(isDev())
+                    <div class="flex gap-2 md:flex-row flex-col w-full">
+                        <x-forms.input id="dev_helper_version" label="Dev Helper Version (Development Only)"
+                            helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
+                            placeholder="{{ config('constants.coolify.helper_version') }}" />
+                    </div>
+                    @endif
                 </div>
             </div>
         </form>

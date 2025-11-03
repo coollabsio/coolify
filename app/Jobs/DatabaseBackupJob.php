@@ -653,9 +653,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getFullImageName(): string
     {
-        $settings = instanceSettings();
         $helperImage = config('constants.coolify.helper_image');
-        $latestVersion = $settings->helper_version;
+        $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
     }

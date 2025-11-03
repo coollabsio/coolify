@@ -35,6 +35,9 @@ class Index extends Component
     #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
+    #[Validate('nullable|string|max:50')]
+    public ?string $dev_helper_version = null;
+
     public array $domainConflicts = [];
 
     public bool $showDomainConflictModal = false;
@@ -60,6 +63,7 @@ class Index extends Component
         $this->public_ipv4 = $this->settings->public_ipv4;
         $this->public_ipv6 = $this->settings->public_ipv6;
         $this->instance_timezone = $this->settings->instance_timezone;
+        $this->dev_helper_version = $this->settings->dev_helper_version;
     }
 
     #[Computed]
@@ -81,6 +85,7 @@ class Index extends Component
         $this->settings->public_ipv4 = $this->public_ipv4;
         $this->settings->public_ipv6 = $this->public_ipv6;
         $this->settings->instance_timezone = $this->instance_timezone;
+        $this->settings->dev_helper_version = $this->dev_helper_version;
         if ($isSave) {
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');

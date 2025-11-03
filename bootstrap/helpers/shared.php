@@ -2879,6 +2879,18 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function getHelperVersion(): string
+{
+    $settings = instanceSettings();
+
+    // In development mode, use the dev_helper_version if set, otherwise fallback to config
+    if (isDev() && ! empty($settings->dev_helper_version)) {
+        return $settings->dev_helper_version;
+    }
+
+    return config('constants.coolify.helper_version');
+}
+
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
 {
     $server = Server::find($server_id)->where('team_id', $team_id)->first();
