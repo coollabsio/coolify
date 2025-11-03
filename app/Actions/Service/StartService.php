@@ -14,6 +14,11 @@ class StartService
 
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
+        // Validate service UUID exists
+        if (empty($service->uuid)) {
+            throw new \Exception('Service UUID is missing. Cannot start service without UUID.');
+        }
+        
         $service->parse();
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
@@ -34,11 +39,43 @@ class StartService
         $commands[] = 'docker compose up -d --remove-orphans --force-recreate --build';
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         if (data_get($service, 'connect_to_docker_network')) {
-            $compose = data_get($service, 'docker_compose', []);
-            $network = $service->destination->network;
-            $serviceNames = data_get(Yaml::parse($compose), 'services', []);
-            foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
+            // Use docker_compose_raw if available, otherwise fall back to docker_compose
+            $compose = $service->docker_compose_raw ?: $service->docker_compose;
+            
+            // Validate compose content exists before parsing
+            if (empty($compose)) {
+                throw new \Exception('Docker Compose configuration is missing. Cannot connect services to network.');
+            }
+            
+            try {
+                $parsedCompose = Yaml::parse($compose);
+                $serviceNames = data_get($parsedCompose, 'services', []);
+                
+                if (empty($serviceNames)) {
+                    throw new \Exception('No services found in Docker Compose configuration.');
+                }
+                
+                $network = $service->destination->network;
+                
+                foreach ($serviceNames as $serviceName => $serviceConfig) {
+                    // Validate service name before using in shell command to prevent injection
+                    try {
+                        validateShellSafePath($serviceName, 'service name');
+                    } catch (\Exception $e) {
+                        throw new \Exception("Invalid service name '{$serviceName}': {$e->getMessage()}");
+                    }
+                    
+                    // Wait for container to exist before connecting network
+                    // This prevents race conditions where network connect runs before container starts
+                    $containerName = "{$serviceName}-{$service->uuid}";
+                    // Wait up to 15 seconds (30 attempts * 0.5s) for container to be created
+                    $commands[] = "i=0; while [ \$i -lt 30 ]; do docker ps -a --format '{{.Names}}' | grep -q '^{$containerName}$' && break || sleep 0.5; i=\$((i+1)); done";
+                    $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} $network {$containerName} >/dev/null 2>&1 || true";
+                }
+            } catch (\Symfony\Component\Yaml\Exception\ParseException $e) {
+                throw new \Exception("Failed to parse Docker Compose configuration: {$e->getMessage()}");
+            } catch (\Exception $e) {
+                throw new \Exception("Error processing Docker Compose services: {$e->getMessage()}");
             }
         }
 
