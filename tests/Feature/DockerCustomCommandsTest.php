@@ -174,3 +174,27 @@ test('ConvertEntrypointComplex', function () {
         'entrypoint' => "sh -c 'npm install && npm start'",
     ]);
 });
+
+test('ConvertEntrypointWithEscapedDoubleQuotes', function () {
+    $input = '--entrypoint "python -c \"print(\'hi\')\""';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => "python -c \"print('hi')\"",
+    ]);
+});
+
+test('ConvertEntrypointWithEscapedSingleQuotesInDoubleQuotes', function () {
+    $input = '--entrypoint "sh -c \"echo \'hello\'\""';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => "sh -c \"echo 'hello'\"",
+    ]);
+});
+
+test('ConvertEntrypointSingleQuotedWithDoubleQuotesInside', function () {
+    $input = '--entrypoint \'python -c "print(\"hi\")"\'';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => 'python -c "print(\"hi\")"',
+    ]);
+});

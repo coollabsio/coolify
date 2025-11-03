@@ -985,21 +985,34 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         }
         if ($option === '--entrypoint') {
             // Match --entrypoint=value or --entrypoint value
-            // Handle quoted strings: --entrypoint "sh -c 'command'" or --entrypoint='command'
-            // Try double quotes first, then single quotes, then unquoted
-            if (preg_match('/--entrypoint(?:=|\s+)"([^"]+)"/', $custom_docker_run_options, $entrypoint_matches)) {
-                $value = $entrypoint_matches[1];
-            } elseif (preg_match("/--entrypoint(?:=|\s+)'([^']+)'/", $custom_docker_run_options, $entrypoint_matches)) {
-                $value = $entrypoint_matches[1];
-            } elseif (preg_match('/--entrypoint(?:=|\s+)([^\s]+)/', $custom_docker_run_options, $entrypoint_matches)) {
-                $value = $entrypoint_matches[1];
-            } else {
-                $value = null;
+            // Handle quoted strings with escaped quotes: --entrypoint "python -c \"print('hi')\""
+            // Pattern matches: double-quoted (with escapes), single-quoted (with escapes), or unquoted values
+            if (preg_match(
+                '/--entrypoint(?:=|\s+)(?<raw>"(?:\\\\.|[^"])*"|\'(?:\\\\.|[^\'])*\'|[^\s]+)/',
+                $custom_docker_run_options,
+                $entrypoint_matches
+            )) {
+                $rawValue = $entrypoint_matches['raw'];
+                // Handle double-quoted strings: strip quotes and unescape special characters
+                if (str_starts_with($rawValue, '"') && str_ends_with($rawValue, '"')) {
+                    $inner = substr($rawValue, 1, -1);
+                    // Unescape backslash sequences: \" \$ \` \\
+                    $value = preg_replace('/\\\\(["$`\\\\])/', '$1', $inner);
+                } elseif (str_starts_with($rawValue, "'") && str_ends_with($rawValue, "'")) {
+                    // Handle single-quoted strings: just strip quotes (no unescaping per shell rules)
+                    $value = substr($rawValue, 1, -1);
+                } else {
+                    // Handle unquoted values
+                    $value = $rawValue;
+                }
             }
-            if ($value && ! empty(trim($value))) {
+
+            if (isset($value) && trim($value) !== '') {
                 $options[$option][] = $value;
-                $options[$option] = array_unique($options[$option]);
+                $options[$option] = array_values(array_unique($options[$option]));
             }
+
+            continue;
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
