@@ -125,3 +125,52 @@ test('ConvertGpusWithQuotes', function () {
         ],
     ]);
 });
+
+test('ConvertEntrypointSimple', function () {
+    $input = '--entrypoint /bin/sh';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => '/bin/sh',
+    ]);
+});
+
+test('ConvertEntrypointWithEquals', function () {
+    $input = '--entrypoint=/bin/bash';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => '/bin/bash',
+    ]);
+});
+
+test('ConvertEntrypointWithArguments', function () {
+    $input = '--entrypoint "sh -c npm install"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => 'sh -c npm install',
+    ]);
+});
+
+test('ConvertEntrypointWithSingleQuotes', function () {
+    $input = "--entrypoint 'memcached -m 256'";
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => 'memcached -m 256',
+    ]);
+});
+
+test('ConvertEntrypointWithOtherOptions', function () {
+    $input = '--entrypoint /bin/bash --cap-add SYS_ADMIN --privileged';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toHaveKeys(['entrypoint', 'cap_add', 'privileged'])
+        ->and($output['entrypoint'])->toBe('/bin/bash')
+        ->and($output['cap_add'])->toBe(['SYS_ADMIN'])
+        ->and($output['privileged'])->toBe(true);
+});
+
+test('ConvertEntrypointComplex', function () {
+    $input = '--entrypoint "sh -c \'npm install && npm start\'"';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'entrypoint' => "sh -c 'npm install && npm start'",
+    ]);
+});

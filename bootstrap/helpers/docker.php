@@ -962,6 +962,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
+        '--entrypoint' => 'entrypoint',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -977,6 +978,24 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
             preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
             $value = $hostname_matches[1] ?? null;
+            if ($value && ! empty(trim($value))) {
+                $options[$option][] = $value;
+                $options[$option] = array_unique($options[$option]);
+            }
+        }
+        if ($option === '--entrypoint') {
+            // Match --entrypoint=value or --entrypoint value
+            // Handle quoted strings: --entrypoint "sh -c 'command'" or --entrypoint='command'
+            // Try double quotes first, then single quotes, then unquoted
+            if (preg_match('/--entrypoint(?:=|\s+)"([^"]+)"/', $custom_docker_run_options, $entrypoint_matches)) {
+                $value = $entrypoint_matches[1];
+            } elseif (preg_match("/--entrypoint(?:=|\s+)'([^']+)'/", $custom_docker_run_options, $entrypoint_matches)) {
+                $value = $entrypoint_matches[1];
+            } elseif (preg_match('/--entrypoint(?:=|\s+)([^\s]+)/', $custom_docker_run_options, $entrypoint_matches)) {
+                $value = $entrypoint_matches[1];
+            } else {
+                $value = null;
+            }
             if ($value && ! empty(trim($value))) {
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
@@ -1020,6 +1039,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--entrypoint') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                // Docker compose accepts entrypoint as either a string or an array
+                // Keep it as a string for simplicity - docker compose will handle it
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
