@@ -14,14 +14,14 @@ class CleanupDocker
     public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
     {
         $settings = instanceSettings();
-        $realtimeImage = config('constants.coolify.realtime_image');
+        $realtimeImage = getRealtimeImage();
         $realtimeImageVersion = config('constants.coolify.realtime_version');
         $realtimeImageWithVersion = "$realtimeImage:$realtimeImageVersion";
         $realtimeImageWithoutPrefix = 'coollabsio/coolify-realtime';
         $realtimeImageWithoutPrefixVersion = "coollabsio/coolify-realtime:$realtimeImageVersion";
 
         $helperImageVersion = getHelperVersion();
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = getHelperImage();
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
         $helperImageWithoutPrefix = 'coollabsio/coolify-helper';
         $helperImageWithoutPrefixVersion = "coollabsio/coolify-helper:$helperImageVersion";

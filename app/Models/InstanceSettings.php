@@ -90,7 +90,31 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return InstanceSettings::findOrFail(0);
+        try {
+            return InstanceSettings::findOrFail(0);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            // If database is not initialized yet, return a default instance
+            // This can happen during installation or migrations
+            $default = new InstanceSettings();
+            $default->id = 0;
+            $default->is_registration_enabled = true;
+            $default->is_api_enabled = false;
+            $default->smtp_enabled = false;
+            $default->is_auto_update_enabled = false;
+            
+            return $default;
+        } catch (\Exception $e) {
+            // If database connection fails, return default settings
+            // This prevents fatal errors during initial setup
+            $default = new InstanceSettings();
+            $default->id = 0;
+            $default->is_registration_enabled = true;
+            $default->is_api_enabled = false;
+            $default->smtp_enabled = false;
+            $default->is_auto_update_enabled = false;
+            
+            return $default;
+        }
     }
 
     // public function getRecipients($notification)

@@ -2891,6 +2891,26 @@ function getHelperVersion(): string
     return config('constants.coolify.helper_version');
 }
 
+function getHelperImage(): string
+{
+    $helperImage = config('constants.coolify.helper_image');
+    if (empty($helperImage)) {
+        $registry = config('constants.coolify.registry_url', 'ghcr.io');
+        return $registry . '/coollabsio/coolify-helper';
+    }
+    return $helperImage;
+}
+
+function getRealtimeImage(): string
+{
+    $realtimeImage = config('constants.coolify.realtime_image');
+    if (empty($realtimeImage)) {
+        $registry = config('constants.coolify.registry_url', 'ghcr.io');
+        return $registry . '/coollabsio/coolify-realtime';
+    }
+    return $realtimeImage;
+}
+
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
 {
     $server = Server::find($server_id)->where('team_id', $team_id)->first();

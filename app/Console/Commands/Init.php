@@ -55,8 +55,15 @@ class Init extends Command
             return;
         }
 
-        $this->settings = instanceSettings();
-        $this->servers = Server::all();
+        // Try to get settings, but handle case when database is not ready
+        try {
+            $this->settings = instanceSettings();
+            $this->servers = Server::all();
+        } catch (\Exception $e) {
+            // Database might not be initialized yet during first installation
+            echo "Database not ready yet, skipping initialization tasks: {$e->getMessage()}\n";
+            return;
+        }
 
         $do_not_track = data_get($this->settings, 'do_not_track', true);
         if ($do_not_track == false) {

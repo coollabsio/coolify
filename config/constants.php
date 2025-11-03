@@ -9,8 +9,9 @@ return [
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
         'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
-        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
-        'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
+        // Helper and realtime images default to registry_url if not explicitly set
+        'helper_image' => env('HELPER_IMAGE') ?: null,
+        'realtime_image' => env('REALTIME_IMAGE') ?: null,
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'releases_url' => 'https://cdn.coollabs.io/coolify/releases.json',
     ],
@@ -57,7 +58,7 @@ return [
     ],
 
     'ssh' => [
-        'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
+        'mux_enabled' => env('MUX_ENABLED') ?: env('SSH_MUX_ENABLED', true),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),
         'mux_health_check_enabled' => env('SSH_MUX_HEALTH_CHECK_ENABLED', true),
         'mux_health_check_timeout' => env('SSH_MUX_HEALTH_CHECK_TIMEOUT', 5),
