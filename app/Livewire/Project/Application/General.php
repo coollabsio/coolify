@@ -401,7 +401,9 @@ class General extends Component
             $this->application->docker_compose_raw = $this->dockerComposeRaw;
             $this->application->docker_compose_custom_start_command = $this->dockerComposeCustomStartCommand;
             $this->application->docker_compose_custom_build_command = $this->dockerComposeCustomBuildCommand;
-            $this->application->custom_labels = base64_encode($this->customLabels);
+            $this->application->custom_labels = is_null($this->customLabels)
+                ? null
+                : base64_encode($this->customLabels);
             $this->application->custom_docker_run_options = $this->customDockerRunOptions;
             $this->application->pre_deployment_command = $this->preDeploymentCommand;
             $this->application->pre_deployment_command_container = $this->preDeploymentCommandContainer;
