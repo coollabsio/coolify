@@ -157,10 +157,10 @@ class ServiceApplicationView extends Component
             $this->description = $this->application->description;
             $this->fqdn = $this->application->fqdn;
             $this->image = $this->application->image;
-            $this->excludeFromStatus = $this->application->exclude_from_status;
-            $this->isLogDrainEnabled = $this->application->is_log_drain_enabled;
-            $this->isGzipEnabled = $this->application->is_gzip_enabled;
-            $this->isStripprefixEnabled = $this->application->is_stripprefix_enabled;
+            $this->excludeFromStatus = data_get($this->application, 'exclude_from_status', false);
+            $this->isLogDrainEnabled = data_get($this->application, 'is_log_drain_enabled', false);
+            $this->isGzipEnabled = data_get($this->application, 'is_gzip_enabled', true);
+            $this->isStripprefixEnabled = data_get($this->application, 'is_stripprefix_enabled', true);
         }
     }
 
