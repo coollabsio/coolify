@@ -482,17 +482,17 @@ class General extends Component
             $oldPortsExposes = $this->application->ports_exposes;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldIsPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
+            $oldIsSpa = $this->application->settings->is_spa;
+            $oldIsHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
 
             $this->syncData(toModel: true);
 
-            if ($this->application->settings->isDirty('is_spa')) {
-                $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
+            if ($oldIsSpa !== $this->isSpa) {
+                $this->generateNginxConfiguration($this->isSpa ? 'spa' : 'static');
             }
-            if ($this->application->isDirty('is_http_basic_auth_enabled')) {
+            if ($oldIsHttpBasicAuthEnabled !== $this->isHttpBasicAuthEnabled) {
                 $this->application->save();
             }
-
-            $this->application->settings->save();
 
             $this->dispatch('success', 'Settings saved.');
             $this->application->refresh();

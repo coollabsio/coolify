@@ -70,9 +70,13 @@
                     placeholder="Empty means default configuration will be used." label="Custom Nginx Configuration"
                     helper="You can add custom Nginx configuration here." x-bind:disabled="!canUpdate" />
                 @can('update', $application)
-                    <x-forms.button wire:click="generateNginxConfiguration">
-                        Generate Default Nginx Configuration
-                    </x-forms.button>
+                    <x-modal-confirmation title="Confirm Nginx Configuration Generation?"
+                        buttonTitle="Generate Default Nginx Configuration" buttonFullWidth
+                        submitAction="generateNginxConfiguration('{{ $application->settings->is_spa ? 'spa' : 'static' }}')"
+                        :actions="[
+                            'This will overwrite your current custom Nginx configuration.',
+                            'The default configuration will be generated based on your application type (' . ($application->settings->is_spa ? 'SPA' : 'static') . ').',
+                        ]" />
                 @endcan
             @endif
             <div class="w-96 pb-6">
