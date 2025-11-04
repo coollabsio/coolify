@@ -2,14 +2,16 @@
 
 namespace App\Livewire\Project\Service;
 
-use App\Livewire\Concerns\SynchronizesModelData;
 use App\Models\ServiceApplication;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class EditDomain extends Component
 {
-    use SynchronizesModelData;
+    use AuthorizesRequests;
+
     public $applicationId;
 
     public ServiceApplication $application;
@@ -20,6 +22,7 @@ class EditDomain extends Component
 
     public $forceSaveDomains = false;
 
+    #[Validate(['nullable'])]
     public ?string $fqdn = null;
 
     protected $rules = [
@@ -28,16 +31,24 @@ class EditDomain extends Component
 
     public function mount()
     {
-        $this->application = ServiceApplication::query()->findOrFail($this->applicationId);
+        $this->application = ServiceApplication::ownedByCurrentTeam()->findOrFail($this->applicationId);
         $this->authorize('view', $this->application);
-        $this->syncFromModel();
+        $this->syncData();
     }
 
-    protected function getModelBindings(): array
+    public function syncData(bool $toModel = false): void
     {
-        return [
-            'fqdn' => 'application.fqdn',
-        ];
+        if ($toModel) {
+            $this->validate();
+
+            // Sync to model
+            $this->application->fqdn = $this->fqdn;
+
+            $this->application->save();
+        } else {
+            // Sync from model
+            $this->fqdn = $this->application->fqdn;
+        }
     }
 
     public function confirmDomainUsage()
@@ -64,8 +75,8 @@ class EditDomain extends Component
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            // Sync to model for domain conflict check
-            $this->syncToModel();
+            // Sync to model for domain conflict check (without validation)
+            $this->application->fqdn = $this->fqdn;
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -83,7 +94,7 @@ class EditDomain extends Component
             $this->validate();
             $this->application->save();
             $this->application->refresh();
-            $this->syncFromModel();
+            $this->syncData();
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -96,7 +107,7 @@ class EditDomain extends Component
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
-                $this->syncFromModel();
+                $this->syncData();
             }
 
             return handleError($e, $this);
