@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
@@ -21,92 +22,136 @@ class General extends Component
 
     public Collection $services;
 
+    #[Validate('required|regex:/^[a-zA-Z0-9\s\-_.\/:()]+$/')]
     public string $name;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $description = null;
 
+    #[Validate(['nullable'])]
     public ?string $fqdn = null;
 
+    #[Validate(['required'])]
     public string $gitRepository;
 
+    #[Validate(['required'])]
     public string $gitBranch;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $gitCommitSha = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $installCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $buildCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $startCommand = null;
 
+    #[Validate(['required'])]
     public string $buildPack;
 
+    #[Validate(['required'])]
     public string $staticImage;
 
+    #[Validate(['required'])]
     public string $baseDirectory;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $publishDirectory = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $portsExposes = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $portsMappings = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $customNetworkAliases = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerfile = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileLocation = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileTargetBuild = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageName = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageTag = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeLocation = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerCompose = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeRaw = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomStartCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomBuildCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $customDockerRunOptions = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $preDeploymentCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $preDeploymentCommandContainer = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommand = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommandContainer = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $customNginxConfiguration = null;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isStatic = false;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isSpa = false;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isBuildServerEnabled = false;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isPreserveRepositoryEnabled = false;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelEscapeEnabled = true;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelReadonlyEnabled = false;
 
+    #[Validate(['boolean', 'required'])]
     public bool $isHttpBasicAuthEnabled = false;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthUsername = null;
 
+    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthPassword = null;
 
+    #[Validate(['nullable'])]
     public ?string $watchPaths = null;
 
+    #[Validate(['string', 'required'])]
     public string $redirect;
 
+    #[Validate(['nullable'])]
     public $customLabels;
 
     public bool $labelsChanged = false;
