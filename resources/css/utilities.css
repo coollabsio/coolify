@@ -124,7 +124,7 @@
 }
 
 @utility menu-item {
-    @apply flex gap-3 items-center px-2 py-1 w-full text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64 text-black dark:text-neutral-400;
+    @apply flex gap-3 items-center px-2 py-1 w-full text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
 }
 
 @utility menu-item-active {
@@ -152,7 +152,7 @@
 }
 
 @utility navbar-main {
-    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 border-neutral-200 md:items-center;
+    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 border-neutral-200 md:items-center text-neutral-700 dark:text-neutral-400;
 }
 
 @utility loading {
@@ -220,7 +220,7 @@
 }
 
 @utility subtitle {
-    @apply pt-2 pb-9 text-neutral-500 dark:text-neutral-400;
+    @apply pt-2 pb-9;
 }
 
 @utility fullscreen {

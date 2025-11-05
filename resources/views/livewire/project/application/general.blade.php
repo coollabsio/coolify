@@ -23,16 +23,15 @@
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.select x-bind:disabled="shouldDisable()" wire:model.live="buildPack"
-                            label="Build Pack" required>
+                        <x-forms.select x-bind:disabled="shouldDisable()" wire:model.live="buildPack" label="Build Pack"
+                            required>
                             <option value="nixpacks">Nixpacks</option>
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockercompose">Docker Compose</option>
                         </x-forms.select>
                         @if ($application->settings->is_static || $application->build_pack === 'static')
-                            <x-forms.select x-bind:disabled="!canUpdate" id="staticImage"
-                                label="Static Image" required>
+                            <x-forms.select x-bind:disabled="!canUpdate" id="staticImage" label="Static Image" required>
                                 <option value="nginx:alpine">nginx:alpine</option>
                                 <option disabled value="apache:alpine">apache:alpine</option>
                             </x-forms.select>
@@ -75,7 +74,9 @@
                         submitAction="generateNginxConfiguration('{{ $application->settings->is_spa ? 'spa' : 'static' }}')"
                         :actions="[
                             'This will overwrite your current custom Nginx configuration.',
-                            'The default configuration will be generated based on your application type (' . ($application->settings->is_spa ? 'SPA' : 'static') . ').',
+                            'The default configuration will be generated based on your application type (' .
+                            ($application->settings->is_spa ? 'SPA' : 'static') .
+                            ').',
                         ]" />
                 @endcan
             @endif
@@ -94,13 +95,11 @@
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
-                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="fqdn"
-                            label="Domains" readonly
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="fqdn" label="Domains" readonly
                             helper="Readonly labels are disabled. You can set the domains in the labels section."
                             x-bind:disabled="!canUpdate" />
                     @else
-                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="fqdn"
-                            label="Domains"
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="fqdn" label="Domains"
                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
                             x-bind:disabled="!canUpdate" />
                         @can('update', $application)
@@ -210,21 +209,17 @@
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
-                        id="customDockerRunOptions" label="Custom Docker Options"
-                        x-bind:disabled="!canUpdate" />
+                        id="customDockerRunOptions" label="Custom Docker Options" x-bind:disabled="!canUpdate" />
                 @else
                     @if ($application->could_set_build_commands())
                         @if ($application->build_pack === 'nixpacks')
                             <div class="flex flex-col gap-2 xl:flex-row">
                                 <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
-                                    id="installCommand" label="Install Command"
-                                    x-bind:disabled="!canUpdate" />
+                                    id="installCommand" label="Install Command" x-bind:disabled="!canUpdate" />
                                 <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
-                                    id="buildCommand" label="Build Command"
-                                    x-bind:disabled="!canUpdate" />
+                                    id="buildCommand" label="Build Command" x-bind:disabled="!canUpdate" />
                                 <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
-                                    id="startCommand" label="Start Command"
-                                    x-bind:disabled="!canUpdate" />
+                                    id="startCommand" label="Start Command" x-bind:disabled="!canUpdate" />
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
@@ -246,13 +241,12 @@
                                             id="baseDirectory" label="Base Directory"
                                             helper="Directory to use as root. Useful for monorepos." />
                                         <x-forms.input x-bind:disabled="shouldDisable()"
-                                            placeholder="/docker-compose.yaml"
-                                            id="dockerComposeLocation" label="Docker Compose Location"
+                                            placeholder="/docker-compose.yaml" id="dockerComposeLocation"
+                                            label="Docker Compose Location"
                                             helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
                                     </div>
                                     <div class="w-96">
-                                        <x-forms.checkbox instantSave
-                                            id="isPreserveRepositoryEnabled"
+                                        <x-forms.checkbox instantSave id="isPreserveRepositoryEnabled"
                                             label="Preserve Repository During Deployment"
                                             helper="Git repository (based on the base directory settings) will be copied to the deployment directory."
                                             x-bind:disabled="shouldDisable()" />
@@ -264,13 +258,11 @@
                                         you doing.</div>
                                     <div class="flex gap-2">
                                         <x-forms.input x-bind:disabled="shouldDisable()"
-                                            placeholder="docker compose build"
-                                            id="dockerComposeCustomBuildCommand"
+                                            placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
                                             helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
                                             label="Custom Build Command" />
                                         <x-forms.input x-bind:disabled="shouldDisable()"
-                                            placeholder="docker compose up -d"
-                                            id="dockerComposeCustomStartCommand"
+                                            placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
                                             helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                             label="Custom Start Command" />
                                     </div>
@@ -278,15 +270,14 @@
                                         <div class="pt-4">
                                             <x-forms.textarea
                                                 helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                                placeholder="services/api/**" id="watchPaths"
-                                                label="Watch Paths" x-bind:disabled="shouldDisable()" />
+                                                placeholder="services/api/**" id="watchPaths" label="Watch Paths"
+                                                x-bind:disabled="shouldDisable()" />
                                         </div>
                                     @endif
                                 </div>
                             @else
                                 <div class="flex flex-col gap-2 xl:flex-row">
-                                    <x-forms.input placeholder="/" id="baseDirectory"
-                                        label="Base Directory"
+                                    <x-forms.input placeholder="/" id="baseDirectory" label="Base Directory"
                                         helper="Directory to use as root. Useful for monorepos."
                                         x-bind:disabled="!canUpdate" />
                                     @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
@@ -297,8 +288,7 @@
                                     @endif
 
                                     @if ($application->build_pack === 'dockerfile')
-                                        <x-forms.input id="dockerfileTargetBuild"
-                                            label="Docker Build Stage Target"
+                                        <x-forms.input id="dockerfileTargetBuild" label="Docker Build Stage Target"
                                             helper="Useful if you have multi-staged dockerfile."
                                             x-bind:disabled="!canUpdate" />
                                     @endif
@@ -317,8 +307,8 @@
                                     <div class="pb-4">
                                         <x-forms.textarea
                                             helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                            placeholder="src/pages/**" id="watchPaths"
-                                            label="Watch Paths" x-bind:disabled="!canUpdate" />
+                                            placeholder="src/pages/**" id="watchPaths" label="Watch Paths"
+                                            x-bind:disabled="!canUpdate" />
                                     </div>
                                 @endif
                                 <x-forms.input
@@ -331,8 +321,8 @@
                                     <div class="pt-2 w-96">
                                         <x-forms.checkbox
                                             helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
-                                            instantSave id="isBuildServerEnabled"
-                                            label="Use a Build Server?" x-bind:disabled="!canUpdate" />
+                                            instantSave id="isBuildServerEnabled" label="Use a Build Server?"
+                                            x-bind:disabled="!canUpdate" />
                                     </div>
                                 @endif
                         @endif
@@ -359,8 +349,7 @@
                             helper="You need to modify the docker compose file in the git repository."
                             monacoEditorLanguage="yaml" useMonacoEditor />
                     @endif
-                    <x-forms.textarea rows="10" readonly id="dockerCompose"
-                        label="Docker Compose Content"
+                    <x-forms.textarea rows="10" readonly id="dockerCompose" label="Docker Compose Content"
                         helper="You need to modify the docker compose file in the git repository."
                         monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
@@ -386,13 +375,11 @@
                             x-bind:disabled="!canUpdate" />
                     @else
                         @if ($application->settings->is_container_label_readonly_enabled === false)
-                            <x-forms.input placeholder="3000,3001" id="portsExposes"
-                                label="Ports Exposes" readonly
+                            <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports Exposes" readonly
                                 helper="Readonly labels are disabled. You can set the ports manually in the labels section."
                                 x-bind:disabled="!canUpdate" />
                         @else
-                            <x-forms.input placeholder="3000,3001" id="portsExposes"
-                                label="Ports Exposes" required
+                            <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports Exposes" required
                                 helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly."
                                 x-bind:disabled="!canUpdate" />
                         @endif
@@ -413,15 +400,14 @@
                 <div>
                     <div class="w-96">
                         <x-forms.checkbox helper="This will add the proper proxy labels to the container." instantSave
-                            label="Enable" id="isHttpBasicAuthEnabled"
-                            x-bind:disabled="!canUpdate" />
+                            label="Enable" id="isHttpBasicAuthEnabled" x-bind:disabled="!canUpdate" />
                     </div>
                     @if ($application->is_http_basic_auth_enabled)
                         <div class="flex gap-2 py-2">
                             <x-forms.input id="httpBasicAuthUsername" label="Username" required
                                 x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="httpBasicAuthPassword" type="password" label="Password"
-                                required x-bind:disabled="!canUpdate" />
+                            <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
+                                x-bind:disabled="!canUpdate" />
                         </div>
                     @endif
                 </div>
@@ -472,8 +458,8 @@
                     id="postDeploymentCommand" label="Post-deployment "
                     helper="An optional script or command to execute in the newly built container after the deployment completes.<br>It is always executed with 'sh -c', so you do not need add it manually." />
                 @if ($application->build_pack === 'dockercompose')
-                    <x-forms.input x-bind:disabled="shouldDisable()"
-                        id="postDeploymentCommandContainer" label="Container Name"
+                    <x-forms.input x-bind:disabled="shouldDisable()" id="postDeploymentCommandContainer"
+                        label="Container Name"
                         helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
                 @endif
             </div>
