@@ -43,23 +43,20 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
+     *
+     * NOTE: This rollback only removes the clickhouse_db column and reverts the default image.
+     * It does NOT revert existing instances to the Bitnami image, as:
+     * 1. Fresh installations created after this migration should never use Bitnami
+     * 2. The Bitnami image is deprecated and not recommended
+     * 3. We cannot distinguish between migrated instances and fresh installs
+     *
+     * If full rollback is absolutely necessary, manually update affected instances:
+     * - Update image to 'bitnamilegacy/clickhouse' for instances that need rollback
+     * - Update mount_path to '/bitnami/clickhouse' in local_persistent_volumes table
      */
     public function down(): void
     {
-        // Revert persistent volumes mount path
-        DB::table('local_persistent_volumes')
-            ->where('resource_type', 'App\\Models\\StandaloneClickhouse')
-            ->where('mount_path', '/var/lib/clickhouse')
-            ->update(['mount_path' => '/bitnami/clickhouse']);
-
-        // Revert image changes
-        DB::table('standalone_clickhouses')
-            ->where('image', 'clickhouse/clickhouse-server:lts')
-            ->update([
-                'image' => 'bitnamilegacy/clickhouse',
-            ]);
-
-        // Revert default image
+        // Revert default image for new installations only
         Schema::table('standalone_clickhouses', function (Blueprint $table) {
             $table->string('image')->default('bitnamilegacy/clickhouse')->change();
         });
@@ -68,5 +65,9 @@ return new class extends Migration
         Schema::table('standalone_clickhouses', function (Blueprint $table) {
             $table->dropColumn('clickhouse_db');
         });
+
+        // NOTE: We intentionally do NOT revert existing instances' images or mount paths
+        // to avoid breaking fresh installations that were created with the official image.
+        // Existing instances will continue to use the official image unless manually changed.
     }
 };

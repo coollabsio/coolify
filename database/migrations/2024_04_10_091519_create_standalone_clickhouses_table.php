@@ -19,7 +19,6 @@ return new class extends Migration
 
             $table->string('clickhouse_admin_user')->default('default');
             $table->text('clickhouse_admin_password');
-            $table->string('clickhouse_db')->default('default');
 
             $table->boolean('is_log_drain_enabled')->default(false);
             $table->boolean('is_include_timestamps')->default(false);
