@@ -64,3 +64,13 @@ services:
         source: ./data
         target: /data
         isDirectory: true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"     
+        - "http://localhost:5000/"  
+      interval: 5s
+      timeout: 20s
+      retries: 10
