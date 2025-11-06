@@ -338,10 +338,11 @@ class Previews extends Component
     private function stopContainers(array $containers, $server)
     {
         $containersToStop = collect($containers)->pluck('Names')->toArray();
+        $timeout = $this->application->settings->stop_grace_period ?? 30;
 
         foreach ($containersToStop as $containerName) {
             instant_remote_process(command: [
-                "docker stop -t 30 $containerName",
+                "docker stop --time=$timeout $containerName",
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
         }

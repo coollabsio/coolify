@@ -61,6 +61,9 @@ class Advanced extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $gpuOptions = null;
 
+    #[Validate(['string', 'nullable'])]
+    public ?string $stopGracePeriod = null;
+
     #[Validate(['boolean'])]
     public bool $isBuildServerEnabled = false;
 
@@ -145,6 +148,10 @@ class Advanced extends Component
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
         }
+
+        // Load stop_grace_period separately since it has its own save handler
+        // Convert null to empty string to prevent dirty detection issues
+        $this->stopGracePeriod = $this->application->settings->stop_grace_period ?? '';
     }
 
     private function resetDefaultLabels()
@@ -247,6 +254,34 @@ class Advanced extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Custom name saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveStopGracePeriod()
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            // Convert empty string to null, otherwise cast to integer
+            $value = ($this->stopGracePeriod === '' || $this->stopGracePeriod === null)
+                ? null
+                : (int) $this->stopGracePeriod;
+
+            // Validate the integer value
+            if ($value !== null && ($value < 1 || $value > 3600)) {
+                $this->dispatch('error', 'Stop grace period must be between 1 and 3600 seconds.');
+
+                return;
+            }
+
+            // Save to model
+            $this->application->settings->stop_grace_period = $value;
+            $this->application->settings->save();
+
+            // User feedback
+            $this->dispatch('success', 'Stop grace period updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

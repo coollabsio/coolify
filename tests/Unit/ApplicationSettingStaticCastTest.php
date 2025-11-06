@@ -103,3 +103,26 @@ it('casts all boolean fields correctly', function () {
             ->and($casts[$field])->toBe('boolean');
     }
 });
+
+it('casts stop_grace_period to integer', function () {
+    $setting = new ApplicationSetting;
+    $casts = $setting->getCasts();
+
+    expect($casts)->toHaveKey('stop_grace_period')
+        ->and($casts['stop_grace_period'])->toBe('integer');
+});
+
+it('handles null stop_grace_period for default behavior', function () {
+    $setting = new ApplicationSetting;
+    $setting->stop_grace_period = null;
+
+    expect($setting->stop_grace_period)->toBeNull();
+});
+
+it('casts stop_grace_period from string to integer', function () {
+    $setting = new ApplicationSetting;
+    $setting->stop_grace_period = '60';
+
+    expect($setting->stop_grace_period)->toBe(60)
+        ->and($setting->stop_grace_period)->toBeInt();
+});
