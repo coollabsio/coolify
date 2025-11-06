@@ -82,8 +82,26 @@ class SyncBunny extends Command
                 return false;
             }
 
+            $this->info('Checking for changes...');
+            $statusOutput = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git status --porcelain json/releases.json 2>&1', $statusOutput, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to check repository status: '.implode("\n", $statusOutput));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            if (empty(array_filter($statusOutput))) {
+                $this->info('Releases are already up to date. No changes to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
             $commitMessage = 'Update releases.json with latest releases - '.date('Y-m-d H:i:s');
-            exec("cd $tmpDir && git commit -m '$commitMessage' 2>&1", $output, $returnCode);
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to commit changes: '.implode("\n", $output));
                 exec("rm -rf $tmpDir");
