@@ -1632,4 +1632,185 @@ class ServicesController extends Controller
             200
         );
     }
+
+    #[OA\Post(
+        summary: 'Check for Image Updates',
+        description: 'Check if there are new versions of the service images available.',
+        path: '/services/{uuid}/check-updates',
+        operationId: 'check-image-updates-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Image update check results.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'updates_available' => ['type' => 'boolean', 'example' => true],
+                                'last_check' => ['type' => 'string', 'example' => '2025-11-06T14:00:00Z'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function check_image_updates(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('view', $service);
+
+        $service->last_image_pull_check = now();
+        $service->save();
+
+        return response()->json([
+            'message' => 'Image update check completed.',
+            'last_check' => $service->last_image_pull_check,
+        ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Configure Auto Pull',
+        description: 'Configure automatic image pull and restart settings.',
+        path: '/services/{uuid}/auto-pull',
+        operationId: 'configure-auto-pull-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Auto pull configuration.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'enabled' => ['type' => 'boolean', 'description' => 'Enable/disable automatic image pull.'],
+                        'schedule' => ['type' => 'string', 'description' => 'Schedule in cron format (e.g., "0 2 * * *" for daily at 2 AM). Can also be: hourly, daily, weekly.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Auto pull configuration updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Auto pull configuration updated.'],
+                                'enabled' => ['type' => 'boolean', 'example' => true],
+                                'schedule' => ['type' => 'string', 'example' => 'daily'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function configure_auto_pull(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('update', $service);
+
+        $validator = customApiValidator($request->all(), [
+            'enabled' => 'boolean',
+            'schedule' => 'string|nullable|in:hourly,daily,weekly',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($request->has('enabled')) {
+            $service->auto_image_pull_enabled = $request->boolean('enabled');
+        }
+
+        if ($request->has('schedule')) {
+            $service->auto_image_pull_schedule = $request->schedule;
+        }
+
+        $service->save();
+
+        return response()->json([
+            'message' => 'Auto pull configuration updated.',
+            'enabled' => $service->auto_image_pull_enabled,
+            'schedule' => $service->auto_image_pull_schedule,
+        ]);
+    }
 }

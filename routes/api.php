@@ -152,6 +152,8 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/check-updates', [ServicesController::class, 'check_image_updates'])->middleware(['api.ability:read']);
+    Route::patch('/services/{uuid}/auto-pull', [ServicesController::class, 'configure_auto_pull'])->middleware(['api.ability:write']);
 });
 
 Route::group([

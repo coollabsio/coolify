@@ -50,6 +50,11 @@ class Service extends BaseModel
 
     protected $appends = ['server_status', 'status'];
 
+    protected $casts = [
+        'auto_image_pull_enabled' => 'boolean',
+        'last_image_pull_check' => 'datetime',
+    ];
+
     protected static function booted()
     {
         static::creating(function ($service) {
