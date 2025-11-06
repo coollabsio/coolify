@@ -1073,6 +1073,9 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         }
         $yaml_compose = Yaml::parse($compose);
         foreach ($yaml_compose['services'] as $service_name => $service) {
+            if (! isset($service['volumes'])) {
+                continue;
+            }
             foreach ($service['volumes'] as $volume_name => $volume) {
                 if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
                     unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
