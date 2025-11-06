@@ -2988,7 +2988,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function graceful_shutdown_container(string $containerName)
     {
         try {
-            $timeout = isDev() ? 1 : 30;
+            if (isDev()) {
+                $timeout = 1;
+            } else {
+                $timeout = $this->application->settings->stop_grace_period ?? 30;
+            }
+
             $this->execute_remote_command(
                 ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
                 ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
