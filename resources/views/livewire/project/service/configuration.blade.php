@@ -35,6 +35,11 @@
         <div class="w-full">
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
+                
+                <div class="pt-6 pb-4">
+                    <livewire:project.service.auto-pull :service="$service" />
+                </div>
+                
                 <h3>Services</h3>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)

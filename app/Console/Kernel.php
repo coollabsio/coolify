@@ -83,6 +83,11 @@ class Kernel extends ConsoleKernel
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily();
 
+            // Auto Pull Images
+            $this->scheduleInstance->command('services:auto-pull hourly')->hourly()->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->command('services:auto-pull daily')->dailyAt('02:00')->timezone($this->instanceTimezone)->onOneServer();
+            $this->scheduleInstance->command('services:auto-pull weekly')->weeklyOn(0, '02:00')->timezone($this->instanceTimezone)->onOneServer();
+
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
         }

@@ -25,12 +25,18 @@ class Heading extends Component
 
     public $title = 'Configuration';
 
+    public $auto_image_pull_enabled = false;
+
+    public $auto_image_pull_schedule = 'daily';
+
     public function mount()
     {
         if (str($this->service->status)->contains('running') && is_null($this->service->config_hash)) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         }
+        $this->auto_image_pull_enabled = $this->service->auto_image_pull_enabled ?? false;
+        $this->auto_image_pull_schedule = $this->service->auto_image_pull_schedule ?? 'daily';
     }
 
     public function getListeners()
@@ -153,6 +159,41 @@ class Heading extends Component
         }
         $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
         $this->dispatch('activityMonitor', $activity->id);
+    }
+
+    public function checkForUpdates()
+    {
+        try {
+            $this->service->last_image_pull_check = now();
+            $this->service->save();
+            $this->dispatch('success', 'Checked for image updates.');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function toggleAutoPull()
+    {
+        try {
+            $this->auto_image_pull_enabled = ! $this->auto_image_pull_enabled;
+            $this->service->auto_image_pull_enabled = $this->auto_image_pull_enabled;
+            $this->service->save();
+            $message = $this->auto_image_pull_enabled ? 'Automatic image pull enabled.' : 'Automatic image pull disabled.';
+            $this->dispatch('success', $message);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function updateAutoPullSchedule()
+    {
+        try {
+            $this->service->auto_image_pull_schedule = $this->auto_image_pull_schedule;
+            $this->service->save();
+            $this->dispatch('success', 'Auto pull schedule updated to '.$this->auto_image_pull_schedule.'.');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function render()
