@@ -338,7 +338,7 @@ class Previews extends Component
     private function stopContainers(array $containers, $server)
     {
         $containersToStop = collect($containers)->pluck('Names')->toArray();
-        $timeout = $this->application->settings->stop_grace_period ?? 30;
+        $timeout = $this->application->settings->stop_grace_period ?? DEFAULT_STOP_GRACE_PERIOD_SECONDS;
 
         foreach ($containersToStop as $containerName) {
             instant_remote_process(command: [

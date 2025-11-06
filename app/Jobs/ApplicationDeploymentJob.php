@@ -3313,7 +3313,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (isDev()) {
                 $timeout = 1;
             } else {
-                $timeout = $this->application->settings->stop_grace_period ?? 30;
+                $timeout = $this->application->settings->stop_grace_period ?? DEFAULT_STOP_GRACE_PERIOD_SECONDS;
             }
 
             if ($skipRemove) {

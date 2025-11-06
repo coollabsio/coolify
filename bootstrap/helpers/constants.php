@@ -16,6 +16,7 @@ const VALID_CRON_STRINGS = [
     '@yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
+const DEFAULT_STOP_GRACE_PERIOD_SECONDS = 30;
 
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',
