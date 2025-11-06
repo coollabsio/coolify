@@ -50,7 +50,7 @@ class SyncBunny extends Command
 
             // Clone the repository
             $this->info('Cloning coolify-cdn repository...');
-            exec("gh repo clone coollabsio/coolify-cdn $tmpDir 2>&1", $output, $returnCode);
+            exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to clone repository: '.implode("\n", $output));
 
@@ -59,10 +59,10 @@ class SyncBunny extends Command
 
             // Create feature branch
             $this->info('Creating feature branch...');
-            exec("cd $tmpDir && git checkout -b $branchName 2>&1", $output, $returnCode);
+            exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to create branch: '.implode("\n", $output));
-                exec("rm -rf $tmpDir");
+                exec('rm -rf '.escapeshellarg($tmpDir));
 
                 return false;
             }
@@ -70,14 +70,23 @@ class SyncBunny extends Command
             // Write releases.json
             $this->info('Writing releases.json...');
             $releasesPath = "$tmpDir/json/releases.json";
-            file_put_contents($releasesPath, json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $jsonContent = json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $bytesWritten = file_put_contents($releasesPath, $jsonContent);
+
+            if ($bytesWritten === false) {
+                $this->error("Failed to write releases.json to: $releasesPath");
+                $this->error('Possible reasons: directory does not exist, permission denied, or disk full.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
 
             // Stage and commit
             $this->info('Committing changes...');
-            exec("cd $tmpDir && git add json/releases.json 2>&1", $output, $returnCode);
+            exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to stage changes: '.implode("\n", $output));
-                exec("rm -rf $tmpDir");
+                exec('rm -rf '.escapeshellarg($tmpDir));
 
                 return false;
             }
@@ -104,17 +113,17 @@ class SyncBunny extends Command
             exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to commit changes: '.implode("\n", $output));
-                exec("rm -rf $tmpDir");
+                exec('rm -rf '.escapeshellarg($tmpDir));
 
                 return false;
             }
 
             // Push to remote
             $this->info('Pushing branch to remote...');
-            exec("cd $tmpDir && git push origin $branchName 2>&1", $output, $returnCode);
+            exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to push branch: '.implode("\n", $output));
-                exec("rm -rf $tmpDir");
+                exec('rm -rf '.escapeshellarg($tmpDir));
 
                 return false;
             }
@@ -123,11 +132,11 @@ class SyncBunny extends Command
             $this->info('Creating pull request...');
             $prTitle = 'Update releases.json - '.date('Y-m-d H:i:s');
             $prBody = 'Automated update of releases.json with latest '.count($releases).' releases from GitHub API';
-            $prCommand = "gh pr create --repo coollabsio/coolify-cdn --title '$prTitle' --body '$prBody' --base main --head $branchName 2>&1";
+            $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
             exec($prCommand, $output, $returnCode);
 
             // Clean up
-            exec("rm -rf $tmpDir");
+            exec('rm -rf '.escapeshellarg($tmpDir));
 
             if ($returnCode !== 0) {
                 $this->error('Failed to create PR: '.implode("\n", $output));
