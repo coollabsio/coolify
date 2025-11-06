@@ -1164,17 +1164,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
             })->map(function ($value, $key) use ($resource) {
-                // Preserve empty strings; only override if database value exists and is non-empty
-                // This is important because empty strings and null have different semantics in Docker:
+                // Preserve empty strings and null values with correct Docker Compose semantics:
                 // - Empty string: Variable is set to "" (e.g., HTTP_PROXY="" means "no proxy")
-                // - Null: Variable is unset/removed from container environment
-                if (str($value)->isEmpty()) {
+                // - Null: Variable is unset/removed from container environment (may inherit from host)
+                if ($value === null) {
+                    // User explicitly wants variable unset - respect that
+                    // NEVER override from database - null means "inherit from environment"
+                    // Keep as null (will be excluded from container environment)
+                } elseif ($value === '') {
+                    // Empty string - allow database override for backward compatibility
                     $dbEnv = $resource->environment_variables()->where('key', $key)->first();
                     // Only use database override if it exists AND has a non-empty value
                     if ($dbEnv && str($dbEnv->value)->isNotEmpty()) {
                         $value = $dbEnv->value;
                     }
-                    // Keep empty string as-is (don't convert to null)
+                    // Otherwise keep empty string as-is
                 }
 
                 return $value;
@@ -1605,21 +1609,22 @@ function serviceParser(Service $resource): Collection
                     ]);
                 }
                 if (substr_count(str($key)->value(), '_') === 3) {
-                    $newKey = str($key)->beforeLast('_');
+                    // For port-specific variables (e.g., SERVICE_FQDN_UMAMI_3000),
+                    // keep the port suffix in the key and use the URL with port
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => $newKey->value(),
+                        'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
-                        'value' => $fqdn,
+                        'value' => $fqdnWithPort,
                         'is_preview' => false,
                     ]);
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => $newKey->value(),
+                        'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
-                        'value' => $url,
+                        'value' => $urlWithPort,
                         'is_preview' => false,
                     ]);
                 }
@@ -2138,17 +2143,21 @@ function serviceParser(Service $resource): Collection
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
             })->map(function ($value, $key) use ($resource) {
-                // Preserve empty strings; only override if database value exists and is non-empty
-                // This is important because empty strings and null have different semantics in Docker:
+                // Preserve empty strings and null values with correct Docker Compose semantics:
                 // - Empty string: Variable is set to "" (e.g., HTTP_PROXY="" means "no proxy")
-                // - Null: Variable is unset/removed from container environment
-                if (str($value)->isEmpty()) {
+                // - Null: Variable is unset/removed from container environment (may inherit from host)
+                if ($value === null) {
+                    // User explicitly wants variable unset - respect that
+                    // NEVER override from database - null means "inherit from environment"
+                    // Keep as null (will be excluded from container environment)
+                } elseif ($value === '') {
+                    // Empty string - allow database override for backward compatibility
                     $dbEnv = $resource->environment_variables()->where('key', $key)->first();
                     // Only use database override if it exists AND has a non-empty value
                     if ($dbEnv && str($dbEnv->value)->isNotEmpty()) {
                         $value = $dbEnv->value;
                     }
-                    // Keep empty string as-is (don't convert to null)
+                    // Otherwise keep empty string as-is
                 }
 
                 return $value;

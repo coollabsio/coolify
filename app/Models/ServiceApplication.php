@@ -118,6 +118,53 @@ class ServiceApplication extends BaseModel
         );
     }
 
+    /**
+     * Extract port number from a given FQDN URL.
+     * Returns null if no port is specified.
+     */
+    public static function extractPortFromUrl(string $url): ?int
+    {
+        try {
+            // Ensure URL has a scheme for proper parsing
+            if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+                $url = 'http://'.$url;
+            }
+
+            $parsed = parse_url($url);
+            $port = $parsed['port'] ?? null;
+
+            return $port ? (int) $port : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if all FQDNs have a port specified.
+     */
+    public function allFqdnsHavePort(): bool
+    {
+        if (is_null($this->fqdn) || $this->fqdn === '') {
+            return false;
+        }
+
+        $fqdns = explode(',', $this->fqdn);
+
+        foreach ($fqdns as $fqdn) {
+            $fqdn = trim($fqdn);
+            if (empty($fqdn)) {
+                continue;
+            }
+
+            $port = self::extractPortFromUrl($fqdn);
+            if ($port === null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function getFilesFromServer(bool $isInit = false)
     {
         getFilesystemVolumesFromServer($this, $isInit);

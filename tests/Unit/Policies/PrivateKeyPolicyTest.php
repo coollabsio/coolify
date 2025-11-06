@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\PrivateKey;
 use App\Models\User;
 use App\Policies\PrivateKeyPolicy;
 

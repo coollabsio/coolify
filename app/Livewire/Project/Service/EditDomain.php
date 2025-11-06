@@ -22,6 +22,12 @@ class EditDomain extends Component
 
     public $forceSaveDomains = false;
 
+    public $showPortWarningModal = false;
+
+    public $forceRemovePort = false;
+
+    public $requiredPort = null;
+
     #[Validate(['nullable'])]
     public ?string $fqdn = null;
 
@@ -33,6 +39,7 @@ class EditDomain extends Component
     {
         $this->application = ServiceApplication::ownedByCurrentTeam()->findOrFail($this->applicationId);
         $this->authorize('view', $this->application);
+        $this->requiredPort = $this->application->service->getRequiredPort();
         $this->syncData();
     }
 
@@ -56,6 +63,19 @@ class EditDomain extends Component
         $this->forceSaveDomains = true;
         $this->showDomainConflictModal = false;
         $this->submit();
+    }
+
+    public function confirmRemovePort()
+    {
+        $this->forceRemovePort = true;
+        $this->showPortWarningModal = false;
+        $this->submit();
+    }
+
+    public function cancelRemovePort()
+    {
+        $this->showPortWarningModal = false;
+        $this->syncData(); // Reset to original FQDN
     }
 
     public function submit()
@@ -89,6 +109,41 @@ class EditDomain extends Component
             } else {
                 // Reset the force flag after using it
                 $this->forceSaveDomains = false;
+            }
+
+            // Check for required port
+            if (! $this->forceRemovePort) {
+                $service = $this->application->service;
+                $requiredPort = $service->getRequiredPort();
+
+                if ($requiredPort !== null) {
+                    // Check if all FQDNs have a port
+                    $fqdns = str($this->fqdn)->trim()->explode(',');
+                    $missingPort = false;
+
+                    foreach ($fqdns as $fqdn) {
+                        $fqdn = trim($fqdn);
+                        if (empty($fqdn)) {
+                            continue;
+                        }
+
+                        $port = ServiceApplication::extractPortFromUrl($fqdn);
+                        if ($port === null) {
+                            $missingPort = true;
+                            break;
+                        }
+                    }
+
+                    if ($missingPort) {
+                        $this->requiredPort = $requiredPort;
+                        $this->showPortWarningModal = true;
+
+                        return;
+                    }
+                }
+            } else {
+                // Reset the force flag after using it
+                $this->forceRemovePort = false;
             }
 
             $this->validate();
