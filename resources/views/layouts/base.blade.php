@@ -2,7 +2,7 @@
 <html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <script>
     // Immediate theme application - runs before any rendering
-    (function() {
+    (function () {
         const t = localStorage.theme || 'dark';
         const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList[d ? 'add' : 'remove']('dark');
@@ -75,102 +75,102 @@
 </head>
 @section('body')
 
-    <body>
-        <x-toast />
-        <script data-navigate-once>
-            // Global HTML sanitization function using DOMPurify
-            window.sanitizeHTML = function(html) {
-                if (!html) return '';
-                const URL_RE = /^(https?:|mailto:)/i;
-                const config = {
-                    ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'p', 'pre', 's', 'span', 'strong',
-                        'u'
-                    ],
-                    ALLOWED_ATTR: ['class', 'href', 'target', 'title', 'rel'],
-                    ALLOW_DATA_ATTR: false,
-                    FORBID_TAGS: ['script', 'object', 'embed', 'applet', 'iframe', 'form', 'input', 'button', 'select',
-                        'textarea', 'details', 'summary', 'dialog', 'style'
-                    ],
-                    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange',
-                        'onsubmit', 'ontoggle', 'style'
-                    ],
-                    KEEP_CONTENT: true,
-                    RETURN_DOM: false,
-                    RETURN_DOM_FRAGMENT: false,
-                    SANITIZE_DOM: true,
-                    SANITIZE_NAMED_PROPS: true,
-                    SAFE_FOR_TEMPLATES: true,
-                    ALLOWED_URI_REGEXP: URL_RE
-                };
-
-                // One-time hook registration (idempotent pattern)
-                if (!window.__dpLinkHook) {
-                    DOMPurify.addHook('afterSanitizeAttributes', node => {
-                        // Remove Alpine.js directives to prevent XSS
-                        if (node.hasAttributes && node.hasAttributes()) {
-                            const attrs = Array.from(node.attributes);
-                            attrs.forEach(attr => {
-                                // Remove x-* attributes (Alpine directives)
-                                if (attr.name.startsWith('x-')) {
-                                    node.removeAttribute(attr.name);
-                                }
-                                // Remove @* attributes (Alpine event shorthand)
-                                if (attr.name.startsWith('@')) {
-                                    node.removeAttribute(attr.name);
-                                }
-                                // Remove :* attributes (Alpine binding shorthand)
-                                if (attr.name.startsWith(':')) {
-                                    node.removeAttribute(attr.name);
-                                }
-                            });
-                        }
-
-                        // Existing link sanitization
-                        if (node.nodeName === 'A' && node.hasAttribute('href')) {
-                            const href = node.getAttribute('href') || '';
-                            if (!URL_RE.test(href)) node.removeAttribute('href');
-                            if (node.getAttribute('target') === '_blank') {
-                                node.setAttribute('rel', 'noopener noreferrer');
-                            }
-                        }
-                    });
-                    window.__dpLinkHook = true;
-                }
-                return DOMPurify.sanitize(html, config);
+<body class="dark:text-inherit text-black">
+    <x-toast />
+    <script data-navigate-once>
+        // Global HTML sanitization function using DOMPurify
+        window.sanitizeHTML = function (html) {
+            if (!html) return '';
+            const URL_RE = /^(https?:|mailto:)/i;
+            const config = {
+                ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'p', 'pre', 's', 'span', 'strong',
+                    'u'
+                ],
+                ALLOWED_ATTR: ['class', 'href', 'target', 'title', 'rel'],
+                ALLOW_DATA_ATTR: false,
+                FORBID_TAGS: ['script', 'object', 'embed', 'applet', 'iframe', 'form', 'input', 'button', 'select',
+                    'textarea', 'details', 'summary', 'dialog', 'style'
+                ],
+                FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange',
+                    'onsubmit', 'ontoggle', 'style'
+                ],
+                KEEP_CONTENT: true,
+                RETURN_DOM: false,
+                RETURN_DOM_FRAGMENT: false,
+                SANITIZE_DOM: true,
+                SANITIZE_NAMED_PROPS: true,
+                SAFE_FOR_TEMPLATES: true,
+                ALLOWED_URI_REGEXP: URL_RE
             };
 
-            // Initialize theme if not set
-            if (!('theme' in localStorage)) {
-                localStorage.theme = 'dark';
-            }
+            // One-time hook registration (idempotent pattern)
+            if (!window.__dpLinkHook) {
+                DOMPurify.addHook('afterSanitizeAttributes', node => {
+                    // Remove Alpine.js directives to prevent XSS
+                    if (node.hasAttributes && node.hasAttributes()) {
+                        const attrs = Array.from(node.attributes);
+                        attrs.forEach(attr => {
+                            // Remove x-* attributes (Alpine directives)
+                            if (attr.name.startsWith('x-')) {
+                                node.removeAttribute(attr.name);
+                            }
+                            // Remove @* attributes (Alpine event shorthand)
+                            if (attr.name.startsWith('@')) {
+                                node.removeAttribute(attr.name);
+                            }
+                            // Remove :* attributes (Alpine binding shorthand)
+                            if (attr.name.startsWith(':')) {
+                                node.removeAttribute(attr.name);
+                            }
+                        });
+                    }
 
-            let theme = localStorage.theme
-            let cpuColor = '#1e90ff'
-            let ramColor = '#00ced1'
-            let textColor = '#ffffff'
-            let editorBackground = '#181818'
-            let editorTheme = 'blackboard'
-
-            function checkTheme() {
-                theme = localStorage.theme
-                if (theme == 'system') {
-                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-                }
-                if (theme == 'dark') {
-                    cpuColor = '#1e90ff'
-                    ramColor = '#00ced1'
-                    textColor = '#ffffff'
-                    editorBackground = '#181818'
-                    editorTheme = 'blackboard'
-                } else {
-                    cpuColor = '#1e90ff'
-                    ramColor = '#00ced1'
-                    textColor = '#000000'
-                    editorBackground = '#ffffff'
-                    editorTheme = null
-                }
+                    // Existing link sanitization
+                    if (node.nodeName === 'A' && node.hasAttribute('href')) {
+                        const href = node.getAttribute('href') || '';
+                        if (!URL_RE.test(href)) node.removeAttribute('href');
+                        if (node.getAttribute('target') === '_blank') {
+                            node.setAttribute('rel', 'noopener noreferrer');
+                        }
+                    }
+                });
+                window.__dpLinkHook = true;
             }
-            @auth
+            return DOMPurify.sanitize(html, config);
+        };
+
+        // Initialize theme if not set
+        if (!('theme' in localStorage)) {
+            localStorage.theme = 'dark';
+        }
+
+        let theme = localStorage.theme
+        let cpuColor = '#1e90ff'
+        let ramColor = '#00ced1'
+        let textColor = '#ffffff'
+        let editorBackground = '#181818'
+        let editorTheme = 'blackboard'
+
+        function checkTheme() {
+            theme = localStorage.theme
+            if (theme == 'system') {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            }
+            if (theme == 'dark') {
+                cpuColor = '#1e90ff'
+                ramColor = '#00ced1'
+                textColor = '#ffffff'
+                editorBackground = '#181818'
+                editorTheme = 'blackboard'
+            } else {
+                cpuColor = '#1e90ff'
+                ramColor = '#00ced1'
+                textColor = '#000000'
+                editorBackground = '#ffffff'
+                editorTheme = null
+            }
+        }
+        @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({
                 broadcaster: 'pusher',
@@ -199,131 +199,131 @@
                 // Maximum number of reconnection attempts
                 maxAttempts: 15
             });
-            @endauth
-            let checkHealthInterval = null;
-            let checkIfIamDeadInterval = null;
+        @endauth
+        let checkHealthInterval = null;
+        let checkIfIamDeadInterval = null;
 
-            function changePasswordFieldType(event) {
-                let element = event.target
-                for (let i = 0; i < 10; i++) {
-                    if (element.className === "relative") {
-                        break;
-                    }
-                    element = element.parentElement;
+        function changePasswordFieldType(event) {
+            let element = event.target
+            for (let i = 0; i < 10; i++) {
+                if (element.className === "relative") {
+                    break;
                 }
-                element = element.children[1];
-                if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
-                    if (element.type === 'password') {
-                        element.type = 'text';
-                        if (element.disabled) return;
-                        element.classList.add('truncate');
-                        this.type = 'text';
-                    } else {
-                        element.type = 'password';
-                        if (element.disabled) return;
-                        element.classList.remove('truncate');
-                        this.type = 'password';
-                    }
+                element = element.parentElement;
+            }
+            element = element.children[1];
+            if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
+                if (element.type === 'password') {
+                    element.type = 'text';
+                    if (element.disabled) return;
+                    element.classList.add('truncate');
+                    this.type = 'text';
+                } else {
+                    element.type = 'password';
+                    if (element.disabled) return;
+                    element.classList.remove('truncate');
+                    this.type = 'password';
                 }
             }
+        }
 
-            function copyToClipboard(text) {
-                navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
-            }
-            document.addEventListener('livewire:init', () => {
-                window.Livewire.on('reloadWindow', (timeout) => {
-                    if (timeout) {
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, timeout);
-                        return;
-                    } else {
+        function copyToClipboard(text) {
+            navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
+        }
+        document.addEventListener('livewire:init', () => {
+            window.Livewire.on('reloadWindow', (timeout) => {
+                if (timeout) {
+                    setTimeout(() => {
                         window.location.reload();
-                    }
-                })
-                window.Livewire.on('info', (message) => {
-                    if (typeof message === 'string') {
-                        window.toast('Info', {
-                            type: 'info',
-                            description: message,
-                        })
-                        return;
-                    }
-                    if (message.length == 1) {
-                        window.toast('Info', {
-                            type: 'info',
-                            description: message[0],
-                        })
-                    } else if (message.length == 2) {
-                        window.toast(message[0], {
-                            type: 'info',
-                            description: message[1],
-                        })
-                    }
-                })
-                window.Livewire.on('error', (message) => {
-                    if (typeof message === 'string') {
-                        window.toast('Error', {
-                            type: 'danger',
-                            description: message,
-                        })
-                        return;
-                    }
-                    if (message.length == 1) {
-                        window.toast('Error', {
-                            type: 'danger',
-                            description: message[0],
-                        })
-                    } else if (message.length == 2) {
-                        window.toast(message[0], {
-                            type: 'danger',
-                            description: message[1],
-                        })
-                    }
-                })
-                window.Livewire.on('warning', (message) => {
-                    if (typeof message === 'string') {
-                        window.toast('Warning', {
-                            type: 'warning',
-                            description: message,
-                        })
-                        return;
-                    }
-                    if (message.length == 1) {
-                        window.toast('Warning', {
-                            type: 'warning',
-                            description: message[0],
-                        })
-                    } else if (message.length == 2) {
-                        window.toast(message[0], {
-                            type: 'warning',
-                            description: message[1],
-                        })
-                    }
-                })
-                window.Livewire.on('success', (message) => {
-                    if (typeof message === 'string') {
-                        window.toast('Success', {
-                            type: 'success',
-                            description: message,
-                        })
-                        return;
-                    }
-                    if (message.length == 1) {
-                        window.toast('Success', {
-                            type: 'success',
-                            description: message[0],
-                        })
-                    } else if (message.length == 2) {
-                        window.toast(message[0], {
-                            type: 'success',
-                            description: message[1],
-                        })
-                    }
-                })
-            });
-        </script>
-    </body>
+                    }, timeout);
+                    return;
+                } else {
+                    window.location.reload();
+                }
+            })
+            window.Livewire.on('info', (message) => {
+                if (typeof message === 'string') {
+                    window.toast('Info', {
+                        type: 'info',
+                        description: message,
+                    })
+                    return;
+                }
+                if (message.length == 1) {
+                    window.toast('Info', {
+                        type: 'info',
+                        description: message[0],
+                    })
+                } else if (message.length == 2) {
+                    window.toast(message[0], {
+                        type: 'info',
+                        description: message[1],
+                    })
+                }
+            })
+            window.Livewire.on('error', (message) => {
+                if (typeof message === 'string') {
+                    window.toast('Error', {
+                        type: 'danger',
+                        description: message,
+                    })
+                    return;
+                }
+                if (message.length == 1) {
+                    window.toast('Error', {
+                        type: 'danger',
+                        description: message[0],
+                    })
+                } else if (message.length == 2) {
+                    window.toast(message[0], {
+                        type: 'danger',
+                        description: message[1],
+                    })
+                }
+            })
+            window.Livewire.on('warning', (message) => {
+                if (typeof message === 'string') {
+                    window.toast('Warning', {
+                        type: 'warning',
+                        description: message,
+                    })
+                    return;
+                }
+                if (message.length == 1) {
+                    window.toast('Warning', {
+                        type: 'warning',
+                        description: message[0],
+                    })
+                } else if (message.length == 2) {
+                    window.toast(message[0], {
+                        type: 'warning',
+                        description: message[1],
+                    })
+                }
+            })
+            window.Livewire.on('success', (message) => {
+                if (typeof message === 'string') {
+                    window.toast('Success', {
+                        type: 'success',
+                        description: message,
+                    })
+                    return;
+                }
+                if (message.length == 1) {
+                    window.toast('Success', {
+                        type: 'success',
+                        description: message[0],
+                    })
+                } else if (message.length == 2) {
+                    window.toast(message[0], {
+                        type: 'success',
+                        description: message[1],
+                    })
+                }
+            })
+        });
+    </script>
+</body>
 @show
 
 </html>
