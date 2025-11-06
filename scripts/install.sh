@@ -32,7 +32,11 @@ if [[ -z "$OPTION_USER" ]]; then # if it's empty
     CURRENT_USER="$DEFAULT_USER"
 elif [[ "$OPTION_USER" == "0" ]]; then # listing all the users
     echo "Here is the list of non-system users:"
+<<<<<<< HEAD
     awk -F':' '{names = names $1 " "} END {print names}' /etc/passwd
+=======
+    awk -F':' '$3 >= 1000 && $1 != "nobody" {names = names $1 " "} END {print names}' /etc/passwd
+>>>>>>> fcb038e62 (fixed todos in install scripts regarding user selection)
     echo
     read -r -p "So, the final one? " USER_WANTED
     CURRENT_USER="${USER_WANTED:-$DEFAULT_USER}"
