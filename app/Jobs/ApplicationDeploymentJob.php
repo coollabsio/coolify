@@ -3224,6 +3224,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return hash_hmac('sha256', $secrets_string, $this->secrets_hash_key);
     }
 
+    protected function findFromInstructionLines($dockerfile): array
+    {
+        $fromLines = [];
+        foreach ($dockerfile as $index => $line) {
+            $trimmedLine = trim($line);
+            // Check if line starts with FROM (case-insensitive)
+            if (preg_match('/^FROM\s+/i', $trimmedLine)) {
+                $fromLines[] = $index;
+            }
+        }
+
+        return $fromLines;
+    }
+
     private function add_build_env_variables_to_dockerfile()
     {
         if ($this->dockerBuildkitSupported) {
@@ -3236,6 +3250,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'ignore_errors' => true,
             ]);
             $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+
+            // Find all FROM instruction positions
+            $fromLines = $this->findFromInstructionLines($dockerfile);
+
+            // If no FROM instructions found, skip ARG insertion
+            if (empty($fromLines)) {
+                return;
+            }
+
+            // Collect all ARG statements to insert
+            $argsToInsert = collect();
+
             if ($this->pull_request_id === 0) {
                 // Only add environment variables that are available during build
                 $envs = $this->application->environment_variables()
@@ -3244,9 +3270,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
+                        $argsToInsert->push("ARG {$env->key}");
                     } else {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
+                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
                     }
                 }
                 // Add Coolify variables as ARGs
@@ -3256,9 +3282,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ->map(function ($var) {
                             return "ARG {$var}";
                         });
-                    foreach ($coolify_vars as $arg) {
-                        $dockerfile->splice(1, 0, [$arg]);
-                    }
+                    $argsToInsert = $argsToInsert->merge($coolify_vars);
                 }
             } else {
                 // Only add preview environment variables that are available during build
@@ -3268,9 +3292,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
+                        $argsToInsert->push("ARG {$env->key}");
                     } else {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
+                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
                     }
                 }
                 // Add Coolify variables as ARGs
@@ -3280,15 +3304,24 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ->map(function ($var) {
                             return "ARG {$var}";
                         });
-                    foreach ($coolify_vars as $arg) {
-                        $dockerfile->splice(1, 0, [$arg]);
-                    }
+                    $argsToInsert = $argsToInsert->merge($coolify_vars);
                 }
             }
 
+            // Add secrets hash if we have environment variables
             if ($envs->isNotEmpty()) {
                 $secrets_hash = $this->generate_secrets_hash($envs);
-                $dockerfile->splice(1, 0, ["ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"]);
+                $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
+            }
+
+            // Insert ARGs after each FROM instruction (in reverse order to maintain correct line numbers)
+            if ($argsToInsert->isNotEmpty()) {
+                foreach (array_reverse($fromLines) as $fromLineIndex) {
+                    // Insert all ARGs after this FROM instruction
+                    foreach ($argsToInsert->reverse() as $arg) {
+                        $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
+                    }
+                }
             }
 
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
