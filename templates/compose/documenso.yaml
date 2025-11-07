@@ -139,12 +139,13 @@ services:
   database:
     image: postgres:17
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-documenso}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-PLACEHOLDER_PASSWORD}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-documenso-db}
     volumes:
       - documenso_postgresql_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
       timeout: 20s
       retries: 10
