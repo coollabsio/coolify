@@ -11,8 +11,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    ports:
-      - "3000:3000"
     environment:
       - SERVICE_URL_DOCUMENSO_3000=http://localhost:3000
       - NEXTAUTH_URL=http://localhost:3000
@@ -32,17 +30,16 @@ services:
       - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://${POSTGRES_USER:-documenso}:${POSTGRES_PASSWORD:-documenso}@database/${POSTGRES_DB:-documenso-db}?schema=public
       - NEXT_PRIVATE_SIGNING_TRANSPORT=local
       - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH=/app/certs/cert.p12
-      - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE=${NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE:-documenso}
+      - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE=${SERVICE_PASSWORD_DOCUMENSO}
       - CERT_VALID_DAYS=${CERT_VALID_DAYS:-365}
       - CERT_INFO_COUNTRY_NAME=${CERT_INFO_COUNTRY_NAME:-US}
       - CERT_INFO_STATE_OR_PROVIDENCE=${CERT_INFO_STATE_OR_PROVIDENCE:-State}
       - CERT_INFO_LOCALITY_NAME=${CERT_INFO_LOCALITY_NAME:-City}
       - CERT_INFO_ORGANIZATION_NAME=${CERT_INFO_ORGANIZATION_NAME:-Test Organization}
       - CERT_INFO_ORGANIZATIONAL_UNIT=${CERT_INFO_ORGANIZATIONAL_UNIT:-IT Department}
-      - CERT_INFO_EMAIL=${CERT_INFO_EMAIL:-test@example.com}
+      - CERT_INFO_EMAIL=${CERT_INFO_EMAIL:-example@example.com}
       - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_LOGIN:-false}
-      - SERVICE_PASSWORD_DOCUMENSO=${SERVICE_PASSWORD_DOCUMENSO:-documenso}
-      - SERVICE_URL_DOCUMENSO=http://localhost:3000
+      - SERVICE_PASSWORD_DOCUMENSO=${SERVICE_PASSWORD_DOCUMENSO:-}
     healthcheck:
       test:
         - CMD-SHELL
@@ -56,6 +53,7 @@ services:
       - -c
       - |
         CERT_PASSPHRASE="$${NEXT_PRIVATE_SIGNING_LOCAL_FILE_PASSPHRASE}"
+        PASSPHRASE_FILE="/tmp/cert_passphrase"
         
         # Save original working directory
         ORIGINAL_DIR="$$(pwd)"
@@ -77,6 +75,11 @@ services:
           mkdir -p "$$CERT_DIR"
           echo "Warning: Using fallback directory: $$CERT_DIR"
         }
+        
+        # Create passphrase file for secure handling (prevents exposure in process list)
+        # This avoids shell word-splitting issues and prevents passphrase from appearing in ps/process list
+        echo -n "$$CERT_PASSPHRASE" > "$$PASSPHRASE_FILE"
+        chmod 600 "$$PASSPHRASE_FILE"
         
         touch /tmp/cert_info_path
         cat <<EOF > /tmp/cert_info_path
@@ -105,13 +108,18 @@ services:
           -days $${CERT_VALID_DAYS} \
           -config /tmp/cert_info_path
         
+        # Create P12 certificate using file-based passphrase (prevents exposure in process list)
+        # Private key is not encrypted, so we only need -passout (not -passin)
         $$OPENSSL_CMD pkcs12 \
           -export \
           -out cert.p12 \
           -inkey private.key \
           -in certificate.crt \
           -legacy \
-          -passout pass:"$$CERT_PASSPHRASE"
+          -passout file:"$$PASSPHRASE_FILE"
+        
+        # Clean up passphrase file immediately after use
+        rm -f "$$PASSPHRASE_FILE"
         
         # Set permissions (may fail if not root, but will work in Coolify)
         chown 1001:1001 cert.p12 private.key certificate.crt 2>/dev/null || true
