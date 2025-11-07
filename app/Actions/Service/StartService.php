@@ -22,6 +22,10 @@ class StartService
         $service->isConfigurationChanged(save: true);
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
+        // Ensure .env file exists before docker compose tries to load it
+        // This is defensive programming - saveComposeConfigs() already creates it,
+        // but we guarantee it here in case of any edge cases or manual deployments
+        $commands[] = 'touch .env';
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = 'docker compose pull';
