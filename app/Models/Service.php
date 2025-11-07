@@ -1287,6 +1287,11 @@ class Service extends BaseModel
 
     public function saveComposeConfigs()
     {
+        // Guard against null or empty docker_compose
+        if (! $this->docker_compose) {
+            return;
+        }
+
         $workdir = $this->workdir();
 
         instant_remote_process([
