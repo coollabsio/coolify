@@ -21,8 +21,31 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
 DOCKER_VERSION="27.0"
-# TODO: Ask for a user
-CURRENT_USER=$USER
+
+# user selection
+DEFAULT_USER="${SUDO_USER:-$USER}"
+
+read -r -p "Which user to use? (Enter for ${DEFAULT_USER}, or type 0 to list users) " OPTION_USER
+
+if [[ -z "$OPTION_USER" ]]; then # if it's empty
+    echo -e "Default user selected..."
+    CURRENT_USER="$DEFAULT_USER"
+elif [[ "$OPTION_USER" == "0" ]]; then # listing all the users
+    echo "Here is the list of non-system users:"
+    awk -F':' '$3 >= 1000 && $1 != "nobody" {names = names $1 " "} END {print names}' /etc/passwd
+    echo
+    read -r -p "So, the final one? " USER_WANTED
+    CURRENT_USER="${USER_WANTED:-$DEFAULT_USER}"
+else
+    CURRENT_USER="$OPTION_USER"
+fi
+
+if ! id -u "$CURRENT_USER" >/dev/null 2>&1; then
+    echo "Error: user '$CURRENT_USER' does not exist." >&2
+    exit 1
+fi
+
+echo "Continuing with user: $CURRENT_USER"
 
 if [ $EUID != 0 ]; then
     echo "Please run this script as root or with sudo"
@@ -718,7 +741,7 @@ if [ -f "$ENV_FILE" ]; then
     cp "$ENV_FILE" "$ENV_FILE-$DATE"
     # Merge .env.production values into .env
     echo " - Merging .env.production values into .env"
-    awk -F '=' '!seen[$1]++' "$ENV_FILE" "/data/coolify/source/.env.production" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+    awk -F '=' '!seen[$1]++' "$ENV_FILE" "/data/coolify/source/.env.production" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
     echo " - .env file merged successfully"
 else
     # If no .env exists, copy .env.production to .env
