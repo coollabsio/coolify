@@ -1,0 +1,37 @@
+# documentation: https://tailscale.com/kb
+# slogan: Tailscale securely connects your devices over the internet using WireGuard.
+# category: networking
+# tags: vpn, wireguard, remote-access
+# logo: svgs/tailscale.svg
+
+version: '3.7'
+services:
+  tailscale-nginx:
+    image: 'tailscale/tailscale:latest'
+    hostname: '${TS_HOSTNAME:-coolify-ts}'
+    environment:
+      - 'TS_HOSTNAME=${TS_HOSTNAME:-coolify-ts}'
+      - 'TS_AUTHKEY=${TS_AUTHKEY:-your_authkey}'
+      - 'TS_STATE_DIR=${TS_STATE_DIR:-/var/lib/tailscale}'
+      - 'TS_USERSPACE=${TS_USERSPACE:-false}'
+    volumes:
+      - 'tailscale-state:/var/lib/tailscale'
+    devices:
+      - '/dev/net/tun:/dev/net/tun'
+    cap_add:
+      - net_admin
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "tailscale status --json | grep -q 'BackendState'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx
+    depends_on:
+      - tailscale-nginx
+    network_mode: 'service:tailscale-nginx'
+
+volumes:
+  tailscale-state: null
