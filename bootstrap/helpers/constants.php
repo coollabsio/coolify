@@ -63,6 +63,7 @@ const SUPPORTED_OS = [
     'sles opensuse-leap opensuse-tumbleweed',
     'arch',
     'alpine',
+    'nixos',
 ];
 
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

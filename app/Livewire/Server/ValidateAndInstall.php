@@ -103,6 +103,14 @@ class ValidateAndInstall extends Component
 
             return;
         }
+
+        if ($this->supported_os_type->contains('nixos')) {
+            $this->error = 'NixOS detected! Please ensure Docker is configured in your NixOS configuration before continuing. See the Docker installation step for detailed instructions.';
+            $this->server->update([
+                'validation_logs' => $this->error,
+            ]);
+        }
+
         $this->dispatch('validateDockerEngine');
     }
 
@@ -113,7 +121,11 @@ class ValidateAndInstall extends Component
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
             if ($this->install) {
                 if ($this->number_of_tries == $this->max_tries) {
-                    $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                    if ($this->supported_os_type && $this->supported_os_type->contains('nixos')) {
+                        $this->error = 'Docker is not installed on your NixOS system. Please follow the NixOS Docker configuration guide shown in the installation logs, then run `sudo nixos-rebuild switch` and click "Retry".';
+                    } else {
+                        $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                    }
                     $this->server->update([
                         'validation_logs' => $this->error,
                     ]);
@@ -129,7 +141,11 @@ class ValidateAndInstall extends Component
                     return;
                 }
             } else {
-                $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                if ($this->supported_os_type && $this->supported_os_type->contains('nixos')) {
+                    $this->error = 'Docker is not installed on your NixOS system. Please configure Docker in your configuration.nix file and run `sudo nixos-rebuild switch`.';
+                } else {
+                    $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                }
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);
