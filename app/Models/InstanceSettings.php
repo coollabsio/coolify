@@ -49,20 +49,32 @@ class InstanceSettings extends Model
             }
         });
     }
-
     public function fqdn(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if ($value) {
-                    $url = Url::fromString($value);
-                    $host = $url->getHost();
+{
+    return Attribute::make(
+        set: function ($value) {
+            if ($value) {
+                $url = Url::fromString($value);
+                $host = $url->getHost();
+                $scheme = $url->getScheme();
+                $port = $url->getPort();
 
-                    return $url->getScheme().'://'.$host;
+                // keep :80 or :443 only if explicitly defined
+                if ($port && !in_array($port, [80, 443])) {
+                    return "{$scheme}://{$host}:{$port}";
                 }
+
+                // explicitly keep :80 if user/template provided it
+                if ($port === 80 && str_contains($value, ':80')) {
+                    return "{$scheme}://{$host}:{$port}";
+                }
+
+                return "{$scheme}://{$host}";
             }
-        );
-    }
+        }
+    );
+}
+
 
     public function updateCheckFrequency(): Attribute
     {
