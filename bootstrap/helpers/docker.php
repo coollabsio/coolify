@@ -17,13 +17,31 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     if (! $server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
+
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
-            if (! str($labels)->contains('coolify.pullRequestId=')) {
-                data_set($container, 'Labels', $labels.",coolify.pullRequestId={$pullRequestId}");
+            $containerName = data_get($container, 'Names');
+            $hasPrLabel = str($labels)->contains('coolify.pullRequestId=');
+            $prLabelValue = null;
 
+            if ($hasPrLabel) {
+                preg_match('/coolify\.pullRequestId=(\d+)/', $labels, $matches);
+                $prLabelValue = $matches[1] ?? null;
+            }
+
+            // Treat pullRequestId=0 or missing label as base deployment (convention: 0 = no PR)
+            $isBaseDeploy = ! $hasPrLabel || (int) $prLabelValue === 0;
+
+            // If we're looking for a specific PR and this is a base deployment, exclude it
+            if ($pullRequestId !== null && $pullRequestId !== 0 && $isBaseDeploy) {
+                return null;
+            }
+
+            // If this is a base deployment, include it when not filtering for PRs
+            if ($isBaseDeploy) {
                 return $container;
             }
+
             if ($includePullrequests) {
                 return $container;
             }
@@ -34,7 +52,9 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
             return null;
         });
 
-        return $containers->filter();
+        $filtered = $containers->filter();
+
+        return $filtered;
     }
 
     return $containers;
