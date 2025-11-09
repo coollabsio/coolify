@@ -10,7 +10,7 @@
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
             <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/r/clickhouse/clickhouse-server/'>https://hub.docker.com/r/clickhouse/clickhouse-server/</a>" />
+                helper="Recommended default: clickhouse/clickhouse-server:lts<br><br>For all available images, check here:<br><a target='_blank' href='https://hub.docker.com/r/clickhouse/clickhouse-server/'>https://hub.docker.com/r/clickhouse/clickhouse-server/</a><br><br>Migration note: When upgrading from bitnami/bitnamilegacy images, keep your existing data volume and mount it to /var/lib/clickhouse for the official image so data is preserved." />
         </div>
 
         @if ($database->started_at)
