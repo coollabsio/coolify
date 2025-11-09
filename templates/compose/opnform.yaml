@@ -10,7 +10,6 @@ x-shared-env: &shared-api-env
   APP_KEY: ${SERVICE_BASE64_APIKEY}
   APP_DEBUG: ${APP_DEBUG:-false}
   APP_URL: ${SERVICE_FQDN_OPNFORM}
-  SELF_HOSTED: ${SELF_HOSTED:-true}
   LOG_CHANNEL: errorlog
   LOG_LEVEL: ${LOG_LEVEL:-debug}
   FILESYSTEM_DRIVER: ${FILESYSTEM_DRIVER:-local}
@@ -50,7 +49,7 @@ x-shared-env: &shared-api-env
 
 services:
   opnform-api:
-    image: jhumanj/opnform-api:1.10.1
+    image: jhumanj/opnform-api:1.10.2
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -77,7 +76,7 @@ services:
       start_period: 60s
 
   api-worker:
-    image: jhumanj/opnform-api:1.10.1
+    image: jhumanj/opnform-api:1.10.2
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -98,7 +97,7 @@ services:
       start_period: 30s
 
   api-scheduler:
-    image: jhumanj/opnform-api:1.10.1
+    image: jhumanj/opnform-api:1.10.2
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -122,15 +121,14 @@ services:
       start_period: 70s # Allow time for first scheduled run and cache write
 
   opnform-ui:
-    image: jhumanj/opnform-client:1.10.1
+    image: jhumanj/opnform-client:1.10.2
     environment:
-      NUXT_PUBLIC_APP_URL: ${NUXT_PUBLIC_APP_URL:-/}
-      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-/api}
-      NUXT_PRIVATE_API_BASE: ${NUXT_PRIVATE_API_BASE:-http://nginx/api}
-      NUXT_PUBLIC_ENV: ${NUXT_PUBLIC_ENV:-production}
-      NUXT_PUBLIC_H_CAPTCHA_SITE_KEY: ${H_CAPTCHA_SITE_KEY}
-      NUXT_PUBLIC_RE_CAPTCHA_SITE_KEY: ${RE_CAPTCHA_SITE_KEY}
-      NUXT_PUBLIC_ROOT_REDIRECT_URL: ${NUXT_PUBLIC_ROOT_REDIRECT_URL}
+      - NUXT_PUBLIC_APP_URL=/
+      - NUXT_PUBLIC_API_BASE=/api
+      - NUXT_PRIVATE_API_BASE=http://nginx/api
+      - NUXT_PUBLIC_ENV=production
+      - NUXT_PUBLIC_H_CAPTCHA_SITE_KEY=${H_CAPTCHA_SITE_KEY}
+      - NUXT_PUBLIC_RE_CAPTCHA_SITE_KEY=${RE_CAPTCHA_SITE_KEY}
     healthcheck:
       test:
         ["CMD-SHELL", "wget --spider -q http://opnform-ui:3000/login || exit 1"]
@@ -138,15 +136,18 @@ services:
       timeout: 10s
       retries: 3
       start_period: 45s
+    depends_on:
+      opnform-api:
+        condition: service_healthy
 
   postgresql:
     image: postgres:16
     volumes:
       - opnform-postgresql-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: ${SERVICE_USER_POSTGRESQL}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRESQL}
-      POSTGRES_DB: ${POSTGRESQL_DATABASE:-opnform}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-opnform}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -156,7 +157,7 @@ services:
   redis:
     image: redis:7
     environment:
-      REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_64_REDIS}
     volumes:
       - redis-data:/data
     command: ["redis-server", "--requirepass", "${SERVICE_PASSWORD_64_REDIS}"]
@@ -170,15 +171,17 @@ services:
   # used for reverse proxying the API service and Web service.
   nginx:
     image: nginx:1.29.2
+    environment:
+      - SERVICE_URL_OPNFORM
     volumes:
       - type: bind
-        source: ./nginx/nginx.conf.template
-        target: /etc/nginx/conf.d/opnform.conf
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/conf.d/default.conf
         read_only: true
         content: |
-          map $request_uri $api_uri {
+          map $original_uri $api_uri {
               ~^/api(/.*$) $1;
-              default $request_uri;
+              default $original_uri;
           }
 
           server {
@@ -210,17 +213,10 @@ services:
                   fastcgi_pass opnform-api:9000;
                   fastcgi_index index.php;
                   include fastcgi_params;
-                  fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+                  fastcgi_param SCRIPT_FILENAME /usr/share/nginx/html/public/index.php;
                   fastcgi_param REQUEST_URI $api_uri;
               }
-
-              # Deny access to . files
-              location ~ /\. {
-                  deny all;
-              }
           }
-    environment:
-      - SERVICE_FQDN_OPNFORM
     depends_on:
       - opnform-api
       - opnform-ui
