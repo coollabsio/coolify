@@ -45,7 +45,7 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
             if ($includePullrequests) {
                 return $container;
             }
-            if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
+            if ($pullRequestId !== null && $pullRequestId !== 0 && str($labels)->contains("coolify.pullRequestId={$pullRequestId}")) {
                 return $container;
             }
 
