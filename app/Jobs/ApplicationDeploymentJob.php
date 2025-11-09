@@ -3029,6 +3029,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function start_by_compose_file()
     {
+        // Ensure .env file exists before docker compose tries to load it (defensive programming)
+        $this->execute_remote_command(
+            ["touch {$this->workdir}/.env", 'hidden' => true],
+            ["touch {$this->configuration_dir}/.env", 'hidden' => true],
+        );
+
         if ($this->application->build_pack === 'dockerimage') {
             $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
             $this->execute_remote_command(

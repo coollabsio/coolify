@@ -59,11 +59,13 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
-                            // Allow simple env vars and env vars with defaults (validated in parseDockerVolumeString)
+                            // Allow env vars and env vars with defaults (validated in parseDockerVolumeString)
+                            // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
                             $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
                             $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
+                            $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $source);
 
-                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault) {
+                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                                 try {
                                     validateShellSafePath($source, 'volume source');
                                 } catch (\Exception $e) {
@@ -310,15 +312,17 @@ function parseDockerVolumeString(string $volumeString): array
     // Validate source path for command injection attempts
     // We validate the final source value after environment variable processing
     if ($source !== null) {
-        // Allow simple environment variables like ${VAR_NAME} or ${VAR}
-        // but validate everything else for shell metacharacters
+        // Allow environment variables like ${VAR_NAME} or ${VAR}
+        // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
         $sourceStr = is_string($source) ? $source : $source;
 
         // Skip validation for simple environment variable references
-        // Pattern: ${WORD_CHARS} with no special characters inside
+        // Pattern 1: ${WORD_CHARS} with no special characters inside
+        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
         $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
+        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
 
-        if (! $isSimpleEnvVar) {
+        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
             try {
                 validateShellSafePath($sourceStr, 'volume source');
             } catch (\Exception $e) {
@@ -711,9 +715,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow simple environment variable references
+                        // Allow environment variable references and env vars with path concatenation
                         $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        if (! $isSimpleEnvVar) {
+                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+
+                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
                             } catch (\Exception $e) {
@@ -1293,6 +1300,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
+        // Auto-inject .env file so Coolify environment variables are available inside containers
+        // This makes Applications behave consistently with manual .env file usage
+        $payload['env_file'] = ['.env'];
         if ($isPullRequest) {
             $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
@@ -1812,9 +1822,12 @@ function serviceParser(Service $resource): Collection
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
                         $sourceValue = $source->value();
-                        // Allow simple environment variable references
+                        // Allow environment variable references and env vars with path concatenation
                         $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        if (! $isSimpleEnvVar) {
+                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
+                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
+
+                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
                             } catch (\Exception $e) {
@@ -2269,6 +2282,9 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
+        // Auto-inject .env file so Coolify environment variables are available inside containers
+        // This makes Services behave consistently with Applications
+        $payload['env_file'] = ['.env'];
 
         $parsedServices->put($serviceName, $payload);
     }

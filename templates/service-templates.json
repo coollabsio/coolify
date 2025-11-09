@@ -3375,6 +3375,19 @@
         "minversion": "0.0.0",
         "port": "9000"
     },
+    "postgresus": {
+        "documentation": "https://postgresus.com/#guide?utm_source=coolify.io",
+        "slogan": "Postgresus is a free, open source and self-hosted tool to backup PostgreSQL.",
+        "compose": "c2VydmljZXM6CiAgcG9zdGdyZXN1czoKICAgIGltYWdlOiAncm9zdGlzbGF2ZHVnaW4vcG9zdGdyZXN1czo3ZmI1OWJiNWQwMmZiYWY4NTZiMGJjZmM3YTA3ODY1NzU4MThiOTZmJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPU1RHUkVTVVNfNDAwNQogICAgdm9sdW1lczoKICAgICAgLSAncG9zdGdyZXN1cy1kYXRhOi9wb3N0Z3Jlc3VzLWRhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gd2dldAogICAgICAgIC0gJy1xTy0nCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo0MDA1L2FwaS92MS9zeXN0ZW0vaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDUK",
+        "tags": [
+            "postgres",
+            "backup"
+        ],
+        "category": "devtools",
+        "logo": "svgs/postgresus.svg",
+        "minversion": "0.0.0",
+        "port": "4005"
+    },
     "postiz": {
         "documentation": "https://docs.postiz.com?utm_source=coolify.io",
         "slogan": "Open source social media scheduling tool.",

@@ -1,6 +1,7 @@
 # documentation: https://rybbit.io/docs
 # slogan: Open-source, privacy-first web analytics.
-# tags: analytics,web,privacy,self-hosted,clickhouse,postgres
+# category: analytics
+# tags: analytics, web, privacy, self-hosted, clickhouse, postgres
 # logo: svgs/rybbit.svg
 # port: 3002
 

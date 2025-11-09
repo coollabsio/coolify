@@ -1,7 +1,7 @@
 # documentation: https://github.com/mregni/EmbyStat
 # slogan: EmbyStat is a web analytics tool, designed to provide insight into website traffic and user behavior.
-# category: media
-# tags: media, server, movies, tv, music
+# category: analytics
+# tags: analytics, insights, statistics, web, traffic
 # port: 6555
 
 services:
