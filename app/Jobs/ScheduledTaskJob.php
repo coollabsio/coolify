@@ -164,9 +164,6 @@ class ScheduledTaskJob implements ShouldQueue
             ]);
 
             // Only notify and throw on final failure
-            if ($this->attempts() >= $this->tries) {
-                $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
-            }
 
             // Re-throw to trigger Laravel's retry mechanism with backoff
             throw $e;
