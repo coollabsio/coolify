@@ -101,7 +101,7 @@ class Heading extends Component
             force_rebuild: $force_rebuild,
         );
         if ($result['status'] === 'skipped') {
-            $this->dispatch('success', 'Deployment skipped', $result['message']);
+            $this->dispatch('error', 'Deployment skipped', $result['message']);
 
             return;
         }
@@ -112,18 +112,6 @@ class Heading extends Component
             'last_restart_at' => null,
             'last_restart_type' => null,
         ]);
-
-        $this->setDeploymentUuid();
-        $result = queue_application_deployment(
-            application: $this->application,
-            deployment_uuid: $this->deploymentUuid,
-            force_rebuild: $force_rebuild,
-        );
-        if ($result['status'] === 'skipped') {
-            $this->dispatch('success', 'Deployment skipped', $result['message']);
-
-            return;
-        }
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
