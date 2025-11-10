@@ -149,9 +149,10 @@ class StackForm extends Component
                 $this->service->save();
                 $this->service->saveExtraFields($this->fields);
                 $this->service->parse();
-                $this->service->refresh();
-                $this->service->saveComposeConfigs();
             });
+            // Refresh and write files after a successful commit
+            $this->service->refresh();
+            $this->service->saveComposeConfigs();
 
             $this->dispatch('refreshEnvs');
             $this->dispatch('refreshServices');
