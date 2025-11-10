@@ -1173,7 +1173,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->build_pack !== 'dockercompose') {
                 $detectedPort = $this->application->detectPortFromEnvironment(false);
                 if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
-                    ray()->orange("PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports));
+                    $this->application_deployment_queue->addLogEntry(
+                        "Warning: PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports).'. It could case "bad gateway" or "no server" errors. Check the "General" page to fix it.',
+                        'stderr'
+                    );
                 }
             }
 
@@ -3060,7 +3063,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         // Ensure .env file exists before docker compose tries to load it (defensive programming)
         $this->execute_remote_command(
-            ["touch {$this->workdir}/.env", 'hidden' => true],
             ["touch {$this->configuration_dir}/.env", 'hidden' => true],
         );
 
