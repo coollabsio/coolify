@@ -48,8 +48,8 @@ services:
       - "465:465" # SMTP over SSL/TLS
       - "2465:2465" # Alternative SMTP port
     volumes:
-      - /data/coolify/certs/${SERVICE_FQDN_UNSEND_PROXY}/key.pem:/data/certs/key.pem:ro
-      - /data/coolify/certs/${SERVICE_FQDN_UNSEND_PROXY}/cert.pem:/data/certs/cert.pem:ro
+      - '/data/coolify/certs/$SERVICE_FQDN_UNSEND_PROXY/key.pem:/data/certs/key.pem:ro'
+      - '/data/coolify/certs/$SERVICE_FQDN_UNSEND_PROXY/cert.pem:/data/certs/cert.pem:ro'
     depends_on:
       - usesend
 
