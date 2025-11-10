@@ -309,16 +309,6 @@ class Github extends Controller
                                             instant_remote_process(["docker rm -f {$deployment_uuid}"], $server);
                                             $activeDeployment->addLogEntry('Deployment container stopped.');
                                         }
-
-                                        // Kill running process if process ID exists
-                                        if ($activeDeployment->current_process_id) {
-                                            try {
-                                                $processKillCommand = "kill -9 {$activeDeployment->current_process_id}";
-                                                instant_remote_process([$processKillCommand], $server);
-                                            } catch (\Throwable $e) {
-                                                // Process might already be gone
-                                            }
-                                        }
                                     } catch (\Throwable $e) {
                                         // Silently handle errors during deployment cancellation
                                     }
@@ -624,15 +614,6 @@ class Github extends Controller
                                             $activeDeployment->addLogEntry('Deployment container stopped.');
                                         }
 
-                                        // Kill running process if process ID exists
-                                        if ($activeDeployment->current_process_id) {
-                                            try {
-                                                $processKillCommand = "kill -9 {$activeDeployment->current_process_id}";
-                                                instant_remote_process([$processKillCommand], $server);
-                                            } catch (\Throwable $e) {
-                                                // Process might already be gone
-                                            }
-                                        }
                                     } catch (\Throwable $e) {
                                         // Silently handle errors during deployment cancellation
                                     }

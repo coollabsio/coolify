@@ -155,15 +155,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     $activeDeployment->addLogEntry('Helper container not yet started. Deployment will be cancelled when job checks status.');
                 }
 
-                // Kill running process if process ID exists
-                if ($activeDeployment->current_process_id) {
-                    try {
-                        $processKillCommand = "kill -9 {$activeDeployment->current_process_id}";
-                        instant_remote_process([$processKillCommand], $server);
-                    } catch (\Throwable $e) {
-                        // Process might already be gone
-                    }
-                }
             } catch (\Throwable $e) {
                 // Silently handle errors during deployment cancellation
             }
