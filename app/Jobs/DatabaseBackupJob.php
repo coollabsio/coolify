@@ -23,6 +23,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 use Visus\Cuid2\Cuid2;
@@ -30,6 +31,16 @@ use Visus\Cuid2\Cuid2;
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 2;
+
+    /**
+     * The maximum number of unhandled exceptions to allow before failing.
+     */
+    public $maxExceptions = 1;
 
     public ?Team $team = null;
 
@@ -659,17 +670,42 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         return "{$helperImage}:{$latestVersion}";
     }
 
+    /**
+     * Calculate the number of seconds to wait before retrying the job.
+     */
+    public function backoff(): array
+    {
+        return [60, 300]; // 1min, 5min between retries
+    }
+
     public function failed(?Throwable $exception): void
     {
+        Log::channel('scheduled-errors')->error('DatabaseBackup permanently failed', [
+            'job' => 'DatabaseBackupJob',
+            'backup_id' => $this->backup->uuid,
+            'database' => $this->database?->name ?? 'unknown',
+            'database_type' => get_class($this->database ?? new \stdClass),
+            'server' => $this->server?->name ?? 'unknown',
+            'total_attempts' => $this->attempts(),
+            'error' => $exception?->getMessage(),
+            'trace' => $exception?->getTraceAsString(),
+        ]);
+
         $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
 
         if ($log) {
             $log->update([
                 'status' => 'failed',
-                'message' => 'Job failed: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
                 'size' => 0,
                 'filename' => null,
+                'finished_at' => Carbon::now(),
             ]);
+        }
+
+        // Notify team about permanent failure
+        if ($this->team) {
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
         }
     }
 }

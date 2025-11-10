@@ -45,6 +45,16 @@ class Dev extends Command
         } else {
             echo "Instance already initialized.\n";
         }
+
+        // Clean up stuck jobs and stale locks on development startup
+        try {
+            echo "Cleaning up Redis (stuck jobs and stale locks)...\n";
+            Artisan::call('cleanup:redis', ['--restart' => true, '--clear-locks' => true]);
+            echo "Redis cleanup completed.\n";
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:redis: {$e->getMessage()}\n";
+        }
+
         CheckHelperImageJob::dispatch();
     }
 }

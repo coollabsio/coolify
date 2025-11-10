@@ -18,10 +18,26 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ScheduledTaskJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 3;
+
+    /**
+     * The maximum number of unhandled exceptions to allow before failing.
+     */
+    public $maxExceptions = 1;
+
+    /**
+     * The number of seconds the job can run before timing out.
+     */
+    public $timeout = 300;
 
     public Team $team;
 
@@ -55,6 +71,9 @@ class ScheduledTaskJob implements ShouldQueue
         }
         $this->team = Team::findOrFail($task->team_id);
         $this->server_timezone = $this->getServerTimezone();
+
+        // Set timeout from task configuration
+        $this->timeout = $this->task->timeout ?? 300;
     }
 
     private function getServerTimezone(): string
@@ -70,9 +89,13 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function handle(): void
     {
+        $startTime = Carbon::now();
+
         try {
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
+                'started_at' => $startTime,
+                'retry_count' => $this->attempts() - 1,
             ]);
 
             $this->server = $this->resource->destination->server;
@@ -129,15 +152,70 @@ class ScheduledTaskJob implements ShouldQueue
                     'message' => $this->task_output ?? $e->getMessage(),
                 ]);
             }
-            $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
+
+            // Log the error to the scheduled-errors channel
+            Log::channel('scheduled-errors')->error('ScheduledTask execution failed', [
+                'job' => 'ScheduledTaskJob',
+                'task_id' => $this->task->uuid,
+                'task_name' => $this->task->name,
+                'server' => $this->server->name ?? 'unknown',
+                'attempt' => $this->attempts(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // Only notify and throw on final failure
+            if ($this->attempts() >= $this->tries) {
+                $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
+            }
+
+            // Re-throw to trigger Laravel's retry mechanism with backoff
             throw $e;
         } finally {
             ScheduledTaskDone::dispatch($this->team->id);
             if ($this->task_log) {
+                $finishedAt = Carbon::now();
+                $duration = round($startTime->floatDiffInSeconds($finishedAt), 2);
+
                 $this->task_log->update([
-                    'finished_at' => Carbon::now()->toImmutable(),
+                    'finished_at' => $finishedAt->toImmutable(),
+                    'duration' => $duration,
                 ]);
             }
         }
+    }
+
+    /**
+     * Calculate the number of seconds to wait before retrying the job.
+     */
+    public function backoff(): array
+    {
+        return [30, 60, 120]; // 30s, 60s, 120s between retries
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(?\Throwable $exception): void
+    {
+        Log::channel('scheduled-errors')->error('ScheduledTask permanently failed', [
+            'job' => 'ScheduledTaskJob',
+            'task_id' => $this->task->uuid,
+            'task_name' => $this->task->name,
+            'server' => $this->server->name ?? 'unknown',
+            'total_attempts' => $this->attempts(),
+            'error' => $exception?->getMessage(),
+            'trace' => $exception?->getTraceAsString(),
+        ]);
+
+        if ($this->task_log) {
+            $this->task_log->update([
+                'status' => 'failed',
+                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+        }
+
+        // Notify team about permanent failure
+        $this->team?->notify(new TaskFailed($this->task, $exception?->getMessage() ?? 'Unknown error'));
     }
 }
