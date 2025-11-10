@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -376,6 +377,10 @@ class GetContainersStatus
                 if (isset($this->applicationContainerRestartCounts) && $this->applicationContainerRestartCounts->has($applicationId)) {
                     $containerRestartCounts = $this->applicationContainerRestartCounts->get($applicationId);
                     $maxRestartCount = $containerRestartCounts->max() ?? 0;
+                }
+
+                // Wrap all database updates in a transaction to ensure consistency
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses) {
                     $previousRestartCount = $application->restart_count ?? 0;
 
                     if ($maxRestartCount > $previousRestartCount) {
@@ -398,18 +403,18 @@ class GetContainersStatus
                             $url = null;
                         }
                     }
-                }
 
-                // Aggregate status after tracking restart counts
-                $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
-                if ($aggregatedStatus) {
-                    $statusFromDb = $application->status;
-                    if ($statusFromDb !== $aggregatedStatus) {
-                        $application->update(['status' => $aggregatedStatus]);
-                    } else {
-                        $application->update(['last_online_at' => now()]);
+                    // Aggregate status after tracking restart counts
+                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
+                    if ($aggregatedStatus) {
+                        $statusFromDb = $application->status;
+                        if ($statusFromDb !== $aggregatedStatus) {
+                            $application->update(['status' => $aggregatedStatus]);
+                        } else {
+                            $application->update(['last_online_at' => now()]);
+                        }
                     }
-                }
+                });
             }
         }
 
