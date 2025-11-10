@@ -135,7 +135,7 @@ class ServiceApplicationView extends Component
         try {
             $this->parameters = get_route_parameters();
             $this->authorize('view', $this->application);
-            $this->requiredPort = $this->application->service->getRequiredPort();
+            $this->requiredPort = $this->application->getRequiredPort();
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -268,8 +268,7 @@ class ServiceApplicationView extends Component
 
             // Check for required port
             if (! $this->forceRemovePort) {
-                $service = $this->application->service;
-                $requiredPort = $service->getRequiredPort();
+                $requiredPort = $this->application->getRequiredPort();
 
                 if ($requiredPort !== null) {
                     // Check if all FQDNs have a port
