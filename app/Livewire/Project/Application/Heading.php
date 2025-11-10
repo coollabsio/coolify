@@ -94,6 +94,14 @@ class Heading extends Component
 
             return;
         }
+
+        // Reset restart count on deployment
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
+
         $this->setDeploymentUuid();
         $result = queue_application_deployment(
             application: $this->application,
@@ -137,6 +145,14 @@ class Heading extends Component
 
             return;
         }
+
+        // Reset restart count on manual restart
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => now(),
+            'last_restart_type' => 'manual',
+        ]);
+
         $this->setDeploymentUuid();
         $result = queue_application_deployment(
             application: $this->application,

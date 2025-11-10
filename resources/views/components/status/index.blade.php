@@ -12,6 +12,13 @@
 @else
     <x-status.stopped :status="$resource->status" />
 @endif
+@if (isset($resource->restart_count) && $resource->restart_count > 0 && !str($resource->status)->startsWith('exited'))
+    <div class="flex items-center pl-2">
+        <span class="text-xs dark:text-warning" title="Container has restarted {{ $resource->restart_count }} time{{ $resource->restart_count > 1 ? 's' : '' }}. Last restart: {{ $resource->last_restart_at?->diffForHumans() }}">
+            ({{ $resource->restart_count }}x restarts)
+        </span>
+    </div>
+@endif
 @if (!str($resource->status)->contains('exited') && $showRefreshButton)
     <button wire:loading.remove.delay.shortest wire:target="manualCheckStatus" title="Refresh Status" wire:click='manualCheckStatus'
         class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">

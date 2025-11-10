@@ -121,6 +121,8 @@ class Application extends BaseModel
 
     protected $casts = [
         'http_basic_auth_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
     ];
 
     protected static function booted()
