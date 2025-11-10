@@ -1000,4 +1000,23 @@ class General extends Component
             }
         }
     }
+
+    public function getDetectedPortInfoProperty(): ?array
+    {
+        $detectedPort = $this->application->detectPortFromEnvironment();
+
+        if (! $detectedPort) {
+            return null;
+        }
+
+        $portsExposesArray = $this->application->ports_exposes_array;
+        $isMatch = in_array($detectedPort, $portsExposesArray);
+        $isEmpty = empty($portsExposesArray);
+
+        return [
+            'port' => $detectedPort,
+            'matches' => $isMatch,
+            'isEmpty' => $isEmpty,
+        ];
+    }
 }

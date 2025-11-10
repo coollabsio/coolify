@@ -772,6 +772,24 @@ class Application extends BaseModel
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
     }
 
+    public function detectPortFromEnvironment(?bool $isPreview = false): ?int
+    {
+        $envVars = $isPreview
+            ? $this->environment_variables_preview
+            : $this->environment_variables;
+
+        $portVar = $envVars->firstWhere('key', 'PORT');
+
+        if ($portVar && $portVar->real_value) {
+            $portValue = trim($portVar->real_value);
+            if (is_numeric($portValue)) {
+                return (int) $portValue;
+            }
+        }
+
+        return null;
+    }
+
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')

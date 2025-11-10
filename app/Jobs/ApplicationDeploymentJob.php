@@ -1168,6 +1168,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($runtime_environment_variables as $env) {
                 $envs->push($env->key.'='.$env->real_value);
             }
+
+            // Check for PORT environment variable mismatch with ports_exposes
+            if ($this->build_pack !== 'dockercompose') {
+                $detectedPort = $this->application->detectPortFromEnvironment(false);
+                if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
+                    ray()->orange("PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports));
+                }
+            }
+
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
                 if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
