@@ -86,6 +86,7 @@ class Init extends Command
             $this->call('cleanup:stucked-resources');
         } catch (\Throwable $e) {
             echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
             $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
