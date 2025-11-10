@@ -94,8 +94,19 @@ class Heading extends Component
 
             return;
         }
+        $this->setDeploymentUuid();
+        $result = queue_application_deployment(
+            application: $this->application,
+            deployment_uuid: $this->deploymentUuid,
+            force_rebuild: $force_rebuild,
+        );
+        if ($result['status'] === 'skipped') {
+            $this->dispatch('success', 'Deployment skipped', $result['message']);
 
-        // Reset restart count on deployment
+            return;
+        }
+
+        // Reset restart count on successful deployment
         $this->application->update([
             'restart_count' => 0,
             'last_restart_at' => null,
