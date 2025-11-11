@@ -394,15 +394,6 @@ class CleanupRedis extends Command
                 continue;
             }
 
-            // Check for JSON decode errors
-            if ($payloadData === null || json_last_error() !== JSON_ERROR_NONE) {
-                $errorMsg = json_last_error_msg();
-                $truncatedPayload = is_string($payload) ? substr($payload, 0, 200) : 'non-string payload';
-                $this->error("Failed to decode job payload for {$keyWithoutPrefix}: {$errorMsg}. Payload: {$truncatedPayload}");
-
-                continue;
-            }
-
             $jobClass = data_get($payloadData, 'displayName', 'Unknown');
 
             // Prefer reserved_at (when job started processing), fallback to created_at
