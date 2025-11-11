@@ -29,6 +29,18 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
+# --- Port Conflict Check ---
+# Check if critical ports (80 and 8000) are already in use
+if ss -tuln | grep -E ':(80|8000)\s' > /dev/null; then
+    echo "❌ Ports 80 or 8000 are already in use."
+    echo "👉 Please free them before running the installer again."
+    echo "   You can check processes with: sudo ss -tulnp | grep -E ':(80|8000)\s'"
+    exit 1
+else
+    echo "✅ Ports 80 and 8000 are free to use."
+fi
+# --- End Port Conflict Check ---
+
 echo -e "Welcome to Coolify Installer!"
 echo -e "This script will install everything for you. Sit back and relax."
 echo -e "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
@@ -842,6 +854,16 @@ IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
 IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
 
 echo -e "\nYour instance is ready to use!\n"
+# --- Enhanced Access URLs (Local & Detected IPs) ---
+IPV4=$(hostname -I 2>/dev/null | awk '{print $1}')
+echo ""
+echo "🚀 Coolify installation complete!"
+echo "🌐 Access URLs:"
+echo "   - Localhost: http://localhost:8000"
+echo "   - Detected IPv4:  http://$IPV4:8000"
+echo "   - IPv6 Loopback:  http://[::1]:8000"
+echo ""
+# --- End Enhanced Access URLs ---
 if [ -n "$IPV4_PUBLIC_IP" ]; then
     echo -e "You can access Coolify through your Public IPV4: http://$IPV4_PUBLIC_IP:8000"
 fi
