@@ -1433,22 +1433,40 @@ function serviceParser(Service $resource): Collection
         }
 
         $image = data_get_str($service, 'image');
-        $isDatabase = isDatabaseImage($image, $service);
-        if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
+
+        // Check for manually migrated services first (respects user's conversion choice)
+        $migratedApp = ServiceApplication::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+        $migratedDb = ServiceDatabase::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+
+        if ($migratedApp || $migratedDb) {
+            // Use the migrated service type, ignoring image detection
+            $isDatabase = (bool) $migratedDb;
+            $savedService = $migratedApp ?: $migratedDb;
+        } else {
+            // Use image detection for non-migrated services
+            $isDatabase = isDatabaseImage($image, $service);
+            if ($isDatabase) {
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                } else {
+                    $savedService = ServiceDatabase::firstOrCreate([
+                        'name' => $serviceName,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             } else {
-                $savedService = ServiceDatabase::firstOrCreate([
+                $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
                     'service_id' => $resource->id,
                 ]);
             }
-        } else {
-            $savedService = ServiceApplication::firstOrCreate([
-                'name' => $serviceName,
-                'service_id' => $resource->id,
-            ]);
         }
         // Update image if it changed
         if ($savedService->image !== $image) {
@@ -1463,7 +1481,24 @@ function serviceParser(Service $resource): Collection
         $environment = collect(data_get($service, 'environment', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
-        $isDatabase = isDatabaseImage($image, $service);
+
+        // Check for manually migrated services first (respects user's conversion choice)
+        $migratedApp = ServiceApplication::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+        $migratedDb = ServiceDatabase::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+
+        if ($migratedApp || $migratedDb) {
+            // Use the migrated service type, ignoring image detection
+            $isDatabase = (bool) $migratedDb;
+        } else {
+            // Use image detection for non-migrated services
+            $isDatabase = isDatabaseImage($image, $service);
+        }
 
         $containerName = "$serviceName-{$resource->uuid}";
 
@@ -1483,7 +1518,11 @@ function serviceParser(Service $resource): Collection
         if ($serviceName === 'plausible') {
             $predefinedPort = '8000';
         }
-        if ($isDatabase) {
+
+        if ($migratedApp || $migratedDb) {
+            // Use the already determined migrated service
+            $savedService = $migratedApp ?: $migratedDb;
+        } elseif ($isDatabase) {
             $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
@@ -1756,7 +1795,25 @@ function serviceParser(Service $resource): Collection
         $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
-        $isDatabase = isDatabaseImage($image, $service);
+        // Check for manually migrated services first (respects user's conversion choice)
+        $migratedApp = ServiceApplication::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+        $migratedDb = ServiceDatabase::where('name', $serviceName)
+            ->where('service_id', $resource->id)
+            ->where('is_migrated', true)
+            ->first();
+
+        if ($migratedApp || $migratedDb) {
+            // Use the migrated service type, ignoring image detection
+            $isDatabase = (bool) $migratedDb;
+            $savedService = $migratedApp ?: $migratedDb;
+        } else {
+            // Use image detection for non-migrated services
+            $isDatabase = isDatabaseImage($image, $service);
+        }
+
         $volumesParsed = collect([]);
 
         $containerName = "$serviceName-{$resource->uuid}";
@@ -1778,7 +1835,10 @@ function serviceParser(Service $resource): Collection
             $predefinedPort = '8000';
         }
 
-        if ($isDatabase) {
+        if ($migratedApp || $migratedDb) {
+            // Use the already determined migrated service
+            $savedService = $migratedApp ?: $migratedDb;
+        } elseif ($isDatabase) {
             $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
