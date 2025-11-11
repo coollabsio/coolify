@@ -379,10 +379,19 @@ class CleanupRedis extends Command
             // Parse job payload to get job class and started time
             $payloadData = json_decode($payload, true);
             $jobClass = data_get($payloadData, 'displayName', 'Unknown');
-            $pushedAt = (int) data_get($data, 'pushed_at', 0);
+
+            // Prefer reserved_at (when job started processing), fallback to created_at
+            $reservedAt = (int) data_get($data, 'reserved_at', 0);
+            $createdAt = (int) data_get($data, 'created_at', 0);
+            $startTime = $reservedAt ?: $createdAt;
+
+            // If we can't determine when the job started, skip it
+            if (! $startTime) {
+                continue;
+            }
 
             // Calculate how long the job has been processing
-            $processingTime = $now - $pushedAt;
+            $processingTime = $now - $startTime;
 
             $shouldFail = false;
             $reason = '';
