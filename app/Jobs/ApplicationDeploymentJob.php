@@ -7,6 +7,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
+use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -31,7 +32,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -976,7 +976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
             if ($forceFail) {
-                throw new RuntimeException($e->getMessage(), 69420);
+                throw new DeploymentException($e->getMessage(), 69420);
             }
         }
     }
@@ -1823,7 +1823,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $env_flags = $this->generate_docker_env_flags_for_secrets();
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
-                throw new RuntimeException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
+                throw new DeploymentException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
@@ -2089,7 +2089,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->saved_outputs->get('nixpacks_type')) {
             $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
             if (str($this->nixpacks_type)->isEmpty()) {
-                throw new RuntimeException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
+                throw new DeploymentException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
         }
 
@@ -3675,7 +3675,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
+        throw new DeploymentException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     private function run_post_deployment_command()
@@ -3711,7 +3711,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Post-deployment command: Could not find a valid container. Is the container name correct?');
+        throw new DeploymentException('Post-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     /**
@@ -3722,7 +3722,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
-            throw new \RuntimeException('Deployment cancelled by user', 69420);
+            throw new DeploymentException('Deployment cancelled by user', 69420);
         }
     }
 
@@ -3755,7 +3755,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
-            throw new \RuntimeException('Deployment cancelled by user', 69420);
+            throw new DeploymentException('Deployment cancelled by user', 69420);
         }
 
         return false;
