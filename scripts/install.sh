@@ -860,10 +860,13 @@ echo ""
 echo "🚀 Coolify installation complete!"
 echo "🌐 Access URLs:"
 echo "   - Localhost: http://localhost:8000"
-echo "   - Detected IPv4:  http://$IPV4:8000"
+if [ -n "$IPV4" ]; then
+    echo "   - Detected IPv4:  http://$IPV4:8000"
+fi
 echo "   - IPv6 Loopback:  http://[::1]:8000"
 echo ""
 # --- End Enhanced Access URLs ---
+
 if [ -n "$IPV4_PUBLIC_IP" ]; then
     echo -e "You can access Coolify through your Public IPV4: http://$IPV4_PUBLIC_IP:8000"
 fi
