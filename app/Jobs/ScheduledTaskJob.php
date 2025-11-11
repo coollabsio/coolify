@@ -41,7 +41,7 @@ class ScheduledTaskJob implements ShouldQueue
 
     public Team $team;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public ScheduledTask $task;
 
@@ -166,7 +166,7 @@ class ScheduledTaskJob implements ShouldQueue
                 'job' => 'ScheduledTaskJob',
                 'task_id' => $this->task->uuid,
                 'task_name' => $this->task->name,
-                'server' => $this->server->name ?? 'unknown',
+                'server' => $this->server?->name ?? 'unknown',
                 'attempt' => $this->attempts(),
                 'error' => $e->getMessage(),
             ]);
@@ -206,7 +206,7 @@ class ScheduledTaskJob implements ShouldQueue
             'job' => 'ScheduledTaskJob',
             'task_id' => $this->task->uuid,
             'task_name' => $this->task->name,
-            'server' => $this->server->name ?? 'unknown',
+            'server' => $this->server?->name ?? 'unknown',
             'total_attempts' => $this->attempts(),
             'error' => $exception?->getMessage(),
             'trace' => $exception?->getTraceAsString(),
