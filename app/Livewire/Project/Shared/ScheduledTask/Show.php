@@ -41,7 +41,7 @@ class Show extends Component
     public ?string $container = null;
 
     #[Validate(['integer', 'required', 'min:60', 'max:3600'])]
-    public int $timeout = 300;
+    public $timeout = 300;
 
     #[Locked]
     public ?string $application_uuid;
@@ -102,7 +102,7 @@ class Show extends Component
             $this->task->command = str($this->command)->trim()->value();
             $this->task->frequency = str($this->frequency)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
-            $this->task->timeout = $this->timeout;
+            $this->task->timeout = (int) $this->timeout;
             $this->task->save();
         } else {
             $this->isEnabled = $this->task->enabled;
