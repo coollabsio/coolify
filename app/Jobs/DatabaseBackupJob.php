@@ -32,14 +32,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * The number of times the job may be attempted.
-     */
-    public $tries = 2;
-
-    /**
-     * The maximum number of unhandled exceptions to allow before failing.
-     */
     public $maxExceptions = 1;
 
     public ?Team $team = null;
@@ -668,14 +660,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
-    }
-
-    /**
-     * Calculate the number of seconds to wait before retrying the job.
-     */
-    public function backoff(): array
-    {
-        return [60, 300]; // 1min, 5min between retries
     }
 
     public function failed(?Throwable $exception): void
