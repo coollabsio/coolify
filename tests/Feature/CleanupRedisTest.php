@@ -64,7 +64,11 @@ it('successfully scans Redis keys when scan returns valid results', function () 
     // Mock command() for hgetall to get job data
     $redisMock->shouldReceive('command')
         ->with('hgetall', Mockery::any())
-        ->andReturn(['status' => 'pending', 'payload' => '{}']);
+        ->andReturn([
+            'status' => 'processing',
+            'reserved_at' => time() - 60, // Started 1 minute ago
+            'payload' => json_encode(['displayName' => 'TestJob']),
+        ]);
 
     Redis::shouldReceive('connection')
         ->with('horizon')
