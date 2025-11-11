@@ -457,13 +457,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             // for example SERVICE_FQDN_APP_3000 (without a value)
             if ($key->startsWith('SERVICE_FQDN_')) {
                 // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
-                if (substr_count(str($key)->value(), '_') === 3) {
-                    $fqdnFor = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
-                    $port = $key->afterLast('_')->value();
-                } else {
-                    $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
-                    $port = null;
-                }
+                $parsed = parseServiceEnvironmentVariable($key->value());
+                $fqdnFor = $parsed['service_name'];
+                $port = $parsed['port'];
                 $fqdn = $resource->fqdn;
                 if (blank($resource->fqdn)) {
                     $fqdn = generateFqdn(server: $server, random: "$uuid", parserVersion: $resource->compose_parsing_version);
@@ -486,7 +482,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $resource->save();
                 }
 
-                if (substr_count(str($key)->value(), '_') === 2) {
+                if (! $parsed['has_port']) {
                     $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -496,7 +492,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 }
-                if (substr_count(str($key)->value(), '_') === 3) {
+                if ($parsed['has_port']) {
 
                     $newKey = str($key)->beforeLast('_');
                     $resource->environment_variables()->updateOrCreate([
@@ -569,13 +565,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } elseif ($command->value() === 'URL') {
                     // SERVICE_URL_APP or SERVICE_URL_APP_3000
                     // Detect if there's a port suffix
-                    if (substr_count(str($key)->value(), '_') === 3) {
-                        $urlFor = $key->after('SERVICE_URL_')->beforeLast('_')->lower()->value();
-                        $port = $key->afterLast('_')->value();
-                    } else {
-                        $urlFor = $key->after('SERVICE_URL_')->lower()->value();
-                        $port = null;
-                    }
+                    $parsed = parseServiceEnvironmentVariable($key->value());
+                    $urlFor = $parsed['service_name'];
+                    $port = $parsed['port'];
                     $originalUrlFor = str($urlFor)->replace('_', '-');
                     if (str($urlFor)->contains('-')) {
                         $urlFor = str($urlFor)->replace('-', '_')->replace('.', '_');
@@ -1554,27 +1546,16 @@ function serviceParser(Service $resource): Collection
             // Get magic environments where we need to preset the FQDN / URL
             if ($key->startsWith('SERVICE_FQDN_') || $key->startsWith('SERVICE_URL_')) {
                 // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
-                if (substr_count(str($key)->value(), '_') === 3) {
-                    if ($key->startsWith('SERVICE_FQDN_')) {
-                        $urlFor = null;
-                        $fqdnFor = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
-                    }
-                    if ($key->startsWith('SERVICE_URL_')) {
-                        $fqdnFor = null;
-                        $urlFor = $key->after('SERVICE_URL_')->beforeLast('_')->lower()->value();
-                    }
-                    $port = $key->afterLast('_')->value();
-                } else {
-                    if ($key->startsWith('SERVICE_FQDN_')) {
-                        $urlFor = null;
-                        $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
-                    }
-                    if ($key->startsWith('SERVICE_URL_')) {
-                        $fqdnFor = null;
-                        $urlFor = $key->after('SERVICE_URL_')->lower()->value();
-                    }
-                    $port = null;
+                $parsed = parseServiceEnvironmentVariable($key->value());
+                if ($key->startsWith('SERVICE_FQDN_')) {
+                    $urlFor = null;
+                    $fqdnFor = $parsed['service_name'];
                 }
+                if ($key->startsWith('SERVICE_URL_')) {
+                    $fqdnFor = null;
+                    $urlFor = $parsed['service_name'];
+                }
+                $port = $parsed['port'];
                 if (blank($savedService->fqdn)) {
                     if ($fqdnFor) {
                         $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -1619,7 +1600,7 @@ function serviceParser(Service $resource): Collection
                     }
                     $savedService->save();
                 }
-                if (substr_count(str($key)->value(), '_') === 2) {
+                if (! $parsed['has_port']) {
                     $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -1637,7 +1618,7 @@ function serviceParser(Service $resource): Collection
                         'is_preview' => false,
                     ]);
                 }
-                if (substr_count(str($key)->value(), '_') === 3) {
+                if ($parsed['has_port']) {
                     // For port-specific variables (e.g., SERVICE_FQDN_UMAMI_3000),
                     // keep the port suffix in the key and use the URL with port
                     $resource->environment_variables()->updateOrCreate([
