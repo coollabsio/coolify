@@ -359,7 +359,14 @@ class CleanupRedis extends Command
         $cursor = 0;
         $keys = [];
         do {
-            $result = $redis->scan($cursor, ['MATCH' => '*', 'COUNT' => 100]);
+            $result = $redis->scan($cursor, ['match' => '*', 'count' => 100]);
+
+            // Guard against scan() returning false
+            if ($result === false) {
+                $this->error('Redis scan failed, stopping key retrieval');
+                break;
+            }
+
             $cursor = $result[0];
             $keys = array_merge($keys, $result[1]);
         } while ($cursor !== 0);
