@@ -47,6 +47,8 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
+    'timescaledb/timescaledb',
+    'pgvector/pgvector',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
