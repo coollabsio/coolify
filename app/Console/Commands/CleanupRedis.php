@@ -356,7 +356,13 @@ class CleanupRedis extends Command
         $now = time();
 
         // Get all keys with the horizon prefix
-        $keys = $redis->keys('*');
+        $cursor = 0;
+        $keys = [];
+        do {
+            $result = $redis->scan($cursor, ['MATCH' => '*', 'COUNT' => 100]);
+            $cursor = $result[0];
+            $keys = array_merge($keys, $result[1]);
+        } while ($cursor !== 0);
 
         foreach ($keys as $key) {
             $keyWithoutPrefix = str_replace($prefix, '', $key);
