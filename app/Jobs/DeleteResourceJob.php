@@ -145,11 +145,12 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Check if helper container exists and kill it
                 $deployment_uuid = $activeDeployment->deployment_uuid;
-                $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
+                $escapedDeploymentUuid = escapeshellarg($deployment_uuid);
+                $checkCommand = "docker ps -a --filter name={$escapedDeploymentUuid} --format '{{.Names}}'";
                 $containerExists = instant_remote_process([$checkCommand], $server);
 
                 if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                    instant_remote_process(["docker rm -f {$deployment_uuid}"], $server);
+                    instant_remote_process(["docker rm -f {$escapedDeploymentUuid}"], $server);
                     $activeDeployment->addLogEntry('Deployment container stopped.');
                 } else {
                     $activeDeployment->addLogEntry('Helper container not yet started. Deployment will be cancelled when job checks status.');
@@ -162,7 +163,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         try {
             if ($server->isSwarm()) {
-                instant_remote_process(["docker stack rm {$application->uuid}-{$pull_request_id}"], $server);
+                $escapedStackName = escapeshellarg("{$application->uuid}-{$pull_request_id}");
+                instant_remote_process(["docker stack rm {$escapedStackName}"], $server);
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $application->id, $pull_request_id)->toArray();
                 $this->stopPreviewContainers($containers, $server);
