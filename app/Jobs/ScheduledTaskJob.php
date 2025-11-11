@@ -49,6 +49,11 @@ class ScheduledTaskJob implements ShouldQueue
 
     public ?ScheduledTaskExecution $task_log = null;
 
+    /**
+     * Store execution ID to survive job serialization for timeout handling.
+     */
+    protected ?int $executionId = null;
+
     public string $task_status = 'failed';
 
     public ?string $task_output = null;
@@ -97,6 +102,9 @@ class ScheduledTaskJob implements ShouldQueue
                 'started_at' => $startTime,
                 'retry_count' => $this->attempts() - 1,
             ]);
+
+            // Store execution ID for timeout handling
+            $this->executionId = $this->task_log->id;
 
             $this->server = $this->resource->destination->server;
 
@@ -204,11 +212,45 @@ class ScheduledTaskJob implements ShouldQueue
             'trace' => $exception?->getTraceAsString(),
         ]);
 
-        if ($this->task_log) {
-            $this->task_log->update([
+        // Reload execution log from database
+        // When a job times out, failed() is called in a fresh process with the original
+        // queue payload, so $executionId will be null. We need to query for the latest execution.
+        $execution = null;
+
+        // Try to find execution using stored ID first (works for non-timeout failures)
+        if ($this->executionId) {
+            $execution = ScheduledTaskExecution::find($this->executionId);
+        }
+
+        // If no stored ID or not found, query for the most recent execution log for this task
+        if (! $execution) {
+            $execution = ScheduledTaskExecution::query()
+                ->where('scheduled_task_id', $this->task->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+
+        // Last resort: check task_log property
+        if (! $execution && $this->task_log) {
+            $execution = $this->task_log;
+        }
+
+        if ($execution) {
+            $errorMessage = 'Job permanently failed after '.$this->attempts().' attempts';
+            if ($exception) {
+                $errorMessage .= ': '.$exception->getMessage();
+            }
+
+            $execution->update([
                 'status' => 'failed',
-                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => $errorMessage,
+                'error_details' => $exception?->getTraceAsString(),
                 'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+        } else {
+            Log::channel('scheduled-errors')->warning('Could not find execution log to update', [
+                'execution_id' => $this->executionId,
+                'task_id' => $this->task->uuid,
             ]);
         }
 
