@@ -63,11 +63,12 @@ echo " - Running final installation checks..."
 # Function to check if a port is in use
 check_port() {
   local port=$1
-  if sudo lsof -i:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+  if ss -tuln 2>/dev/null | grep -q ":$port "; then
     echo "⚠️  Port $port is already in use. This may prevent Coolify from starting correctly."
     echo "   Please free this port or set APP_PORT in /data/coolify/source/.env to another value."
   fi
 }
+
 
 # 1. Check for port conflicts
 check_port 80
