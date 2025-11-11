@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a993799242581bd06b5939005ee458d9",
+    "content-hash": "423b7d10901b9f31c926d536ff163a22",
     "packages": [
         {
             "name": "amphp/amp",
@@ -7048,16 +7048,16 @@
         },
         {
             "name": "resend/resend-laravel",
-            "version": "v0.19.0",
+            "version": "v0.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/resend/resend-laravel.git",
-                "reference": "ce11e363c42c1d6b93983dfebbaba3f906863c3a"
+                "reference": "f32c2f484df2bc65fba8ea9ab9b210cd42d9f3ed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/resend/resend-laravel/zipball/ce11e363c42c1d6b93983dfebbaba3f906863c3a",
-                "reference": "ce11e363c42c1d6b93983dfebbaba3f906863c3a",
+                "url": "https://api.github.com/repos/resend/resend-laravel/zipball/f32c2f484df2bc65fba8ea9ab9b210cd42d9f3ed",
+                "reference": "f32c2f484df2bc65fba8ea9ab9b210cd42d9f3ed",
                 "shasum": ""
             },
             "require": {
@@ -7111,9 +7111,9 @@
             ],
             "support": {
                 "issues": "https://github.com/resend/resend-laravel/issues",
-                "source": "https://github.com/resend/resend-laravel/tree/v0.19.0"
+                "source": "https://github.com/resend/resend-laravel/tree/v0.20.0"
             },
-            "time": "2025-05-06T21:36:51+00:00"
+            "time": "2025-08-04T19:26:47+00:00"
         },
         {
             "name": "resend/resend-php",
