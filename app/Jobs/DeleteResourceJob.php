@@ -125,15 +125,15 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Cancel any active deployments for this PR (same logic as API cancel_deployment)
-        $activeDeployment = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
+        $activeDeployments = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
             ->where('pull_request_id', $pull_request_id)
             ->whereIn('status', [
                 \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
                 \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
             ])
-            ->first();
+            ->get();
 
-        if ($activeDeployment) {
+        foreach ($activeDeployments as $activeDeployment) {
             try {
                 // Mark deployment as cancelled
                 $activeDeployment->update([
