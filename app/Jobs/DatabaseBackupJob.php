@@ -705,7 +705,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         // Notify team about permanent failure
         if ($this->team) {
-            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
+            $databaseName = $log?->database_name ?? 'unknown';
+            $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $output, $databaseName));
         }
     }
 }
