@@ -130,3 +130,5 @@
         </div>
     </div>
 </form>
+
+<livewire:project.database.backup.configuration :backup="$backup" />
