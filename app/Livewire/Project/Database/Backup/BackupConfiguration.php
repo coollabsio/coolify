@@ -47,8 +47,8 @@ class BackupConfiguration extends Component
         $this->enabled = $this->backup->enabled;
         $this->save_s3 = $this->backup->save_s3;
         $this->s3_storage_id = $this->backup->s3_storage_id;
-        $this->number_of_backups_locally = $this->backup->number_of_backups_locally;
-        $this->backup_retention_days = $this->backup->backup_retention_days;
+        $this->number_of_backups_locally = $this->backup->number_of_backups_locally ?? 0;
+        $this->backup_retention_days = $this->backup->backup_retention_days ?? 0;
         $this->use_pgbackrest = $this->backup->use_pgbackrest ?? false;
         $this->backup_engine = $this->backup->backup_engine ?? 'pg_dump';
         

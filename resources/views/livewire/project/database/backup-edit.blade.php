@@ -1,3 +1,4 @@
+<div>
 <form wire:submit="submit">
     <div class="flex gap-2 pb-2">
         <h2>Scheduled Backup</h2>
@@ -131,4 +132,7 @@
     </div>
 </form>
 
-<livewire:project.database.backup.configuration :backup="$backup" />
+<div class="mt-8 mb-8">
+    <livewire:project.database.backup.backup-configuration :backup="$backup" />
+</div>
+</div>

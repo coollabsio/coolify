@@ -30,7 +30,7 @@ class PgBackRestService
     public function install(): array
     {
         try {
-            $containerName = $this->database->uuid;
+            $containerName = $this->database->container_name ?? $this->database->uuid;
             
             // Check if already installed
             $checkCommand = "docker exec {$containerName} which pgbackrest";

@@ -13,7 +13,7 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
-                            pgBackRest - Enterprise Backup Solution
+                            PGBackRest - Enterprise Backup Solution
                         </h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
                             Advanced backup engine with incremental backups, parallel processing, and significant S3 cost savings.
