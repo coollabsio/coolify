@@ -212,7 +212,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v3.1',
+                    'image' => 'traefik:v3.6',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
