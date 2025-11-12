@@ -295,6 +295,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
+    Route::post('/upload/terminal', [UploadController::class, 'uploadTerminalFile'])->name('upload.terminal');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $user = auth()->user();

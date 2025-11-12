@@ -16,6 +16,8 @@ class Index extends Component
 
     public bool $isLoadingContainers = true;
 
+    public bool $showImportModal = false;
+
     public function mount()
     {
         $this->servers = Server::isReachable()->get()->filter(function ($server) {
@@ -82,6 +84,58 @@ class Index extends Component
             $container['connection_name'] ?? $this->selected_uuid,
             $container['server_uuid'] ?? $this->selected_uuid
         );
+    }
+
+    public function getTargetName()
+    {
+        if ($this->selected_uuid === 'default') {
+            return '';
+        }
+
+        // Check if it's a server
+        $server = collect($this->servers)->firstWhere('uuid', $this->selected_uuid);
+        if ($server) {
+            return $server->name.' (Server)';
+        }
+
+        // Otherwise it's a container
+        $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
+        if ($container) {
+            return $container['name'];
+        }
+
+        return '';
+    }
+
+    public function getServerUuid()
+    {
+        if ($this->selected_uuid === 'default') {
+            return null;
+        }
+
+        // Check if it's a server
+        $server = collect($this->servers)->firstWhere('uuid', $this->selected_uuid);
+        if ($server) {
+            return $server->uuid;
+        }
+
+        // Otherwise it's a container, get its server
+        $container = collect($this->containers)->firstWhere('uuid', $this->selected_uuid);
+        if ($container) {
+            return $container['server_uuid'];
+        }
+
+        return null;
+    }
+
+    public function openImportModal()
+    {
+        $this->showImportModal = true;
+    }
+
+    public function closeImportModal()
+    {
+        $this->showImportModal = false;
     }
 
     public function render()
