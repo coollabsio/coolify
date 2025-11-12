@@ -198,6 +198,8 @@ Route::group([
     });
 });
 
+require __DIR__.'/api_backup.php';
+
 Route::any('/{any}', function () {
     return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
