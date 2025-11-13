@@ -1,5 +1,5 @@
 <div class="pb-6">
-    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen>
+    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
             <livewire:activity-monitor header="Logs" fullHeight />
@@ -97,12 +97,6 @@
         <div class="order-first sm:order-last">
             <div>
                 @if ($server->proxySet())
-                    <x-slide-over fullScreen @startproxy.window="slideOverOpen = true">
-                        <x-slot:title>Proxy Status</x-slot:title>
-                        <x-slot:content>
-                            <livewire:activity-monitor header="Logs" />
-                        </x-slot:content>
-                    </x-slide-over>
                     @if ($proxyStatus === 'running')
                         <div class="flex gap-2">
                             <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
@@ -181,6 +175,7 @@
                         });
                         $wire.$on('restartEvent', () => {
                             $wire.$dispatch('info', 'Initiating proxy restart.');
+                            window.dispatchEvent(new CustomEvent('startproxy'))
                             $wire.$call('restart');
                         });
                         $wire.$on('startProxy', () => {

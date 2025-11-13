@@ -347,6 +347,8 @@ class Index extends Component
         }
         $this->createdServer->proxy->type = $proxyType;
         $this->createdServer->proxy->status = 'exited';
+        $this->createdServer->proxy->last_saved_settings = null;
+        $this->createdServer->proxy->last_applied_settings = null;
         $this->createdServer->save();
         $this->getProjects();
     }

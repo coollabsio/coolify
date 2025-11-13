@@ -167,6 +167,7 @@ class Server extends BaseModel
         'hetzner_server_id',
         'hetzner_server_status',
         'is_validating',
+        'detected_traefik_version',
     ];
 
     protected $guarded = [];

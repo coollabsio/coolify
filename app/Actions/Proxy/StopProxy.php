@@ -12,13 +12,16 @@ class StopProxy
 {
     use AsAction;
 
-    public function handle(Server $server, bool $forceStop = true, int $timeout = 30)
+    public function handle(Server $server, bool $forceStop = true, int $timeout = 30, bool $restarting = false)
     {
         try {
             $containerName = $server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
             $server->proxy->status = 'stopping';
             $server->save();
-            ProxyStatusChangedUI::dispatch($server->team_id);
+
+            if (! $restarting) {
+                ProxyStatusChangedUI::dispatch($server->team_id);
+            }
 
             instant_remote_process(command: [
                 "docker stop --time=$timeout $containerName",
@@ -32,7 +35,10 @@ class StopProxy
             return handleError($e);
         } finally {
             ProxyDashboardCacheService::clearCache($server);
-            ProxyStatusChanged::dispatch($server->id);
+
+            if (! $restarting) {
+                ProxyStatusChanged::dispatch($server->id);
+            }
         }
     }
 }

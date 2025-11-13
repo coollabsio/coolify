@@ -13,7 +13,7 @@ class StartProxy
 {
     use AsAction;
 
-    public function handle(Server $server, bool $async = true, bool $force = false): string|Activity
+    public function handle(Server $server, bool $async = true, bool $force = false, bool $restarting = false): string|Activity
     {
         $proxyType = $server->proxyType();
         if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
@@ -22,7 +22,10 @@ class StartProxy
         $server->proxy->set('status', 'starting');
         $server->save();
         $server->refresh();
-        ProxyStatusChangedUI::dispatch($server->team_id);
+
+        if (! $restarting) {
+            ProxyStatusChangedUI::dispatch($server->team_id);
+        }
 
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
