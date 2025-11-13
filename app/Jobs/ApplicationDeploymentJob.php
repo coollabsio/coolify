@@ -1125,7 +1125,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             }
 
