@@ -1112,8 +1112,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyUrl->__toString());
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyFqdn);
                     }
                 }
 
@@ -1125,7 +1125,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                    $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->upper();
+                    $envKey = sprintf('SERVICE_NAME_%s', $sanitizedKey);
+
+                    if ($envs->contains(fn($env) => str($env)->startsWith(sprintf('%s=', $envKey)))) {
+                        $this->application_deployment_queue->addLogEntry("Warning: SERVICE_NAME collision detected for service '{$serviceName}' (sanitized to {$sanitizedKey})", 'warning');
+                    }
+
+                    $envs->push(sprintf('%s=%s', $envKey, $serviceName));
                 }
             }
 
