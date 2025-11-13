@@ -161,7 +161,7 @@
                                         @endif
                                     </td>
                                     <td class="py-3 pr-4">
-                                        {{ number_format($file['size'] / 1024 / 1024, 2) }} MB
+                                        {{ formatBytes($file['size']) }}
                                     </td>
                                     <td class="py-3 pr-4">
                                         {{ \Carbon\Carbon::createFromTimestamp($file['uploaded_at'])->diffForHumans() }}
