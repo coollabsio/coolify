@@ -130,14 +130,17 @@ class FileImport extends Component
 
             // Copy file to server's temporary directory
             $serverTmpPath = "/tmp/coolify_import_{$uploadId}_{$sanitizedFilename}";
-            instant_scp($finalPath, $serverTmpPath, $server);
+            $safeServerTmpPath = escapeshellarg($serverTmpPath);
+            instant_scp($finalPath, $safeServerTmpPath, $server);
 
             // If it's a container, copy to container
             if ($isContainer) {
                 $containerPath = "/tmp/{$sanitizedFilename}";
+                $safeContainer = escapeshellarg($this->selectedUuid);
+                $safeContainerPath = escapeshellarg($containerPath);
 
                 instant_remote_process([
-                    "docker cp {$serverTmpPath} {$this->selectedUuid}:{$containerPath}",
+                    "docker cp {$safeServerTmpPath} {$safeContainer}:{$safeContainerPath}",
                 ], $server);
 
                 $this->filePath = $containerPath;

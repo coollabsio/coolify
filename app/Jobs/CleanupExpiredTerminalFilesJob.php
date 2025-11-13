@@ -41,9 +41,10 @@ class CleanupExpiredTerminalFilesJob implements ShouldQueue
             // Delete file from server
             $server = Server::find($this->serverId);
             if ($server) {
-                // Remove from server
+                // Remove from server - escape shell arguments to prevent injection
+                $escapedServerPath = escapeshellarg($this->serverPath);
                 $result = instant_remote_process([
-                    "rm -f {$this->serverPath}"
+                    "rm -f {$escapedServerPath}"
                 ], $server, throwError: false);
 
                 if ($result) {
@@ -52,9 +53,12 @@ class CleanupExpiredTerminalFilesJob implements ShouldQueue
 
                 // If container was specified, remove from container as well
                 if ($this->containerUuid) {
-                    $containerPath = "/tmp/{$this->filename}";
+                    $escapedContainerUuid = escapeshellarg($this->containerUuid);
+                    $escapedFilename = escapeshellarg($this->filename);
+                    $containerPath = "/tmp/{$this->filename}"; // For logging only
+
                     instant_remote_process([
-                        "docker exec {$this->containerUuid} rm -f {$containerPath} 2>/dev/null || true"
+                        "docker exec {$escapedContainerUuid} rm -f /tmp/{$escapedFilename} 2>/dev/null || true"
                     ], $server, throwError: false);
 
                     Log::info("Cleaned up container terminal file: {$containerPath}");

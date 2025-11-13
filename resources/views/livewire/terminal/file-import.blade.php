@@ -1,7 +1,6 @@
 <div x-data="{ error: $wire.entangle('error'), filesize: $wire.entangle('filesize'), filename: $wire.entangle('filename'), isUploading: $wire.entangle('isUploading'), progress: $wire.entangle('progress'), filePath: $wire.entangle('filePath') }">
 
     <div class="pb-4">
-        <h2>Import File for Terminal</h2>
         <div class="text-sm text-neutral-500 pb-2">
             Upload a file that will be temporarily stored and accessible in your selected server or container.
             Perfect for importing SQL dumps, configuration files, or any other data.

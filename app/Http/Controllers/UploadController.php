@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Pion\Laravel\ChunkUpload\Exceptions\UploadMissingFileException;
 use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
 use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
@@ -114,13 +115,28 @@ class UploadController extends BaseController
             mkdir($finalPath, 0755, true);
         }
 
-        // Use original filename with timestamp to avoid conflicts
-        $filename = time().'_'.$file->getClientOriginalName();
-        $file->move($finalPath, $filename);
+        // Security: Generate safe filename server-side to prevent path traversal
+        $originalName = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+
+        // Create a safe slug from original filename (without extension)
+        $nameWithoutExt = pathinfo($originalName, PATHINFO_FILENAME);
+        $safeSlug = Str::slug($nameWithoutExt); // Converts to lowercase, replaces special chars with dashes
+        $safeSlug = substr($safeSlug, 0, 50); // Limit length
+
+        // Sanitize extension (only allow alphanumeric)
+        $safeExtension = preg_replace('/[^a-zA-Z0-9]/', '', $extension);
+
+        // Generate safe filename: timestamp_slug_randomhash.ext
+        $randomHash = Str::random(16);
+        $safeFilename = time().'_'.$safeSlug.'_'.$randomHash.($safeExtension ? '.'.$safeExtension : '');
+
+        $file->move($finalPath, $safeFilename);
 
         return response()->json([
             'mime_type' => $mime,
-            'filename' => $filename,
+            'filename' => $safeFilename,
+            'original_name' => $originalName, // Keep original name for reference
         ]);
     }
 }
