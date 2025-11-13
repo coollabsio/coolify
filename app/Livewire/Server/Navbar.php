@@ -143,6 +143,9 @@ class Navbar extends Component
                     $this->dispatch('success', 'Proxy is running.');
                 }
                 break;
+            case 'restarting':
+                $this->dispatch('info', 'Initiating proxy restart.');
+                break;
             case 'exited':
                 // Only show "Proxy has exited" notification when transitioning from running state
                 // Don't show during normal stop/restart flows (stopping, restarting)
