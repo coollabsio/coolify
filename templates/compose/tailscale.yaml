@@ -28,7 +28,7 @@ services:
   nginx:
     image: nginx:latest
     depends_on:
-      - tailscale-nginx
+      - tailscale-client
     network_mode: 'service:tailscale-nginx'
 
 volumes:
