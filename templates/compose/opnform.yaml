@@ -9,7 +9,7 @@ x-shared-env: &shared-api-env
   APP_ENV: production
   APP_KEY: ${SERVICE_BASE64_APIKEY}
   APP_DEBUG: ${APP_DEBUG:-false}
-  APP_URL: ${SERVICE_FQDN_NGINX}
+  APP_URL: ${SERVICE_URL_NGINX}
   LOG_CHANNEL: errorlog
   LOG_LEVEL: ${LOG_LEVEL:-debug}
   FILESYSTEM_DRIVER: ${FILESYSTEM_DRIVER:-local}
@@ -171,8 +171,6 @@ services:
   # used for reverse proxying the API service and Web service.
   nginx:
     image: nginx:1.29.2
-    environment:
-      - SERVICE_URL_NGINX
     volumes:
       - type: bind
         source: ./nginx/nginx.conf
