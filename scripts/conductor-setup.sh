@@ -11,12 +11,14 @@ echo "Setting up shared node_modules and vendor directories..."
 mkdir -p "$CONDUCTOR_ROOT_PATH/node_modules"
 mkdir -p "$CONDUCTOR_ROOT_PATH/vendor"
 
+# Get current worktree path
+WORKTREE_PATH=$(pwd)
+
 # Remove existing directories if they exist and are not symlinks
-[ -d "node_modules" ] && [ ! -L "node_modules" ] && rm -rf node_modules
-[ -d "vendor" ] && [ ! -L "vendor" ] && rm -rf vendor
+[ -d "node_modules" ] && [ ! -L "node_modules" ] && rm -rf "$WORKTREE_PATH/node_modules"
+[ -d "vendor" ] && [ ! -L "vendor" ] && rm -rf "$WORKTREE_PATH/vendor"
 
 # Calculate relative path from worktree to main repo
-WORKTREE_PATH=$(pwd)
 RELATIVE_PATH=$(python3 -c "import os.path; print(os.path.relpath('$CONDUCTOR_ROOT_PATH', '$WORKTREE_PATH'))")
 
 # Create symlinks to main repo's node_modules and vendor
