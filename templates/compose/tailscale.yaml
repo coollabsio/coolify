@@ -10,7 +10,7 @@ services:
     hostname: '${TS_HOSTNAME:-coolify-ts}'
     environment:
       - 'TS_HOSTNAME=${TS_HOSTNAME:-coolify-ts}'
-      - 'TS_AUTHKEY=${TS_AUTHKEY:-your_authkey}'
+      - 'TS_AUTHKEY=${TS_AUTHKEY:?}'
       - 'TS_STATE_DIR=${TS_STATE_DIR:-/var/lib/tailscale}'
       - 'TS_USERSPACE=${TS_USERSPACE:-false}'
     volumes:
