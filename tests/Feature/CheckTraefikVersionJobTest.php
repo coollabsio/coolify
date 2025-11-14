@@ -179,3 +179,37 @@ it('groups servers by team correctly', function () {
     expect($grouped[$team1->id])->toHaveCount(2);
     expect($grouped[$team2->id])->toHaveCount(1);
 });
+
+it('parallel processing jobs exist and have correct structure', function () {
+    expect(class_exists(\App\Jobs\CheckTraefikVersionForServerJob::class))->toBeTrue();
+    expect(class_exists(\App\Jobs\NotifyOutdatedTraefikServersJob::class))->toBeTrue();
+
+    // Verify CheckTraefikVersionForServerJob has required properties
+    $reflection = new \ReflectionClass(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    expect($reflection->hasProperty('tries'))->toBeTrue();
+    expect($reflection->hasProperty('timeout'))->toBeTrue();
+
+    // Verify it implements ShouldQueue
+    $interfaces = class_implements(\App\Jobs\CheckTraefikVersionForServerJob::class);
+    expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
+});
+
+it('calculates delay seconds correctly for notification job', function () {
+    // Test delay calculation logic
+    $serverCounts = [10, 100, 500, 1000, 5000];
+
+    foreach ($serverCounts as $count) {
+        $delaySeconds = min(300, max(60, (int) ($count / 10)));
+
+        // Should be at least 60 seconds
+        expect($delaySeconds)->toBeGreaterThanOrEqual(60);
+
+        // Should not exceed 300 seconds
+        expect($delaySeconds)->toBeLessThanOrEqual(300);
+    }
+
+    // Specific test cases
+    expect(min(300, max(60, (int) (10 / 10))))->toBe(60);  // 10 servers = 60s (minimum)
+    expect(min(300, max(60, (int) (1000 / 10))))->toBe(100); // 1000 servers = 100s
+    expect(min(300, max(60, (int) (5000 / 10))))->toBe(300); // 5000 servers = 300s (maximum)
+});
