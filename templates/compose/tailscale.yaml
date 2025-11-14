@@ -5,7 +5,7 @@
 # logo: svgs/tailscale.svg
 
 services:
-  tailscale-nginx:
+  tailscale-client:
     image: 'tailscale/tailscale:latest'
     hostname: '${TS_HOSTNAME:-coolify-ts}'
     environment:
