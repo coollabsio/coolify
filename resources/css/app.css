@@ -82,7 +82,7 @@
 */
 html,
 body {
-    @apply w-full min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400;
+    @apply w-full min-h-full bg-gray-50 dark:bg-base dark:text-neutral-400;
 }
 
 body {

@@ -28,7 +28,20 @@ class GithubApp extends BaseModel
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
             }
-            $github_app->privateKey()->delete();
+
+            $privateKey = $github_app->privateKey;
+            if ($privateKey) {
+                // Check if key is used by anything EXCEPT this GitHub app
+                $isUsedElsewhere = $privateKey->servers()->exists()
+                    || $privateKey->applications()->exists()
+                    || $privateKey->githubApps()->where('id', '!=', $github_app->id)->exists()
+                    || $privateKey->gitlabApps()->exists();
+
+                if (! $isUsedElsewhere) {
+                    $privateKey->delete();
+                } else {
+                }
+            }
         });
     }
 

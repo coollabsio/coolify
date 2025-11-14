@@ -7,6 +7,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
+use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -31,7 +32,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -341,20 +341,42 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->fail($e);
             throw $e;
         } finally {
-            $this->application_deployment_queue->update([
-                'finished_at' => Carbon::now()->toImmutable(),
-            ]);
-
-            if ($this->use_build_server) {
-                $this->server = $this->build_server;
-            } else {
-                $this->write_deployment_configurations();
+            // Wrap cleanup operations in try-catch to prevent exceptions from interfering
+            // with Laravel's job failure handling and status updates
+            try {
+                $this->application_deployment_queue->update([
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+            } catch (Exception $e) {
+                // Log but don't fail - finished_at is not critical
+                \Log::warning('Failed to update finished_at for deployment '.$this->deployment_uuid.': '.$e->getMessage());
             }
 
-            $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
-            $this->graceful_shutdown_container($this->deployment_uuid);
+            try {
+                if ($this->use_build_server) {
+                    $this->server = $this->build_server;
+                } else {
+                    $this->write_deployment_configurations();
+                }
+            } catch (Exception $e) {
+                // Log but don't fail - configuration writing errors shouldn't prevent status updates
+                $this->application_deployment_queue->addLogEntry('Warning: Failed to write deployment configurations: '.$e->getMessage(), 'stderr');
+            }
 
-            ServiceStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
+            try {
+                $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
+                $this->graceful_shutdown_container($this->deployment_uuid);
+            } catch (Exception $e) {
+                // Log but don't fail - container cleanup errors are expected when container is already gone
+                \Log::warning('Failed to shutdown container '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+
+            try {
+                ServiceStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
+            } catch (Exception $e) {
+                // Log but don't fail - event dispatch errors shouldn't prevent status updates
+                \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+            }
         }
     }
 
@@ -954,7 +976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
             if ($forceFail) {
-                throw new RuntimeException($e->getMessage(), 69420);
+                throw new DeploymentException($e->getMessage(), 69420);
             }
         }
     }
@@ -1146,6 +1168,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($runtime_environment_variables as $env) {
                 $envs->push($env->key.'='.$env->real_value);
             }
+
+            // Check for PORT environment variable mismatch with ports_exposes
+            if ($this->build_pack !== 'dockercompose') {
+                $detectedPort = $this->application->detectPortFromEnvironment(false);
+                if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
+                    $this->application_deployment_queue->addLogEntry(
+                        "Warning: PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports).'. It could case "bad gateway" or "no server" errors. Check the "General" page to fix it.',
+                        'stderr'
+                    );
+                }
+            }
+
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
                 if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
@@ -1780,9 +1814,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image(bool $firstTry = true)
     {
         $this->checkForCancellation();
-        $settings = instanceSettings();
         $helperImage = config('constants.coolify.helper_image');
-        $helperImage = "{$helperImage}:{$settings->helper_version}";
+        $helperImage = "{$helperImage}:".getHelperVersion();
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
@@ -1790,7 +1823,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $env_flags = $this->generate_docker_env_flags_for_secrets();
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
-                throw new RuntimeException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
+                throw new DeploymentException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
             }
             $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
@@ -2056,7 +2089,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->saved_outputs->get('nixpacks_type')) {
             $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
             if (str($this->nixpacks_type)->isEmpty()) {
-                throw new RuntimeException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
+                throw new DeploymentException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
         }
 
@@ -2322,8 +2355,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
         $custom_network_aliases = [];
-        if (is_array($this->application->custom_network_aliases) && count($this->application->custom_network_aliases) > 0) {
-            $custom_network_aliases = $this->application->custom_network_aliases;
+        if (! empty($this->application->custom_network_aliases_array)) {
+            $custom_network_aliases = $this->application->custom_network_aliases_array;
         }
         $docker_compose = [
             'services' => [
@@ -3030,6 +3063,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function start_by_compose_file()
     {
+        // Ensure .env file exists before docker compose tries to load it (defensive programming)
+        $this->execute_remote_command(
+            ["touch {$this->configuration_dir}/.env", 'hidden' => true],
+        );
+
         if ($this->application->build_pack === 'dockerimage') {
             $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
             $this->execute_remote_command(
@@ -3227,6 +3265,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return hash_hmac('sha256', $secrets_string, $this->secrets_hash_key);
     }
 
+    protected function findFromInstructionLines($dockerfile): array
+    {
+        $fromLines = [];
+        foreach ($dockerfile as $index => $line) {
+            $trimmedLine = trim($line);
+            // Check if line starts with FROM (case-insensitive)
+            if (preg_match('/^FROM\s+/i', $trimmedLine)) {
+                $fromLines[] = $index;
+            }
+        }
+
+        return $fromLines;
+    }
+
     private function add_build_env_variables_to_dockerfile()
     {
         if ($this->dockerBuildkitSupported) {
@@ -3239,6 +3291,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'ignore_errors' => true,
             ]);
             $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+
+            // Find all FROM instruction positions
+            $fromLines = $this->findFromInstructionLines($dockerfile);
+
+            // If no FROM instructions found, skip ARG insertion
+            if (empty($fromLines)) {
+                return;
+            }
+
+            // Collect all ARG statements to insert
+            $argsToInsert = collect();
+
             if ($this->pull_request_id === 0) {
                 // Only add environment variables that are available during build
                 $envs = $this->application->environment_variables()
@@ -3247,9 +3311,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
+                        $argsToInsert->push("ARG {$env->key}");
                     } else {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
+                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
                     }
                 }
                 // Add Coolify variables as ARGs
@@ -3259,9 +3323,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ->map(function ($var) {
                             return "ARG {$var}";
                         });
-                    foreach ($coolify_vars as $arg) {
-                        $dockerfile->splice(1, 0, [$arg]);
-                    }
+                    $argsToInsert = $argsToInsert->merge($coolify_vars);
                 }
             } else {
                 // Only add preview environment variables that are available during build
@@ -3271,9 +3333,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
+                        $argsToInsert->push("ARG {$env->key}");
                     } else {
-                        $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
+                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
                     }
                 }
                 // Add Coolify variables as ARGs
@@ -3283,15 +3345,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ->map(function ($var) {
                             return "ARG {$var}";
                         });
-                    foreach ($coolify_vars as $arg) {
-                        $dockerfile->splice(1, 0, [$arg]);
-                    }
+                    $argsToInsert = $argsToInsert->merge($coolify_vars);
                 }
             }
 
-            if ($envs->isNotEmpty()) {
-                $secrets_hash = $this->generate_secrets_hash($envs);
-                $dockerfile->splice(1, 0, ["ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"]);
+            // Insert ARGs after each FROM instruction (in reverse order to maintain correct line numbers)
+            if ($argsToInsert->isNotEmpty()) {
+                foreach (array_reverse($fromLines) as $fromLineIndex) {
+                    // Insert all ARGs after this FROM instruction
+                    foreach ($argsToInsert->reverse() as $arg) {
+                        $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
+                    }
+                }
+                $envs_mapped = $envs->mapWithKeys(function ($env) {
+                    return [$env->key => $env->real_value];
+                });
+                $secrets_hash = $this->generate_secrets_hash($envs_mapped);
+                $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
             }
 
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
@@ -3606,7 +3676,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
+        throw new DeploymentException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     private function run_post_deployment_command()
@@ -3642,7 +3712,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Post-deployment command: Could not find a valid container. Is the container name correct?');
+        throw new DeploymentException('Post-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     /**
@@ -3653,7 +3723,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
-            throw new \RuntimeException('Deployment cancelled by user', 69420);
+            throw new DeploymentException('Deployment cancelled by user', 69420);
         }
     }
 
@@ -3686,7 +3756,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
-            throw new \RuntimeException('Deployment cancelled by user', 69420);
+            throw new DeploymentException('Deployment cancelled by user', 69420);
         }
 
         return false;
@@ -3767,10 +3837,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
-        $this->application_deployment_queue->addLogEntry('Oops something is not okay, are you okay? 😢', 'stderr');
-        if (str($exception->getMessage())->isNotEmpty()) {
-            $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
-        }
+        $errorMessage = $exception->getMessage() ?: 'Unknown error occurred';
+        $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
 
         if ($this->application->build_pack !== 'dockercompose') {
             $code = $exception->getCode();

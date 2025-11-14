@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -27,6 +28,8 @@ class GetContainersStatus
     public $server;
 
     protected ?Collection $applicationContainerStatuses;
+
+    protected ?Collection $applicationContainerRestartCounts;
 
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
@@ -135,6 +138,18 @@ class GetContainersStatus
                         $containerName = data_get($labels, 'com.docker.compose.service');
                         if ($containerName) {
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                        }
+
+                        // Track restart counts for applications
+                        $restartCount = data_get($container, 'RestartCount', 0);
+                        if (! isset($this->applicationContainerRestartCounts)) {
+                            $this->applicationContainerRestartCounts = collect();
+                        }
+                        if (! $this->applicationContainerRestartCounts->has($applicationId)) {
+                            $this->applicationContainerRestartCounts->put($applicationId, collect());
+                        }
+                        if ($containerName) {
+                            $this->applicationContainerRestartCounts->get($applicationId)->put($containerName, $restartCount);
                         }
                     } else {
                         // Notify user that this container should not be there.
@@ -291,7 +306,24 @@ class GetContainersStatus
                 continue;
             }
 
-            $application->update(['status' => 'exited']);
+            // If container was recently restarting (crash loop), keep it as degraded for a grace period
+            // This prevents false "exited" status during the brief moment between container removal and recreation
+            $recentlyRestarted = $application->restart_count > 0 &&
+                                 $application->last_restart_at &&
+                                 $application->last_restart_at->greaterThan(now()->subSeconds(30));
+
+            if ($recentlyRestarted) {
+                // Keep it as degraded if it was recently in a crash loop
+                $application->update(['status' => 'degraded (unhealthy)']);
+            } else {
+                // Reset restart count when application exits completely
+                $application->update([
+                    'status' => 'exited',
+                    'restart_count' => 0,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                ]);
+            }
         }
         $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
         foreach ($notRunningApplicationPreviews as $previewId) {
@@ -340,22 +372,56 @@ class GetContainersStatus
                     continue;
                 }
 
-                $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses);
-                if ($aggregatedStatus) {
-                    $statusFromDb = $application->status;
-                    if ($statusFromDb !== $aggregatedStatus) {
-                        $application->update(['status' => $aggregatedStatus]);
-                    } else {
-                        $application->update(['last_online_at' => now()]);
-                    }
+                // Track restart counts first
+                $maxRestartCount = 0;
+                if (isset($this->applicationContainerRestartCounts) && $this->applicationContainerRestartCounts->has($applicationId)) {
+                    $containerRestartCounts = $this->applicationContainerRestartCounts->get($applicationId);
+                    $maxRestartCount = $containerRestartCounts->max() ?? 0;
                 }
+
+                // Wrap all database updates in a transaction to ensure consistency
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses) {
+                    $previousRestartCount = $application->restart_count ?? 0;
+
+                    if ($maxRestartCount > $previousRestartCount) {
+                        // Restart count increased - this is a crash restart
+                        $application->update([
+                            'restart_count' => $maxRestartCount,
+                            'last_restart_at' => now(),
+                            'last_restart_type' => 'crash',
+                        ]);
+
+                        // Send notification
+                        $containerName = $application->name;
+                        $projectUuid = data_get($application, 'environment.project.uuid');
+                        $environmentName = data_get($application, 'environment.name');
+                        $applicationUuid = data_get($application, 'uuid');
+
+                        if ($projectUuid && $applicationUuid && $environmentName) {
+                            $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
+                        } else {
+                            $url = null;
+                        }
+                    }
+
+                    // Aggregate status after tracking restart counts
+                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
+                    if ($aggregatedStatus) {
+                        $statusFromDb = $application->status;
+                        if ($statusFromDb !== $aggregatedStatus) {
+                            $application->update(['status' => $aggregatedStatus]);
+                        } else {
+                            $application->update(['last_online_at' => now()]);
+                        }
+                    }
+                });
             }
         }
 
         ServiceChecked::dispatch($this->server->team->id);
     }
 
-    private function aggregateApplicationStatus($application, Collection $containerStatuses): ?string
+    private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
     {
         // Parse docker compose to check for excluded containers
         $dockerComposeRaw = data_get($application, 'docker_compose_raw');
@@ -413,6 +479,11 @@ class GetContainersStatus
             return 'degraded (unhealthy)';
         }
 
+        // If container is exited but has restart count > 0, it's in a crash loop
+        if ($hasExited && $maxRestartCount > 0) {
+            return 'degraded (unhealthy)';
+        }
+
         if ($hasRunning && $hasExited) {
             return 'degraded (unhealthy)';
         }
@@ -421,7 +492,7 @@ class GetContainersStatus
             return $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
         }
 
-        // All containers are exited
+        // All containers are exited with no restart count - truly stopped
         return 'exited (unhealthy)';
     }
 }

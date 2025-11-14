@@ -97,6 +97,7 @@ function sharedDataApplications()
         'start_command' => 'string|nullable',
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
         'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+        'custom_network_aliases' => 'string|nullable',
         'base_directory' => 'string|nullable',
         'publish_directory' => 'string|nullable',
         'health_check_enabled' => 'boolean',

@@ -26,9 +26,9 @@ class SyncBunny extends Command
     protected $description = 'Sync files to BunnyCDN';
 
     /**
-     * Fetch GitHub releases and sync to CDN
+     * Fetch GitHub releases and sync to GitHub repository
      */
-    private function syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn)
+    private function syncReleasesToGitHubRepo(): bool
     {
         $this->info('Fetching releases from GitHub...');
         try {
@@ -37,33 +37,122 @@ class SyncBunny extends Command
                     'per_page' => 30,  // Fetch more releases for better changelog
                 ]);
 
-            if ($response->successful()) {
-                $releases = $response->json();
-
-                // Save releases to a temporary file
-                $releases_file = "$parent_dir/releases.json";
-                file_put_contents($releases_file, json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-                // Upload to CDN
-                Http::pool(fn (Pool $pool) => [
-                    $pool->storage(fileName: $releases_file)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/releases.json"),
-                    $pool->purge("$bunny_cdn/coolify/releases.json"),
-                ]);
-
-                // Clean up temporary file
-                unlink($releases_file);
-
-                $this->info('releases.json uploaded & purged...');
-                $this->info('Total releases synced: '.count($releases));
-
-                return true;
-            } else {
+            if (! $response->successful()) {
                 $this->error('Failed to fetch releases from GitHub: '.$response->status());
 
                 return false;
             }
+
+            $releases = $response->json();
+            $timestamp = time();
+            $tmpDir = sys_get_temp_dir().'/coolify-cdn-'.$timestamp;
+            $branchName = 'update-releases-'.$timestamp;
+
+            // Clone the repository
+            $this->info('Cloning coolify-cdn repository...');
+            exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to clone repository: '.implode("\n", $output));
+
+                return false;
+            }
+
+            // Create feature branch
+            $this->info('Creating feature branch...');
+            exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to create branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Write releases.json
+            $this->info('Writing releases.json...');
+            $releasesPath = "$tmpDir/json/releases.json";
+            $jsonContent = json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $bytesWritten = file_put_contents($releasesPath, $jsonContent);
+
+            if ($bytesWritten === false) {
+                $this->error("Failed to write releases.json to: $releasesPath");
+                $this->error('Possible reasons: directory does not exist, permission denied, or disk full.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Stage and commit
+            $this->info('Committing changes...');
+            exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to stage changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            $this->info('Checking for changes...');
+            $statusOutput = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git status --porcelain json/releases.json 2>&1', $statusOutput, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to check repository status: '.implode("\n", $statusOutput));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            if (empty(array_filter($statusOutput))) {
+                $this->info('Releases are already up to date. No changes to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
+            $commitMessage = 'Update releases.json with latest releases - '.date('Y-m-d H:i:s');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to commit changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Push to remote
+            $this->info('Pushing branch to remote...');
+            exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to push branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Create pull request
+            $this->info('Creating pull request...');
+            $prTitle = 'Update releases.json - '.date('Y-m-d H:i:s');
+            $prBody = 'Automated update of releases.json with latest '.count($releases).' releases from GitHub API';
+            $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            exec($prCommand, $output, $returnCode);
+
+            // Clean up
+            exec('rm -rf '.escapeshellarg($tmpDir));
+
+            if ($returnCode !== 0) {
+                $this->error('Failed to create PR: '.implode("\n", $output));
+
+                return false;
+            }
+
+            $this->info('Pull request created successfully!');
+            if (! empty($output)) {
+                $this->info('PR Output: '.implode("\n", $output));
+            }
+            $this->info('Total releases synced: '.count($releases));
+
+            return true;
         } catch (\Throwable $e) {
-            $this->error('Error fetching releases: '.$e->getMessage());
+            $this->error('Error syncing releases: '.$e->getMessage());
 
             return false;
         }
@@ -174,11 +263,7 @@ class SyncBunny extends Command
                     return;
                 }
 
-                // First sync GitHub releases
-                $this->info('Syncing GitHub releases first...');
-                $this->syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn);
-
-                // Then sync versions.json
+                // Sync versions.json to BunnyCDN
                 Http::pool(fn (Pool $pool) => [
                     $pool->storage(fileName: $versions_location)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
@@ -187,14 +272,14 @@ class SyncBunny extends Command
 
                 return;
             } elseif ($only_github_releases) {
-                $this->info('About to sync GitHub releases to BunnyCDN.');
+                $this->info('About to sync GitHub releases to GitHub repository.');
                 $confirmed = confirm('Are you sure you want to sync GitHub releases?');
                 if (! $confirmed) {
                     return;
                 }
 
-                // Use the reusable function
-                $this->syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn);
+                // Sync releases to GitHub repository
+                $this->syncReleasesToGitHubRepo();
 
                 return;
             }

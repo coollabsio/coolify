@@ -31,11 +31,11 @@
         </div>
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
-                <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres"
-                    canGate="update" :canResource="$database"
+                <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres" canGate="update"
+                    :canResource="$database"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Password" id="postgresPassword" type="password" required
-                    canGate="update" :canResource="$database"
+                <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
+                    :canResource="$database"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Initial Database" id="postgresDb"
                     placeholder="If empty, it will be the same as Username." readonly
@@ -43,19 +43,19 @@
             </div>
         @else
             <div class="flex xl:flex-row flex-col gap-2 pb-2">
-                <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres"
-                    canGate="update" :canResource="$database" />
-                <x-forms.input label="Password" id="postgresPassword" type="password" required
-                    canGate="update" :canResource="$database" />
+                <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres" canGate="update"
+                    :canResource="$database" />
+                <x-forms.input label="Password" id="postgresPassword" type="password" required canGate="update"
+                    :canResource="$database" />
                 <x-forms.input label="Initial Database" id="postgresDb"
                     placeholder="If empty, it will be the same as Username." canGate="update" :canResource="$database" />
             </div>
         @endif
         <div class="flex gap-2">
-            <x-forms.input label="Initial Database Arguments" canGate="update" :canResource="$database"
-                id="postgresInitdbArgs" placeholder="If empty, use default. See in docker docs." />
-            <x-forms.input label="Host Auth Method" canGate="update" :canResource="$database"
-                id="postgresHostAuthMethod" placeholder="If empty, use default. See in docker docs." />
+            <x-forms.input label="Initial Database Arguments" canGate="update" :canResource="$database" id="postgresInitdbArgs"
+                placeholder="If empty, use default. See in docker docs." />
+            <x-forms.input label="Host Auth Method" canGate="update" :canResource="$database" id="postgresHostAuthMethod"
+                placeholder="If empty, use default. See in docker docs." />
         </div>
         <x-forms.input
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
@@ -107,20 +107,19 @@
             <div class="flex flex-col gap-2">
                 <div class="w-64" wire:key='enable_ssl'>
                     @if ($database->isExited())
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
-                            wire:model.live="enableSsl" instantSave="instantSaveSSL" canGate="update"
-                            :canResource="$database" />
+                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
+                            instantSave="instantSaveSSL" canGate="update" :canResource="$database" />
                     @else
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
-                            wire:model.live="enableSsl" instantSave="instantSaveSSL" disabled
+                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
+                            instantSave="instantSaveSSL" disabled
                             helper="Database should be stopped to change this settings." />
                     @endif
                 </div>
                 @if ($enableSsl)
                     <div class="mx-2">
                         @if ($database->isExited())
-                            <x-forms.select id="sslMode" label="SSL Mode"
-                                wire:model.live="sslMode" instantSave="instantSaveSSL"
+                            <x-forms.select id="sslMode" label="SSL Mode" wire:model.live="sslMode"
+                                instantSave="instantSaveSSL"
                                 helper="Choose the SSL verification mode for PostgreSQL connections" canGate="update"
                                 :canResource="$database">
                                 <option value="allow" title="Allow insecure connections">allow (insecure)</option>
@@ -131,8 +130,8 @@
                                 </option>
                             </x-forms.select>
                         @else
-                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL"
-                                disabled helper="Database should be stopped to change this settings.">
+                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL" disabled
+                                helper="Database should be stopped to change this settings.">
                                 <option value="allow" title="Allow insecure connections">allow (insecure)</option>
                                 <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
                                 <option value="require" title="Require secure connections">require (secure)</option>
@@ -164,22 +163,24 @@
                         <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                             canGate="update" :canResource="$database" />
                     </div>
-                    <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
-                        id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                        label="Public Port" canGate="update" :canResource="$database" />
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10"
-                        id="postgresConf" canGate="update" :canResource="$database" />
+                    <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="postgresConf"
+                        canGate="update" :canResource="$database" />
                 </div>
+            </div>
+        </div>
     </form>
 
     <div class="flex flex-col gap-4 pt-4">
         <h3>Advanced</h3>
         <div class="flex flex-col">
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs"
-                canGate="update" :canResource="$database" />
+                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update"
+                :canResource="$database" />
         </div>
 
         <div class="pb-16">

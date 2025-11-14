@@ -1,17 +1,14 @@
 name: Cleanup Untagged GHCR Images
 
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_dispatch:
 
-env:
-  GITHUB_REGISTRY: ghcr.io
+permissions:
+  packages: write
 
 jobs:
   cleanup-all-packages:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       matrix:
         package: ['coolify', 'coolify-helper', 'coolify-realtime', 'coolify-testing-host']

@@ -1353,51 +1353,70 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Decide if the service is a database
                 $image = data_get_str($service, 'image');
-                $isDatabase = isDatabaseImage($image, $service);
-                data_set($service, 'is_database', $isDatabase);
 
-                // Create new serviceApplication or serviceDatabase
-                if ($isDatabase) {
-                    if ($isNew) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceDatabase::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                        if (is_null($savedService)) {
+                // Check for manually migrated services first (respects user's conversion choice)
+                $migratedApp = ServiceApplication::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+                $migratedDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+
+                if ($migratedApp || $migratedDb) {
+                    // Use the migrated service type, ignoring image detection
+                    $isDatabase = (bool) $migratedDb;
+                    $savedService = $migratedApp ?: $migratedDb;
+                } else {
+                    // Use image detection for non-migrated services
+                    $isDatabase = isDatabaseImage($image, $service);
+
+                    // Create new serviceApplication or serviceDatabase
+                    if ($isDatabase) {
+                        if ($isNew) {
                             $savedService = ServiceDatabase::create([
                                 'name' => $serviceName,
                                 'image' => $image,
                                 'service_id' => $resource->id,
                             ]);
+                        } else {
+                            $savedService = ServiceDatabase::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceDatabase::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
                         }
-                    }
-                } else {
-                    if ($isNew) {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
                     } else {
-                        $savedService = ServiceApplication::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                        if (is_null($savedService)) {
+                        if ($isNew) {
                             $savedService = ServiceApplication::create([
                                 'name' => $serviceName,
                                 'image' => $image,
                                 'service_id' => $resource->id,
                             ]);
+                        } else {
+                            $savedService = ServiceApplication::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceApplication::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
                         }
                     }
                 }
+
+                data_set($service, 'is_database', $isDatabase);
 
                 // Check if image changed
                 if ($savedService->image !== $image) {
@@ -2877,6 +2896,18 @@ function convertToKeyValueCollection($environment)
 function instanceSettings()
 {
     return InstanceSettings::get();
+}
+
+function getHelperVersion(): string
+{
+    $settings = instanceSettings();
+
+    // In development mode, use the dev_helper_version if set, otherwise fallback to config
+    if (isDev() && ! empty($settings->dev_helper_version)) {
+        return $settings->dev_helper_version;
+    }
+
+    return config('constants.coolify.helper_version');
 }
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)

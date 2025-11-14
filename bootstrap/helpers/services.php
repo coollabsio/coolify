@@ -184,3 +184,53 @@ function serviceKeys()
 {
     return get_service_templates()->keys();
 }
+
+/**
+ * Parse a SERVICE_URL_* or SERVICE_FQDN_* variable to extract the service name and port.
+ *
+ * This function detects if a service environment variable has a port suffix by checking
+ * if the last segment after the underscore is numeric.
+ *
+ * Examples:
+ *   - SERVICE_URL_APP_3000 → ['service_name' => 'app', 'port' => '3000', 'has_port' => true]
+ *   - SERVICE_URL_MY_API_8080 → ['service_name' => 'my_api', 'port' => '8080', 'has_port' => true]
+ *   - SERVICE_URL_MY_APP → ['service_name' => 'my_app', 'port' => null, 'has_port' => false]
+ *   - SERVICE_FQDN_REDIS_CACHE_6379 → ['service_name' => 'redis_cache', 'port' => '6379', 'has_port' => true]
+ *
+ * @param  string  $key  The environment variable key (e.g., SERVICE_URL_APP_3000)
+ * @return array{service_name: string, port: string|null, has_port: bool} Parsed service information
+ */
+function parseServiceEnvironmentVariable(string $key): array
+{
+    $strKey = str($key);
+    $lastSegment = $strKey->afterLast('_')->value();
+    $hasPort = is_numeric($lastSegment) && ctype_digit($lastSegment);
+
+    if ($hasPort) {
+        // Port-specific variable (e.g., SERVICE_URL_APP_3000)
+        if ($strKey->startsWith('SERVICE_URL_')) {
+            $serviceName = $strKey->after('SERVICE_URL_')->beforeLast('_')->lower()->value();
+        } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+            $serviceName = $strKey->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
+        } else {
+            $serviceName = '';
+        }
+        $port = $lastSegment;
+    } else {
+        // Base variable without port (e.g., SERVICE_URL_APP)
+        if ($strKey->startsWith('SERVICE_URL_')) {
+            $serviceName = $strKey->after('SERVICE_URL_')->lower()->value();
+        } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+            $serviceName = $strKey->after('SERVICE_FQDN_')->lower()->value();
+        } else {
+            $serviceName = '';
+        }
+        $port = null;
+    }
+
+    return [
+        'service_name' => $serviceName,
+        'port' => $port,
+        'has_port' => $hasPort,
+    ];
+}

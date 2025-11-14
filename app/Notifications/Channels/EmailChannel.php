@@ -101,6 +101,38 @@ class EmailChannel
 
                 $mailer->send($email);
             }
+        } catch (\Resend\Exceptions\ErrorException $e) {
+            // Map HTTP status codes to user-friendly messages
+            $userMessage = match ($e->getErrorCode()) {
+                403 => 'Invalid Resend API key. Please verify your API key in the Resend dashboard and update it in settings.',
+                401 => 'Your Resend API key has restricted permissions. Please use an API key with Full Access permissions.',
+                429 => 'Resend rate limit exceeded. Please try again in a few minutes.',
+                400 => 'Email validation failed: '.$e->getErrorMessage(),
+                default => 'Failed to send email via Resend: '.$e->getErrorMessage(),
+            };
+
+            // Log detailed error for admin debugging (redact sensitive data)
+            $emailSettings = $notifiable->emailNotificationSettings ?? instanceSettings();
+            data_set($emailSettings, 'smtp_password', '********');
+            data_set($emailSettings, 'resend_api_key', '********');
+
+            send_internal_notification(sprintf(
+                "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
+                $e->getErrorCode(),
+                $e->getErrorMessage(),
+                get_class($notification),
+                json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            ));
+
+            // Don't report expected errors (invalid keys, validation) to Sentry
+            if (in_array($e->getErrorCode(), [403, 401, 400])) {
+                throw NonReportableException::fromException(new \Exception($userMessage, $e->getCode(), $e));
+            }
+
+            throw new \Exception($userMessage, $e->getCode(), $e);
+        } catch (\Resend\Exceptions\TransporterException $e) {
+            send_internal_notification("Resend Transport Error: {$e->getMessage()}");
+            throw new \Exception('Unable to connect to Resend API. Please check your internet connection and try again.');
         } catch (\Throwable $e) {
             // Check if this is a Resend domain verification error on cloud instances
             if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {

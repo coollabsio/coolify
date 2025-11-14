@@ -34,11 +34,14 @@ class Add extends Component
 
     public ?string $container = '';
 
+    public int $timeout = 300;
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
+        'timeout' => 'required|integer|min:60|max:3600',
     ];
 
     protected $validationAttributes = [
@@ -46,6 +49,7 @@ class Add extends Component
         'command' => 'command',
         'frequency' => 'frequency',
         'container' => 'container',
+        'timeout' => 'timeout',
     ];
 
     public function mount()
@@ -103,6 +107,7 @@ class Add extends Component
             $task->command = $this->command;
             $task->frequency = $this->frequency;
             $task->container = $this->container;
+            $task->timeout = $this->timeout;
             $task->team_id = currentTeam()->id;
 
             switch ($this->type) {
@@ -130,5 +135,6 @@ class Add extends Component
         $this->command = '';
         $this->frequency = '';
         $this->container = '';
+        $this->timeout = 300;
     }
 }

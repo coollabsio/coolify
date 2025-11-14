@@ -94,6 +94,27 @@ test('parseDockerVolumeString accepts simple environment variables', function ()
     }
 });
 
+test('parseDockerVolumeString accepts environment variables with path concatenation', function () {
+    $volumes = [
+        '${VOLUMES_PATH}/mysql:/var/lib/mysql',
+        '${DATA_PATH}/config:/etc/config',
+        '${VOLUME_PATH}/app_data:/app',
+        '${MY_VAR_123}/deep/nested/path:/data',
+        '${VAR}/path:/app',
+        '${VAR}_suffix:/app',
+        '${VAR}-suffix:/app',
+        '${VAR}.ext:/app',
+        '${VOLUMES_PATH}/mysql:/var/lib/mysql:ro',
+        '${DATA_PATH}/config:/etc/config:rw',
+    ];
+
+    foreach ($volumes as $volume) {
+        $result = parseDockerVolumeString($volume);
+        expect($result)->toBeArray();
+        expect($result['source'])->not->toBeNull();
+    }
+});
+
 test('parseDockerVolumeString rejects environment variables with command injection in default', function () {
     $maliciousVolumes = [
         '${VAR:-`whoami`}:/app',

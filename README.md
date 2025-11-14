@@ -69,7 +69,6 @@ Thank you so much!
 * [Dade2](https://dade2.net/?ref=coolify.io) - IT Consulting, Cloud Solutions & System Integration
 * [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
 * [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
-* [Gozunga](https://gozunga.com?ref=coolify.io) - Seriously Simple Cloud Infrastructure
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - Server, cloud, hosting, and data center solutions
 * [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - Web hosting and VPS solutions
 * [JobsCollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - 30,000+ remote jobs for developers

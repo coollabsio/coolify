@@ -246,6 +246,40 @@ class Github extends Controller
                         if ($action === 'closed') {
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if ($found) {
+                                // Cancel any active deployments for this PR immediately
+                                $activeDeployment = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
+                                    ->where('pull_request_id', $pull_request_id)
+                                    ->whereIn('status', [
+                                        \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
+                                        \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+                                    ])
+                                    ->first();
+
+                                if ($activeDeployment) {
+                                    try {
+                                        // Mark deployment as cancelled
+                                        $activeDeployment->update([
+                                            'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                                        ]);
+
+                                        // Add cancellation log entry
+                                        $activeDeployment->addLogEntry('Deployment cancelled: Pull request closed.', 'stderr');
+
+                                        // Check if helper container exists and kill it
+                                        $deployment_uuid = $activeDeployment->deployment_uuid;
+                                        $server = $application->destination->server;
+                                        $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
+                                        $containerExists = instant_remote_process([$checkCommand], $server);
+
+                                        if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
+                                            instant_remote_process(["docker rm -f {$deployment_uuid}"], $server);
+                                            $activeDeployment->addLogEntry('Deployment container stopped.');
+                                        }
+                                    } catch (\Throwable $e) {
+                                        // Silently handle errors during deployment cancellation
+                                    }
+                                }
+
                                 DeleteResourceJob::dispatch($found);
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -481,6 +515,42 @@ class Github extends Controller
                         if ($action === 'closed' || $action === 'close') {
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if ($found) {
+                                // Cancel any active deployments for this PR immediately
+                                $activeDeployment = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
+                                    ->where('pull_request_id', $pull_request_id)
+                                    ->whereIn('status', [
+                                        \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
+                                        \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+                                    ])
+                                    ->first();
+
+                                if ($activeDeployment) {
+                                    try {
+                                        // Mark deployment as cancelled
+                                        $activeDeployment->update([
+                                            'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                                        ]);
+
+                                        // Add cancellation log entry
+                                        $activeDeployment->addLogEntry('Deployment cancelled: Pull request closed.', 'stderr');
+
+                                        // Check if helper container exists and kill it
+                                        $deployment_uuid = $activeDeployment->deployment_uuid;
+                                        $server = $application->destination->server;
+                                        $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
+                                        $containerExists = instant_remote_process([$checkCommand], $server);
+
+                                        if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
+                                            instant_remote_process(["docker rm -f {$deployment_uuid}"], $server);
+                                            $activeDeployment->addLogEntry('Deployment container stopped.');
+                                        }
+
+                                    } catch (\Throwable $e) {
+                                        // Silently handle errors during deployment cancellation
+                                    }
+                                }
+
+                                // Clean up any deployed containers
                                 $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pull_request_id);
                                 if ($containers->isNotEmpty()) {
                                     $containers->each(function ($container) use ($application) {

@@ -2,8 +2,8 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.438',
-        'helper_version' => '1.0.11',
+        'version' => '4.0.0-beta.444',
+        'helper_version' => '1.0.12',
         'realtime_version' => '1.0.10',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -12,7 +12,7 @@ return [
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
         'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
-        'releases_url' => 'https://cdn.coollabs.io/coolify/releases.json',
+        'releases_url' => 'https://cdn.coolify.io/releases.json',
     ],
 
     'urls' => [

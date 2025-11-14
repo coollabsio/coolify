@@ -7,8 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class ApplicationSetting extends Model
 {
-    protected $cast = [
+    protected $casts = [
         'is_static' => 'boolean',
+        'is_spa' => 'boolean',
+        'is_build_server_enabled' => 'boolean',
+        'is_preserve_repository_enabled' => 'boolean',
+        'is_container_label_escape_enabled' => 'boolean',
+        'is_container_label_readonly_enabled' => 'boolean',
+        'use_build_secrets' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
         'is_debug_enabled' => 'boolean',

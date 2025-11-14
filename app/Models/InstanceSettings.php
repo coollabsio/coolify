@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Jobs\PullHelperImageJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Url\Url;
@@ -35,14 +34,6 @@ class InstanceSettings extends Model
     protected static function booted(): void
     {
         static::updated(function ($settings) {
-            if ($settings->wasChanged('helper_version')) {
-                Server::chunkById(100, function ($servers) {
-                    foreach ($servers as $server) {
-                        PullHelperImageJob::dispatch($server);
-                    }
-                });
-            }
-
             // Clear trusted hosts cache when FQDN changes
             if ($settings->wasChanged('fqdn')) {
                 \Cache::forget('instance_settings_fqdn_host');

@@ -101,10 +101,17 @@ class Heading extends Component
             force_rebuild: $force_rebuild,
         );
         if ($result['status'] === 'skipped') {
-            $this->dispatch('success', 'Deployment skipped', $result['message']);
+            $this->dispatch('error', 'Deployment skipped', $result['message']);
 
             return;
         }
+
+        // Reset restart count on successful deployment
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
@@ -137,6 +144,7 @@ class Heading extends Component
 
             return;
         }
+
         $this->setDeploymentUuid();
         $result = queue_application_deployment(
             application: $this->application,
@@ -148,6 +156,13 @@ class Heading extends Component
 
             return;
         }
+
+        // Reset restart count on manual restart
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => now(),
+            'last_restart_type' => 'manual',
+        ]);
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],

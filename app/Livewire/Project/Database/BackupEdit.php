@@ -79,7 +79,7 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
-    #[Validate(['required', 'int', 'min:1', 'max:36000'])]
+    #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
     public function mount()

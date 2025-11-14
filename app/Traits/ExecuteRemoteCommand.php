@@ -219,9 +219,22 @@ trait ExecuteRemoteCommand
         $process_result = $process->wait();
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
+                // Check if deployment was cancelled while command was running
+                if (isset($this->application_deployment_queue)) {
+                    $this->application_deployment_queue->refresh();
+                    if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                        throw new \RuntimeException('Deployment cancelled by user', 69420);
+                    }
+                }
+
                 // Don't immediately set to FAILED - let the retry logic handle it
                 // This prevents premature status changes during retryable SSH errors
-                throw new \RuntimeException($process_result->errorOutput());
+                $error = $process_result->errorOutput();
+                if (empty($error)) {
+                    $error = $process_result->output() ?: 'Command failed with no error output';
+                }
+                $redactedCommand = $this->redact_sensitive_info($command);
+                throw new \RuntimeException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
             }
         }
     }

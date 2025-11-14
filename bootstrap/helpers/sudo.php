@@ -58,16 +58,35 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
     $commands = $commands->map(function ($line) {
         $line = str($line);
+
+        // Detect complex piped commands that should be wrapped in bash -c
+        $isComplexPipeCommand = (
+            $line->contains(' | sh') ||
+            $line->contains(' | bash') ||
+            ($line->contains(' | ') && ($line->contains('||') || $line->contains('&&')))
+        );
+
+        // If it's a complex pipe command and starts with sudo, wrap it in bash -c
+        if ($isComplexPipeCommand && $line->startsWith('sudo ')) {
+            $commandWithoutSudo = $line->after('sudo ')->value();
+            // Escape single quotes for bash -c by replacing ' with '\''
+            $escapedCommand = str_replace("'", "'\\''", $commandWithoutSudo);
+
+            return "sudo bash -c '$escapedCommand'";
+        }
+
+        // For non-complex commands, apply the original logic
         if (str($line)->contains('$(')) {
             $line = $line->replace('$(', '$(sudo ');
         }
-        if (str($line)->contains('||')) {
+        if (! $isComplexPipeCommand && str($line)->contains('||')) {
             $line = $line->replace('||', '|| sudo');
         }
-        if (str($line)->contains('&&')) {
+        if (! $isComplexPipeCommand && str($line)->contains('&&')) {
             $line = $line->replace('&&', '&& sudo');
         }
-        if (str($line)->contains(' | ')) {
+        // Don't insert sudo into pipes for complex commands
+        if (! $isComplexPipeCommand && str($line)->contains(' | ')) {
             $line = $line->replace(' | ', ' | sudo ');
         }
 

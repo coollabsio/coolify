@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Redis;
 
 class CleanupRedis extends Command
 {
-    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup} {--clear-locks : Clear stale WithoutOverlapping locks}';
+    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup} {--clear-locks : Clear stale WithoutOverlapping locks} {--restart : Aggressive cleanup mode for system restart (marks all processing jobs as failed)}';
 
     protected $description = 'Cleanup Redis (Horizon jobs, metrics, overlapping queues, cache locks, and related data)';
 
@@ -61,6 +61,14 @@ class CleanupRedis extends Command
             $this->info('Cleaning up stale cache locks...');
             $locksCleaned = $this->cleanupCacheLocks($dryRun);
             $deletedCount += $locksCleaned;
+        }
+
+        // Clean up stuck jobs (restart mode = aggressive, runtime mode = conservative)
+        $isRestart = $this->option('restart');
+        if ($isRestart || $this->option('clear-locks')) {
+            $this->info($isRestart ? 'Cleaning up stuck jobs (RESTART MODE - aggressive)...' : 'Checking for stuck jobs (runtime mode - conservative)...');
+            $jobsCleaned = $this->cleanupStuckJobs($redis, $prefix, $dryRun, $isRestart);
+            $deletedCount += $jobsCleaned;
         }
 
         if ($dryRun) {
@@ -328,6 +336,132 @@ class CleanupRedis extends Command
 
         if ($cleanedCount === 0) {
             $this->info('  No stale locks found (all locks have expiration set)');
+        }
+
+        return $cleanedCount;
+    }
+
+    /**
+     * Clean up stuck jobs based on mode (restart vs runtime).
+     *
+     * @param  mixed  $redis  Redis connection
+     * @param  string  $prefix  Horizon prefix
+     * @param  bool  $dryRun  Dry run mode
+     * @param  bool  $isRestart  Restart mode (aggressive) vs runtime mode (conservative)
+     * @return int Number of jobs cleaned
+     */
+    private function cleanupStuckJobs($redis, string $prefix, bool $dryRun, bool $isRestart): int
+    {
+        $cleanedCount = 0;
+        $now = time();
+
+        // Get all keys with the horizon prefix
+        $cursor = 0;
+        $keys = [];
+        do {
+            $result = $redis->scan($cursor, ['match' => '*', 'count' => 100]);
+
+            // Guard against scan() returning false
+            if ($result === false) {
+                $this->error('Redis scan failed, stopping key retrieval');
+                break;
+            }
+
+            $cursor = $result[0];
+            $keys = array_merge($keys, $result[1]);
+        } while ($cursor !== 0);
+
+        foreach ($keys as $key) {
+            $keyWithoutPrefix = str_replace($prefix, '', $key);
+            $type = $redis->command('type', [$keyWithoutPrefix]);
+
+            // Only process hash-type keys (individual jobs)
+            if ($type !== 5) {
+                continue;
+            }
+
+            $data = $redis->command('hgetall', [$keyWithoutPrefix]);
+            $status = data_get($data, 'status');
+            $payload = data_get($data, 'payload');
+
+            // Only process jobs in "processing" or "reserved" state
+            if (! in_array($status, ['processing', 'reserved'])) {
+                continue;
+            }
+
+            // Parse job payload to get job class and started time
+            $payloadData = json_decode($payload, true);
+
+            // Check for JSON decode errors
+            if ($payloadData === null || json_last_error() !== JSON_ERROR_NONE) {
+                $errorMsg = json_last_error_msg();
+                $truncatedPayload = is_string($payload) ? substr($payload, 0, 200) : 'non-string payload';
+                $this->error("Failed to decode job payload for {$keyWithoutPrefix}: {$errorMsg}. Payload: {$truncatedPayload}");
+
+                continue;
+            }
+
+            $jobClass = data_get($payloadData, 'displayName', 'Unknown');
+
+            // Prefer reserved_at (when job started processing), fallback to created_at
+            $reservedAt = (int) data_get($data, 'reserved_at', 0);
+            $createdAt = (int) data_get($data, 'created_at', 0);
+            $startTime = $reservedAt ?: $createdAt;
+
+            // If we can't determine when the job started, skip it
+            if (! $startTime) {
+                continue;
+            }
+
+            // Calculate how long the job has been processing
+            $processingTime = $now - $startTime;
+
+            $shouldFail = false;
+            $reason = '';
+
+            if ($isRestart) {
+                // RESTART MODE: Mark ALL processing/reserved jobs as failed
+                // Safe because all workers are dead on restart
+                $shouldFail = true;
+                $reason = 'System restart - all workers terminated';
+            } else {
+                // RUNTIME MODE: Only mark truly stuck jobs as failed
+                // Be conservative to avoid killing legitimate long-running jobs
+
+                // Skip ApplicationDeploymentJob entirely (has dynamic_timeout, can run 2+ hours)
+                if (str_contains($jobClass, 'ApplicationDeploymentJob')) {
+                    continue;
+                }
+
+                // Skip DatabaseBackupJob (large backups can take hours)
+                if (str_contains($jobClass, 'DatabaseBackupJob')) {
+                    continue;
+                }
+
+                // For other jobs, only fail if processing > 12 hours
+                if ($processingTime > 43200) { // 12 hours
+                    $shouldFail = true;
+                    $reason = 'Processing for more than 12 hours';
+                }
+            }
+
+            if ($shouldFail) {
+                if ($dryRun) {
+                    $this->warn("  Would mark as FAILED: {$jobClass} (processing for ".round($processingTime / 60, 1)." min) - {$reason}");
+                } else {
+                    // Mark job as failed
+                    $redis->command('hset', [$keyWithoutPrefix, 'status', 'failed']);
+                    $redis->command('hset', [$keyWithoutPrefix, 'failed_at', $now]);
+                    $redis->command('hset', [$keyWithoutPrefix, 'exception', "Job cleaned up by cleanup:redis - {$reason}"]);
+
+                    $this->info("  ✓ Marked as FAILED: {$jobClass} (processing for ".round($processingTime / 60, 1).' min) - '.$reason);
+                }
+                $cleanedCount++;
+            }
+        }
+
+        if ($cleanedCount === 0) {
+            $this->info($isRestart ? '  No jobs to clean up' : '  No stuck jobs found (all jobs running normally)');
         }
 
         return $cleanedCount;

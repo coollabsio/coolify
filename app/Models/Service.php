@@ -1184,6 +1184,31 @@ class Service extends BaseModel
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
 
+    /**
+     * Get the required port for this service from the template definition.
+     */
+    public function getRequiredPort(): ?int
+    {
+        try {
+            $services = get_service_templates();
+            $serviceName = str($this->name)->beforeLast('-')->value();
+            $service = data_get($services, $serviceName, []);
+            $port = data_get($service, 'port');
+
+            return $port ? (int) $port : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if this service requires a port to function correctly.
+     */
+    public function requiresPort(): bool
+    {
+        return $this->getRequiredPort() !== null;
+    }
+
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
@@ -1262,6 +1287,11 @@ class Service extends BaseModel
 
     public function saveComposeConfigs()
     {
+        // Guard against null or empty docker_compose
+        if (! $this->docker_compose) {
+            return;
+        }
+
         $workdir = $this->workdir();
 
         instant_remote_process([

@@ -17,6 +17,10 @@ on:
         - templates/**
         - CHANGELOG.md
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
@@ -34,11 +38,10 @@ jobs:
             platform: linux/aarch64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Sanitize branch name for Docker tag
         id: sanitize
@@ -82,11 +85,10 @@ jobs:
   merge-manifest:
     runs-on: ubuntu-24.04
     needs: build-push
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Sanitize branch name for Docker tag
         id: sanitize
