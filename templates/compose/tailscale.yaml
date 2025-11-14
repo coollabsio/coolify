@@ -19,7 +19,6 @@ services:
       - '/dev/net/tun:/dev/net/tun'
     cap_add:
       - net_admin
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "tailscale status --json | grep -q 'BackendState'"]
       interval: 10s
