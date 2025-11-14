@@ -171,6 +171,8 @@ services:
   # used for reverse proxying the API service and Web service.
   nginx:
     image: nginx:1.29.2
+    environment:
+      - SERVICE_URL_NGINX
     volumes:
       - type: bind
         source: ./nginx/nginx.conf
