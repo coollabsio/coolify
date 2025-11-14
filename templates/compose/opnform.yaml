@@ -172,7 +172,7 @@ services:
   nginx:
     image: nginx:1.29.2
     environment:
-      - SERVICE_URL_OPNFORM
+      - SERVICE_URL_NGINX
     volumes:
       - type: bind
         source: ./nginx/nginx.conf
