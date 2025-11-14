@@ -14,7 +14,7 @@ services:
       - 'TS_STATE_DIR=${TS_STATE_DIR:-/var/lib/tailscale}'
       - 'TS_USERSPACE=${TS_USERSPACE:-false}'
     volumes:
-      - 'tailscale-state:/var/lib/tailscale'
+      - 'tailscale-client:/var/lib/tailscale'
     devices:
       - '/dev/net/tun:/dev/net/tun'
     cap_add:
