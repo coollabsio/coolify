@@ -14,6 +14,18 @@ mkdir -p "$CONDUCTOR_ROOT_PATH/vendor"
 # Get current worktree path
 WORKTREE_PATH=$(pwd)
 
+# Safety check: ensure WORKTREE_PATH is valid and not a dangerous location
+if [ -z "$WORKTREE_PATH" ] || [ "$WORKTREE_PATH" = "/" ] || [ "$WORKTREE_PATH" = "/Users" ] || [ "$WORKTREE_PATH" = "$HOME" ]; then
+    echo "ERROR: Invalid or dangerous WORKTREE_PATH: $WORKTREE_PATH"
+    exit 1
+fi
+
+# Additional safety: ensure we're in a git worktree
+if [ ! -f ".git" ] && [ ! -d ".git" ]; then
+    echo "ERROR: Not in a git repository"
+    exit 1
+fi
+
 # Remove existing directories if they exist and are not symlinks
 [ -d "node_modules" ] && [ ! -L "node_modules" ] && rm -rf "$WORKTREE_PATH/node_modules"
 [ -d "vendor" ] && [ ! -L "vendor" ] && rm -rf "$WORKTREE_PATH/vendor"
