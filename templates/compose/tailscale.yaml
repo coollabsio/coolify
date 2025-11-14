@@ -30,6 +30,3 @@ services:
     depends_on:
       - tailscale-client
     network_mode: 'service:tailscale-nginx'
-
-volumes:
-  tailscale-state: null
