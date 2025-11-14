@@ -10,6 +10,44 @@ This file provides guidance to **Claude Code** (claude.ai/code) when working wit
 
 Coolify is an open-source, self-hostable platform for deploying applications and managing servers - an alternative to Heroku/Netlify/Vercel. It's built with Laravel (PHP) and uses Docker for containerization.
 
+## Git Worktree Shared Dependencies
+
+This repository uses git worktrees for parallel development with **automatic shared dependency setup** via Conductor.
+
+### How It Works
+
+The `conductor.json` setup script (`scripts/conductor-setup.sh`) automatically:
+1. Creates a shared `.shared-deps/` directory in the main repository
+2. Creates symlinks from `node_modules` and `vendor` to the shared location
+3. This happens automatically when Conductor creates a new worktree
+
+### Benefits
+
+- **Save disk space**: Only one copy of dependencies across all worktrees
+- **Faster setup**: No need to run `npm install` or `composer install` for each worktree
+- **Consistent versions**: All worktrees use the same dependency versions
+- **Auto-configured**: Handled by Conductor's setup script
+
+### Manual Setup (If Needed)
+
+If you need to set up symlinks manually or for non-Conductor worktrees:
+
+```bash
+# From the worktree directory
+SHARED_DEPS="../../.shared-deps"
+mkdir -p "$SHARED_DEPS/node_modules" "$SHARED_DEPS/vendor"
+rm -rf node_modules vendor
+ln -sf "$SHARED_DEPS/node_modules" node_modules
+ln -sf "$SHARED_DEPS/vendor" vendor
+```
+
+### Important Notes
+
+- Dependencies are shared at `$CONDUCTOR_ROOT_PATH/.shared-deps/`
+- Run `npm install` or `composer install` from any worktree to update all
+- Ensure `.shared-deps/` is in `.gitignore` (should already be there)
+- If different branches need different dependency versions, this won't work - remove symlinks and use separate directories
+
 ## Development Commands
 
 ### Frontend Development
