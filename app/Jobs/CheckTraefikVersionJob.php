@@ -47,10 +47,10 @@ class CheckTraefikVersionJob implements ShouldQueue
 
             // Query all servers with Traefik proxy that are reachable
             $servers = Server::whereNotNull('proxy')
+                ->whereProxyType(ProxyTypes::TRAEFIK->value)
                 ->whereRelation('settings', 'is_reachable', true)
                 ->whereRelation('settings', 'is_usable', true)
-                ->get()
-                ->filter(fn ($server) => $server->proxyType() === ProxyTypes::TRAEFIK->value);
+                ->get();
 
             $serverCount = $servers->count();
             Log::info("CheckTraefikVersionJob: Found {$serverCount} server(s) with Traefik proxy");

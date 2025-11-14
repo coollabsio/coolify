@@ -523,6 +523,11 @@ $schema://$host {
         return $this->proxy->modelScope();
     }
 
+    public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
+    {
+        return $query->where('proxy->type', $proxyType);
+    }
+
     public function isLocalhost()
     {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
