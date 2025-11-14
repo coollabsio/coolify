@@ -46,7 +46,8 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-sm drop-shadow-sm min-w-full lg:min-w-[{{ $minWidth }}] lg:max-w-[{{ $maxWidth }}] max-h-[calc(100vh-2rem)] bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                style="max-height: calc(100vh - 2rem); @media (min-width: 1024px) { min-width: {{ $minWidth }}; max-width: {{ $maxWidth }}; }"
+                class="relative w-full border rounded-sm drop-shadow-sm min-w-full bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
                 <div class="flex items-center justify-between py-6 px-6 shrink-0">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"
