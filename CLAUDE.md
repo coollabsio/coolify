@@ -17,8 +17,8 @@ This repository uses git worktrees for parallel development with **automatic sha
 ### How It Works
 
 The `conductor.json` setup script (`scripts/conductor-setup.sh`) automatically:
-1. Creates a shared `.shared-deps/` directory in the main repository
-2. Creates symlinks from `node_modules` and `vendor` to the shared location
+1. Creates symlinks from worktree's `node_modules` and `vendor` to the main repository's directories
+2. All worktrees share the same dependencies from the main repository
 3. This happens automatically when Conductor creates a new worktree
 
 ### Benefits
@@ -27,6 +27,7 @@ The `conductor.json` setup script (`scripts/conductor-setup.sh`) automatically:
 - **Faster setup**: No need to run `npm install` or `composer install` for each worktree
 - **Consistent versions**: All worktrees use the same dependency versions
 - **Auto-configured**: Handled by Conductor's setup script
+- **Simple**: Uses the main repo's existing directories, no extra folders
 
 ### Manual Setup (If Needed)
 
@@ -34,18 +35,15 @@ If you need to set up symlinks manually or for non-Conductor worktrees:
 
 ```bash
 # From the worktree directory
-SHARED_DEPS="../../.shared-deps"
-mkdir -p "$SHARED_DEPS/node_modules" "$SHARED_DEPS/vendor"
 rm -rf node_modules vendor
-ln -sf "$SHARED_DEPS/node_modules" node_modules
-ln -sf "$SHARED_DEPS/vendor" vendor
+ln -sf ../../node_modules node_modules
+ln -sf ../../vendor vendor
 ```
 
 ### Important Notes
 
-- Dependencies are shared at `$CONDUCTOR_ROOT_PATH/.shared-deps/`
-- Run `npm install` or `composer install` from any worktree to update all
-- Ensure `.shared-deps/` is in `.gitignore` (should already be there)
+- Dependencies are shared from the main repository (`$CONDUCTOR_ROOT_PATH`)
+- Run `npm install` or `composer install` from the main repo or any worktree to update all
 - If different branches need different dependency versions, this won't work - remove symlinks and use separate directories
 
 ## Development Commands
