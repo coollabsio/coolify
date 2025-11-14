@@ -29,4 +29,15 @@ services:
     image: nginx:latest
     depends_on:
       - tailscale-client
-    network_mode: 'service:tailscale-nginx'
+    network_mode: 'service:tailscale-client'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:80/'
+        - '-o'
+        - /dev/null
+      interval: 20s
+      timeout: 5s
+      retries: 3
