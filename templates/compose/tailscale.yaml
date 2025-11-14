@@ -4,7 +4,6 @@
 # tags: vpn, wireguard, remote-access
 # logo: svgs/tailscale.svg
 
-version: '3.7'
 services:
   tailscale-nginx:
     image: 'tailscale/tailscale:latest'
