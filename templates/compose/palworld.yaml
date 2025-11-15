@@ -1,6 +1,6 @@
 services:
   palworld:
-    image: thijsvanloef/palworld-server-docker:1.4.6
+    image: thijsvanloef/palworld-server-docker:v1.4.6
     stop_grace_period: 30s
     ports:
       - '8211:8211/udp'
