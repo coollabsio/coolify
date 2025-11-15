@@ -1,15 +1,12 @@
-version: '3.7'
 services:
   palworld:
-    image: 'thijsvanloef/palworld-server-docker:latest'
-    restart: unless-stopped
-    container_name: palworld-server
+    image: thijsvanloef/palworld-server-docker:1.4.6
     stop_grace_period: 30s
     ports:
       - '8211:8211/udp'
       - '27015:27015/udp'
     volumes:
-      - '${COOLIFY_VOLUME_APP}:/palworld/'
+      - 'palworld-data:/palworld/'
     environment:
       - 'TZ=${TZ:?UTC}'
       - 'PUID=${PUID:?1000}'
