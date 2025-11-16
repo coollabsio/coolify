@@ -162,3 +162,82 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'repositories' => $json['repositories'],
     ];
 }
+
+function hasGitHubDeploymentsPermission(GithubApp $source): bool
+{
+    return ! empty($source->deployments) && $source->deployments === 'write';
+}
+
+function getGitHubEnvironments(GithubApp $source, string $repository): array
+{
+    try {
+        $response = githubApi($source, "repos/{$repository}/environments", 'get', null, false);
+        $environments = data_get($response, 'data.environments', []);
+
+        return collect($environments)->map(function ($env) {
+            return data_get($env, 'name');
+        })->filter()->values()->toArray();
+    } catch (\Exception $e) {
+        return [];
+    }
+}
+
+function createGitHubDeployment(GithubApp $source, string $repository, string $ref, string $environment, ?string $description = null): ?int
+{
+    try {
+        $data = [
+            'ref' => $ref,
+            'environment' => $environment,
+            'auto_merge' => false,
+            'required_contexts' => [],
+        ];
+
+        if ($description) {
+            $data['description'] = $description;
+        }
+
+        $response = githubApi($source, "repos/{$repository}/deployments", 'post', $data, false);
+
+        return data_get($response, 'data.id');
+    } catch (\Exception $e) {
+        ray('Failed to create GitHub deployment: '.$e->getMessage());
+
+        return null;
+    }
+}
+
+function updateGitHubDeploymentStatus(
+    GithubApp $source,
+    string $repository,
+    int $deploymentId,
+    string $state,
+    ?string $description = null,
+    ?string $logUrl = null,
+    ?string $environmentUrl = null
+): bool {
+    try {
+        $data = [
+            'state' => $state,
+        ];
+
+        if ($description) {
+            $data['description'] = $description;
+        }
+
+        if ($logUrl) {
+            $data['log_url'] = $logUrl;
+        }
+
+        if ($environmentUrl) {
+            $data['environment_url'] = $environmentUrl;
+        }
+
+        githubApi($source, "repos/{$repository}/deployments/{$deploymentId}/statuses", 'post', $data, false);
+
+        return true;
+    } catch (\Exception $e) {
+        ray('Failed to update GitHub deployment status: '.$e->getMessage());
+
+        return false;
+    }
+}

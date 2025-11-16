@@ -33,8 +33,19 @@ class Source extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $gitCommitSha = null;
 
+    #[Validate(['nullable', 'string'])]
+    public ?string $githubDeploymentProductionEnvironment = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $githubDeploymentPreviewEnvironment = null;
+
     #[Locked]
     public $sources;
+
+    #[Locked]
+    public $availableEnvironments = [];
+
+    public bool $hasDeploymentsPermission = false;
 
     public function mount()
     {
@@ -42,6 +53,8 @@ class Source extends Component
             $this->syncData();
             $this->getPrivateKeys();
             $this->getSources();
+            $this->checkGitHubDeploymentsPermission();
+            $this->loadGitHubEnvironments();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -71,6 +84,8 @@ class Source extends Component
                 'git_branch' => $this->gitBranch,
                 'git_commit_sha' => $this->gitCommitSha,
                 'private_key_id' => $this->privateKeyId,
+                'deployment_production_environment' => $this->githubDeploymentProductionEnvironment,
+                'deployment_preview_environment' => $this->githubDeploymentPreviewEnvironment,
             ]);
             // Refresh to get the trimmed values from the model
             $this->application->refresh();
@@ -81,6 +96,8 @@ class Source extends Component
             $this->gitCommitSha = $this->application->git_commit_sha;
             $this->privateKeyId = $this->application->private_key_id;
             $this->privateKeyName = data_get($this->application, 'private_key.name');
+            $this->githubDeploymentProductionEnvironment = $this->application->deployment_production_environment;
+            $this->githubDeploymentPreviewEnvironment = $this->application->deployment_preview_environment;
         }
     }
 
@@ -155,6 +172,26 @@ class Source extends Component
             $this->dispatch('success', 'Source updated!');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function checkGitHubDeploymentsPermission()
+    {
+        if ($this->application->is_github_based() && $this->application->source) {
+            $this->hasDeploymentsPermission = hasGitHubDeploymentsPermission($this->application->source);
+        }
+    }
+
+    private function loadGitHubEnvironments()
+    {
+        if ($this->application->is_github_based() && $this->application->source && $this->hasDeploymentsPermission) {
+            try {
+                ['repository' => $customRepository] = $this->application->customRepository();
+                $this->availableEnvironments = getGitHubEnvironments($this->application->source, $customRepository);
+            } catch (\Throwable $e) {
+                // Silently fail if we can't load environments
+                $this->availableEnvironments = [];
+            }
         }
     }
 }

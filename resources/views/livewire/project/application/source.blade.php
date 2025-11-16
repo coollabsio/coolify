@@ -42,6 +42,42 @@
                 <x-forms.input placeholder="HEAD" id="gitCommitSha" placeholder="HEAD" label="Commit SHA"
                     canGate="update" :canResource="$application" />
             </div>
+
+            @if ($application->is_github_based() && $application->source)
+                <h3 class="pt-4">GitHub Environments</h3>
+                @if (!$hasDeploymentsPermission)
+                    <div class="pb-2 text-sm text-warning">
+                        Deployments repository permission (write) is not granted for this GitHub App. 
+                        <a href="{{ getPermissionsPath($application->source) }}" target="_blank" class="underline">Update permissions</a> to enable GitHub deployment status updates.
+                    </div>
+                @endif
+                <div class="flex flex-col gap-2">
+                    <x-forms.select 
+                        id="githubDeploymentProductionEnvironment" 
+                        label="Production Environment"
+                        helper="Select a GitHub environment to update deployment status for production deployments. Leave empty to disable."
+                        :disabled="!$hasDeploymentsPermission"
+                        canGate="update" 
+                        :canResource="$application">
+                        <option value="">None</option>
+                        @foreach ($availableEnvironments as $env)
+                            <option value="{{ $env }}">{{ $env }}</option>
+                        @endforeach
+                    </x-forms.select>
+                    <x-forms.select 
+                        id="githubDeploymentPreviewEnvironment" 
+                        label="Preview Environment"
+                        helper="Select a GitHub environment to update deployment status for preview deployments. Leave empty to disable."
+                        :disabled="!$hasDeploymentsPermission"
+                        canGate="update" 
+                        :canResource="$application">
+                        <option value="">None</option>
+                        @foreach ($availableEnvironments as $env)
+                            <option value="{{ $env }}">{{ $env }}</option>
+                        @endforeach
+                    </x-forms.select>
+                </div>
+            @endif
         </div>
 
         @if ($privateKeyId)

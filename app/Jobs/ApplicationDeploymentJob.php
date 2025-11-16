@@ -172,6 +172,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
+    private ?int $github_deployment_id = null;
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -268,6 +270,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
         ]);
+
+        $this->createGitHubDeployment();
+        $this->updateGitHubDeploymentStatus('in_progress', 'Deployment started');
+
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
@@ -3723,6 +3729,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            $this->updateGitHubDeploymentStatus('error', 'Deployment cancelled by user');
             throw new DeploymentException('Deployment cancelled by user', 69420);
         }
     }
@@ -3796,6 +3803,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->sendDeploymentNotification(DeploymentSuccess::class);
+        $this->updateGitHubDeploymentStatus('success', 'Deployment completed successfully');
     }
 
     /**
@@ -3804,6 +3812,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function handleFailedDeployment(): void
     {
         $this->sendDeploymentNotification(DeploymentFailed::class);
+        $this->updateGitHubDeploymentStatus('failure', 'Deployment failed');
     }
 
     /**
@@ -3853,6 +3862,98 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     );
                 }
             }
+        }
+    }
+
+    /**
+     * Create a GitHub deployment and store the ID for later status updates.
+     */
+    private function createGitHubDeployment(): void
+    {
+        if (! $this->application->is_github_based() || ! $this->application->source) {
+            return;
+        }
+
+        if (! hasGitHubDeploymentsPermission($this->application->source)) {
+            return;
+        }
+
+        try {
+            $environment = $this->pull_request_id !== 0
+                ? $this->application->deployment_preview_environment
+                : $this->application->deployment_production_environment;
+
+            if (empty($environment)) {
+                return;
+            }
+
+            ['repository' => $repository] = $this->application->customRepository();
+            $ref = $this->commit ?? $this->application->git_commit_sha ?? 'HEAD';
+
+            $this->github_deployment_id = createGitHubDeployment(
+                $this->application->source,
+                $repository,
+                $ref,
+                $environment,
+                "Coolify deployment {$this->deployment_uuid}"
+            );
+
+            if ($this->github_deployment_id) {
+                $this->application_deployment_queue->addLogEntry("GitHub deployment created: {$this->github_deployment_id}");
+            }
+        } catch (\Throwable $e) {
+            // Silently fail - don't abort deployment if GitHub API fails
+            ray('Failed to create GitHub deployment: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Update GitHub deployment status based on deployment state.
+     */
+    private function updateGitHubDeploymentStatus(string $state, ?string $description = null): void
+    {
+        if (! $this->application->is_github_based() || ! $this->application->source) {
+            return;
+        }
+
+        if (! $this->github_deployment_id) {
+            return;
+        }
+
+        try {
+            ['repository' => $repository] = $this->application->customRepository();
+
+            $logUrl = route('project.application.deployment.show', [
+                'project_uuid' => data_get($this->application, 'environment.project.uuid'),
+                'application_uuid' => data_get($this->application, 'uuid'),
+                'deployment_uuid' => $this->deployment_uuid,
+            ]);
+
+            $environmentUrl = null;
+            if ($state === 'success') {
+                if ($this->pull_request_id !== 0 && $this->preview) {
+                    $environmentUrl = $this->preview->fqdn;
+                } elseif ($this->application->fqdn) {
+                    $fqdns = str($this->application->fqdn)->explode(',');
+                    $environmentUrl = data_get($fqdns, '0');
+                    if (! str($environmentUrl)->startsWith('http')) {
+                        $environmentUrl = 'http://'.$environmentUrl;
+                    }
+                }
+            }
+
+            updateGitHubDeploymentStatus(
+                $this->application->source,
+                $repository,
+                $this->github_deployment_id,
+                $state,
+                $description,
+                $logUrl,
+                $environmentUrl
+            );
+        } catch (\Throwable $e) {
+            // Silently fail - don't abort deployment if GitHub API fails
+            ray('Failed to update GitHub deployment status: '.$e->getMessage());
         }
     }
 }
