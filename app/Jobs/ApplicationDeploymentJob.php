@@ -976,7 +976,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
             if ($forceFail) {
-                throw new DeploymentException($e->getMessage(), 69420);
+                throw new DeploymentException(get_class($e).': '.$e->getMessage(), $e->getCode(), $e);
             }
         }
     }
@@ -1655,7 +1655,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (Exception $e) {
-            throw new DeploymentException("Rolling update failed: {$e->getMessage()}", $e->getCode(), $e);
+            throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -1734,8 +1734,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (Exception $e) {
-            $this->newVersionIsHealthy = false;
-            throw new DeploymentException("Health check failed: {$e->getMessage()}", $e->getCode(), $e);
+            throw new DeploymentException('Health check failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -3845,7 +3844,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      * Fail the deployment.
      * Sends failure notification and queues next deployment.
      */
-    private function failDeployment(): void
+    protected function failDeployment(): void
     {
         $this->transitionToStatus(ApplicationDeploymentStatus::FAILED);
     }
@@ -3861,28 +3860,28 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
         $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
-        $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr');
-        $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr');
+        $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr', hidden: true);
+        $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr', hidden: true);
 
         // Log the exception file and line for debugging
-        $this->application_deployment_queue->addLogEntry("Location: {$exception->getFile()}:{$exception->getLine()}", 'stderr');
+        $this->application_deployment_queue->addLogEntry("Location: {$exception->getFile()}:{$exception->getLine()}", 'stderr', hidden: true);
 
         // Log previous exceptions if they exist (for chained exceptions)
         $previous = $exception->getPrevious();
         if ($previous) {
-            $this->application_deployment_queue->addLogEntry('Caused by:', 'stderr');
+            $this->application_deployment_queue->addLogEntry('Caused by:', 'stderr', hidden: true);
             $previousMessage = $previous->getMessage() ?: 'No message';
             $previousClass = get_class($previous);
-            $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr');
-            $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr');
+            $this->application_deployment_queue->addLogEntry("  {$previousClass}: {$previousMessage}", 'stderr', hidden: true);
+            $this->application_deployment_queue->addLogEntry("  at {$previous->getFile()}:{$previous->getLine()}", 'stderr', hidden: true);
         }
 
         // Log first few lines of stack trace for debugging
         $trace = $exception->getTraceAsString();
         $traceLines = explode("\n", $trace);
-        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr');
+        $this->application_deployment_queue->addLogEntry('Stack trace (first 5 lines):', 'stderr', hidden: true);
         foreach (array_slice($traceLines, 0, 5) as $traceLine) {
-            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr');
+            $this->application_deployment_queue->addLogEntry("  {$traceLine}", 'stderr', hidden: true);
         }
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
 
