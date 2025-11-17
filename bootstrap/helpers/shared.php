@@ -241,10 +241,9 @@ function get_latest_sentinel_version(): string
 function get_latest_version_of_coolify(): string
 {
     try {
-        $versions = File::get(base_path('versions.json'));
-        $versions = json_decode($versions, true);
+        $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.v4.version');
+        return data_get($versions, 'coolify.v4.version', '0.0.0');
     } catch (\Throwable $e) {
 
         return '0.0.0';

@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -166,6 +167,22 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+    }
+
+    /**
+     * Check if Traefik has any outdated version info (patch or minor upgrade).
+     * This shows a warning indicator in the navbar.
+     */
+    public function getHasTraefikOutdatedProperty(): bool
+    {
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        // Check if server has outdated info stored
+        $outdatedInfo = $this->server->traefik_outdated_info;
+
+        return ! empty($outdatedInfo) && isset($outdatedInfo['type']);
     }
 
     public function render()

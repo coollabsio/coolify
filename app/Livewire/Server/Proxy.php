@@ -7,7 +7,6 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\File;
 use Livewire\Component;
 
 class Proxy extends Component
@@ -25,6 +24,12 @@ class Proxy extends Component
     public ?string $redirectUrl = null;
 
     public bool $generateExactLabels = false;
+
+    /**
+     * Cache the versions.json file data in memory for this component instance.
+     * This avoids multiple file reads during a single request/render cycle.
+     */
+    protected ?array $cachedVersionsFile = null;
 
     public function getListeners()
     {
@@ -55,6 +60,34 @@ class Proxy extends Component
         } else {
             $this->generateExactLabels = $this->server->settings->generate_exact_labels ?? false;
         }
+    }
+
+    /**
+     * Get Traefik versions from cached data with in-memory optimization.
+     * Returns array like: ['v3.5' => '3.5.6', 'v3.6' => '3.6.2']
+     *
+     * This method adds an in-memory cache layer on top of the global
+     * get_traefik_versions() helper to avoid multiple calls during
+     * a single component lifecycle/render.
+     */
+    protected function getTraefikVersions(): ?array
+    {
+        // In-memory cache for this component instance (per-request)
+        if ($this->cachedVersionsFile !== null) {
+            return data_get($this->cachedVersionsFile, 'traefik');
+        }
+
+        // Load from global cached helper (Redis + filesystem)
+        $versionsData = get_versions_data();
+        $this->cachedVersionsFile = $versionsData;
+
+        if (! $versionsData) {
+            return null;
+        }
+
+        $traefikVersions = data_get($versionsData, 'traefik');
+
+        return is_array($traefikVersions) ? $traefikVersions : null;
     }
 
     public function getConfigurationFilePathProperty()
@@ -147,49 +180,45 @@ class Proxy extends Component
         }
     }
 
+    /**
+     * Get the latest Traefik version for this server's current branch.
+     *
+     * This compares the server's detected version against available versions
+     * in versions.json to determine the latest patch for the current branch,
+     * or the newest available version if no current version is detected.
+     */
     public function getLatestTraefikVersionProperty(): ?string
     {
         try {
-            $versionsPath = base_path('versions.json');
-            if (! File::exists($versionsPath)) {
-                return null;
-            }
-
-            $versions = json_decode(File::get($versionsPath), true);
-            $traefikVersions = data_get($versions, 'traefik');
+            $traefikVersions = $this->getTraefikVersions();
 
             if (! $traefikVersions) {
                 return null;
             }
 
-            // Handle new structure (array of branches)
-            if (is_array($traefikVersions)) {
-                $currentVersion = $this->server->detected_traefik_version;
+            // Get this server's current version
+            $currentVersion = $this->server->detected_traefik_version;
 
-                // If we have a current version, try to find matching branch
-                if ($currentVersion && $currentVersion !== 'latest') {
-                    $current = ltrim($currentVersion, 'v');
-                    if (preg_match('/^(\d+\.\d+)/', $current, $matches)) {
-                        $branch = "v{$matches[1]}";
-                        if (isset($traefikVersions[$branch])) {
-                            $version = $traefikVersions[$branch];
+            // If we have a current version, try to find matching branch
+            if ($currentVersion && $currentVersion !== 'latest') {
+                $current = ltrim($currentVersion, 'v');
+                if (preg_match('/^(\d+\.\d+)/', $current, $matches)) {
+                    $branch = "v{$matches[1]}";
+                    if (isset($traefikVersions[$branch])) {
+                        $version = $traefikVersions[$branch];
 
-                            return str_starts_with($version, 'v') ? $version : "v{$version}";
-                        }
+                        return str_starts_with($version, 'v') ? $version : "v{$version}";
                     }
                 }
-
-                // Return the newest available version
-                $newestVersion = collect($traefikVersions)
-                    ->map(fn ($v) => ltrim($v, 'v'))
-                    ->sortBy(fn ($v) => $v, SORT_NATURAL)
-                    ->last();
-
-                return $newestVersion ? "v{$newestVersion}" : null;
             }
 
-            // Handle old structure (simple string) for backward compatibility
-            return str_starts_with($traefikVersions, 'v') ? $traefikVersions : "v{$traefikVersions}";
+            // Return the newest available version
+            $newestVersion = collect($traefikVersions)
+                ->map(fn ($v) => ltrim($v, 'v'))
+                ->sortBy(fn ($v) => $v, SORT_NATURAL)
+                ->last();
+
+            return $newestVersion ? "v{$newestVersion}" : null;
         } catch (\Throwable $e) {
             return null;
         }
@@ -218,6 +247,10 @@ class Proxy extends Component
         return version_compare($current, $latest, '<');
     }
 
+    /**
+     * Check if a newer Traefik branch (minor version) is available for this server.
+     * Returns the branch identifier (e.g., "v3.6") if a newer branch exists.
+     */
     public function getNewerTraefikBranchAvailableProperty(): ?string
     {
         try {
@@ -225,12 +258,13 @@ class Proxy extends Component
                 return null;
             }
 
+            // Get this server's current version
             $currentVersion = $this->server->detected_traefik_version;
             if (! $currentVersion || $currentVersion === 'latest') {
                 return null;
             }
 
-            // Check if we have outdated info stored
+            // Check if we have outdated info stored for this server (faster than computing)
             $outdatedInfo = $this->server->traefik_outdated_info;
             if ($outdatedInfo && isset($outdatedInfo['type']) && $outdatedInfo['type'] === 'minor_upgrade') {
                 // Use the upgrade_target field if available (e.g., "v3.6")
@@ -241,15 +275,10 @@ class Proxy extends Component
                 }
             }
 
-            $versionsPath = base_path('versions.json');
-            if (! File::exists($versionsPath)) {
-                return null;
-            }
+            // Fallback: compute from cached versions data
+            $traefikVersions = $this->getTraefikVersions();
 
-            $versions = json_decode(File::get($versionsPath), true);
-            $traefikVersions = data_get($versions, 'traefik');
-
-            if (! is_array($traefikVersions)) {
+            if (! $traefikVersions) {
                 return null;
             }
 

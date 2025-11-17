@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\File;
 
 class CheckTraefikVersionJob implements ShouldQueue
 {
@@ -19,16 +18,10 @@ class CheckTraefikVersionJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Load versions from versions.json
-        $versionsPath = base_path('versions.json');
-        if (! File::exists($versionsPath)) {
-            return;
-        }
+        // Load versions from cached data
+        $traefikVersions = get_traefik_versions();
 
-        $allVersions = json_decode(File::get($versionsPath), true);
-        $traefikVersions = data_get($allVersions, 'traefik');
-
-        if (empty($traefikVersions) || ! is_array($traefikVersions)) {
+        if (empty($traefikVersions)) {
             return;
         }
 
