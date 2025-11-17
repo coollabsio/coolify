@@ -11,7 +11,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('cloud_init_scripts')) {
             Schema::create('cloud_init_scripts', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('team_id')->constrained()->onDelete('cascade');
@@ -21,7 +20,6 @@ return new class extends Migration
 
                 $table->index('team_id');
             });
-        }
     }
 
     /**

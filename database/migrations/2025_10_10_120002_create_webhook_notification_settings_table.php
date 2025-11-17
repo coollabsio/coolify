@@ -11,7 +11,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('webhook_notification_settings')) {
             Schema::create('webhook_notification_settings', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('team_id')->constrained()->cascadeOnDelete();
@@ -35,7 +34,6 @@ return new class extends Migration
 
                 $table->unique(['team_id']);
             });
-        }
     }
 
     /**
