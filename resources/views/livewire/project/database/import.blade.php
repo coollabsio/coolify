@@ -29,6 +29,7 @@
                 });
                 this.on("addedfile", file => {
                     $wire.isUploading = true;
+                    $wire.customLocation = '';
                 });
                 this.on('uploadprogress', function (file, progress, bytesSent) {
                     $wire.progress = progress;
@@ -132,8 +133,8 @@
                     <h3>Backup File</h3>
                     <form class="flex gap-2 items-end pt-2">
                         <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
-                            wire:model='customLocation'></x-forms.input>
-                        <x-forms.button class="w-full" wire:click='checkFile'>Check File</x-forms.button>
+                            wire:model='customLocation' x-model="$wire.customLocation"></x-forms.input>
+                        <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation">Check File</x-forms.button>
                     </form>
                     <div class="pt-2 text-center text-xl font-bold">
                         Or

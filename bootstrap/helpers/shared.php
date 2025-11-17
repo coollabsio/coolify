@@ -3288,10 +3288,12 @@ function isSafeTmpPath(?string $path): bool
         $canonicalTmpPath = '/tmp';
     }
 
+    // Calculate dirname once to avoid redundant calls
+    $dirPath = dirname($resolvedPath);
+
     // If the directory exists, resolve it via realpath to catch symlink attacks
-    if (file_exists($resolvedPath) || is_dir(dirname($resolvedPath))) {
+    if (file_exists($resolvedPath) || is_dir($dirPath)) {
         // For existing paths, resolve to absolute path to catch symlinks
-        $dirPath = dirname($resolvedPath);
         if (is_dir($dirPath)) {
             $realDir = realpath($dirPath);
             if ($realDir === false) {

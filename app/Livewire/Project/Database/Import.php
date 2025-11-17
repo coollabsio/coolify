@@ -187,22 +187,22 @@ EOD;
         try {
             $this->importRunning = true;
             $this->importCommands = [];
-            if (filled($this->customLocation)) {
-                $backupFileName = '/tmp/restore_'.$this->resource->uuid;
-                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$backupFileName}";
-                $tmpPath = $backupFileName;
-            } else {
-                $backupFileName = "upload/{$this->resource->uuid}/restore";
-                $path = Storage::path($backupFileName);
-                if (! Storage::exists($backupFileName)) {
-                    $this->dispatch('error', 'The file does not exist or has been deleted.');
+            $backupFileName = "upload/{$this->resource->uuid}/restore";
 
-                    return;
-                }
+            // Check if an uploaded file exists first (takes priority over custom location)
+            if (Storage::exists($backupFileName)) {
+                $path = Storage::path($backupFileName);
                 $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
                 instant_scp($path, $tmpPath, $this->server);
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
+            } elseif (filled($this->customLocation)) {
+                $tmpPath = '/tmp/restore_'.$this->resource->uuid;
+                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$tmpPath}";
+            } else {
+                $this->dispatch('error', 'The file does not exist or has been deleted.');
+
+                return;
             }
 
             // Copy the restore command to a script file
@@ -383,7 +383,7 @@ EOD;
             $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
 
             // 2. Start helper container on the database network
-            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} --rm {$fullImageName} sleep 3600";
+            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} {$fullImageName} sleep 3600";
 
             // 3. Configure S3 access in helper container
             $escapedEndpoint = escapeshellarg($endpoint);

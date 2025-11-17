@@ -30,7 +30,10 @@ class RestoreJobFinished
             }
 
             if (! empty($commands)) {
-                instant_remote_process($commands, Server::find($serverId), throwError: false);
+                $server = Server::find($serverId);
+                if ($server) {
+                    instant_remote_process($commands, $server, throwError: false);
+                }
             }
         }
     }
