@@ -20,7 +20,7 @@ services:
       timeout: 10s
       retries: 15
     depends_on:
-      uptime-kuma-mariadb:
+      uptime-kuma-db:
         condition: service_healthy
   uptime-kuma-db:
     image: mariadb:11.8
