@@ -379,8 +379,10 @@ EOD;
             // Prepare all commands in sequence
             $commands = [];
 
-            // 1. Clean up any existing helper container
+            // 1. Clean up any existing helper container and temp files from previous runs
             $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+            $commands[] = "docker exec {$this->container} rm -f {$containerTmpPath} {$scriptPath} 2>/dev/null || true";
 
             // 2. Start helper container on the database network
             $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} {$fullImageName} sleep 3600";
@@ -394,14 +396,16 @@ EOD;
             // 4. Check file exists in S3
             $commands[] = "docker exec {$containerName} mc stat s3temp/{$bucket}/{$cleanPath}";
 
-            // 5. Download from S3 to helper container's internal /tmp
+            // 5. Download from S3 to helper container (progress shown by default)
             $commands[] = "docker exec {$containerName} mc cp s3temp/{$bucket}/{$cleanPath} {$helperTmpPath}";
 
-            // 6. Copy file from helper container to server
+            // 6. Copy from helper to server, then immediately to database container
             $commands[] = "docker cp {$containerName}:{$helperTmpPath} {$serverTmpPath}";
-
-            // 7. Copy file from server to database container
             $commands[] = "docker cp {$serverTmpPath} {$this->container}:{$containerTmpPath}";
+
+            // 7. Cleanup helper container and server temp file immediately (no longer needed)
+            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
 
             // 8. Build and execute restore command inside database container
             $restoreCommand = $this->buildRestoreCommand($containerTmpPath);
@@ -410,10 +414,12 @@ EOD;
             $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
             $commands[] = "chmod +x {$scriptPath}";
             $commands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
-            $commands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
+
+            // 9. Execute restore and cleanup temp files immediately after completion
+            $commands[] = "docker exec {$this->container} sh -c '{$scriptPath} && rm -f {$containerTmpPath} {$scriptPath}'";
             $commands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
-            // Execute all commands with cleanup event
+            // Execute all commands with cleanup event (as safety net for edge cases)
             $activity = remote_process($commands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
                 'containerName' => $containerName,
                 'serverTmpPath' => $serverTmpPath,
@@ -426,7 +432,7 @@ EOD;
             // Dispatch activity to the monitor and open slide-over
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
-            $this->dispatch('info', 'Restoring database from S3. This may take a few minutes for large backups...');
+            $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (\Throwable $e) {
             $this->importRunning = false;
 

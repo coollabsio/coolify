@@ -20,26 +20,22 @@ class S3RestoreJobFinished
         $container = data_get($data, 'container');
         $serverId = data_get($data, 'serverId');
 
-        // Clean up helper container and temporary files
+        // Most cleanup now happens inline during restore process
+        // This acts as a safety net for edge cases (errors, interruptions)
         if (filled($serverId)) {
             $commands = [];
 
-            // Stop and remove helper container
+            // Ensure helper container is removed (may already be gone from inline cleanup)
             if (filled($containerName)) {
                 $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
             }
 
-            // Clean up downloaded file from server /tmp
+            // Clean up server temp file if still exists (should already be cleaned)
             if (isSafeTmpPath($serverTmpPath)) {
                 $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
             }
 
-            // Clean up script from server
-            if (isSafeTmpPath($scriptPath)) {
-                $commands[] = "rm -f {$scriptPath} 2>/dev/null || true";
-            }
-
-            // Clean up files from database container
+            // Clean up any remaining files in database container (may already be cleaned)
             if (filled($container)) {
                 if (isSafeTmpPath($containerTmpPath)) {
                     $commands[] = "docker exec {$container} rm -f {$containerTmpPath} 2>/dev/null || true";
@@ -49,9 +45,11 @@ class S3RestoreJobFinished
                 }
             }
 
-            $server = Server::find($serverId);
-            if ($server) {
-                instant_remote_process($commands, $server, throwError: false);
+            if (! empty($commands)) {
+                $server = Server::find($serverId);
+                if ($server) {
+                    instant_remote_process($commands, $server, throwError: false);
+                }
             }
         }
     }
