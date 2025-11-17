@@ -13,37 +13,43 @@ class S3RestoreJobFinished
 
     public function __construct($data)
     {
+        $containerName = data_get($data, 'containerName');
+        $serverTmpPath = data_get($data, 'serverTmpPath');
         $scriptPath = data_get($data, 'scriptPath');
-        $tmpPath = data_get($data, 'tmpPath');
+        $containerTmpPath = data_get($data, 'containerTmpPath');
         $container = data_get($data, 'container');
         $serverId = data_get($data, 'serverId');
-        $s3DownloadedFile = data_get($data, 's3DownloadedFile');
 
-        // Clean up temporary files from container
-        if (filled($scriptPath) && filled($tmpPath) && filled($container) && filled($serverId)) {
-            if (str($tmpPath)->startsWith('/tmp/')
-                && str($scriptPath)->startsWith('/tmp/')
-                && ! str($tmpPath)->contains('..')
-                && ! str($scriptPath)->contains('..')
-                && strlen($tmpPath) > 5  // longer than just "/tmp/"
-                && strlen($scriptPath) > 5
-            ) {
-                $commands[] = "docker exec {$container} sh -c 'rm {$scriptPath}'";
-                $commands[] = "docker exec {$container} sh -c 'rm {$tmpPath}'";
-                instant_remote_process($commands, Server::find($serverId), throwError: true);
-            }
-        }
+        // Clean up helper container and temporary files
+        if (filled($serverId)) {
+            $commands = [];
 
-        // Clean up S3 downloaded file from server
-        if (filled($s3DownloadedFile) && filled($serverId)) {
-            if (str($s3DownloadedFile)->startsWith('/tmp/s3-restore-')
-                && ! str($s3DownloadedFile)->contains('..')
-                && strlen($s3DownloadedFile) > 16  // longer than just "/tmp/s3-restore-"
-            ) {
-                $commands = [];
-                $commands[] = "rm -f {$s3DownloadedFile}";
-                instant_remote_process($commands, Server::find($serverId), throwError: false);
+            // Stop and remove helper container
+            if (filled($containerName)) {
+                $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
             }
+
+            // Clean up downloaded file from server /tmp
+            if (isSafeTmpPath($serverTmpPath)) {
+                $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+            }
+
+            // Clean up script from server
+            if (isSafeTmpPath($scriptPath)) {
+                $commands[] = "rm -f {$scriptPath} 2>/dev/null || true";
+            }
+
+            // Clean up files from database container
+            if (filled($container)) {
+                if (isSafeTmpPath($containerTmpPath)) {
+                    $commands[] = "docker exec {$container} rm -f {$containerTmpPath} 2>/dev/null || true";
+                }
+                if (isSafeTmpPath($scriptPath)) {
+                    $commands[] = "docker exec {$container} rm -f {$scriptPath} 2>/dev/null || true";
+                }
+            }
+
+            instant_remote_process($commands, Server::find($serverId), throwError: false);
         }
     }
 }

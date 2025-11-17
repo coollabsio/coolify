@@ -62,11 +62,7 @@ class Import extends Component
 
     public string $s3Path = '';
 
-    public ?string $s3DownloadedFile = null;
-
     public ?int $s3FileSize = null;
-
-    public bool $s3DownloadInProgress = false;
 
     public function getListeners()
     {
@@ -74,27 +70,11 @@ class Import extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            "echo-private:user.{$userId},S3DownloadFinished" => 'handleS3DownloadFinished',
         ];
-    }
-
-    public function handleS3DownloadFinished($data): void
-    {
-        $this->s3DownloadInProgress = false;
-
-        // Set the downloaded file path from the event data
-        $downloadPath = data_get($data, 'downloadPath');
-        if (filled($downloadPath)) {
-            $this->s3DownloadedFile = $downloadPath;
-            $this->filename = $downloadPath;
-        }
     }
 
     public function mount()
     {
-        if (isDev()) {
-            $this->customLocation = '/data/coolify/pg-dump-all-1736245863.gz';
-        }
         $this->parameters = get_route_parameters();
         $this->getContainers();
         $this->loadAvailableS3Storages();
@@ -276,7 +256,10 @@ EOD;
                     'container' => $this->container,
                     'serverId' => $this->server->id,
                 ]);
+
+                // Dispatch activity to the monitor and open slide-over
                 $this->dispatch('activityMonitor', $activity->id);
+                $this->dispatch('databaserestore');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -294,7 +277,6 @@ EOD;
                 ->get();
         } catch (\Throwable $e) {
             $this->availableS3Storages = collect();
-            ray($e);
         }
     }
 
@@ -350,7 +332,7 @@ EOD;
         }
     }
 
-    public function downloadFromS3()
+    public function restoreFromS3()
     {
         $this->authorize('update', $this->resource);
 
@@ -367,7 +349,7 @@ EOD;
         }
 
         try {
-            $this->s3DownloadInProgress = true;
+            $this->importRunning = true;
 
             $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
 
@@ -376,154 +358,119 @@ EOD;
             $bucket = $s3Storage->bucket;
             $endpoint = $s3Storage->endpoint;
 
-            // Clean the path
+            // Clean the S3 path
             $cleanPath = ltrim($this->s3Path, '/');
-
-            // Create temporary download directory
-            $downloadDir = "/tmp/s3-restore-{$this->resource->uuid}";
-            $downloadPath = "{$downloadDir}/".basename($cleanPath);
 
             // Get helper image
             $helperImage = config('constants.coolify.helper_image');
-            $latestVersion = instanceSettings()->helper_version;
+            $latestVersion = getHelperVersion();
             $fullImageName = "{$helperImage}:{$latestVersion}";
 
-            // Prepare download commands
-            $commands = [];
+            // Get the database destination network
+            $destinationNetwork = $this->resource->destination->network ?? 'coolify';
 
-            // Create download directory on server
-            $commands[] = "mkdir -p {$downloadDir}";
-
-            // Check if container exists and remove it (done in the command queue to avoid blocking)
+            // Generate unique names for this operation
             $containerName = "s3-restore-{$this->resource->uuid}";
-            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
-
-            // Run MinIO client container to download file
-            $commands[] = "docker run -d --name {$containerName} --rm -v {$downloadDir}:{$downloadDir} {$fullImageName} sleep 30";
-            $commands[] = "docker exec {$containerName} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
-            $commands[] = "docker exec {$containerName} mc cp temporary/{$bucket}/{$cleanPath} {$downloadPath}";
-
-            // Execute download commands
-            $activity = remote_process($commands, $this->server, ignore_errors: false, callEventOnFinish: 'S3DownloadFinished', callEventData: [
-                'userId' => Auth::id(),
-                'downloadPath' => $downloadPath,
-                'containerName' => $containerName,
-                'serverId' => $this->server->id,
-                'resourceUuid' => $this->resource->uuid,
-            ]);
-
-            $this->dispatch('activityMonitor', $activity->id);
-            $this->dispatch('info', 'Downloading file from S3. This may take a few minutes for large backups...');
-        } catch (\Throwable $e) {
-            $this->s3DownloadInProgress = false;
-            $this->s3DownloadedFile = null;
-
-            return handleError($e, $this);
-        }
-    }
-
-    public function restoreFromS3()
-    {
-        $this->authorize('update', $this->resource);
-
-        if (! $this->s3DownloadedFile) {
-            $this->dispatch('error', 'Please download the file from S3 first.');
-
-            return;
-        }
-
-        try {
-            $this->importRunning = true;
-            $this->importCommands = [];
-
-            // Use the downloaded file path
-            $backupFileName = '/tmp/restore_'.$this->resource->uuid;
-            $this->importCommands[] = "docker cp {$this->s3DownloadedFile} {$this->container}:{$backupFileName}";
-            $tmpPath = $backupFileName;
-
-            // Copy the restore command to a script file
+            $helperTmpPath = '/tmp/'.basename($cleanPath);
+            $serverTmpPath = "/tmp/s3-restore-{$this->resource->uuid}-".basename($cleanPath);
+            $containerTmpPath = "/tmp/restore_{$this->resource->uuid}-".basename($cleanPath);
             $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
 
-            switch ($this->resource->getMorphClass()) {
-                case \App\Models\StandaloneMariadb::class:
-                    $restoreCommand = $this->mariadbRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
-                    } else {
-                        $restoreCommand .= " < {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandaloneMysql::class:
-                    $restoreCommand = $this->mysqlRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
-                    } else {
-                        $restoreCommand .= " < {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandalonePostgresql::class:
-                    $restoreCommand = $this->postgresqlRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
-                    } else {
-                        $restoreCommand .= " {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandaloneMongodb::class:
-                    $restoreCommand = $this->mongodbRestoreCommand;
-                    if ($this->dumpAll === false) {
-                        $restoreCommand .= "{$tmpPath}";
-                    }
-                    break;
-            }
+            // Prepare all commands in sequence
+            $commands = [];
+
+            // 1. Clean up any existing helper container
+            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+
+            // 2. Start helper container on the database network
+            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} --rm {$fullImageName} sleep 3600";
+
+            // 3. Configure S3 access in helper container
+            $escapedEndpoint = escapeshellarg($endpoint);
+            $escapedKey = escapeshellarg($key);
+            $escapedSecret = escapeshellarg($secret);
+            $commands[] = "docker exec {$containerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+
+            // 4. Check file exists in S3
+            $commands[] = "docker exec {$containerName} mc stat s3temp/{$bucket}/{$cleanPath}";
+
+            // 5. Download from S3 to helper container's internal /tmp
+            $commands[] = "docker exec {$containerName} mc cp s3temp/{$bucket}/{$cleanPath} {$helperTmpPath}";
+
+            // 6. Copy file from helper container to server
+            $commands[] = "docker cp {$containerName}:{$helperTmpPath} {$serverTmpPath}";
+
+            // 7. Copy file from server to database container
+            $commands[] = "docker cp {$serverTmpPath} {$this->container}:{$containerTmpPath}";
+
+            // 8. Build and execute restore command inside database container
+            $restoreCommand = $this->buildRestoreCommand($containerTmpPath);
 
             $restoreCommandBase64 = base64_encode($restoreCommand);
-            $this->importCommands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
-            $this->importCommands[] = "chmod +x {$scriptPath}";
-            $this->importCommands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
+            $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
+            $commands[] = "chmod +x {$scriptPath}";
+            $commands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
+            $commands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
+            $commands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
-            $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
-            $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
+            // Execute all commands with cleanup event
+            $activity = remote_process($commands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
+                'containerName' => $containerName,
+                'serverTmpPath' => $serverTmpPath,
+                'scriptPath' => $scriptPath,
+                'containerTmpPath' => $containerTmpPath,
+                'container' => $this->container,
+                'serverId' => $this->server->id,
+            ]);
 
-            if (! empty($this->importCommands)) {
-                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
-                    'scriptPath' => $scriptPath,
-                    'tmpPath' => $tmpPath,
-                    'container' => $this->container,
-                    'serverId' => $this->server->id,
-                    's3DownloadedFile' => $this->s3DownloadedFile,
-                    'resourceUuid' => $this->resource->uuid,
-                ]);
-                $this->dispatch('activityMonitor', $activity->id);
-            }
+            // Dispatch activity to the monitor and open slide-over
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('databaserestore');
+            $this->dispatch('info', 'Restoring database from S3. This may take a few minutes for large backups...');
         } catch (\Throwable $e) {
+            $this->importRunning = false;
+
             return handleError($e, $this);
-        } finally {
-            $this->importCommands = [];
         }
     }
 
-    public function cancelS3Download()
+    public function buildRestoreCommand(string $tmpPath): string
     {
-        if ($this->s3DownloadedFile) {
-            try {
-                // Cleanup downloaded file and directory
-                $downloadDir = "/tmp/s3-restore-{$this->resource->uuid}";
-                instant_remote_process(["rm -rf {$downloadDir}"], $this->server, false);
-
-                // Cleanup container if exists
-                $containerName = "s3-restore-{$this->resource->uuid}";
-                instant_remote_process(["docker rm -f {$containerName}"], $this->server, false);
-
-                $this->dispatch('success', 'S3 download cancelled and temporary files cleaned up.');
-            } catch (\Throwable $e) {
-                ray($e);
-            }
+        switch ($this->resource->getMorphClass()) {
+            case \App\Models\StandaloneMariadb::class:
+                $restoreCommand = $this->mariadbRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
+                } else {
+                    $restoreCommand .= " < {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandaloneMysql::class:
+                $restoreCommand = $this->mysqlRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
+                } else {
+                    $restoreCommand .= " < {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandalonePostgresql::class:
+                $restoreCommand = $this->postgresqlRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
+                } else {
+                    $restoreCommand .= " {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandaloneMongodb::class:
+                $restoreCommand = $this->mongodbRestoreCommand;
+                if ($this->dumpAll === false) {
+                    $restoreCommand .= "{$tmpPath}";
+                }
+                break;
+            default:
+                $restoreCommand = '';
         }
 
-        // Reset S3 download state
-        $this->s3DownloadedFile = null;
-        $this->s3DownloadInProgress = false;
-        $this->filename = null;
+        return $restoreCommand;
     }
 }

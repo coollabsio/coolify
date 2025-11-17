@@ -90,5 +90,22 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
             'failed_at' => now()->toIso8601String(),
         ]);
         $this->activity->save();
+
+        // Dispatch cleanup event on failure (same as on success)
+        if ($this->call_event_on_finish) {
+            try {
+                $eventClass = "App\\Events\\$this->call_event_on_finish";
+                if (! is_null($this->call_event_data)) {
+                    event(new $eventClass($this->call_event_data));
+                } else {
+                    event(new $eventClass($this->activity->causer_id));
+                }
+                Log::info('Cleanup event dispatched after job failure', [
+                    'event' => $this->call_event_on_finish,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Error dispatching cleanup event on failure: '.$e->getMessage());
+            }
+        }
     }
 }
