@@ -128,6 +128,7 @@ Route::group([
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/backups', [DatabasesController::class, 'create_backup'])->middleware(['api.ability:write']);
     Route::patch('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'update_backup'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/backups/{scheduled_backup_uuid}/restore/{execution_uuid}', [DatabasesController::class, 'restore_backup'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'delete_backup_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}', [DatabasesController::class, 'delete_execution_by_uuid'])->middleware(['api.ability:write']);

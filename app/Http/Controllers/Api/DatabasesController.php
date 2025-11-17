@@ -676,7 +676,8 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'backup_type', 'pgbackrest_type', 'pgbackrest_stanza', 'pgbackrest_retention_full', 'pgbackrest_retention_diff', 'pgbackrest_block_incremental', 'pgbackrest_process_max'];
+
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -703,6 +704,13 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'backup_type' => 'string|in:pg_dump,pgbackrest',
+            'pgbackrest_type' => 'string|in:full,diff,incr|nullable',
+            'pgbackrest_stanza' => 'string|nullable',
+            'pgbackrest_retention_full' => 'integer|min:1|nullable',
+            'pgbackrest_retention_diff' => 'integer|min:0|nullable',
+            'pgbackrest_block_incremental' => 'boolean',
+            'pgbackrest_process_max' => 'integer|min:1|max:16|nullable',
         ]);
 
         if ($validator->fails()) {
@@ -780,6 +788,54 @@ class DatabasesController extends Controller
             }
             unset($backupData['s3_storage_uuid']);
         }
+
+        // Validate pgBackRest is only used with PostgreSQL
+        if (isset($backupData['backup_type']) && $backupData['backup_type'] === 'pgbackrest') {
+            $databaseType = $database->type();
+            $isPostgres = $databaseType === 'standalone-postgresql' || str_contains($databaseType, 'postgres');
+
+            if (! $isPostgres) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['backup_type' => ['pgBackRest backup type is only supported for PostgreSQL databases.']],
+                ], 422);
+            }
+        }
+
+        // Default to pgBackRest for PostgreSQL databases if backup_type not specified
+        if (! isset($backupData['backup_type']) || empty($backupData['backup_type'])) {
+            $databaseType = $database->type();
+            $isPostgres = $databaseType === 'standalone-postgresql' || str_contains($databaseType, 'postgres');
+
+            if ($isPostgres) {
+                $backupData['backup_type'] = 'pgbackrest';
+                // Set default pgBackRest type if not specified
+                if (! isset($backupData['pgbackrest_type'])) {
+                    $backupData['pgbackrest_type'] = 'incr';
+                }
+            } else {
+                $backupData['backup_type'] = 'pg_dump';
+            }
+        }
+
+
+        // Validate S3 connectivity for pgBackRest with S3 repository
+        if (isset($backupData['backup_type']) && $backupData['backup_type'] === 'pgbackrest' && $request->boolean('save_s3')) {
+            if (isset($backupData['s3_storage_id'])) {
+                $s3Storage = S3Storage::find($backupData['s3_storage_id']);
+                if ($s3Storage) {
+                    try {
+                        $s3Storage->testConnection(shouldSave: false);
+                    } catch (\Throwable $e) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => ['s3_storage_uuid' => ['S3 connectivity test failed: '.$e->getMessage()]],
+                        ], 422);
+                    }
+                }
+            }
+        }
+
 
         // Set default databases_to_backup based on database type if not provided
         if (! isset($backupData['databases_to_backup']) || empty($backupData['databases_to_backup'])) {
@@ -896,7 +952,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid','backup_type', 'pgbackrest_type', 'pgbackrest_stanza', 'pgbackrest_retention_full', 'pgbackrest_retention_diff', 'pgbackrest_block_incremental', 'pgbackrest_process_max'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1007,6 +1063,160 @@ class DatabasesController extends Controller
 
         return response()->json([
             'message' => 'Database backup configuration updated',
+        ]);
+    }
+
+
+    #[OA\Post(
+        summary: 'Restore Database',
+        description: 'Restore a database from a specific backup execution',
+        path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/restore/{execution_uuid}',
+        operationId: 'restore-database-backup',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'scheduled_backup_uuid',
+                in: 'path',
+                description: 'UUID of the backup configuration.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'execution_uuid',
+                in: 'path',
+                description: 'UUID of the backup execution to restore from.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Restore options',
+            required: false,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'target_database' => ['type' => 'string', 'description' => 'Target database name (optional, defaults to original database)'],
+                    ],
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restore initiated successfully',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function restore_backup(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'target_database' => 'string|nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Database UUID is required.'], 404);
+        }
+
+        if (! $request->scheduled_backup_uuid) {
+            return response()->json(['message' => 'Backup configuration UUID is required.'], 404);
+        }
+
+        if (! $request->execution_uuid) {
+            return response()->json(['message' => 'Backup execution UUID is required.'], 404);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)
+            ->where('database_id', $database->id)
+            ->where('uuid', $request->scheduled_backup_uuid)
+            ->first();
+
+        if (! $backupConfig) {
+            return response()->json(['message' => 'Backup configuration not found.'], 404);
+        }
+
+        $backupExecution = ScheduledDatabaseBackupExecution::where('scheduled_database_backup_id', $backupConfig->id)
+            ->where('uuid', $request->execution_uuid)
+            ->where('status', 'success')
+            ->first();
+
+        if (! $backupExecution) {
+            return response()->json(['message' => 'Backup execution not found or backup was not successful.'], 404);
+        }
+
+        $databaseType = $database->type();
+        $isPostgres = $databaseType === 'standalone-postgresql' || str_contains($databaseType, 'postgres');
+
+        if (! $isPostgres) {
+            return response()->json([
+                'message' => 'Restore is currently only supported for PostgreSQL databases.',
+            ], 422);
+        }
+
+        dispatch(new \App\Jobs\DatabaseRestoreJob(
+            $backupConfig,
+            $backupExecution,
+            $request->input('target_database')
+        ));
+
+        return response()->json([
+            'message' => 'Database restore initiated successfully. You will be notified when it completes.',
         ]);
     }
 
@@ -2274,6 +2484,15 @@ class DatabasesController extends Controller
                 $execution->delete();
             }
 
+            // Clean up pgBackRest stanza if using pgBackRest
+            if ($backup->isPgBackRest()) {
+                try {
+                    $this->cleanup_pgbackrest_stanza($backup, $database);
+                } catch (\Throwable $e) {
+                    \Log::warning('Failed to clean up pgBackRest stanza: '.$e->getMessage());
+                }
+            }
+
             // Delete the backup configuration itself
             $backup->delete();
             DB::commit();
@@ -2286,6 +2505,39 @@ class DatabasesController extends Controller
 
             return response()->json(['message' => 'Failed to delete backup: '.$e->getMessage()], 500);
         }
+
+        private function cleanup_pgbackrest_stanza($backup, $database): void
+    {
+        $stanzaName = $backup->getStanzaName();
+        $pgbackrestImage = 'woblerr/pgbackrest:2.48';
+
+        if (data_get($backup, 'database_type') === \App\Models\ServiceDatabase::class) {
+            $server = $database->service->destination->server;
+        } else {
+            $server = $database->destination->server;
+        }
+
+        $databaseName = str($database->name)->slug()->value();
+        $containerName = $database->uuid;
+        $directoryName = $databaseName.'-'.$containerName;
+        $team = Team::find($backup->team_id);
+        $backupDir = backup_dir().'/databases/'.str($team->name)->slug().'-'.$team->id.'/'.$directoryName;
+
+        $pgbackrestConfigDir = escapeshellarg($backupDir.'/.pgbackrest');
+        $configPath = trim($pgbackrestConfigDir, "'").'/'.'pgbackrest.conf';
+        $quotedConfigPath = escapeshellarg($configPath);
+        $quotedStanzaName = escapeshellarg($stanzaName);
+        $quotedBackupDir = escapeshellarg($backupDir);
+
+        $stanzaDeleteCommand = "docker run --rm ";
+        $stanzaDeleteCommand .= "-v $quotedConfigPath:/etc/pgbackrest/pgbackrest.conf:ro ";
+        $stanzaDeleteCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:rw ";
+        $stanzaDeleteCommand .= "$pgbackrestImage ";
+        $stanzaDeleteCommand .= "pgbackrest stanza-delete --stanza=$quotedStanzaName --log-level-console=info";
+
+        instant_remote_process([$stanzaDeleteCommand], $server, false);
+
+        deleteBackupsLocally("$backupDir/.pgbackrest", $server);
     }
 
     #[OA\Delete(

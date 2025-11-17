@@ -307,10 +307,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Step 1: Create local backup
                 try {
+                    $backupResult = ['uses_native_s3' => false, 'backup_size' => 0, 's3_uploaded' => false];
+
                     if (str($databaseType)->contains('postgres')) {
-                        $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
-                        if ($this->backup->dump_all) {
-                            $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        // For pgBackRest, use repository directory instead of single file
+                        if ($this->backup->isPgBackRest()) {
+                            $stanzaName = $this->backup->getStanzaName();
+                            $backupType = $this->backup->getPgBackRestType();
+                            $this->backup_file = "/.pgbackrest/stanza-$stanzaName-$backupType-".Carbon::now()->timestamp;
+                        } else {
+                            $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                            if ($this->backup->dump_all) {
+                                $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            }
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
@@ -320,7 +329,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        $backupResult = $this->backup_standalone_postgresql($database);
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -374,13 +383,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
 
-                    $size = $this->calculate_size();
-
-                    // Verify local backup succeeded
-                    if ($size > 0) {
+                    // For pgBackRest with native S3, use size from backup info
+                    if ($backupResult['uses_native_s3'] && $backupResult['backup_size'] > 0) {
+                        $size = $backupResult['backup_size'];
+                        $this->s3_uploaded = true;
                         $localBackupSucceeded = true;
                     } else {
-                        throw new \Exception('Local backup file is empty or was not created');
+                        // Standard backup or pgBackRest with local repository
+                        $size = $this->calculate_size();
+
+                        // Verify local backup succeeded
+                        if ($size > 0) {
+                            $localBackupSucceeded = true;
+                        } else {
+                            throw new \Exception('Local backup file is empty or was not created');
+                        }
                     }
                 } catch (\Throwable $e) {
                     // Local backup failed
@@ -400,7 +417,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Step 2: Upload to S3 if enabled (independent of local backup)
                 $localStorageDeleted = false;
-                if ($this->backup->save_s3 && $localBackupSucceeded) {
+                if ($this->backup->save_s3 && $localBackupSucceeded && !$backupResult['uses_native_s3']) {
+                    // Only upload manually if not using pgBackRest native S3
                     try {
                         $this->upload_to_s3();
 
@@ -413,6 +431,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         // S3 upload failed but local backup succeeded
                         $s3UploadError = $e->getMessage();
                     }
+                } elseif ($backupResult['uses_native_s3']) {
+                    // pgBackRest native S3 - backup is already in S3, mark as uploaded
+                    $this->s3_uploaded = true;
                 }
 
                 // Step 3: Update status and send notifications based on results
@@ -514,9 +535,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function backup_standalone_postgresql(string $database): void
+    private function backup_standalone_postgresql(string $database): array
     {
         try {
+            // Check if pgBackRest is enabled for this backup
+            if ($this->backup->isPgBackRest()) {
+                return $this->backup_pgbackrest_postgresql($database);
+            }
+
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $backupCommand = 'docker exec';
             if ($this->postgres_password) {
@@ -529,6 +555,205 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $commands[] = $backupCommand;
+            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+
+            return ['uses_native_s3' => false];
+
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+     private function backup_pgbackrest_postgresql(string $database): array
+    {
+        try {
+            $commands = [];
+            $stanzaName = $this->backup->getStanzaName();
+            $backupType = $this->backup->getPgBackRestType();
+            $processMax = $this->backup->pgbackrest_process_max ?? 1;
+            $usesNativeS3 = $this->s3 !== null;
+
+            // Use versioned pgBackRest image for stability
+            $pgbackrestImage = 'woblerr/pgbackrest:2.48';
+
+            // Create pgBackRest configuration directory
+            $pgbackrestConfigDir = escapeshellarg($this->backup_dir.'/.pgbackrest');
+            $commands[] = "mkdir -p $pgbackrestConfigDir";
+
+            // Generate pgBackRest configuration
+            $config = $this->generate_pgbackrest_config($stanzaName, $database);
+            $configPath = trim($pgbackrestConfigDir, "'").'/'.'pgbackrest.conf';
+            $quotedConfigPath = escapeshellarg($configPath);
+
+            // Write config file to server (safely using base64)
+            $escapedConfig = base64_encode($config);
+            $commands[] = "echo ".escapeshellarg($escapedConfig)." | base64 -d > $quotedConfigPath";
+
+            // Get PostgreSQL container's data directory
+            $containerName = escapeshellarg($this->container_name);
+            $pgDataDir = instant_remote_process(["docker inspect $containerName --format='{{range .Mounts}}{{if eq .Destination \"/var/lib/postgresql/data\"}}{{.Source}}{{end}}{{end}}'"], $this->server, false);
+            $pgDataDir = trim($pgDataDir);
+
+            if (empty($pgDataDir)) {
+                throw new \Exception('Could not determine PostgreSQL data directory');
+            }
+
+            $quotedPgDataDir = escapeshellarg($pgDataDir);
+            $quotedBackupDir = escapeshellarg($this->backup_dir);
+            $quotedStanzaName = escapeshellarg($stanzaName);
+            $quotedBackupType = escapeshellarg($backupType);
+
+            // S3 credentials are now safely stored in the config file (generate_pgbackrest_config)            
+
+            // Check if stanza exists, create if not
+            $stanzaCheckCommand = "docker run --rm ";
+            $stanzaCheckCommand .= "-v $quotedConfigPath:/etc/pgbackrest/pgbackrest.conf:ro ";
+            $stanzaCheckCommand .= "-v $quotedPgDataDir:/var/lib/postgresql/data:ro ";
+            if ($this->s3) {
+                $stanzaCheckCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:ro ";
+            } else {
+                $stanzaCheckCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:rw ";
+            }
+            $stanzaCheckCommand .= "$pgbackrestImage pgbackrest info --stanza=$quotedStanzaName 2>&1";
+
+            $stanzaInfo = instant_remote_process([$stanzaCheckCommand], $this->server, false);
+
+            if (str_contains($stanzaInfo, 'does not exist') || str_contains($stanzaInfo, 'unable to find')) {
+                // Initialize stanza
+                $this->add_to_backup_output("Initializing pgBackRest stanza: $stanzaName");
+
+                $stanzaCreateCommand = "docker run --rm ";
+                $stanzaCreateCommand .= "-v $quotedConfigPath:/etc/pgbackrest/pgbackrest.conf:ro ";
+                $stanzaCreateCommand .= "-v $quotedPgDataDir:/var/lib/postgresql/data:rw ";
+                $stanzaCreateCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:rw ";
+                $stanzaCreateCommand .= "$pgbackrestImage ";
+                $stanzaCreateCommand .= "pgbackrest stanza-create --stanza=$quotedStanzaName --log-level-console=info";
+
+                $commands[] = $stanzaCreateCommand;
+                $stanzaOutput = instant_remote_process([$stanzaCreateCommand], $this->server);
+                $this->add_to_backup_output($stanzaOutput);
+            }
+
+            // Perform backup
+            $this->add_to_backup_output("Starting pgBackRest $backupType backup for stanza: $stanzaName");
+
+            $backupCommand = "docker run --rm ";
+            $backupCommand .= "-v $quotedConfigPath:/etc/pgbackrest/pgbackrest.conf:ro ";
+            $backupCommand .= "-v $quotedPgDataDir:/var/lib/postgresql/data:rw ";
+            $backupCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:rw ";
+            $backupCommand .= "$pgbackrestImage ";
+            $backupCommand .= "pgbackrest backup --stanza=$quotedStanzaName --type=$quotedBackupType ";
+            $backupCommand .= '--process-max='.escapeshellarg((string) $processMax).' --log-level-console=info';
+
+            $commands[] = $backupCommand;
+            $backupOutput = instant_remote_process($commands, $this->server);
+            $this->add_to_backup_output($backupOutput);
+
+            // Get backup info to verify success
+            $infoCommand = "docker run --rm ";
+            $infoCommand .= "-v $quotedConfigPath:/etc/pgbackrest/pgbackrest.conf:ro ";
+            $infoCommand .= "-v $quotedBackupDir:/var/lib/pgbackrest:ro ";
+            $infoCommand .= "$pgbackrestImage pgbackrest info --stanza=$quotedStanzaName --output=json";
+
+            $infoOutput = instant_remote_process([$infoCommand], $this->server, false);
+
+            // Store backup info in output
+            $this->add_to_backup_output("\n=== Backup Info ===\n".$infoOutput);
+
+            // Extract backup size from info JSON
+            $backupSize = 0;
+            try {
+                $infoData = json_decode($infoOutput, true);
+                if (isset($infoData[0]['backup']) && is_array($infoData[0]['backup'])) {
+                    $lastBackup = end($infoData[0]['backup']);
+                    if (isset($lastBackup['info']['size'])) {
+                        $backupSize = $lastBackup['info']['size'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Failed to parse JSON, size will remain 0
+                $this->add_to_backup_output("\nWarning: Could not extract backup size from info output");
+            }
+
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+
+            return [
+                'uses_native_s3' => $usesNativeS3,
+                'backup_size' => $backupSize,
+                's3_uploaded' => $usesNativeS3,
+            ];
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function generate_pgbackrest_config(string $stanzaName, string $database): string
+    {
+        $config = "[global]\n";
+        $config .= "log-level-console=info\n";
+        $config .= "log-level-file=info\n";
+        $config .= "process-max={$this->backup->pgbackrest_process_max}\n";
+
+        // Retention settings
+        if ($this->backup->pgbackrest_retention_full) {
+            $config .= "repo1-retention-full={$this->backup->pgbackrest_retention_full}\n";
+        }
+
+        if ($this->backup->pgbackrest_retention_diff) {
+            $config .= "repo1-retention-diff={$this->backup->pgbackrest_retention_diff}\n";
+        }
+
+        // Repository configuration
+        if ($this->s3) {
+            // S3 repository with credentials in config file (secure)
+            $config .= "repo1-type=s3\n";
+            $config .= "repo1-s3-bucket={$this->s3->bucket}\n";
+            $config .= "repo1-s3-endpoint={$this->s3->endpoint}\n";
+            $config .= "repo1-s3-region={$this->s3->region}\n";
+            $config .= "repo1-path=/pgbackrest/{$stanzaName}\n";
+
+            // Store credentials directly in config file (more secure than env vars)
+            $config .= "repo1-s3-key={$this->s3->key}\n";
+            $config .= "repo1-s3-key-secret={$this->s3->secret}\n";
+        } else {
+            // Local repository
+            $config .= "repo1-path=/var/lib/pgbackrest\n";
+        }
+
+        // Block incremental backup (if enabled and supported)
+        if ($this->backup->pgbackrest_block_incremental) {
+            $config .= "repo1-block=y\n";
+        }
+
+        // Stanza configuration
+        $config .= "\n[{$stanzaName}]\n";
+        $config .= "pg1-path=/var/lib/postgresql/data\n";
+
+        if ($this->postgres_password) {
+            $config .= "pg1-port=5432\n";
+        }
+
+        return $config;
+    }
+
+    private function backup_standalone_mysql(string $database): void
+    {
+        try {
+            $commands[] = 'mkdir -p '.$this->backup_dir;
+            if ($this->backup->dump_all) {
+                $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
+            } else {
+                $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" $database > $this->backup_location";
+            }
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {

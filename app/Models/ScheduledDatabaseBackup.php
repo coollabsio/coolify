@@ -10,6 +10,16 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'pgbackrest_block_incremental' => 'boolean',
+            'pgbackrest_retention_full' => 'integer',
+            'pgbackrest_retention_diff' => 'integer',
+            'pgbackrest_process_max' => 'integer',
+        ];
+    }
+
     public static function ownedByCurrentTeam()
     {
         return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');
