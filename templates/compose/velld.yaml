@@ -1,0 +1,42 @@
+# documentation: https://velld.vercel.app/docs
+# slogan: Self-hosted database backup management with a beautiful web interface for scheduling, managing, and monitoring backups across PostgreSQL, MySQL, MongoDB, and Redis.
+# tags: backup,database,postgresql,mysql,mongodb,redis,automation,self-hosted
+# logo: svgs/velld.svg
+# port: 3000
+
+services:
+  api:
+    image: ghcr.io/dendianugerah/velld/api:latest
+    environment:
+      - SERVICE_URL_API_8080
+      - JWT_SECRET=${JWT_SECRET:?} #Generate using: openssl rand -hex 32
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?} #Generate using: openssl rand -hex 32
+      - ADMIN_USERNAME_CREDENTIAL=${ADMIN_USERNAME_CREDENTIAL:-admin}
+      - ADMIN_PASSWORD_CREDENTIAL=$SERVICE_PASSWORD_VELLDADMIN
+      - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
+      - PORT=8080
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+    volumes:
+      - api_data:/app/data
+      - backup_data:/app/backups
+    restart: unless-stopped
+    exclude_from_hc: true
+
+  web:
+    image: ghcr.io/dendianugerah/velld/web:latest
+    environment:
+      - SERVICE_URL_VELLD_3000
+      - NEXT_PUBLIC_API_URL=$SERVICE_URL_API #Needs to be accessible by a browser
+      - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
+    depends_on:
+      - api
+    restart: unless-stopped
+    exclude_from_hc: true
+
+volumes:
+  api_data:
+  backup_data:
