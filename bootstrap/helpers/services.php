@@ -122,32 +122,35 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if ($resource->fqdn) {
             $resourceFqdns = str($resource->fqdn)->explode(',');
             $resourceFqdns = $resourceFqdns->first();
-            $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
+            $baseVariableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
             $url = Url::fromString($resourceFqdns);
             $port = $url->getPort();
             $path = $url->getPath();
             $urlValue = $url->getScheme().'://'.$url->getHost();
             $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
+
             $resource->service->environment_variables()->updateOrCreate([
                 'resourceable_type' => Service::class,
                 'resourceable_id' => $resource->service_id,
-                'key' => $variableName,
+                'key' => $baseVariableName,
             ], [
                 'value' => $urlValue,
                 'is_preview' => false,
             ]);
+
             if ($port) {
-                $variableName = $variableName."_$port";
+                $portVariableName = $baseVariableName."_$port";
                 $resource->service->environment_variables()->updateOrCreate([
                     'resourceable_type' => Service::class,
                     'resourceable_id' => $resource->service_id,
-                    'key' => $variableName,
+                    'key' => $portVariableName,
                 ], [
                     'value' => $urlValue,
                     'is_preview' => false,
                 ]);
             }
-            $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
+
+            $baseFqdnVariableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
             $fqdn = Url::fromString($resourceFqdns);
             $port = $fqdn->getPort();
             $path = $fqdn->getPath();
@@ -156,20 +159,22 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             if ($path !== '/') {
                 $fqdnValue = $fqdnValue.$path;
             }
+
             $resource->service->environment_variables()->updateOrCreate([
                 'resourceable_type' => Service::class,
                 'resourceable_id' => $resource->service_id,
-                'key' => $variableName,
+                'key' => $baseFqdnVariableName,
             ], [
                 'value' => $fqdnValue,
                 'is_preview' => false,
             ]);
+
             if ($port) {
-                $variableName = $variableName."_$port";
+                $portFqdnVariableName = $baseFqdnVariableName."_$port";
                 $resource->service->environment_variables()->updateOrCreate([
                     'resourceable_type' => Service::class,
                     'resourceable_id' => $resource->service_id,
-                    'key' => $variableName,
+                    'key' => $portFqdnVariableName,
                 ], [
                     'value' => $fqdnValue,
                     'is_preview' => false,
