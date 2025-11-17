@@ -420,7 +420,6 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
         return null;
     } catch (\Exception $e) {
         Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
-        ray('Error getting Traefik version from running container: '.$e->getMessage());
 
         return null;
     }
