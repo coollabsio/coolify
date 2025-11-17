@@ -63,14 +63,13 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
         }
 
         $currentBranch = $matches[1]; // e.g., "3.6"
-        $currentPatch = $matches[2];  // e.g., "0"
 
         // Find the latest version for this branch
         $latestForBranch = $this->traefikVersions["v{$currentBranch}"] ?? null;
 
         if (! $latestForBranch) {
             // User is on a branch we don't track - check if newer branches exist
-            $newerBranchInfo = $this->getNewerBranchInfo($current, $currentBranch);
+            $newerBranchInfo = $this->getNewerBranchInfo($currentBranch);
 
             if ($newerBranchInfo) {
                 $this->storeOutdatedInfo($current, $newerBranchInfo['latest'], 'minor_upgrade', $newerBranchInfo['target']);
@@ -86,7 +85,7 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
         $latest = ltrim($latestForBranch, 'v');
 
         // Always check for newer branches first
-        $newerBranchInfo = $this->getNewerBranchInfo($current, $currentBranch);
+        $newerBranchInfo = $this->getNewerBranchInfo($currentBranch);
 
         if (version_compare($current, $latest, '<')) {
             // Patch update available
@@ -103,7 +102,7 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
     /**
      * Get information about newer branches if available.
      */
-    private function getNewerBranchInfo(string $current, string $currentBranch): ?array
+    private function getNewerBranchInfo(string $currentBranch): ?array
     {
         $newestBranch = null;
         $newestVersion = null;
