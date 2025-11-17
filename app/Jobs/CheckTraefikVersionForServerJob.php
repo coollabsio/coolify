@@ -8,7 +8,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class CheckTraefikVersionForServerJob implements ShouldQueue
 {
@@ -33,80 +32,78 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
      */
     public function handle(): void
     {
-        try {
-            Log::debug("CheckTraefikVersionForServerJob: Processing server '{$this->server->name}' (ID: {$this->server->id})");
+        // Detect current version (makes SSH call)
+        $currentVersion = getTraefikVersionFromDockerCompose($this->server);
 
-            // Detect current version (makes SSH call)
-            $currentVersion = getTraefikVersionFromDockerCompose($this->server);
+        // Update detected version in database
+        $this->server->update(['detected_traefik_version' => $currentVersion]);
 
-            Log::info("CheckTraefikVersionForServerJob: Server '{$this->server->name}' - Detected version: ".($currentVersion ?? 'unable to detect'));
+        if (! $currentVersion) {
+            return;
+        }
 
-            // Update detected version in database
-            $this->server->update(['detected_traefik_version' => $currentVersion]);
+        // Check if image tag is 'latest' by inspecting the image (makes SSH call)
+        $imageTag = instant_remote_process([
+            "docker inspect coolify-proxy --format '{{.Config.Image}}' 2>/dev/null",
+        ], $this->server, false);
 
-            if (! $currentVersion) {
-                Log::warning("CheckTraefikVersionForServerJob: Server '{$this->server->name}' - Unable to detect version, skipping");
+        // Handle empty/null response from SSH command
+        if (empty(trim($imageTag))) {
+            return;
+        }
 
-                return;
-            }
+        if (str_contains(strtolower(trim($imageTag)), ':latest')) {
+            return;
+        }
 
-            // Check if image tag is 'latest' by inspecting the image (makes SSH call)
-            $imageTag = instant_remote_process([
-                "docker inspect coolify-proxy --format '{{.Config.Image}}' 2>/dev/null",
-            ], $this->server, false);
+        // Parse current version to extract major.minor.patch
+        $current = ltrim($currentVersion, 'v');
+        if (! preg_match('/^(\d+\.\d+)\.(\d+)$/', $current, $matches)) {
+            return;
+        }
 
-            if (str_contains(strtolower(trim($imageTag)), ':latest')) {
-                Log::info("CheckTraefikVersionForServerJob: Server '{$this->server->name}' uses 'latest' tag, skipping notification (UI warning only)");
+        $currentBranch = $matches[1]; // e.g., "3.6"
+        $currentPatch = $matches[2];  // e.g., "0"
 
-                return;
-            }
+        // Find the latest version for this branch
+        $latestForBranch = $this->traefikVersions["v{$currentBranch}"] ?? null;
 
-            // Parse current version to extract major.minor.patch
-            $current = ltrim($currentVersion, 'v');
-            if (! preg_match('/^(\d+\.\d+)\.(\d+)$/', $current, $matches)) {
-                Log::warning("CheckTraefikVersionForServerJob: Server '{$this->server->name}' - Invalid version format '{$current}', skipping");
+        if (! $latestForBranch) {
+            // User is on a branch we don't track - check if newer branches exist
+            $newerBranchInfo = $this->getNewerBranchInfo($current, $currentBranch);
 
-                return;
-            }
-
-            $currentBranch = $matches[1]; // e.g., "3.6"
-            $currentPatch = $matches[2];  // e.g., "0"
-
-            Log::debug("CheckTraefikVersionForServerJob: Server '{$this->server->name}' - Parsed branch: {$currentBranch}, patch: {$currentPatch}");
-
-            // Find the latest version for this branch
-            $latestForBranch = $this->traefikVersions["v{$currentBranch}"] ?? null;
-
-            if (! $latestForBranch) {
-                // User is on a branch we don't track - check if newer branches exist
-                $this->checkForNewerBranch($current, $currentBranch);
-
-                return;
-            }
-
-            // Compare patch version within the same branch
-            $latest = ltrim($latestForBranch, 'v');
-
-            if (version_compare($current, $latest, '<')) {
-                Log::info("CheckTraefikVersionForServerJob: Server '{$this->server->name}' is outdated - current: {$current}, latest for branch: {$latest}");
-                $this->storeOutdatedInfo($current, $latest, 'patch_update');
+            if ($newerBranchInfo) {
+                $this->storeOutdatedInfo($current, $newerBranchInfo['latest'], 'minor_upgrade', $newerBranchInfo['target']);
             } else {
-                // Check if newer branches exist
-                $this->checkForNewerBranch($current, $currentBranch);
+                // No newer branch found, clear outdated info
+                $this->server->update(['traefik_outdated_info' => null]);
             }
-        } catch (\Throwable $e) {
-            Log::error("CheckTraefikVersionForServerJob: Error checking server '{$this->server->name}': ".$e->getMessage(), [
-                'server_id' => $this->server->id,
-                'exception' => $e,
-            ]);
-            throw $e;
+
+            return;
+        }
+
+        // Compare patch version within the same branch
+        $latest = ltrim($latestForBranch, 'v');
+
+        // Always check for newer branches first
+        $newerBranchInfo = $this->getNewerBranchInfo($current, $currentBranch);
+
+        if (version_compare($current, $latest, '<')) {
+            // Patch update available
+            $this->storeOutdatedInfo($current, $latest, 'patch_update', null, $newerBranchInfo);
+        } elseif ($newerBranchInfo) {
+            // Only newer branch available (no patch update)
+            $this->storeOutdatedInfo($current, $newerBranchInfo['latest'], 'minor_upgrade', $newerBranchInfo['target']);
+        } else {
+            // Fully up to date
+            $this->server->update(['traefik_outdated_info' => null]);
         }
     }
 
     /**
-     * Check if there are newer branches available.
+     * Get information about newer branches if available.
      */
-    private function checkForNewerBranch(string $current, string $currentBranch): void
+    private function getNewerBranchInfo(string $current, string $currentBranch): ?array
     {
         $newestBranch = null;
         $newestVersion = null;
@@ -122,28 +119,38 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
         }
 
         if ($newestVersion) {
-            Log::info("CheckTraefikVersionForServerJob: Server '{$this->server->name}' - newer branch {$newestBranch} available ({$newestVersion})");
-            $this->storeOutdatedInfo($current, $newestVersion, 'minor_upgrade');
-        } else {
-            Log::info("CheckTraefikVersionForServerJob: Server '{$this->server->name}' is fully up to date - version: {$current}");
-            // Clear any outdated info using schemaless attributes
-            $this->server->extra_attributes->forget('traefik_outdated_info');
-            $this->server->save();
+            return [
+                'target' => "v{$newestBranch}",
+                'latest' => ltrim($newestVersion, 'v'),
+            ];
         }
+
+        return null;
     }
 
     /**
-     * Store outdated information using schemaless attributes.
+     * Store outdated information in database.
      */
-    private function storeOutdatedInfo(string $current, string $latest, string $type): void
+    private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null, ?array $newerBranchInfo = null): void
     {
-        // Store in schemaless attributes for persistence
-        $this->server->extra_attributes->set('traefik_outdated_info', [
+        $outdatedInfo = [
             'current' => $current,
             'latest' => $latest,
             'type' => $type,
             'checked_at' => now()->toIso8601String(),
-        ]);
-        $this->server->save();
+        ];
+
+        // For minor upgrades, add the upgrade_target field (e.g., "v3.6")
+        if ($type === 'minor_upgrade' && $upgradeTarget) {
+            $outdatedInfo['upgrade_target'] = $upgradeTarget;
+        }
+
+        // If there's a newer branch available (even for patch updates), include that info
+        if ($newerBranchInfo) {
+            $outdatedInfo['newer_branch_target'] = $newerBranchInfo['target'];
+            $outdatedInfo['newer_branch_latest'] = $newerBranchInfo['latest'];
+        }
+
+        $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
     }
 }

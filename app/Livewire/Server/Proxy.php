@@ -230,6 +230,17 @@ class Proxy extends Component
                 return null;
             }
 
+            // Check if we have outdated info stored
+            $outdatedInfo = $this->server->traefik_outdated_info;
+            if ($outdatedInfo && isset($outdatedInfo['type']) && $outdatedInfo['type'] === 'minor_upgrade') {
+                // Use the upgrade_target field if available (e.g., "v3.6")
+                if (isset($outdatedInfo['upgrade_target'])) {
+                    return str_starts_with($outdatedInfo['upgrade_target'], 'v')
+                        ? $outdatedInfo['upgrade_target']
+                        : "v{$outdatedInfo['upgrade_target']}";
+                }
+            }
+
             $versionsPath = base_path('versions.json');
             if (! File::exists($versionsPath)) {
                 return null;
@@ -251,18 +262,17 @@ class Proxy extends Component
             $currentBranch = $matches[1];
 
             // Find the newest branch that's greater than current
-            $newestVersion = null;
+            $newestBranch = null;
             foreach ($traefikVersions as $branch => $version) {
                 $branchNum = ltrim($branch, 'v');
                 if (version_compare($branchNum, $currentBranch, '>')) {
-                    $cleanVersion = ltrim($version, 'v');
-                    if (! $newestVersion || version_compare($cleanVersion, $newestVersion, '>')) {
-                        $newestVersion = $cleanVersion;
+                    if (! $newestBranch || version_compare($branchNum, $newestBranch, '>')) {
+                        $newestBranch = $branchNum;
                     }
                 }
             }
 
-            return $newestVersion ? "v{$newestVersion}" : null;
+            return $newestBranch ? "v{$newestBranch}" : null;
         } catch (\Throwable $e) {
             return null;
         }

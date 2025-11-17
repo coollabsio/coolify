@@ -103,3 +103,39 @@ it('handles invalid version format gracefully', function () {
     expect($result)->toBe(0);
     expect($matches)->toBeEmpty();
 });
+
+it('handles empty image tag correctly', function () {
+    // Test that empty string after trim doesn't cause issues with str_contains
+    $emptyImageTag = '';
+    $trimmed = trim($emptyImageTag);
+
+    // This should be false, not an error
+    expect(empty($trimmed))->toBeTrue();
+
+    // Test with whitespace only
+    $whitespaceTag = "   \n  ";
+    $trimmed = trim($whitespaceTag);
+    expect(empty($trimmed))->toBeTrue();
+});
+
+it('detects latest tag in image name', function () {
+    // Test various formats where :latest appears
+    $testCases = [
+        'traefik:latest' => true,
+        'traefik:Latest' => true,
+        'traefik:LATEST' => true,
+        'traefik:v3.6.0' => false,
+        'traefik:3.6.0' => false,
+        '' => false,
+    ];
+
+    foreach ($testCases as $imageTag => $expected) {
+        if (empty(trim($imageTag))) {
+            $result = false; // Should return false for empty tags
+        } else {
+            $result = str_contains(strtolower(trim($imageTag)), ':latest');
+        }
+
+        expect($result)->toBe($expected, "Failed for imageTag: '{$imageTag}'");
+    }
+});

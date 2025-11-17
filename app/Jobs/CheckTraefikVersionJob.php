@@ -10,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Log;
 
 class CheckTraefikVersionJob implements ShouldQueue
 {
@@ -20,69 +19,85 @@ class CheckTraefikVersionJob implements ShouldQueue
 
     public function handle(): void
     {
-        try {
-            Log::info('CheckTraefikVersionJob: Starting Traefik version check with parallel processing');
-
-            // Load versions from versions.json
-            $versionsPath = base_path('versions.json');
-            if (! File::exists($versionsPath)) {
-                Log::warning('CheckTraefikVersionJob: versions.json not found, skipping check');
-
-                return;
-            }
-
-            $allVersions = json_decode(File::get($versionsPath), true);
-            $traefikVersions = data_get($allVersions, 'traefik');
-
-            if (empty($traefikVersions) || ! is_array($traefikVersions)) {
-                Log::warning('CheckTraefikVersionJob: Traefik versions not found or invalid in versions.json');
-
-                return;
-            }
-
-            $branches = array_keys($traefikVersions);
-            Log::info('CheckTraefikVersionJob: Loaded Traefik version branches', ['branches' => $branches]);
-
-            // Query all servers with Traefik proxy that are reachable
-            $servers = Server::whereNotNull('proxy')
-                ->whereProxyType(ProxyTypes::TRAEFIK->value)
-                ->whereRelation('settings', 'is_reachable', true)
-                ->whereRelation('settings', 'is_usable', true)
-                ->get();
-
-            $serverCount = $servers->count();
-            Log::info("CheckTraefikVersionJob: Found {$serverCount} server(s) with Traefik proxy");
-
-            if ($serverCount === 0) {
-                Log::info('CheckTraefikVersionJob: No Traefik servers found, job completed');
-
-                return;
-            }
-
-            // Dispatch individual server check jobs in parallel
-            Log::info('CheckTraefikVersionJob: Dispatching parallel server check jobs');
-
-            foreach ($servers as $server) {
-                CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions);
-            }
-
-            Log::info("CheckTraefikVersionJob: Dispatched {$serverCount} parallel server check jobs");
-
-            // Dispatch notification job with delay to allow server checks to complete
-            // For 1000 servers with 60s timeout each, we need at least 60s delay
-            // But jobs run in parallel via queue workers, so we only need enough time
-            // for the slowest server to complete
-            $delaySeconds = min(300, max(60, (int) ($serverCount / 10))); // 60s minimum, 300s maximum, 0.1s per server
-            NotifyOutdatedTraefikServersJob::dispatch()->delay(now()->addSeconds($delaySeconds));
-
-            Log::info("CheckTraefikVersionJob: Scheduled notification job with {$delaySeconds}s delay");
-            Log::info('CheckTraefikVersionJob: Job completed successfully - parallel processing initiated');
-        } catch (\Throwable $e) {
-            Log::error('CheckTraefikVersionJob: Error checking Traefik versions: '.$e->getMessage(), [
-                'exception' => $e,
-                'trace' => $e->getTraceAsString(),
-            ]);
-            throw $e;
+        // Load versions from versions.json
+        $versionsPath = base_path('versions.json');
+        if (! File::exists($versionsPath)) {
+            return;
         }
+
+        $allVersions = json_decode(File::get($versionsPath), true);
+        $traefikVersions = data_get($allVersions, 'traefik');
+
+        if (empty($traefikVersions) || ! is_array($traefikVersions)) {
+            return;
+        }
+
+        // Query all servers with Traefik proxy that are reachable
+        $servers = Server::whereNotNull('proxy')
+            ->whereProxyType(ProxyTypes::TRAEFIK->value)
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->get();
+
+        $serverCount = $servers->count();
+
+        if ($serverCount === 0) {
+            return;
+        }
+
+        // Dispatch individual server check jobs in parallel
+        foreach ($servers as $server) {
+            CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions);
+        }
+
+        // Dispatch notification job with delay to allow server checks to complete
+        // Jobs run in parallel via queue workers, but we need to account for:
+        // - Queue worker capacity (workers process jobs concurrently)
+        // - Job timeout (60s per server check)
+        // - Retry attempts (3 retries with exponential backoff)
+        // - Network latency and SSH connection overhead
+        //
+        // Calculation strategy:
+        // - Assume ~10-20 workers processing the high queue
+        // - Each server check takes up to 60s (timeout)
+        // - With retries, worst case is ~180s per job
+        // - More conservative: 0.2s per server (instead of 0.1s)
+        // - Higher minimum: 120s (instead of 60s) to account for retries
+        // - Keep 300s maximum to avoid excessive delays
+        $delaySeconds = $this->calculateNotificationDelay($serverCount);
+        if (isDev()) {
+            $delaySeconds = 1;
+        }
+        NotifyOutdatedTraefikServersJob::dispatch()->delay(now()->addSeconds($delaySeconds));
+    }
+
+    /**
+     * Calculate the delay in seconds before sending notifications.
+     *
+     * This method calculates an appropriate delay to allow all parallel
+     * CheckTraefikVersionForServerJob instances to complete before sending
+     * notifications to teams.
+     *
+     * The calculation considers:
+     * - Server count (more servers = longer delay)
+     * - Queue worker capacity
+     * - Job timeout (60s) and retry attempts (3x)
+     * - Network latency and SSH connection overhead
+     *
+     * @param  int  $serverCount  Number of servers being checked
+     * @return int Delay in seconds
+     */
+    protected function calculateNotificationDelay(int $serverCount): int
+    {
+        $minDelay = config('constants.server_checks.notification_delay_min');
+        $maxDelay = config('constants.server_checks.notification_delay_max');
+        $scalingFactor = config('constants.server_checks.notification_delay_scaling');
+
+        // Calculate delay based on server count
+        // More conservative approach: 0.2s per server
+        $calculatedDelay = (int) ($serverCount * $scalingFactor);
+
+        // Apply min/max boundaries
+        return min($maxDelay, max($minDelay, $calculatedDelay));
     }
 }

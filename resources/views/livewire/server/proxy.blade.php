@@ -115,12 +115,14 @@
                                         </x-callout>
                                     @endif
                                     @if ($this->newerTraefikBranchAvailable)
-                                        <x-callout dismissible onDismiss="traefikWarningsDismissed = true; localStorage.setItem('callout-dismissed-traefik-warnings-{{ $server->id }}', 'true')" type="info" title="Newer Traefik Version Available" class="my-4">
-                                            A newer version of Traefik is available: <span
+                                        <x-callout dismissible onDismiss="traefikWarningsDismissed = true; localStorage.setItem('callout-dismissed-traefik-warnings-{{ $server->id }}', 'true')" type="info" title="New Minor Traefik Version Available" class="my-4">
+                                            A new minor version of Traefik is available: <span
                                                 class="font-mono">{{ $this->newerTraefikBranchAvailable }}</span>
                                             <br><br>
-                                            <strong>Important:</strong> Before upgrading to a new major or minor version, please
-                                            read
+                                            You are currently running <span class="font-mono">v{{ $server->detected_traefik_version }}</span>.
+                                            Upgrading to <span class="font-mono">{{ $this->newerTraefikBranchAvailable }}</span> will give you access to new features and improvements.
+                                            <br><br>
+                                            <strong>Important:</strong> Before upgrading to a new minor version, please read
                                             the <a href="https://github.com/traefik/traefik/releases" target="_blank"
                                                 class="underline text-white">Traefik changelog</a> to understand breaking changes
                                             and new features.

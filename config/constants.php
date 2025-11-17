@@ -95,4 +95,27 @@ return [
         'storage_api_key' => env('BUNNY_STORAGE_API_KEY'),
         'api_key' => env('BUNNY_API_KEY'),
     ],
+
+    'server_checks' => [
+        // Notification delay configuration for parallel server checks
+        // Used for Traefik version checks and other future server check jobs
+        // These settings control how long to wait before sending notifications
+        // after dispatching parallel check jobs for all servers
+
+        // Minimum delay in seconds (120s = 2 minutes)
+        // Accounts for job processing time, retries, and network latency
+        'notification_delay_min' => 120,
+
+        // Maximum delay in seconds (300s = 5 minutes)
+        // Prevents excessive waiting for very large server counts
+        'notification_delay_max' => 300,
+
+        // Scaling factor: seconds to add per server (0.2)
+        // Formula: delay = min(max, max(min, serverCount * scaling))
+        // Examples:
+        //   - 100 servers: 120s (uses minimum)
+        //   - 1000 servers: 200s
+        //   - 2000 servers: 300s (hits maximum)
+        'notification_delay_scaling' => 0.2,
+    ],
 ];

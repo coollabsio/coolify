@@ -195,21 +195,32 @@ it('parallel processing jobs exist and have correct structure', function () {
 });
 
 it('calculates delay seconds correctly for notification job', function () {
-    // Test delay calculation logic
-    $serverCounts = [10, 100, 500, 1000, 5000];
+    // Test the delay calculation logic
+    // Values: min=120s, max=300s, scaling=0.2
+    $testCases = [
+        ['servers' => 10, 'expected' => 120],    // 10 * 0.2 = 2s -> uses min of 120s
+        ['servers' => 100, 'expected' => 120],   // 100 * 0.2 = 20s -> uses min of 120s
+        ['servers' => 600, 'expected' => 120],   // 600 * 0.2 = 120s (exactly at min)
+        ['servers' => 1000, 'expected' => 200],  // 1000 * 0.2 = 200s
+        ['servers' => 1500, 'expected' => 300],  // 1500 * 0.2 = 300s (at max)
+        ['servers' => 5000, 'expected' => 300],  // 5000 * 0.2 = 1000s -> uses max of 300s
+    ];
 
-    foreach ($serverCounts as $count) {
-        $delaySeconds = min(300, max(60, (int) ($count / 10)));
+    foreach ($testCases as $case) {
+        $count = $case['servers'];
+        $expected = $case['expected'];
 
-        // Should be at least 60 seconds
-        expect($delaySeconds)->toBeGreaterThanOrEqual(60);
+        // Use the same logic as the job's calculateNotificationDelay method
+        $minDelay = 120;
+        $maxDelay = 300;
+        $scalingFactor = 0.2;
+        $calculatedDelay = (int) ($count * $scalingFactor);
+        $delaySeconds = min($maxDelay, max($minDelay, $calculatedDelay));
 
-        // Should not exceed 300 seconds
-        expect($delaySeconds)->toBeLessThanOrEqual(300);
+        expect($delaySeconds)->toBe($expected, "Failed for {$count} servers");
+
+        // Should always be within bounds
+        expect($delaySeconds)->toBeGreaterThanOrEqual($minDelay);
+        expect($delaySeconds)->toBeLessThanOrEqual($maxDelay);
     }
-
-    // Specific test cases
-    expect(min(300, max(60, (int) (10 / 10))))->toBe(60);  // 10 servers = 60s (minimum)
-    expect(min(300, max(60, (int) (1000 / 10))))->toBe(100); // 1000 servers = 100s
-    expect(min(300, max(60, (int) (5000 / 10))))->toBe(300); // 5000 servers = 300s (maximum)
 });
