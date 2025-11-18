@@ -188,13 +188,16 @@ class Application extends BaseModel
 
                     // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
                     $application->environment_variables()
-                        ->where('key', 'LIKE', 'SERVICE_FQDN_%')
-                        ->orWhere('key', 'LIKE', 'SERVICE_URL_%')
+                        ->where(function ($q) {
+                            $q->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                                ->orWhere('key', 'LIKE', 'SERVICE_URL_%');
+                        })
                         ->delete();
-
                     $application->environment_variables_preview()
-                        ->where('key', 'LIKE', 'SERVICE_FQDN_%')
-                        ->orWhere('key', 'LIKE', 'SERVICE_URL_%')
+                        ->where(function ($q) {
+                            $q->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                                ->orWhere('key', 'LIKE', 'SERVICE_URL_%');
+                        })
                         ->delete();
                 }
 
