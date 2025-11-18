@@ -489,3 +489,129 @@ it('does not modify docker compose string in bash comments', function () {
     expect(substr_count($customCommand, 'docker compose', 0))->toBe(2); // Two total occurrences
     expect(substr_count($customCommand, '-f /artifacts/uuid/docker-compose.yaml'))->toBe(1); // Only first has flags
 });
+
+// False positive prevention tests: Flags like -foo, -from, -feature should NOT be detected as -f
+
+it('injects -f flag when command contains -foo flag (not -f)', function () {
+    $customCommand = 'docker compose build --foo bar';
+
+    // Use the helper function
+    $customCommand = injectDockerComposeFlags($customCommand, '/artifacts/uuid/docker-compose.yaml', '/artifacts/build-time.env');
+
+    // SHOULD inject -f flag because -foo is NOT the -f flag
+    expect($customCommand)->toBe('docker compose -f /artifacts/uuid/docker-compose.yaml --env-file /artifacts/build-time.env build --foo bar');
+    expect($customCommand)->toContain('-f /artifacts/uuid/docker-compose.yaml');
+});
+
+it('injects -f flag when command contains --from flag (not -f)', function () {
+    $customCommand = 'docker compose build --from cache-image';
+
+    // Use the helper function
+    $customCommand = injectDockerComposeFlags($customCommand, '/artifacts/uuid/docker-compose.yaml', '/artifacts/build-time.env');
+
+    // SHOULD inject -f flag because --from is NOT the -f flag
+    expect($customCommand)->toBe('docker compose -f /artifacts/uuid/docker-compose.yaml --env-file /artifacts/build-time.env build --from cache-image');
+    expect($customCommand)->toContain('-f /artifacts/uuid/docker-compose.yaml');
+});
+
+it('injects -f flag when command contains -feature flag (not -f)', function () {
+    $customCommand = 'docker compose build -feature test';
+
+    // Use the helper function
+    $customCommand = injectDockerComposeFlags($customCommand, '/artifacts/uuid/docker-compose.yaml', '/artifacts/build-time.env');
+
+    // SHOULD inject -f flag because -feature is NOT the -f flag
+    expect($customCommand)->toBe('docker compose -f /artifacts/uuid/docker-compose.yaml --env-file /artifacts/build-time.env build -feature test');
+    expect($customCommand)->toContain('-f /artifacts/uuid/docker-compose.yaml');
+});
+
+it('injects -f flag when command contains -fast flag (not -f)', function () {
+    $customCommand = 'docker compose build -fast';
+
+    // Use the helper function
+    $customCommand = injectDockerComposeFlags($customCommand, '/artifacts/uuid/docker-compose.yaml', '/artifacts/build-time.env');
+
+    // SHOULD inject -f flag because -fast is NOT the -f flag
+    expect($customCommand)->toBe('docker compose -f /artifacts/uuid/docker-compose.yaml --env-file /artifacts/build-time.env build -fast');
+    expect($customCommand)->toContain('-f /artifacts/uuid/docker-compose.yaml');
+});
+
+// Path normalization tests for preview methods
+
+it('normalizes path when baseDirectory is root slash', function () {
+    $baseDirectory = '/';
+    $composeLocation = '/docker-compose.yaml';
+
+    // Normalize baseDirectory to prevent double slashes
+    $normalizedBase = $baseDirectory === '/' ? '' : rtrim($baseDirectory, '/');
+    $path = ".{$normalizedBase}{$composeLocation}";
+
+    expect($path)->toBe('./docker-compose.yaml');
+    expect($path)->not->toContain('//');
+});
+
+it('normalizes path when baseDirectory has trailing slash', function () {
+    $baseDirectory = '/backend/';
+    $composeLocation = '/docker-compose.yaml';
+
+    // Normalize baseDirectory to prevent double slashes
+    $normalizedBase = $baseDirectory === '/' ? '' : rtrim($baseDirectory, '/');
+    $path = ".{$normalizedBase}{$composeLocation}";
+
+    expect($path)->toBe('./backend/docker-compose.yaml');
+    expect($path)->not->toContain('//');
+});
+
+it('handles empty baseDirectory correctly', function () {
+    $baseDirectory = '';
+    $composeLocation = '/docker-compose.yaml';
+
+    // Normalize baseDirectory to prevent double slashes
+    $normalizedBase = $baseDirectory === '/' ? '' : rtrim($baseDirectory, '/');
+    $path = ".{$normalizedBase}{$composeLocation}";
+
+    expect($path)->toBe('./docker-compose.yaml');
+    expect($path)->not->toContain('//');
+});
+
+it('handles normal baseDirectory without trailing slash', function () {
+    $baseDirectory = '/backend';
+    $composeLocation = '/docker-compose.yaml';
+
+    // Normalize baseDirectory to prevent double slashes
+    $normalizedBase = $baseDirectory === '/' ? '' : rtrim($baseDirectory, '/');
+    $path = ".{$normalizedBase}{$composeLocation}";
+
+    expect($path)->toBe('./backend/docker-compose.yaml');
+    expect($path)->not->toContain('//');
+});
+
+it('handles nested baseDirectory with trailing slash', function () {
+    $baseDirectory = '/app/backend/';
+    $composeLocation = '/docker-compose.prod.yaml';
+
+    // Normalize baseDirectory to prevent double slashes
+    $normalizedBase = $baseDirectory === '/' ? '' : rtrim($baseDirectory, '/');
+    $path = ".{$normalizedBase}{$composeLocation}";
+
+    expect($path)->toBe('./app/backend/docker-compose.prod.yaml');
+    expect($path)->not->toContain('//');
+});
+
+it('produces correct preview path with normalized baseDirectory', function () {
+    $testCases = [
+        ['baseDir' => '/', 'compose' => '/docker-compose.yaml', 'expected' => './docker-compose.yaml'],
+        ['baseDir' => '', 'compose' => '/docker-compose.yaml', 'expected' => './docker-compose.yaml'],
+        ['baseDir' => '/backend', 'compose' => '/docker-compose.yaml', 'expected' => './backend/docker-compose.yaml'],
+        ['baseDir' => '/backend/', 'compose' => '/docker-compose.yaml', 'expected' => './backend/docker-compose.yaml'],
+        ['baseDir' => '/app/src/', 'compose' => '/docker-compose.prod.yaml', 'expected' => './app/src/docker-compose.prod.yaml'],
+    ];
+
+    foreach ($testCases as $case) {
+        $normalizedBase = $case['baseDir'] === '/' ? '' : rtrim($case['baseDir'], '/');
+        $path = ".{$normalizedBase}{$case['compose']}";
+
+        expect($path)->toBe($case['expected'], "Failed for baseDir: {$case['baseDir']}");
+        expect($path)->not->toContain('//', "Double slash found for baseDir: {$case['baseDir']}");
+    }
+});

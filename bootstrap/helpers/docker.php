@@ -1280,14 +1280,19 @@ function generateDockerEnvFlags($variables): string
  * @param  string  $composeFilePath  The path to the compose file
  * @param  string  $envFilePath  The path to the .env file
  * @return string The modified command with injected flags
+ *
+ * @example
+ * Input:  "docker compose build"
+ * Output: "docker compose -f ./docker-compose.yml --env-file .env build"
  */
 function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath): string
 {
     $dockerComposeReplacement = 'docker compose';
 
     // Add -f flag if not present (checks for both -f and --file with various formats)
-    // Detects: -f path, -f=path, -fpath (concatenated), --file path, --file=path with any whitespace (space, tab, newline)
-    if (! preg_match('/(?:^|\s)(?:-f(?:[=\s]|\S)|--file(?:=|\s))/', $command)) {
+    // Detects: -f path, -f=path, -fpath (concatenated with path chars: . / ~), --file path, --file=path
+    // Note: Uses [.~/]|$ instead of \S to prevent false positives with flags like -foo, -from, -feature
+    if (! preg_match('/(?:^|\s)(?:-f(?:[=\s]|[.\/~]|$)|--file(?:=|\s))/', $command)) {
         $dockerComposeReplacement .= " -f {$composeFilePath}";
     }
 
