@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -126,7 +127,7 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
     }
 
     /**
-     * Store outdated information in database.
+     * Store outdated information in database and send immediate notification.
      */
     private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null, ?array $newerBranchInfo = null): void
     {
@@ -149,5 +150,24 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
         }
 
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
+
+        // Send immediate notification to the team
+        $this->sendNotification($outdatedInfo);
+    }
+
+    /**
+     * Send notification to team about outdated Traefik.
+     */
+    private function sendNotification(array $outdatedInfo): void
+    {
+        // Attach the outdated info as a dynamic property for the notification
+        $this->server->outdatedInfo = $outdatedInfo;
+
+        // Get the team and send notification
+        $team = $this->server->team()->first();
+
+        if ($team) {
+            $team->notify(new TraefikVersionOutdated(collect([$this->server])));
+        }
     }
 }

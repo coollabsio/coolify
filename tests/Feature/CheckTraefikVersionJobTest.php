@@ -180,9 +180,8 @@ it('groups servers by team correctly', function () {
     expect($grouped[$team2->id])->toHaveCount(1);
 });
 
-it('parallel processing jobs exist and have correct structure', function () {
+it('server check job exists and has correct structure', function () {
     expect(class_exists(\App\Jobs\CheckTraefikVersionForServerJob::class))->toBeTrue();
-    expect(class_exists(\App\Jobs\NotifyOutdatedTraefikServersJob::class))->toBeTrue();
 
     // Verify CheckTraefikVersionForServerJob has required properties
     $reflection = new \ReflectionClass(\App\Jobs\CheckTraefikVersionForServerJob::class);
@@ -194,33 +193,24 @@ it('parallel processing jobs exist and have correct structure', function () {
     expect($interfaces)->toContain(\Illuminate\Contracts\Queue\ShouldQueue::class);
 });
 
-it('calculates delay seconds correctly for notification job', function () {
-    // Test the delay calculation logic
-    // Values: min=120s, max=300s, scaling=0.2
-    $testCases = [
-        ['servers' => 10, 'expected' => 120],    // 10 * 0.2 = 2s -> uses min of 120s
-        ['servers' => 100, 'expected' => 120],   // 100 * 0.2 = 20s -> uses min of 120s
-        ['servers' => 600, 'expected' => 120],   // 600 * 0.2 = 120s (exactly at min)
-        ['servers' => 1000, 'expected' => 200],  // 1000 * 0.2 = 200s
-        ['servers' => 1500, 'expected' => 300],  // 1500 * 0.2 = 300s (at max)
-        ['servers' => 5000, 'expected' => 300],  // 5000 * 0.2 = 1000s -> uses max of 300s
+it('sends immediate notifications when outdated traefik is detected', function () {
+    // Notifications are now sent immediately from CheckTraefikVersionForServerJob
+    // when outdated Traefik is detected, rather than being aggregated and delayed
+    $team = Team::factory()->create();
+    $server = Server::factory()->make([
+        'name' => 'Server 1',
+        'team_id' => $team->id,
+    ]);
+
+    $server->outdatedInfo = [
+        'current' => '3.5.0',
+        'latest' => '3.5.6',
+        'type' => 'patch_update',
     ];
 
-    foreach ($testCases as $case) {
-        $count = $case['servers'];
-        $expected = $case['expected'];
+    // Each server triggers its own notification immediately
+    $notification = new TraefikVersionOutdated(collect([$server]));
 
-        // Use the same logic as the job's calculateNotificationDelay method
-        $minDelay = 120;
-        $maxDelay = 300;
-        $scalingFactor = 0.2;
-        $calculatedDelay = (int) ($count * $scalingFactor);
-        $delaySeconds = min($maxDelay, max($minDelay, $calculatedDelay));
-
-        expect($delaySeconds)->toBe($expected, "Failed for {$count} servers");
-
-        // Should always be within bounds
-        expect($delaySeconds)->toBeGreaterThanOrEqual($minDelay);
-        expect($delaySeconds)->toBeLessThanOrEqual($maxDelay);
-    }
+    expect($notification->servers)->toHaveCount(1);
+    expect($notification->servers->first()->outdatedInfo['type'])->toBe('patch_update');
 });
