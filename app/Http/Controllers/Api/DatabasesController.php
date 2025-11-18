@@ -703,6 +703,10 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'backup_method' => 'string|in:pg_dump,pgbackrest',
+            'backup_type' => 'string|in:full,diff,incr|nullable',
+            'enable_pitr' => 'boolean',
+            'pgbackrest_config' => 'json|nullable',
         ]);
 
         if ($validator->fails()) {
@@ -800,6 +804,22 @@ class DatabasesController extends Controller
         // Set defaults
         if (! isset($backupData['enabled'])) {
             $backupData['enabled'] = true;
+        }
+
+        // Set default backup method to pg_dump if not specified
+        if (! isset($backupData['backup_method'])) {
+            $backupData['backup_method'] = 'pg_dump';
+        }
+
+        // Validate pgBackRest-specific requirements
+        if (isset($backupData['backup_method']) && $backupData['backup_method'] === 'pgbackrest') {
+            // Only PostgreSQL databases support pgBackRest
+            if ($database->type() !== 'standalone-postgresql') {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['backup_method' => ['pgBackRest is only supported for PostgreSQL databases.']],
+                ], 422);
+            }
         }
 
         $backupConfig = ScheduledDatabaseBackup::create($backupData);
