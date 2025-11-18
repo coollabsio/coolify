@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
 use App\Enums\ProxyTypes;
+use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -68,6 +69,11 @@ class Navbar extends Component
 
             $activity = StartProxy::run($this->server, force: true, restarting: true);
             $this->dispatch('activityMonitor', $activity->id);
+
+            // Check Traefik version after restart to provide immediate feedback
+            if ($this->server->proxyType() === ProxyTypes::TRAEFIK->value) {
+                CheckTraefikVersionForServerJob::dispatch($this->server);
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -136,9 +142,6 @@ class Navbar extends Component
                 if (in_array($previousStatus, ['exited', 'stopped', 'unknown', null])) {
                     $this->dispatch('success', 'Proxy is running.');
                 }
-                break;
-            case 'restarting':
-                $this->dispatch('info', 'Initiating proxy restart.');
                 break;
             case 'exited':
                 // Only show "Proxy has exited" notification when transitioning from running state
