@@ -244,6 +244,11 @@ class Service extends BaseModel
             }
         }
 
+        // If all services are excluded from status checks, return a default exited status
+        if ($complexStatus === null && $complexHealth === null) {
+            return 'exited:healthy';
+        }
+
         return "{$complexStatus}:{$complexHealth}";
     }
 

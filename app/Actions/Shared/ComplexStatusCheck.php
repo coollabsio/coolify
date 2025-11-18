@@ -114,7 +114,7 @@ class ComplexStatusCheck
         }
 
         if ($relevantContainerCount === 0) {
-            return 'running:healthy';
+            return 'exited:healthy';
         }
 
         if ($hasRestarting) {
