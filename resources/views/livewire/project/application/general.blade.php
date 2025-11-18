@@ -259,13 +259,31 @@
                                     <div class="flex gap-2">
                                         <x-forms.input x-bind:disabled="shouldDisable()"
                                             placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
-                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Environment variables are automatically injected via <span class='dark:text-warning'>--env-file</span> flag. If you need custom env handling, include your own <span class='dark:text-warning'>--env-file</span> flag in the command.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
+                                            helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose build</span>"
                                             label="Custom Build Command" />
                                         <x-forms.input x-bind:disabled="shouldDisable()"
                                             placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
-                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
+                                            helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose up -d</span>"
                                             label="Custom Start Command" />
                                     </div>
+                                    @if ($this->dockerComposeCustomBuildCommand)
+                                        <div wire:key="preview-{{ $this->dockerComposeCustomBuildCommand }}">
+                                            <x-forms.input
+                                                readonly
+                                                value="{{ $this->dockerComposeBuildCommandPreview }}"
+                                                label="Final Build Command (Preview)"
+                                                helper="This shows the actual command that will be executed with auto-injected flags." />
+                                        </div>
+                                    @endif
+                                    @if ($this->dockerComposeCustomStartCommand)
+                                        <div wire:key="start-preview-{{ $this->dockerComposeCustomStartCommand }}">
+                                            <x-forms.input
+                                                readonly
+                                                value="{{ $this->dockerComposeStartCommandPreview }}"
+                                                label="Final Start Command (Preview)"
+                                                helper="This shows the actual command that will be executed with auto-injected flags." />
+                                        </div>
+                                    @endif
                                     @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                         <div class="pt-4">
                                             <x-forms.textarea

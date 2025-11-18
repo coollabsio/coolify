@@ -1005,4 +1005,34 @@ class General extends Component
             'isEmpty' => $isEmpty,
         ];
     }
+
+    public function getDockerComposeBuildCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomBuildCommand) {
+            return '';
+        }
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomBuildCommand,
+            ".{$this->baseDirectory}{$this->dockerComposeLocation}",
+            '/artifacts/build-time.env'
+        );
+    }
+
+    public function getDockerComposeStartCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomStartCommand) {
+            return '';
+        }
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Placeholder {workdir}/.env shows it's the workdir .env file (runtime env, not build-time)
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomStartCommand,
+            ".{$this->baseDirectory}{$this->dockerComposeLocation}",
+            '{workdir}/.env'
+        );
+    }
 }

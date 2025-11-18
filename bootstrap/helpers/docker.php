@@ -1272,3 +1272,31 @@ function generateDockerEnvFlags($variables): string
         })
         ->implode(' ');
 }
+
+/**
+ * Auto-inject -f and --env-file flags into a docker compose command if not already present
+ *
+ * @param  string  $command  The docker compose command to modify
+ * @param  string  $composeFilePath  The path to the compose file
+ * @param  string  $envFilePath  The path to the .env file
+ * @return string The modified command with injected flags
+ */
+function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath): string
+{
+    $dockerComposeReplacement = 'docker compose';
+
+    // Add -f flag if not present (checks for both -f and --file with various formats)
+    // Detects: -f path, -f=path, -fpath (concatenated), --file path, --file=path with any whitespace (space, tab, newline)
+    if (! preg_match('/(?:^|\s)(?:-f(?:[=\s]|\S)|--file(?:=|\s))/', $command)) {
+        $dockerComposeReplacement .= " -f {$composeFilePath}";
+    }
+
+    // Add --env-file flag if not present (checks for --env-file with various formats)
+    // Detects: --env-file path, --env-file=path with any whitespace
+    if (! preg_match('/(?:^|\s)--env-file(?:=|\s)/', $command)) {
+        $dockerComposeReplacement .= " --env-file {$envFilePath}";
+    }
+
+    // Replace only first occurrence to avoid modifying comments/strings/chained commands
+    return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
+}
