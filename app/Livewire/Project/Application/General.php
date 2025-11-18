@@ -622,7 +622,6 @@ class General extends Component
 
     public function updatedBuildPack()
     {
-        $originalBuildPack = $this->application->getOriginal('build_pack');
         // Check if user has permission to update
         try {
             $this->authorize('update', $this->application);
