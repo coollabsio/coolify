@@ -41,6 +41,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, EnvironmentVariableAnalyzer, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
+    private const BUILD_TIME_ENV_PATH = '/artifacts/build-time.env';
+
+    private const BUILD_SCRIPT_PATH = '/artifacts/build.sh';
+
+    private const NIXPACKS_PLAN_PATH = '/artifacts/thegameplan.json';
+
     public $tries = 1;
 
     public $timeout = 3600;
@@ -652,17 +658,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_buildtime_environment_variables();
 
         if ($this->docker_compose_custom_build_command) {
-            $build_command = $this->docker_compose_custom_build_command;
-
-            // Inject --env-file flag if not already present in custom command
-            // This ensures build-time environment variables are available during the build
-            if (! str_contains($build_command, '--env-file')) {
-                $build_command = str_replace(
-                    'docker compose',
-                    'docker compose --env-file /artifacts/build-time.env',
-                    $build_command
-                );
-            }
+            // Auto-inject -f (compose file) and --env-file flags using helper function
+            $build_command = injectDockerComposeFlags(
+                $this->docker_compose_custom_build_command,
+                "{$this->workdir}{$this->docker_compose_location}",
+                self::BUILD_TIME_ENV_PATH
+            );
 
             // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
             if ($this->dockerBuildkitSupported) {
@@ -688,7 +689,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $command = "DOCKER_BUILDKIT=1 {$command}";
             }
             // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
-            $command .= ' --env-file /artifacts/build-time.env';
+            $command .= ' --env-file '.self::BUILD_TIME_ENV_PATH;
             if ($this->force_rebuild) {
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
             } else {
@@ -736,9 +737,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $server_workdir = $this->application->workdir();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
+                // Auto-inject -f (compose file) and --env-file flags using helper function
+                $start_command = injectDockerComposeFlags(
+                    $this->docker_compose_custom_start_command,
+                    "{$server_workdir}{$this->docker_compose_location}",
+                    "{$server_workdir}/.env"
+                );
+
                 $this->write_deployment_configurations();
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
+                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$start_command}"), 'hidden' => true],
                 );
             } else {
                 $this->write_deployment_configurations();
@@ -754,9 +762,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             if ($this->docker_compose_custom_start_command) {
+                // Auto-inject -f (compose file) and --env-file flags using helper function
+                // Use $this->workdir for non-preserve-repository mode
+                $workdir_path = $this->preserveRepository ? $server_workdir : $this->workdir;
+                $start_command = injectDockerComposeFlags(
+                    $this->docker_compose_custom_start_command,
+                    "{$workdir_path}{$this->docker_compose_location}",
+                    "{$workdir_path}/.env"
+                );
+
                 $this->write_deployment_configurations();
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), 'hidden' => true],
+                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => true],
                 );
             } else {
                 $command = "{$this->coolify_variables} docker compose";
@@ -1555,10 +1572,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee /artifacts/build-time.env > /dev/null"),
+                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, 'cat /artifacts/build-time.env'),
+                    executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
                     'hidden' => true,
                 ],
             );
@@ -1569,7 +1586,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, 'touch /artifacts/build-time.env'),
+                    executeInDocker($this->deployment_uuid, 'touch '.self::BUILD_TIME_ENV_PATH),
                 ]
             );
         }
@@ -2693,15 +2710,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null"),
             ],
             [
-                executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                 'hidden' => true,
             ],
             [
-                executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                 'hidden' => true,
             ],
             [
-                executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                 'hidden' => true,
             ]
         );
@@ -2709,7 +2726,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Wrap a docker build command with environment export from /artifacts/build-time.env
+     * Wrap a docker build command with environment export from build-time .env file
      * This enables shell interpolation of variables (e.g., APP_URL=$COOLIFY_URL)
      *
      * @param  string  $build_command  The docker build command to wrap
@@ -2717,7 +2734,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function wrap_build_command_with_env_export(string $build_command): string
     {
-        return "cd {$this->workdir} && set -a && source /artifacts/build-time.env && set +a && {$build_command}";
+        return "cd {$this->workdir} && set -a && source ".self::BUILD_TIME_ENV_PATH." && set +a && {$build_command}";
     }
 
     private function build_image()
@@ -2756,10 +2773,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->build_pack === 'nixpacks') {
                 $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), 'hidden' => true]);
+                $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true]);
                 if ($this->force_rebuild) {
                     $this->execute_remote_command([
-                        executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
+                        executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                         'hidden' => true,
                     ], [
                         executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
@@ -2779,7 +2796,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } else {
                     $this->execute_remote_command([
-                        executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
+                        executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                         'hidden' => true,
                     ], [
                         executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
@@ -2803,19 +2820,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ]
                 );
-                $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
+                $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm '.self::NIXPACKS_PLAN_PATH), 'hidden' => true]);
             } else {
                 // Dockerfile buildpack
                 if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
@@ -2847,15 +2864,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ]
                 );
@@ -2886,15 +2903,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d | tee {$this->workdir}/nginx.conf > /dev/null"),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                     'hidden' => true,
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                    executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                     'hidden' => true,
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                    executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                     'hidden' => true,
                 ]
             );
@@ -2921,25 +2938,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
-                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ],
                     [
-                        executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                        executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                         'hidden' => true,
                     ]
                 );
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee /artifacts/thegameplan.json > /dev/null"), 'hidden' => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
+                            executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ], [
                             executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
@@ -2960,7 +2977,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         }
                     } else {
                         $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
+                            executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ], [
                             executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
@@ -2983,19 +3000,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                             'hidden' => true,
                         ],
                         [
-                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                             'hidden' => true,
                         ],
                         [
-                            executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                            executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                             'hidden' => true,
                         ]
                     );
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm '.self::NIXPACKS_PLAN_PATH), 'hidden' => true]);
                 } else {
                     // Dockerfile buildpack
                     if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
@@ -3028,15 +3045,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee ".self::BUILD_SCRIPT_PATH.' > /dev/null'),
                             'hidden' => true,
                         ],
                         [
-                            executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
+                            executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_SCRIPT_PATH),
                             'hidden' => true,
                         ],
                         [
-                            executeInDocker($this->deployment_uuid, 'bash /artifacts/build.sh'),
+                            executeInDocker($this->deployment_uuid, 'bash '.self::BUILD_SCRIPT_PATH),
                             'hidden' => true,
                         ]
                     );
