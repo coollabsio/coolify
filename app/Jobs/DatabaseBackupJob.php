@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Services\PgBackRestService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -516,6 +517,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function backup_standalone_postgresql(string $database): void
     {
+        // Check if using pgBackRest
+        if ($this->backup->backup_method === 'pgbackrest') {
+            $this->backup_with_pgbackrest($database);
+            return;
+        }
+
+        // Default pg_dump method
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $backupCommand = 'docker exec';
@@ -534,6 +542,48 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backup_with_pgbackrest(string $database): void
+    {
+        try {
+            $pgBackRestService = new PgBackRestService(
+                $this->database,
+                $this->backup,
+                $this->server
+            );
+
+            // Initialize pgBackRest if not already done
+            if (!$this->backup->pgbackrest_stanza_created) {
+                $pgBackRestService->initialize();
+            }
+
+            // Determine backup type (full, diff, incr)
+            $backupType = $pgBackRestService->determineBackupType();
+
+            // Perform backup
+            $result = $pgBackRestService->performBackup($backupType);
+
+            // Set backup output
+            $this->backup_output = "pgBackRest {$backupType} backup completed\n";
+            $this->backup_output .= $result['output'];
+
+            // For pgBackRest, we don't have a single file location
+            // The backup is managed by pgBackRest in its repository
+            // We'll use a special marker to indicate this
+            $this->backup_location = "pgbackrest://{$this->backup->pgbackrest_stanza_name}/{$backupType}";
+
+            // Get backup info to calculate size
+            $backups = $pgBackRestService->listBackups();
+            if (!empty($backups)) {
+                $latestBackup = $backups[count($backups) - 1];
+                $this->size = $latestBackup['repo_size'] ?? 0;
+            }
+
         } catch (\Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
