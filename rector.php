@@ -79,18 +79,17 @@ return RectorConfig::configure()
     ])
     ->withPhpSets()
     ->withPreparedSets(
-        carbon: true,
+        deadCode: true,
         codeQuality: true,
         codingStyle: true,
-        deadCode: true,
-        earlyReturn: true,
-        instanceOf: true,
-        naming: true,
-        phpunitCodeQuality: true,
-        privatization: true,
-        rectorPreset: true,
-        strictBooleans: true,
         typeDeclarations: true,
+        privatization: true,
+        naming: true,
+        instanceOf: true,
+        earlyReturn: true,
+        carbon: true,
+        rectorPreset: true,
+        phpunitCodeQuality: true,
     )
     ->withAttributesSets()
     ->withRules([
