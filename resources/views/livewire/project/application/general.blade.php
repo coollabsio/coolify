@@ -267,7 +267,7 @@
                                             label="Custom Start Command" />
                                     </div>
                                     @if ($this->dockerComposeCustomBuildCommand)
-                                        <div wire:key="preview-{{ $this->dockerComposeCustomBuildCommand }}">
+                                        <div wire:key="docker-compose-build-preview">
                                             <x-forms.input
                                                 readonly
                                                 value="{{ $this->dockerComposeBuildCommandPreview }}"
@@ -276,7 +276,7 @@
                                         </div>
                                     @endif
                                     @if ($this->dockerComposeCustomStartCommand)
-                                        <div wire:key="start-preview-{{ $this->dockerComposeCustomStartCommand }}">
+                                        <div wire:key="docker-compose-start-preview">
                                             <x-forms.input
                                                 readonly
                                                 value="{{ $this->dockerComposeStartCommandPreview }}"
