@@ -1,23 +1,19 @@
----
-description: Complete technology stack, dependencies, and infrastructure components
-globs: composer.json, package.json, docker-compose*.yml, config/*.php
-alwaysApply: false
----
 # Coolify Technology Stack
+
+Complete technology stack, dependencies, and infrastructure components.
 
 ## Backend Framework
 
 ### **Laravel 12.4.1** (PHP Framework)
-- **Location**: [composer.json](mdc:composer.json)
 - **Purpose**: Core application framework
-- **Key Features**: 
+- **Key Features**:
   - Eloquent ORM for database interactions
   - Artisan CLI for development tasks
   - Queue system for background jobs
   - Event-driven architecture
 
-### **PHP 8.4**
-- **Requirement**: `^8.4` in [composer.json](mdc:composer.json)
+### **PHP 8.4.7**
+- **Requirement**: `^8.4` in composer.json
 - **Features Used**:
   - Typed properties and return types
   - Attributes for validation and configuration
@@ -28,11 +24,11 @@ alwaysApply: false
 
 ### **Livewire 3.5.20** (Primary Frontend Framework)
 - **Purpose**: Server-side rendering with reactive components
-- **Location**: [app/Livewire/](mdc:app/Livewire/)
+- **Location**: `app/Livewire/`
 - **Key Components**:
-  - [Dashboard.php](mdc:app/Livewire/Dashboard.php) - Main interface
-  - [ActivityMonitor.php](mdc:app/Livewire/ActivityMonitor.php) - Real-time monitoring
-  - [MonacoEditor.php](mdc:app/Livewire/MonacoEditor.php) - Code editor
+  - Dashboard - Main interface
+  - ActivityMonitor - Real-time monitoring
+  - MonacoEditor - Code editor
 
 ### **Alpine.js** (Client-Side Interactivity)
 - **Purpose**: Lightweight JavaScript for DOM manipulation
@@ -40,8 +36,7 @@ alwaysApply: false
 - **Usage**: Declarative directives in Blade templates
 
 ### **Tailwind CSS 4.1.4** (Styling Framework)
-- **Location**: [package.json](mdc:package.json)
-- **Configuration**: [postcss.config.cjs](mdc:postcss.config.cjs)
+- **Configuration**: `postcss.config.cjs`
 - **Extensions**:
   - `@tailwindcss/forms` - Form styling
   - `@tailwindcss/typography` - Content typography
@@ -57,24 +52,24 @@ alwaysApply: false
 ### **PostgreSQL 15** (Primary Database)
 - **Purpose**: Main application data storage
 - **Features**: JSONB support, advanced indexing
-- **Models**: [app/Models/](mdc:app/Models/)
+- **Models**: `app/Models/`
 
 ### **Redis 7** (Caching & Real-time)
-- **Purpose**: 
+- **Purpose**:
   - Session storage
   - Queue backend
   - Real-time data caching
   - WebSocket session management
 
 ### **Supported Databases** (For User Applications)
-- **PostgreSQL**: [StandalonePostgresql.php](mdc:app/Models/StandalonePostgresql.php)
-- **MySQL**: [StandaloneMysql.php](mdc:app/Models/StandaloneMysql.php)
-- **MariaDB**: [StandaloneMariadb.php](mdc:app/Models/StandaloneMariadb.php)
-- **MongoDB**: [StandaloneMongodb.php](mdc:app/Models/StandaloneMongodb.php)
-- **Redis**: [StandaloneRedis.php](mdc:app/Models/StandaloneRedis.php)
-- **KeyDB**: [StandaloneKeydb.php](mdc:app/Models/StandaloneKeydb.php)
-- **Dragonfly**: [StandaloneDragonfly.php](mdc:app/Models/StandaloneDragonfly.php)
-- **ClickHouse**: [StandaloneClickhouse.php](mdc:app/Models/StandaloneClickhouse.php)
+- **PostgreSQL**: StandalonePostgresql
+- **MySQL**: StandaloneMysql
+- **MariaDB**: StandaloneMariadb
+- **MongoDB**: StandaloneMongodb
+- **Redis**: StandaloneRedis
+- **KeyDB**: StandaloneKeydb
+- **Dragonfly**: StandaloneDragonfly
+- **ClickHouse**: StandaloneClickhouse
 
 ## Authentication & Security
 
@@ -101,7 +96,7 @@ alwaysApply: false
 
 ### **Queue System**
 - **Backend**: Redis-based queues
-- **Jobs**: [app/Jobs/](mdc:app/Jobs/)
+- **Jobs**: `app/Jobs/`
 - **Processing**: Background deployment and monitoring tasks
 
 ## Development Tools
@@ -130,21 +125,21 @@ alwaysApply: false
 - **Gitea**: Self-hosted Git service
 
 ### **Cloud Storage**
-- **AWS S3**: [league/flysystem-aws-s3-v3](mdc:composer.json)
-- **SFTP**: [league/flysystem-sftp-v3](mdc:composer.json)
+- **AWS S3**: league/flysystem-aws-s3-v3
+- **SFTP**: league/flysystem-sftp-v3
 - **Local Storage**: File system integration
 
 ### **Notification Services**
-- **Email**: [resend/resend-laravel](mdc:composer.json)
+- **Email**: resend/resend-laravel
 - **Discord**: Custom webhook integration
 - **Slack**: Webhook notifications
 - **Telegram**: Bot API integration
 - **Pushover**: Push notifications
 
 ### **Monitoring & Logging**
-- **Sentry**: [sentry/sentry-laravel](mdc:composer.json) - Error tracking
-- **Laravel Ray**: [spatie/laravel-ray](mdc:composer.json) - Debug tool
-- **Activity Log**: [spatie/laravel-activitylog](mdc:composer.json)
+- **Sentry**: sentry/sentry-laravel - Error tracking
+- **Laravel Ray**: spatie/laravel-ray - Debug tool
+- **Activity Log**: spatie/laravel-activitylog
 
 ## DevOps & Infrastructure
 
@@ -181,9 +176,9 @@ alwaysApply: false
 ## API & Documentation
 
 ### **OpenAPI/Swagger**
-- **Documentation**: [openapi.json](mdc:openapi.json) (373KB)
-- **Generator**: [zircote/swagger-php](mdc:composer.json)
-- **API Routes**: [routes/api.php](mdc:routes/api.php)
+- **Documentation**: openapi.json (373KB)
+- **Generator**: zircote/swagger-php
+- **API Routes**: `routes/api.php`
 
 ### **WebSocket Communication**
 - **Laravel Echo**: Real-time event broadcasting
@@ -192,7 +187,7 @@ alwaysApply: false
 
 ## Package Management
 
-### **PHP Dependencies** ([composer.json](mdc:composer.json))
+### **PHP Dependencies** (composer.json)
 ```json
 {
   "require": {
@@ -205,7 +200,7 @@ alwaysApply: false
 }
 ```
 
-### **JavaScript Dependencies** ([package.json](mdc:package.json))
+### **JavaScript Dependencies** (package.json)
 ```json
 {
   "devDependencies": {
@@ -223,15 +218,15 @@ alwaysApply: false
 ## Configuration Files
 
 ### **Build Configuration**
-- **[vite.config.js](mdc:vite.config.js)**: Frontend build setup
-- **[postcss.config.cjs](mdc:postcss.config.cjs)**: CSS processing
-- **[rector.php](mdc:rector.php)**: PHP refactoring rules
-- **[pint.json](mdc:pint.json)**: Code style configuration
+- **vite.config.js**: Frontend build setup
+- **postcss.config.cjs**: CSS processing
+- **rector.php**: PHP refactoring rules
+- **pint.json**: Code style configuration
 
 ### **Testing Configuration**
-- **[phpunit.xml](mdc:phpunit.xml)**: Unit test configuration
-- **[phpunit.dusk.xml](mdc:phpunit.dusk.xml)**: Browser test configuration
-- **[tests/Pest.php](mdc:tests/Pest.php)**: Pest testing setup
+- **phpunit.xml**: Unit test configuration
+- **phpunit.dusk.xml**: Browser test configuration
+- **tests/Pest.php**: Pest testing setup
 
 ## Version Requirements
 

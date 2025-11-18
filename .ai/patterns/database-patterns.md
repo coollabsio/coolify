@@ -1,8 +1,3 @@
----
-description: Database architecture, models, migrations, relationships, and data management patterns
-globs: app/Models/*.php, database/migrations/*.php, database/seeders/*.php, app/Actions/Database/*.php
-alwaysApply: false
----
 # Coolify Database Architecture & Patterns
 
 ## Database Strategy

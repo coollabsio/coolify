@@ -1,8 +1,3 @@
----
-description: Laravel application structure, patterns, and architectural decisions
-globs: app/**/*.php, config/*.php, bootstrap/**/*.php
-alwaysApply: false
----
 # Coolify Application Architecture
 
 ## Laravel Project Structure

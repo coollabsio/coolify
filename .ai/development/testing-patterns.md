@@ -1,8 +1,3 @@
----
-description: Testing strategies with Pest PHP, Laravel Dusk, and quality assurance patterns
-globs: tests/**/*.php, database/factories/*.php
-alwaysApply: false
----
 # Coolify Testing Architecture & Patterns
 
 > **Cross-Reference**: These detailed testing patterns align with the testing guidelines in **[CLAUDE.md](mdc:CLAUDE.md)**. Both documents share the same core principles about Docker execution and mocking preferences.

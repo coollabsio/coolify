@@ -1,8 +1,3 @@
----
-description: Docker orchestration, deployment workflows, and containerization patterns
-globs: app/Jobs/*.php, app/Actions/Application/*.php, app/Actions/Server/*.php, docker/*.*, *.yml, *.yaml
-alwaysApply: false
----
 # Coolify Deployment Architecture
 
 ## Deployment Philosophy

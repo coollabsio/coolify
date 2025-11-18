@@ -1,8 +1,3 @@
----
-description: Security architecture, authentication, authorization patterns, and enhanced form component security
-globs: app/Policies/*.php, app/View/Components/Forms/*.php, app/Http/Middleware/*.php, resources/views/**/*.blade.php
-alwaysApply: true
----
 # Coolify Security Architecture & Patterns
 
 ## Security Philosophy

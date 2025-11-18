@@ -1,8 +1,3 @@
----
-description: RESTful API design, routing patterns, webhooks, and HTTP communication
-globs: routes/*.php, app/Http/Controllers/**/*.php, app/Http/Resources/*.php, app/Http/Requests/*.php
-alwaysApply: false
----
 # Coolify API & Routing Architecture
 
 ## Routing Structure

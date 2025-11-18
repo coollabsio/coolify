@@ -1,8 +1,3 @@
----
-description: Enhanced form components with built-in authorization system
-globs: resources/views/**/*.blade.php, app/View/Components/Forms/*.php
-alwaysApply: true
----
 
 # Enhanced Form Components with Authorization
 

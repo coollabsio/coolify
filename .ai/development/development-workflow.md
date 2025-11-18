@@ -1,8 +1,3 @@
----
-description: Development setup, coding standards, contribution guidelines, and best practices
-globs: **/*.php, composer.json, package.json, *.md, .env.example
-alwaysApply: false
----
 # Coolify Development Workflow
 
 ## Development Environment Setup

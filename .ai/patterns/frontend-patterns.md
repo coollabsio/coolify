@@ -1,8 +1,3 @@
----
-description: Livewire components, Alpine.js patterns, Tailwind CSS, and enhanced form components
-globs: app/Livewire/**/*.php, resources/views/**/*.blade.php, resources/js/**/*.js, resources/css/**/*.css
-alwaysApply: false
----
 # Coolify Frontend Architecture & Patterns
 
 ## Frontend Philosophy

@@ -1,8 +1,3 @@
----
-description: High-level project mission, core concepts, and architectural overview
-globs: README.md, CONTRIBUTING.md, CHANGELOG.md, *.md
-alwaysApply: false
----
 # Coolify Project Overview
 
 ## What is Coolify?
