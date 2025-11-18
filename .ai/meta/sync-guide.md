@@ -4,112 +4,158 @@ This document explains how AI instructions are organized and synchronized across
 
 ## Overview
 
-Coolify maintains AI instructions in two parallel systems:
+Coolify maintains AI instructions with a **single source of truth** approach:
 
-1. **CLAUDE.md** - For Claude Code (claude.ai/code)
-2. **.cursor/rules/** - For Cursor IDE and other AI assistants
+1. **CLAUDE.md** - Main entry point for Claude Code (references `.ai/` directory)
+2. **.cursor/rules/coolify-ai-docs.mdc** - Master reference file for Cursor IDE (references `.ai/` directory)
+3. **.ai/** - Single source of truth containing all detailed documentation
 
-Both systems share core principles but are optimized for their respective workflows.
+All AI tools (Claude Code, Cursor IDE, etc.) reference the same `.ai/` directory to ensure consistency.
 
 ## Structure
 
-### CLAUDE.md
-- **Purpose**: Condensed, workflow-focused guide for Claude Code
+### CLAUDE.md (Root Directory)
+- **Purpose**: Entry point for Claude Code with quick-reference guide
 - **Format**: Single markdown file
 - **Includes**:
   - Quick-reference development commands
   - High-level architecture overview
-  - Core patterns and guidelines
-  - Embedded Laravel Boost guidelines
-  - References to detailed .cursor/rules/ documentation
+  - Essential patterns and guidelines
+  - References to detailed `.ai/` documentation
 
-### .cursor/rules/
-- **Purpose**: Detailed, topic-specific documentation
-- **Format**: Multiple .mdc files organized by topic
+### .cursor/rules/coolify-ai-docs.mdc
+- **Purpose**: Master reference file for Cursor IDE
+- **Format**: Single .mdc file with frontmatter
+- **Content**: Quick decision tree and references to `.ai/` directory
+- **Note**: Replaces all previous topic-specific .mdc files
+
+### .ai/ Directory (Single Source of Truth)
+- **Purpose**: All detailed, topic-specific documentation
+- **Format**: Organized markdown files by category
 - **Structure**:
-  - `README.mdc` - Main index and overview
-  - `cursor_rules.mdc` - Maintenance guidelines
-  - Topic-specific files (testing-patterns.mdc, security-patterns.mdc, etc.)
-- **Used by**: Cursor IDE, Claude Code (for detailed reference), other AI assistants
+  ```
+  .ai/
+  ├── README.md                    # Navigation hub
+  ├── core/                        # Project information
+  │   ├── technology-stack.md      # Version numbers (SINGLE SOURCE OF TRUTH)
+  │   ├── project-overview.md
+  │   ├── application-architecture.md
+  │   └── deployment-architecture.md
+  ├── development/                 # Development practices
+  │   ├── development-workflow.md
+  │   ├── testing-patterns.md
+  │   └── laravel-boost.md
+  ├── patterns/                    # Code patterns
+  │   ├── database-patterns.md
+  │   ├── frontend-patterns.md
+  │   ├── security-patterns.md
+  │   ├── form-components.md
+  │   └── api-and-routing.md
+  └── meta/                        # Documentation guides
+      ├── maintaining-docs.md
+      └── sync-guide.md (this file)
+  ```
+- **Used by**: All AI tools through CLAUDE.md or coolify-ai-docs.mdc
 
 ## Cross-References
 
-Both systems reference each other:
+All systems reference the `.ai/` directory as the source of truth:
 
-- **CLAUDE.md** → references `.cursor/rules/` for detailed documentation
-- **.cursor/rules/README.mdc** → references `CLAUDE.md` for Claude Code workflow
-- **.cursor/rules/cursor_rules.mdc** → notes that changes should sync with CLAUDE.md
+- **CLAUDE.md** → references `.ai/` files for detailed documentation
+- **.cursor/rules/coolify-ai-docs.mdc** → references `.ai/` files for detailed documentation
+- **.ai/README.md** → provides navigation to all documentation
 
 ## Maintaining Consistency
 
-When updating AI instructions, follow these guidelines:
-
 ### 1. Core Principles (MUST be consistent)
-- Laravel version (currently Laravel 12)
-- PHP version (8.4)
+
+These are defined ONCE in `.ai/core/technology-stack.md`:
+- Laravel version (currently Laravel 12.4.1)
+- PHP version (8.4.7)
+- All package versions (Livewire 3.5.20, Tailwind 4.1.4, etc.)
+
+**Exception**: CLAUDE.md is permitted to show essential version numbers as a quick reference for convenience. These must stay synchronized with `technology-stack.md`. When updating versions, update both locations.
+
+Other critical patterns defined in `.ai/`:
 - Testing execution rules (Docker for Feature tests, mocking for Unit tests)
 - Security patterns and authorization requirements
 - Code style requirements (Pint, PSR-12)
 
 ### 2. Where to Make Changes
 
+**For version numbers** (Laravel, PHP, packages):
+1. Update `.ai/core/technology-stack.md` (single source of truth)
+2. Update CLAUDE.md quick reference section (essential versions only)
+3. Verify both files stay synchronized
+4. Never duplicate version numbers in other locations
+
 **For workflow changes** (how to run commands, development setup):
-- Primary: `CLAUDE.md`
-- Secondary: `.cursor/rules/development-workflow.mdc`
+1. Update `.ai/development/development-workflow.md`
+2. Update quick reference in CLAUDE.md if needed
+3. Verify `.cursor/rules/coolify-ai-docs.mdc` references are correct
 
 **For architectural patterns** (how code should be structured):
-- Primary: `.cursor/rules/` topic files
-- Secondary: Reference in `CLAUDE.md` "Additional Documentation" section
+1. Update appropriate file in `.ai/core/`
+2. Add cross-references from related docs
+3. Update CLAUDE.md if it needs to highlight this pattern
+
+**For code patterns** (how to write code):
+1. Update appropriate file in `.ai/patterns/`
+2. Add examples from real codebase
+3. Cross-reference from related docs
 
 **For testing patterns**:
-- Both: Must be synchronized
-- `CLAUDE.md` - Contains condensed testing execution rules
-- `.cursor/rules/testing-patterns.mdc` - Contains detailed examples and patterns
+1. Update `.ai/development/testing-patterns.md`
+2. Ensure CLAUDE.md testing section references it
 
 ### 3. Update Checklist
 
 When making significant changes:
 
 - [ ] Identify if change affects core principles (version numbers, critical patterns)
-- [ ] Update primary location (CLAUDE.md or .cursor/rules/)
-- [ ] Check if update affects cross-referenced content
-- [ ] Update secondary location if needed
-- [ ] Verify cross-references are still accurate
-- [ ] Run: `./vendor/bin/pint CLAUDE.md .cursor/rules/*.mdc` (if applicable)
+- [ ] Update primary location in `.ai/` directory
+- [ ] Check if CLAUDE.md needs quick-reference update
+- [ ] Verify `.cursor/rules/coolify-ai-docs.mdc` references are still accurate
+- [ ] Update cross-references in related `.ai/` files
+- [ ] Verify all relative paths work correctly
+- [ ] Test links in markdown files
+- [ ] Run: `./vendor/bin/pint` on modified files (if applicable)
 
 ### 4. Common Inconsistencies to Watch
 
-- **Version numbers**: Laravel, PHP, package versions
-- **Testing instructions**: Docker execution requirements
-- **File paths**: Ensure relative paths work from root
-- **Command syntax**: Docker commands, artisan commands
-- **Architecture decisions**: Laravel 10 structure vs Laravel 12+ structure
+- **Version numbers**: Should ONLY exist in `.ai/core/technology-stack.md`
+- **Testing instructions**: Docker execution requirements must be consistent
+- **File paths**: Ensure relative paths work from their location
+- **Command syntax**: Docker commands, artisan commands must be accurate
+- **Cross-references**: Links must point to current file locations
 
 ## File Organization
 
 ```
 /
-├── CLAUDE.md                          # Claude Code instructions (condensed)
-├── .AI_INSTRUCTIONS_SYNC.md          # This file
-└── .cursor/
-    └── rules/
-        ├── README.mdc                 # Index and overview
-        ├── cursor_rules.mdc           # Maintenance guide
-        ├── testing-patterns.mdc       # Testing details
-        ├── development-workflow.mdc   # Dev setup details
-        ├── security-patterns.mdc      # Security details
-        ├── application-architecture.mdc
-        ├── deployment-architecture.mdc
-        ├── database-patterns.mdc
-        ├── frontend-patterns.mdc
-        ├── api-and-routing.mdc
-        ├── form-components.mdc
-        ├── technology-stack.mdc
-        ├── project-overview.mdc
-        └── laravel-boost.mdc          # Laravel-specific patterns
+├── CLAUDE.md                          # Claude Code entry point
+├── .AI_INSTRUCTIONS_SYNC.md           # Redirect to this file
+├── .cursor/
+│   └── rules/
+│       └── coolify-ai-docs.mdc        # Cursor IDE master reference
+└── .ai/                               # SINGLE SOURCE OF TRUTH
+    ├── README.md                       # Navigation hub
+    ├── core/                           # Project information
+    ├── development/                    # Development practices
+    ├── patterns/                       # Code patterns
+    └── meta/                          # Documentation guides
 ```
 
 ## Recent Updates
+
+### 2025-11-18 - Documentation Consolidation
+- ✅ Consolidated all documentation into `.ai/` directory
+- ✅ Created single source of truth for version numbers
+- ✅ Reduced CLAUDE.md from 719 to 319 lines
+- ✅ Replaced 11 .cursor/rules/*.mdc files with single coolify-ai-docs.mdc
+- ✅ Organized by topic: core/, development/, patterns/, meta/
+- ✅ Standardized version numbers (Laravel 12.4.1, PHP 8.4.7, Tailwind 4.1.4)
+- ✅ Created comprehensive navigation with .ai/README.md
 
 ### 2025-10-07
 - ✅ Added cross-references between CLAUDE.md and .cursor/rules/
@@ -117,40 +163,52 @@ When making significant changes:
 - ✅ Added comprehensive testing execution rules (Docker for Feature tests)
 - ✅ Added test design philosophy (prefer mocking over database)
 - ✅ Fixed inconsistencies in testing documentation
-- ✅ Created this synchronization guide
 
 ## Maintenance Commands
 
 ```bash
-# Check for version inconsistencies
-grep -r "Laravel [0-9]" CLAUDE.md .cursor/rules/*.mdc
+# Check for version inconsistencies (should only be in technology-stack.md)
+# Note: CLAUDE.md is allowed to show quick reference versions
+grep -r "Laravel 12" .ai/ CLAUDE.md .cursor/rules/coolify-ai-docs.mdc
+grep -r "PHP 8.4" .ai/ CLAUDE.md .cursor/rules/coolify-ai-docs.mdc
 
-# Check for PHP version consistency
-grep -r "PHP [0-9]" CLAUDE.md .cursor/rules/*.mdc
+# Check for broken cross-references to old .mdc files
+grep -r "\.cursor/rules/.*\.mdc" .ai/ CLAUDE.md
 
 # Format all documentation
-./vendor/bin/pint CLAUDE.md .cursor/rules/*.mdc
+./vendor/bin/pint CLAUDE.md .ai/**/*.md
 
 # Search for specific patterns across all docs
-grep -r "pattern_to_check" CLAUDE.md .cursor/rules/
+grep -r "pattern_to_check" CLAUDE.md .ai/ .cursor/rules/
+
+# Verify all markdown links work (from repository root)
+find .ai -name "*.md" -exec grep -H "\[.*\](.*)" {} \;
 ```
 
 ## Contributing
 
 When contributing documentation:
 
-1. Check both CLAUDE.md and .cursor/rules/ for existing documentation
-2. Add to appropriate location(s) based on guidelines above
-3. Add cross-references if creating new patterns
-4. Update this file if changing organizational structure
-5. Verify consistency before submitting PR
+1. **Check `.ai/` directory** for existing documentation
+2. **Update `.ai/` files** - this is the single source of truth
+3. **Use cross-references** - never duplicate content
+4. **Update CLAUDE.md** if adding critical quick-reference information
+5. **Verify `.cursor/rules/coolify-ai-docs.mdc`** still references correctly
+6. **Test all links** work from their respective locations
+7. **Update this sync-guide.md** if changing organizational structure
+8. **Verify consistency** before submitting PR
 
 ## Questions?
 
 If unsure about where to document something:
 
-- **Quick reference / workflow** → CLAUDE.md
-- **Detailed patterns / examples** → .cursor/rules/[topic].mdc
-- **Both?** → Start with .cursor/rules/, then reference in CLAUDE.md
+- **Version numbers** → `.ai/core/technology-stack.md` (ONLY location)
+- **Quick reference / commands** → CLAUDE.md + `.ai/development/development-workflow.md`
+- **Detailed patterns / examples** → `.ai/patterns/[topic].md`
+- **Architecture / concepts** → `.ai/core/[topic].md`
+- **Development practices** → `.ai/development/[topic].md`
+- **Documentation guides** → `.ai/meta/[topic].md`
 
-When in doubt, prefer detailed documentation in .cursor/rules/ and concise references in CLAUDE.md.
+**Golden Rule**: Each piece of information exists in ONE location in `.ai/`, other files reference it.
+
+When in doubt, prefer detailed documentation in `.ai/` and lightweight references in CLAUDE.md and coolify-ai-docs.mdc.

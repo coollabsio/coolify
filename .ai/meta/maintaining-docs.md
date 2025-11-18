@@ -9,12 +9,13 @@ All AI documentation lives in the `.ai/` directory with the following structure:
 ```
 .ai/
 ├── README.md                    # Navigation hub
-├── CLAUDE.md                    # Main Claude Code instructions
 ├── core/                        # Core project information
 ├── development/                 # Development practices
 ├── patterns/                    # Code patterns and best practices
 └── meta/                        # Documentation maintenance guides
 ```
+
+> **Note**: `CLAUDE.md` is in the repository root, not in the `.ai/` directory.
 
 ## Required File Structure
 

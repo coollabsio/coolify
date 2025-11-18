@@ -4,7 +4,7 @@ Welcome to the Coolify AI documentation hub. This directory contains all AI assi
 
 ## Quick Start
 
-- **For Claude Code**: Start with [CLAUDE.md](CLAUDE.md)
+- **For Claude Code**: Start with [CLAUDE.md in root directory](../CLAUDE.md)
 - **For Cursor IDE**: Check `.cursor/rules/coolify-ai-docs.mdc` which references this directory
 - **For Other AI Tools**: Continue reading below
 
@@ -92,7 +92,7 @@ Documentation about documentation:
 
 ## Navigation Tips
 
-1. **Start broad**: Begin with project-overview or CLAUDE.md
+1. **Start broad**: Begin with project-overview or ../CLAUDE.md
 2. **Get specific**: Navigate to topic-specific files for details
 3. **Cross-reference**: Files link to related topics
 4. **Single source**: Version numbers and critical data exist in ONE place only
@@ -135,7 +135,7 @@ When updating documentation:
 
 ## Questions?
 
-- **Claude Code users**: Check [CLAUDE.md](CLAUDE.md) first
+- **Claude Code users**: Check [../CLAUDE.md](../CLAUDE.md) first
 - **Cursor IDE users**: Check `.cursor/rules/coolify-ai-docs.mdc`
 - **Documentation issues**: See [meta/maintaining-docs.md](meta/maintaining-docs.md)
 - **Sync issues**: See [meta/sync-guide.md](meta/sync-guide.md)
