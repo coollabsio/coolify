@@ -2,7 +2,12 @@ name: Lock inactive threads
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: "0 1 * * *"
+
+permissions:
+  issues: write
+  discussions: write
+  pull-requests: write
 
 jobs:
   lock-threads:

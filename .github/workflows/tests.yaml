@@ -3,7 +3,10 @@ name: Tests
 on:
   push:
     branches:
-      - '**v5.x**'
+      - "**v5.x**"
+
+permissions:
+  contents: read
 
 jobs:
   composer-validate:
@@ -11,13 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-    
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
-    
+          php-version: "8.4"
+
       - name: Validate composer.json
         run: composer validate --check-lock --strict
 
@@ -32,7 +37,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: "8.4"
 
       - name: Cache Composer packages
         id: composer-cache
@@ -55,7 +60,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -74,12 +79,12 @@ jobs:
       - name: Setup PHP with Xdebug
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: "8.4"
           coverage: xdebug
 
       # - name: Install aspell
       #   run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
-      
+
       - name: Cache Composer packages
         id: composer-cache
         uses: actions/cache@v4
