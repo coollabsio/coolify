@@ -72,7 +72,7 @@ class Navbar extends Component
 
             // Check Traefik version after restart to provide immediate feedback
             if ($this->server->proxyType() === ProxyTypes::TRAEFIK->value) {
-                CheckTraefikVersionForServerJob::dispatch($this->server);
+                CheckTraefikVersionForServerJob::dispatch($this->server, get_traefik_versions());
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
