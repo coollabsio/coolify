@@ -176,6 +176,36 @@ class Application extends BaseModel
             if (count($payload) > 0) {
                 $application->forceFill($payload);
             }
+
+            // Buildpack switching cleanup logic
+            if ($application->isDirty('build_pack')) {
+                $originalBuildPack = $application->getOriginal('build_pack');
+
+                // Clear Docker Compose specific data when switching away from dockercompose
+                if ($originalBuildPack === 'dockercompose') {
+                    $application->docker_compose_domains = null;
+                    $application->docker_compose_raw = null;
+
+                    // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
+                    $application->environment_variables()
+                        ->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                        ->orWhere('key', 'LIKE', 'SERVICE_URL_%')
+                        ->delete();
+
+                    $application->environment_variables_preview()
+                        ->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                        ->orWhere('key', 'LIKE', 'SERVICE_URL_%')
+                        ->delete();
+                }
+
+                // Clear Dockerfile specific data when switching away from dockerfile
+                if ($originalBuildPack === 'dockerfile') {
+                    $application->dockerfile = null;
+                    $application->dockerfile_location = null;
+                    $application->dockerfile_target_build = null;
+                    $application->custom_healthcheck_found = false;
+                }
+            }
         });
         static::created(function ($application) {
             ApplicationSetting::create([
