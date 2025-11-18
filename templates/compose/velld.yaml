@@ -9,8 +9,8 @@ services:
     image: ghcr.io/dendianugerah/velld/api:sha-ce8b88c
     environment:
       - SERVICE_URL_API_8080
-      - JWT_SECRET=${JWT_SECRET:?} #Generate using: openssl rand -hex 32
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?} #Generate using: openssl rand -hex 32
+      - JWT_SECRET=${SERVICE_HEX_32_JWT}
+      - ENCRYPTION_KEY=${SERVICE_HEX_32_ENCRYPTION}
       - ADMIN_USERNAME_CREDENTIAL=${ADMIN_USERNAME_CREDENTIAL:-admin}
       - ADMIN_PASSWORD_CREDENTIAL=$SERVICE_PASSWORD_VELLDADMIN
       - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
@@ -23,12 +23,18 @@ services:
     volumes:
       - api_data:/app/data
       - backup_data:/app/backups
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 10s
 
   web:
     image: ghcr.io/dendianugerah/velld/web:sha-ce8b88c
     environment:
       - SERVICE_URL_VELLD_3000
-      - NEXT_PUBLIC_API_URL=$SERVICE_URL_API #Needs to be accessible by a browser
+      - NEXT_PUBLIC_API_URL=$SERVICE_URL_API # Needs to be accessible by a browser
       - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
     depends_on:
       - api
