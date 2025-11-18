@@ -1012,12 +1012,16 @@ class General extends Component
             return '';
         }
 
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
         // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
         // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
+        // Build-time env path references ApplicationDeploymentJob::BUILD_TIME_ENV_PATH as source of truth
         return injectDockerComposeFlags(
             $this->dockerComposeCustomBuildCommand,
-            ".{$this->baseDirectory}{$this->dockerComposeLocation}",
-            '/artifacts/build-time.env'
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
         );
     }
 
@@ -1027,11 +1031,14 @@ class General extends Component
             return '';
         }
 
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
         // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
         // Placeholder {workdir}/.env shows it's the workdir .env file (runtime env, not build-time)
         return injectDockerComposeFlags(
             $this->dockerComposeCustomStartCommand,
-            ".{$this->baseDirectory}{$this->dockerComposeLocation}",
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
             '{workdir}/.env'
         );
     }

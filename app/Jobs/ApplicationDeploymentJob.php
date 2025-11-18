@@ -41,7 +41,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, EnvironmentVariableAnalyzer, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
-    private const BUILD_TIME_ENV_PATH = '/artifacts/build-time.env';
+    public const BUILD_TIME_ENV_PATH = '/artifacts/build-time.env';
 
     private const BUILD_SCRIPT_PATH = '/artifacts/build.sh';
 
