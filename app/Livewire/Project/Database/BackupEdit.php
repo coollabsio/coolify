@@ -82,6 +82,18 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'string', 'in:pg_dump,pgbackrest'])]
+    public string $backupMethod = 'pg_dump';
+
+    #[Validate(['nullable', 'string', 'in:full,diff,incr'])]
+    public ?string $backupType = null;
+
+    #[Validate(['required', 'boolean'])]
+    public bool $enablePitr = false;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestConfig = null;
+
     public function mount()
     {
         try {
@@ -110,6 +122,10 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->backup_method = $this->backupMethod;
+            $this->backup->backup_type = $this->backupType;
+            $this->backup->enable_pitr = $this->enablePitr;
+            $this->backup->pgbackrest_config = $this->pgbackrestConfig;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -128,6 +144,10 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->backupMethod = $this->backup->backup_method ?? 'pg_dump';
+            $this->backupType = $this->backup->backup_type;
+            $this->enablePitr = $this->backup->enable_pitr ?? false;
+            $this->pgbackrestConfig = $this->backup->pgbackrest_config;
         }
     }
 
@@ -216,6 +236,15 @@ class BackupEdit extends Component
         if (! $isValid) {
             throw new \Exception('Invalid Cron / Human expression');
         }
+
+        // Validate pgBackRest-specific requirements
+        if ($this->backup->backup_method === 'pgbackrest') {
+            // Only PostgreSQL databases support pgBackRest
+            if ($this->backup->database->type() !== 'standalone-postgresql') {
+                throw new \Exception('pgBackRest is only supported for PostgreSQL databases');
+            }
+        }
+
         $this->validate();
     }
 
