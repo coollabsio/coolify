@@ -652,11 +652,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_buildtime_environment_variables();
 
         if ($this->docker_compose_custom_build_command) {
-            // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
             $build_command = $this->docker_compose_custom_build_command;
+
+            // Inject --env-file flag if not already present in custom command
+            // This ensures build-time environment variables are available during the build
+            if (! str_contains($build_command, '--env-file')) {
+                $build_command = str_replace(
+                    'docker compose',
+                    'docker compose --env-file /artifacts/build-time.env',
+                    $build_command
+                );
+            }
+
+            // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
             if ($this->dockerBuildkitSupported) {
                 $build_command = "DOCKER_BUILDKIT=1 {$build_command}";
             }
+
+            // Append build arguments if not using build secrets (matching default behavior)
+            if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
+                $build_args_string = $this->build_args->implode(' ');
+                // Escape single quotes for bash -c context used by executeInDocker
+                $build_args_string = str_replace("'", "'\\''", $build_args_string);
+                $build_command .= " {$build_args_string}";
+                $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+            }
+
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$build_command}"), 'hidden' => true],
             );

@@ -259,7 +259,7 @@
                                     <div class="flex gap-2">
                                         <x-forms.input x-bind:disabled="shouldDisable()"
                                             placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
-                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
+                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Environment variables are automatically injected via <span class='dark:text-warning'>--env-file</span> flag. If you need custom env handling, include your own <span class='dark:text-warning'>--env-file</span> flag in the command.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
                                             label="Custom Build Command" />
                                         <x-forms.input x-bind:disabled="shouldDisable()"
                                             placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
