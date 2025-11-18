@@ -11,15 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-            Schema::create('cloud_init_scripts', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('team_id')->constrained()->onDelete('cascade');
-                $table->string('name');
-                $table->text('script'); // Encrypted in the model
-                $table->timestamps();
-
-                $table->index('team_id');
-            });
+        Schema::create('cloud_init_scripts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('team_id')->constrained()->onDelete('cascade');
+            $table->string('name');
+            $table->text('script'); // Encrypted in the model
+            $table->timestamps();
+        });
     }
 
     /**
