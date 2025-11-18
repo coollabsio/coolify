@@ -23,9 +23,7 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
     public function __construct(
         public Server $server,
         public array $traefikVersions
-    ) {
-        $this->onQueue('high');
-    }
+    ) {}
 
     /**
      * Execute the job.
