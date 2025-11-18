@@ -44,6 +44,65 @@
             </x-forms.select>
         </div>
     @endif
+    
+    @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
+        <div class="flex flex-col gap-2 pb-6">
+            <h3>Backup Method</h3>
+            <div class="w-64">
+                <x-forms.select instantSave id="backupMethod" label="Backup Method" 
+                    helper="Choose between traditional pg_dump or pgBackRest for incremental backups">
+                    <option value="pg_dump">pg_dump (Traditional)</option>
+                    <option value="pgbackrest">pgBackRest (Incremental)</option>
+                </x-forms.select>
+            </div>
+            
+            @if ($backupMethod === 'pgbackrest')
+                <div class="flex flex-col gap-2 p-4 bg-coolgray-100 dark:bg-coolgray-800 rounded-lg">
+                    <h4 class="font-medium">pgBackRest Configuration</h4>
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        pgBackRest provides incremental backups, reducing storage costs and backup times for large databases.
+                    </div>
+                    
+                    <div class="w-64">
+                        <x-forms.select instantSave id="backupType" label="Backup Type" 
+                            helper="Leave empty for automatic selection based on schedule">
+                            <option value="">Auto (Recommended)</option>
+                            <option value="full">Full Backup</option>
+                            <option value="diff">Differential Backup</option>
+                            <option value="incr">Incremental Backup</option>
+                        </x-forms.select>
+                    </div>
+                    
+                    <div class="w-64">
+                        <x-forms.checkbox instantSave id="enablePitr" label="Enable Point-in-Time Recovery (PITR)" 
+                            helper="Enables WAL archiving for point-in-time recovery. Requires additional storage for WAL files." />
+                    </div>
+                    
+                    @if ($enablePitr)
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                            <div class="text-sm text-blue-800 dark:text-blue-200">
+                                <strong>PITR Enabled:</strong> You can restore to any point in time between backups. WAL files will be archived continuously.
+                            </div>
+                        </div>
+                    @endif
+                    
+                    <div class="pt-2">
+                        <x-forms.textarea id="pgbackrestConfig" label="Advanced Configuration (JSON)" 
+                            rows="4"
+                            helper="Optional: Custom pgBackRest configuration overrides in JSON format. Leave empty for defaults." />
+                    </div>
+                    
+                    <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                        <div class="text-sm text-yellow-800 dark:text-yellow-200">
+                            <strong>Note:</strong> pgBackRest will be automatically installed in your PostgreSQL container on first backup. 
+                            Initial setup may take a few extra minutes.
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+    
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
         <div class="flex gap-2 flex-col ">
