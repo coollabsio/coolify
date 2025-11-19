@@ -55,7 +55,7 @@ class TerminalFileHelper
     public static function parseFilename(string $filename): ?array
     {
         // Pattern: uploadedAt_expiresAt_serverId_containerUuid_originalName_hash.ext
-        $pattern = '/^(\d+)_(\d+)_(\d+)_([^_]+)_([^_]+)_([a-zA-Z0-9]+)(?:\.(.+))?$/';
+        $pattern = '/^(\d+)_(\d+)_(\d+)_([^_]+)_([^_]+)_([a-zA-Z0-9]+)(?:\.([a-zA-Z0-9]+))?$/';
 
         if (!preg_match($pattern, $filename, $matches)) {
             return null;

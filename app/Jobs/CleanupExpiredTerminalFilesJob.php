@@ -67,8 +67,11 @@ class CleanupExpiredTerminalFilesJob implements ShouldQueue
 
             // Clean up empty parent directory
             $parentDir = dirname($this->localPath);
-            if (is_dir($parentDir) && count(scandir($parentDir)) === 2) { // Only . and ..
-                rmdir($parentDir);
+            if (is_dir($parentDir)) {
+                $contents = scandir($parentDir);
+                if ($contents !== false && count($contents) === 2) { // Only . and ..
+                    rmdir($parentDir);
+                }
             }
         } catch (\Throwable $e) {
             Log::error("Failed to cleanup terminal file: {$e->getMessage()}", [
