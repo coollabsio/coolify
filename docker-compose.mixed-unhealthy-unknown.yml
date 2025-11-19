@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8084:80"
+    healthcheck:
+      # This will fail
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9999/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  worker:
+    image: nginx:alpine
+    # No healthcheck - will show as "running (unknown)"
+    # Since one is unhealthy, aggregated status should be "running (unhealthy)"

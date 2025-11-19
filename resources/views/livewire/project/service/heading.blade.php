@@ -29,7 +29,7 @@
         @if ($service->isDeployable)
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <x-services.advanced :service="$service" />
-                @if (str($service->status)->contains('running') || (str($service->status)->startsWith('running:') && !str($service->status)->contains('exited')))
+                @if (str($service->status)->contains('running'))
                     <x-forms.button title="Restart" @click="$wire.dispatch('restartEvent')">
                         <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
