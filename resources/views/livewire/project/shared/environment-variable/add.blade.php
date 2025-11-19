@@ -1,8 +1,16 @@
 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
     <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
     <x-forms.textarea x-show="$wire.is_multiline === true" x-cloak id="value" label="Value" required />
-    <x-forms.input x-show="$wire.is_multiline === false" x-cloak placeholder="production" id="value"
-        x-bind:label="$wire.is_multiline === false && 'Value'" required />
+    <x-forms.env-var-input x-show="$wire.is_multiline === false" x-cloak placeholder="production" id="value"
+        x-bind:label="$wire.is_multiline === false && 'Value'" required
+        :availableVars="$shared ? [] : $this->availableSharedVariables" />
+
+    @if (!$shared)
+        <div x-show="$wire.is_multiline === false" x-cloak class="text-xs text-neutral-500 dark:text-neutral-400 -mt-1">
+            Tip: Type <span class="font-mono dark:text-warning text-coollabs">{{</span> to reference a shared environment
+            variable
+        </div>
+    @endif
 
     @if (!$shared)
         <x-forms.checkbox id="is_buildtime"
