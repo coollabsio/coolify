@@ -269,6 +269,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             // Aggregate status: if any container is running, app is running
             $hasRunning = false;
             $hasUnhealthy = false;
+            $hasUnknown = false;
 
             foreach ($relevantStatuses as $status) {
                 if (str($status)->contains('running')) {
@@ -276,12 +277,21 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     if (str($status)->contains('unhealthy')) {
                         $hasUnhealthy = true;
                     }
+                    if (str($status)->contains('unknown')) {
+                        $hasUnknown = true;
+                    }
                 }
             }
 
             $aggregatedStatus = null;
             if ($hasRunning) {
-                $aggregatedStatus = $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
+                if ($hasUnhealthy) {
+                    $aggregatedStatus = 'running (unhealthy)';
+                } elseif ($hasUnknown) {
+                    $aggregatedStatus = 'running (unknown)';
+                } else {
+                    $aggregatedStatus = 'running (healthy)';
+                }
             } else {
                 // All containers are exited
                 $aggregatedStatus = 'exited (unhealthy)';

@@ -19,7 +19,9 @@ it('ensures ComplexStatusCheck returns excluded status when all containers exclu
         ->toContain('// If all containers are excluded, calculate status from excluded containers')
         ->toContain('// but mark it with :excluded to indicate monitoring is disabled')
         ->toContain('if ($relevantContainerCount === 0) {')
-        ->toContain("return 'running:excluded';")
+        ->toContain("return 'running:unhealthy:excluded';")
+        ->toContain("return 'running:unknown:excluded';")
+        ->toContain("return 'running:healthy:excluded';")
         ->toContain("return 'degraded:excluded';")
         ->toContain("return 'exited:excluded';");
 });
