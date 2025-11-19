@@ -190,9 +190,15 @@ class Service extends BaseModel
             if ($application->exclude_from_status) {
                 continue;
             }
-            $hasNonExcluded = true;
             $status = str($application->status)->before('(')->trim();
             $health = str($application->status)->between('(', ')')->trim();
+
+            // Skip containers with :excluded suffix (they are excluded from health checks)
+            if ($health->contains(':excluded')) {
+                continue;
+            }
+
+            $hasNonExcluded = true;
             if ($complexStatus === 'degraded') {
                 continue;
             }
@@ -206,12 +212,26 @@ class Service extends BaseModel
                 $complexStatus = 'degraded';
             } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
+            } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
+                if ($complexStatus === null) {
+                    $complexStatus = 'starting';
+                }
+            } elseif ($status->startsWith('paused')) {
+                if ($complexStatus === null) {
+                    $complexStatus = 'paused';
+                }
+            } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
+                $complexStatus = 'degraded';
             }
             if ($health->value() === 'healthy') {
                 if ($complexHealth === 'unhealthy') {
                     continue;
                 }
                 $complexHealth = 'healthy';
+            } elseif ($health->value() === 'unknown') {
+                if ($complexHealth !== 'unhealthy') {
+                    $complexHealth = 'unknown';
+                }
             } else {
                 $complexHealth = 'unhealthy';
             }
@@ -220,9 +240,15 @@ class Service extends BaseModel
             if ($database->exclude_from_status) {
                 continue;
             }
-            $hasNonExcluded = true;
             $status = str($database->status)->before('(')->trim();
             $health = str($database->status)->between('(', ')')->trim();
+
+            // Skip containers with :excluded suffix (they are excluded from health checks)
+            if ($health->contains(':excluded')) {
+                continue;
+            }
+
+            $hasNonExcluded = true;
             if ($complexStatus === 'degraded') {
                 continue;
             }
@@ -236,12 +262,26 @@ class Service extends BaseModel
                 $complexStatus = 'degraded';
             } elseif ($status->startsWith('exited')) {
                 $complexStatus = 'exited';
+            } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
+                if ($complexStatus === null) {
+                    $complexStatus = 'starting';
+                }
+            } elseif ($status->startsWith('paused')) {
+                if ($complexStatus === null) {
+                    $complexStatus = 'paused';
+                }
+            } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
+                $complexStatus = 'degraded';
             }
             if ($health->value() === 'healthy') {
                 if ($complexHealth === 'unhealthy') {
                     continue;
                 }
                 $complexHealth = 'healthy';
+            } elseif ($health->value() === 'unknown') {
+                if ($complexHealth !== 'unhealthy') {
+                    $complexHealth = 'unknown';
+                }
             } else {
                 $complexHealth = 'unhealthy';
             }
@@ -257,6 +297,15 @@ class Service extends BaseModel
             foreach ($applications as $application) {
                 $status = str($application->status)->before('(')->trim();
                 $health = str($application->status)->between('(', ')')->trim();
+
+                // Only process containers with :excluded suffix (or truly excluded ones)
+                if (! $health->contains(':excluded') && ! $application->exclude_from_status) {
+                    continue;
+                }
+
+                // Strip :excluded suffix for health comparison
+                $health = str($health)->replace(':excluded', '');
+
                 if ($excludedStatus === 'degraded') {
                     continue;
                 }
@@ -270,12 +319,26 @@ class Service extends BaseModel
                     $excludedStatus = 'degraded';
                 } elseif ($status->startsWith('exited')) {
                     $excludedStatus = 'exited';
+                } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
+                    if ($excludedStatus === null) {
+                        $excludedStatus = 'starting';
+                    }
+                } elseif ($status->startsWith('paused')) {
+                    if ($excludedStatus === null) {
+                        $excludedStatus = 'paused';
+                    }
+                } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
+                    $excludedStatus = 'degraded';
                 }
                 if ($health->value() === 'healthy') {
                     if ($excludedHealth === 'unhealthy') {
                         continue;
                     }
                     $excludedHealth = 'healthy';
+                } elseif ($health->value() === 'unknown') {
+                    if ($excludedHealth !== 'unhealthy') {
+                        $excludedHealth = 'unknown';
+                    }
                 } else {
                     $excludedHealth = 'unhealthy';
                 }
@@ -284,6 +347,15 @@ class Service extends BaseModel
             foreach ($databases as $database) {
                 $status = str($database->status)->before('(')->trim();
                 $health = str($database->status)->between('(', ')')->trim();
+
+                // Only process containers with :excluded suffix (or truly excluded ones)
+                if (! $health->contains(':excluded') && ! $database->exclude_from_status) {
+                    continue;
+                }
+
+                // Strip :excluded suffix for health comparison
+                $health = str($health)->replace(':excluded', '');
+
                 if ($excludedStatus === 'degraded') {
                     continue;
                 }
@@ -297,12 +369,26 @@ class Service extends BaseModel
                     $excludedStatus = 'degraded';
                 } elseif ($status->startsWith('exited')) {
                     $excludedStatus = 'exited';
+                } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
+                    if ($excludedStatus === null) {
+                        $excludedStatus = 'starting';
+                    }
+                } elseif ($status->startsWith('paused')) {
+                    if ($excludedStatus === null) {
+                        $excludedStatus = 'paused';
+                    }
+                } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
+                    $excludedStatus = 'degraded';
                 }
                 if ($health->value() === 'healthy') {
                     if ($excludedHealth === 'unhealthy') {
                         continue;
                     }
                     $excludedHealth = 'healthy';
+                } elseif ($health->value() === 'unknown') {
+                    if ($excludedHealth !== 'unhealthy') {
+                        $excludedHealth = 'unknown';
+                    }
                 } else {
                     $excludedHealth = 'unhealthy';
                 }

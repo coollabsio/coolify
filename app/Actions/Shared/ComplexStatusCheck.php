@@ -84,7 +84,11 @@ class ComplexStatusCheck
         $hasRunning = false;
         $hasRestarting = false;
         $hasUnhealthy = false;
+        $hasUnknown = false;
         $hasExited = false;
+        $hasStarting = false;
+        $hasPaused = false;
+        $hasDead = false;
         $relevantContainerCount = 0;
 
         foreach ($containers as $container) {
@@ -104,12 +108,20 @@ class ComplexStatusCheck
                 $hasUnhealthy = true;
             } elseif ($containerStatus === 'running') {
                 $hasRunning = true;
-                if ($containerHealth && $containerHealth === 'unhealthy') {
+                if ($containerHealth === 'unhealthy') {
                     $hasUnhealthy = true;
+                } elseif ($containerHealth === null) {
+                    $hasUnknown = true;
                 }
             } elseif ($containerStatus === 'exited') {
                 $hasExited = true;
                 $hasUnhealthy = true;
+            } elseif ($containerStatus === 'created' || $containerStatus === 'starting') {
+                $hasStarting = true;
+            } elseif ($containerStatus === 'paused') {
+                $hasPaused = true;
+            } elseif ($containerStatus === 'dead' || $containerStatus === 'removing') {
+                $hasDead = true;
             }
         }
 
@@ -119,7 +131,11 @@ class ComplexStatusCheck
             $excludedHasRunning = false;
             $excludedHasRestarting = false;
             $excludedHasUnhealthy = false;
+            $excludedHasUnknown = false;
             $excludedHasExited = false;
+            $excludedHasStarting = false;
+            $excludedHasPaused = false;
+            $excludedHasDead = false;
 
             foreach ($containers as $container) {
                 $labels = data_get($container, 'Config.Labels', []);
@@ -138,12 +154,20 @@ class ComplexStatusCheck
                     $excludedHasUnhealthy = true;
                 } elseif ($containerStatus === 'running') {
                     $excludedHasRunning = true;
-                    if ($containerHealth && $containerHealth === 'unhealthy') {
+                    if ($containerHealth === 'unhealthy') {
                         $excludedHasUnhealthy = true;
+                    } elseif ($containerHealth === null) {
+                        $excludedHasUnknown = true;
                     }
                 } elseif ($containerStatus === 'exited') {
                     $excludedHasExited = true;
                     $excludedHasUnhealthy = true;
+                } elseif ($containerStatus === 'created' || $containerStatus === 'starting') {
+                    $excludedHasStarting = true;
+                } elseif ($containerStatus === 'paused') {
+                    $excludedHasPaused = true;
+                } elseif ($containerStatus === 'dead' || $containerStatus === 'removing') {
+                    $excludedHasDead = true;
                 }
             }
 
@@ -156,7 +180,25 @@ class ComplexStatusCheck
             }
 
             if ($excludedHasRunning) {
-                return 'running:excluded';
+                if ($excludedHasUnhealthy) {
+                    return 'running:unhealthy:excluded';
+                } elseif ($excludedHasUnknown) {
+                    return 'running:unknown:excluded';
+                } else {
+                    return 'running:healthy:excluded';
+                }
+            }
+
+            if ($excludedHasDead) {
+                return 'degraded:excluded';
+            }
+
+            if ($excludedHasPaused) {
+                return 'paused:excluded';
+            }
+
+            if ($excludedHasStarting) {
+                return 'starting:excluded';
             }
 
             return 'exited:excluded';
@@ -171,7 +213,25 @@ class ComplexStatusCheck
         }
 
         if ($hasRunning) {
-            return $hasUnhealthy ? 'running:unhealthy' : 'running:healthy';
+            if ($hasUnhealthy) {
+                return 'running:unhealthy';
+            } elseif ($hasUnknown) {
+                return 'running:unknown';
+            } else {
+                return 'running:healthy';
+            }
+        }
+
+        if ($hasDead) {
+            return 'degraded:unhealthy';
+        }
+
+        if ($hasPaused) {
+            return 'paused:unknown';
+        }
+
+        if ($hasStarting) {
+            return 'starting:unknown';
         }
 
         return 'exited:unhealthy';

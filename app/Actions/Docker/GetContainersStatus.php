@@ -224,14 +224,40 @@ class GetContainersStatus
             if ($serviceLabelId) {
                 $subType = data_get($labels, 'coolify.service.subType');
                 $subId = data_get($labels, 'coolify.service.subId');
-                $service = $services->where('id', $serviceLabelId)->first();
-                if (! $service) {
+                $parentService = $services->where('id', $serviceLabelId)->first();
+                if (! $parentService) {
                     continue;
                 }
+
+                // Check if this container is excluded from health checks
+                $containerName = data_get($labels, 'com.docker.compose.service');
+                $isExcluded = false;
+                if ($containerName) {
+                    $dockerComposeRaw = data_get($parentService, 'docker_compose_raw');
+                    if ($dockerComposeRaw) {
+                        try {
+                            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+                            $serviceConfig = data_get($dockerCompose, "services.{$containerName}", []);
+                            $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
+                            $restartPolicy = data_get($serviceConfig, 'restart', 'always');
+                            if ($excludeFromHc || $restartPolicy === 'no') {
+                                $isExcluded = true;
+                            }
+                        } catch (\Exception $e) {
+                            // If we can't parse, treat as not excluded
+                        }
+                    }
+                }
+
+                // Append :excluded suffix if container is excluded
+                if ($isExcluded) {
+                    $containerStatus = str_replace(')', ':excluded)', $containerStatus);
+                }
+
                 if ($subType === 'application') {
-                    $service = $service->applications()->where('id', $subId)->first();
+                    $service = $parentService->applications()->where('id', $subId)->first();
                 } else {
-                    $service = $service->databases()->where('id', $subId)->first();
+                    $service = $parentService->databases()->where('id', $subId)->first();
                 }
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
@@ -461,7 +487,11 @@ class GetContainersStatus
         $hasRunning = false;
         $hasRestarting = false;
         $hasUnhealthy = false;
+        $hasUnknown = false;
         $hasExited = false;
+        $hasStarting = false;
+        $hasPaused = false;
+        $hasDead = false;
 
         foreach ($relevantStatuses as $status) {
             if (str($status)->contains('restarting')) {
@@ -471,9 +501,18 @@ class GetContainersStatus
                 if (str($status)->contains('unhealthy')) {
                     $hasUnhealthy = true;
                 }
+                if (str($status)->contains('unknown')) {
+                    $hasUnknown = true;
+                }
             } elseif (str($status)->contains('exited')) {
                 $hasExited = true;
                 $hasUnhealthy = true;
+            } elseif (str($status)->contains('created') || str($status)->contains('starting')) {
+                $hasStarting = true;
+            } elseif (str($status)->contains('paused')) {
+                $hasPaused = true;
+            } elseif (str($status)->contains('dead') || str($status)->contains('removing')) {
+                $hasDead = true;
             }
         }
 
@@ -491,7 +530,25 @@ class GetContainersStatus
         }
 
         if ($hasRunning) {
-            return $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
+            if ($hasUnhealthy) {
+                return 'running (unhealthy)';
+            } elseif ($hasUnknown) {
+                return 'running (unknown)';
+            } else {
+                return 'running (healthy)';
+            }
+        }
+
+        if ($hasDead) {
+            return 'degraded (unhealthy)';
+        }
+
+        if ($hasPaused) {
+            return 'paused (unknown)';
+        }
+
+        if ($hasStarting) {
+            return 'starting (unknown)';
         }
 
         // All containers are exited with no restart count - truly stopped
