@@ -21,6 +21,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Laravel\Horizon\Contracts\Silenced;
 
 class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
@@ -299,6 +300,19 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
+                Log::debug('[STATUS-DEBUG] Sentinel status change', [
+                    'source' => 'PushServerUpdateJob',
+                    'app_id' => $application->id,
+                    'app_name' => $application->name,
+                    'old_status' => $application->status,
+                    'new_status' => $aggregatedStatus,
+                    'container_statuses' => $relevantStatuses->toArray(),
+                    'flags' => [
+                        'hasRunning' => $hasRunning,
+                        'hasUnhealthy' => $hasUnhealthy,
+                        'hasUnknown' => $hasUnknown,
+                    ],
+                ]);
                 $application->status = $aggregatedStatus;
                 $application->save();
             }

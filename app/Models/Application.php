@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -702,6 +703,13 @@ class Application extends BaseModel
                     } else {
                         $status = $value;
                         $health = 'unhealthy';
+                        Log::debug('[STATUS-DEBUG] Status set without health - defaulting to unhealthy', [
+                            'source' => 'Application model accessor',
+                            'app_id' => $this->id,
+                            'app_name' => $this->name,
+                            'raw_value' => $value,
+                            'result' => "$status:$health",
+                        ]);
                     }
 
                     return "$status:$health";
@@ -715,6 +723,13 @@ class Application extends BaseModel
                     } else {
                         $status = $value;
                         $health = 'unhealthy';
+                        Log::debug('[STATUS-DEBUG] Status set without health (multi-server) - defaulting to unhealthy', [
+                            'source' => 'Application model accessor',
+                            'app_id' => $this->id,
+                            'app_name' => $this->name,
+                            'raw_value' => $value,
+                            'result' => "$status:$health",
+                        ]);
                     }
 
                     return "$status:$health";

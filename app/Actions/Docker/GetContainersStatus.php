@@ -11,6 +11,7 @@ use App\Models\ServiceDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -342,9 +343,26 @@ class GetContainersStatus
 
             if ($recentlyRestarted) {
                 // Keep it as degraded if it was recently in a crash loop
+                Log::debug('[STATUS-DEBUG] Recently restarted - keeping degraded', [
+                    'source' => 'GetContainersStatus (not running)',
+                    'app_id' => $application->id,
+                    'app_name' => $application->name,
+                    'old_status' => $application->status,
+                    'new_status' => 'degraded (unhealthy)',
+                    'restart_count' => $application->restart_count,
+                    'last_restart_at' => $application->last_restart_at,
+                ]);
                 $application->update(['status' => 'degraded (unhealthy)']);
             } else {
                 // Reset restart count when application exits completely
+                Log::debug('[STATUS-DEBUG] Application not running', [
+                    'source' => 'GetContainersStatus (not running)',
+                    'app_id' => $application->id,
+                    'app_name' => $application->name,
+                    'old_status' => $application->status,
+                    'new_status' => 'exited',
+                    'containers_exist' => ! $this->containers->isEmpty(),
+                ]);
                 $application->update([
                     'status' => 'exited',
                     'restart_count' => 0,
@@ -437,6 +455,15 @@ class GetContainersStatus
                     if ($aggregatedStatus) {
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $aggregatedStatus) {
+                            Log::debug('[STATUS-DEBUG] SSH status change', [
+                                'source' => 'GetContainersStatus',
+                                'app_id' => $application->id,
+                                'app_name' => $application->name,
+                                'old_status' => $statusFromDb,
+                                'new_status' => $aggregatedStatus,
+                                'container_statuses' => $containerStatuses->toArray(),
+                                'max_restart_count' => $maxRestartCount,
+                            ]);
                             $application->update(['status' => $aggregatedStatus]);
                         } else {
                             $application->update(['last_online_at' => now()]);
