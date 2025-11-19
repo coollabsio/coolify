@@ -241,8 +241,22 @@ class BackupEdit extends Component
         if ($this->backup->backup_method === 'pgbackrest') {
             // Only PostgreSQL databases support pgBackRest
             if ($this->backup->database->type() !== 'standalone-postgresql') {
-                throw new \Exception('pgBackRest is only supported for PostgreSQL databases');
+                throw new Exception('pgBackRest is only supported for PostgreSQL databases');
             }
+        }
+
+        // Validate JSON format for pgbackrestConfig
+        if ($this->backupMethod === 'pgbackrest' && ! empty($this->pgbackrestConfig)) {
+            json_decode($this->pgbackrestConfig);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception('Invalid JSON format in pgBackRest configuration: '.json_last_error_msg());
+            }
+        }
+
+        // Normalize Auto backup type: empty string -> null for enum/validation compatibility
+        if ($this->backupMethod === 'pgbackrest' && $this->backupType === '') {
+            $this->backupType = null;
+            $this->backup->backup_type = null;
         }
 
         $this->validate();

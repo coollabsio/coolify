@@ -46,7 +46,7 @@ class RestoreDatabaseJob implements ShouldBeEncrypted, ShouldQueue
                 'job_id' => $this->jobId,
             ]);
 
-            $server = $this->database->destination->server;
+            $server = $this->database->destination?->server;
             $team = $this->database->team();
 
             if (! $server) {
@@ -118,7 +118,7 @@ class RestoreDatabaseJob implements ShouldBeEncrypted, ShouldQueue
 
             // Try to restart the database even if restore failed
             try {
-                $server = $this->database->destination->server;
+                $server = $this->database->destination?->server;
                 if ($server) {
                     $this->startPostgresContainer($server);
                 }
@@ -145,20 +145,22 @@ class RestoreDatabaseJob implements ShouldBeEncrypted, ShouldQueue
     private function stopPostgresContainer(Server $server): void
     {
         $containerName = $this->database->uuid;
-        $command = "docker stop {$containerName}";
+        // Stop PostgreSQL process inside the running container
+        $command = "docker exec -u postgres {$containerName} pg_ctl -D /var/lib/postgresql/data -m fast stop";
         instant_remote_process([$command], $server);
 
-        // Wait for container to stop
+        // Wait for PostgreSQL to stop
         sleep(5);
     }
 
     private function startPostgresContainer(Server $server): void
     {
         $containerName = $this->database->uuid;
-        $command = "docker start {$containerName}";
+        // Start PostgreSQL process inside the running container
+        $command = "docker exec -u postgres {$containerName} pg_ctl -D /var/lib/postgresql/data -w start";
         instant_remote_process([$command], $server);
 
-        // Wait for container to start
+        // Wait for PostgreSQL to start
         sleep(5);
     }
 

@@ -7048,6 +7048,181 @@
                 ]
             }
         },
+        "\/databases\/{uuid}\/restore": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Restore Database",
+                "description": "Restore a PostgreSQL database from a pgBackRest backup",
+                "operationId": "restore-database",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database to restore.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Restore configuration",
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "backup_label": {
+                                        "description": "Specific backup label to restore from (optional, uses latest if not provided)",
+                                        "type": "string"
+                                    },
+                                    "target_time": {
+                                        "description": "Point-in-time recovery timestamp (ISO 8601 format, requires PITR enabled)",
+                                        "type": "string"
+                                    },
+                                    "delta": {
+                                        "description": "Use delta restore (only restore changed files)",
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "scheduled_backup_uuid": {
+                                        "description": "UUID of the backup configuration to use",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Restore initiated successfully",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Database restore initiated successfully."
+                                        },
+                                        "restore_job_id": {
+                                            "type": "string",
+                                            "example": "123e4567-e89b-12d3-a456-426614174000"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid parameters"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "description": "Database or backup configuration not found"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/backups\/list": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "List Backups",
+                "description": "List all available backups for a pgBackRest-enabled database",
+                "operationId": "list-database-backups",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "scheduled_backup_uuid",
+                        "in": "query",
+                        "description": "UUID of the backup configuration (optional)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of available backups",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "backups": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "label": {
+                                                        "type": "string",
+                                                        "example": "20251119-103000F"
+                                                    },
+                                                    "type": {
+                                                        "type": "string",
+                                                        "example": "full"
+                                                    },
+                                                    "timestamp": {
+                                                        "type": "object"
+                                                    },
+                                                    "database_size": {
+                                                        "type": "integer",
+                                                        "example": 107374182400
+                                                    },
+                                                    "repo_size": {
+                                                        "type": "integer",
+                                                        "example": 21474836480
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "description": "Database or backup configuration not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/security\/keys": {
             "get": {
                 "tags": [

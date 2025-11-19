@@ -40,10 +40,10 @@ class RestoreDatabaseController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'backup_label' => ['type' => 'string', 'description' => 'Specific backup label to restore from (optional, uses latest if not provided)'],
-                        'target_time' => ['type' => 'string', 'description' => 'Point-in-time recovery timestamp (ISO 8601 format, requires PITR enabled)'],
-                        'delta' => ['type' => 'boolean', 'description' => 'Use delta restore (only restore changed files)', 'default' => false],
-                        'scheduled_backup_uuid' => ['type' => 'string', 'description' => 'UUID of the backup configuration to use'],
+                        new OA\Property(property: 'backup_label', type: 'string', description: 'Specific backup label to restore from (optional, uses latest if not provided)'),
+                        new OA\Property(property: 'target_time', type: 'string', description: 'Point-in-time recovery timestamp (ISO 8601 format, requires PITR enabled)'),
+                        new OA\Property(property: 'delta', type: 'boolean', description: 'Use delta restore (only restore changed files)', default: false),
+                        new OA\Property(property: 'scheduled_backup_uuid', type: 'string', description: 'UUID of the backup configuration to use'),
                     ],
                 ),
             )
@@ -166,7 +166,7 @@ class RestoreDatabaseController extends Controller
 
             // Validate timestamp format
             try {
-                $targetTime = new \DateTime($request->target_time);
+                new \DateTime($request->target_time);
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -177,7 +177,7 @@ class RestoreDatabaseController extends Controller
 
         // Dispatch restore job
         $restoreJobId = \Illuminate\Support\Str::uuid()->toString();
-        
+
         try {
             dispatch(new RestoreDatabaseJob(
                 database: $database,
@@ -316,7 +316,11 @@ class RestoreDatabaseController extends Controller
         }
 
         try {
-            $server = $database->destination->server;
+            $server = $database->destination?->server;
+            if (! $server) {
+                return response()->json(['message' => 'Server not found for database.'], 404);
+            }
+
             $pgBackRestService = new \App\Services\PgBackRestService($database, $backupConfig, $server);
             $backups = $pgBackRestService->listBackups();
 

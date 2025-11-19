@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
@@ -54,8 +53,8 @@ class PgBackRestService
 
         $commands = [];
 
-        // Detect OS and install pgBackRest
-        $commands[] = "docker exec {$this->containerName} sh -c 'if command -v apt-get > /dev/null; then apt-get update && apt-get install -y pgbackrest; elif command -v yum > /dev/null; then yum install -y pgbackrest; elif command -v apk > /dev/null; then apk add --no-cache pgbackrest; else echo \"Unsupported OS\"; exit 1; fi'";
+        // Detect OS and install pgBackRest (requires root privileges)
+        $commands[] = "docker exec -u root {$this->containerName} sh -c 'if command -v apt-get > /dev/null; then apt-get update && apt-get install -y pgbackrest; elif command -v yum > /dev/null; then yum install -y pgbackrest; elif command -v apk > /dev/null; then apk add --no-cache pgbackrest; else echo \"Unsupported OS\"; exit 1; fi'";
 
         instant_remote_process($commands, $this->server);
 
@@ -81,7 +80,7 @@ class PgBackRestService
 
         // Compression and encryption
         $config .= "repo1-cipher-type=aes-256-cbc\n";
-        $config .= "repo1-cipher-pass=".$this->generateCipherPassword()."\n";
+        $config .= 'repo1-cipher-pass='.$this->generateCipherPassword()."\n";
         $config .= "compress-type=zst\n";
         $config .= "compress-level=3\n";
 
@@ -121,7 +120,7 @@ class PgBackRestService
         $config .= "repo1-s3-region={$s3->region}\n";
         $config .= "repo1-s3-key={$s3->key}\n";
         $config .= "repo1-s3-key-secret={$s3->secret}\n";
-        $config .= "repo1-path=/pgbackrest/".str($this->database->team()->name)->slug().'-'.$this->database->team()->id.'/'.$this->database->uuid."\n";
+        $config .= 'repo1-path=/pgbackrest/'.str($this->database->team()->name)->slug().'-'.$this->database->team()->id.'/'.$this->database->uuid."\n";
 
         return $config;
     }
@@ -401,27 +400,33 @@ class PgBackRestService
         }
 
         // Find last full backup
-        $lastFull = collect($backups)->where('type', 'full')->sortByDesc('timestamp')->first();
+        $lastFull = collect($backups)
+            ->where('type', 'full')
+            ->sortByDesc(fn ($b) => $b['timestamp']['start'] ?? 0)
+            ->first();
 
         if (! $lastFull) {
             return 'full';
         }
 
         // If last full backup is older than 7 days, do a full backup
-        $lastFullTime = \Carbon\Carbon::parse($lastFull['timestamp']['start']);
+        $lastFullTime = \Carbon\Carbon::createFromTimestamp($lastFull['timestamp']['start']);
         if ($lastFullTime->diffInDays() >= 7) {
             return 'full';
         }
 
         // Find last differential backup
-        $lastDiff = collect($backups)->where('type', 'diff')->sortByDesc('timestamp')->first();
+        $lastDiff = collect($backups)
+            ->where('type', 'diff')
+            ->sortByDesc(fn ($b) => $b['timestamp']['start'] ?? 0)
+            ->first();
 
         if (! $lastDiff) {
             return 'diff';
         }
 
         // If last differential backup is older than 1 day, do a differential backup
-        $lastDiffTime = \Carbon\Carbon::parse($lastDiff['timestamp']['start']);
+        $lastDiffTime = \Carbon\Carbon::createFromTimestamp($lastDiff['timestamp']['start']);
         if ($lastDiffTime->diffInDays() >= 1) {
             return 'diff';
         }
@@ -466,8 +471,8 @@ class PgBackRestService
             $this->configureWalArchiving();
         }
 
-        // Perform initial full backup
-        $this->performBackup('full');
+        // Note: Initial backup will be performed by the backup job
+        // determineBackupType() will return 'full' when no backups exist
 
         Log::info('pgBackRest initialization completed', ['database' => $this->database->uuid]);
     }

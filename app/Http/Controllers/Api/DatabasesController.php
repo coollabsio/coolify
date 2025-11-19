@@ -676,7 +676,25 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = [
+            'save_s3',
+            'enabled',
+            'dump_all',
+            'frequency',
+            'databases_to_backup',
+            'database_backup_retention_amount_locally',
+            'database_backup_retention_days_locally',
+            'database_backup_retention_max_storage_locally',
+            'database_backup_retention_amount_s3',
+            'database_backup_retention_days_s3',
+            'database_backup_retention_max_storage_s3',
+            's3_storage_uuid',
+            // pgBackRest fields
+            'backup_method',
+            'backup_type',
+            'enable_pitr',
+            'pgbackrest_config',
+        ];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -916,7 +934,25 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = [
+            'save_s3',
+            'enabled',
+            'dump_all',
+            'frequency',
+            'databases_to_backup',
+            'database_backup_retention_amount_locally',
+            'database_backup_retention_days_locally',
+            'database_backup_retention_max_storage_locally',
+            'database_backup_retention_amount_s3',
+            'database_backup_retention_days_s3',
+            'database_backup_retention_max_storage_s3',
+            's3_storage_uuid',
+            // pgBackRest fields
+            'backup_method',
+            'backup_type',
+            'enable_pitr',
+            'pgbackrest_config',
+        ];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

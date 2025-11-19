@@ -38,10 +38,10 @@ class RestoreSuccess extends CustomEmailNotification
     {
         $message = "✅ **Database Restore Successful**\n\n";
         $message .= "**Database:** {$this->database->name}\n";
-        $message .= "**UUID:** {$this->database->uuid}\n";
+        $message .= "**UUID:** `{$this->database->uuid}`\n";
 
         if ($this->backupLabel) {
-            $message .= "**Backup Label:** {$this->backupLabel}\n";
+            $message .= "**Backup Label:** `{$this->backupLabel}`\n";
         }
 
         if ($this->targetTime) {
