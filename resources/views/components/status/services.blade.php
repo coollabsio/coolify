@@ -1,13 +1,20 @@
-@if (str($complexStatus)->contains('running'))
-    <x-status.running :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('starting'))
-    <x-status.restarting :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('restarting'))
-    <x-status.restarting :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('degraded'))
-    <x-status.degraded :status="$complexStatus" />
+@php
+    $isExcluded = str($complexStatus)->endsWith(':excluded');
+    $displayStatus = $isExcluded ? str($complexStatus)->beforeLast(':excluded') : $complexStatus;
+@endphp
+@if (str($displayStatus)->contains('running'))
+    <x-status.running :status="$displayStatus" />
+@elseif(str($displayStatus)->contains('starting'))
+    <x-status.restarting :status="$displayStatus" />
+@elseif(str($displayStatus)->contains('restarting'))
+    <x-status.restarting :status="$displayStatus" />
+@elseif(str($displayStatus)->contains('degraded'))
+    <x-status.degraded :status="$displayStatus" />
 @else
-    <x-status.stopped :status="$complexStatus" />
+    <x-status.stopped :status="$displayStatus" />
+@endif
+@if ($isExcluded)
+    <span class="text-xs text-neutral-500 dark:text-neutral-400" title="All containers excluded from health monitoring">(Monitoring Disabled)</span>
 @endif
 @if (!str($complexStatus)->contains('exited') && $showRefreshButton)
     <button wire:loading.remove.delay.shortest wire:target="manualCheckStatus" title="Refresh Status" wire:click='manualCheckStatus'

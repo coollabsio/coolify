@@ -97,14 +97,14 @@ class ComplexStatusCheck
 
             $relevantContainerCount++;
             $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
+            $containerHealth = data_get($container, 'State.Health.Status');
 
             if ($containerStatus === 'restarting') {
                 $hasRestarting = true;
                 $hasUnhealthy = true;
             } elseif ($containerStatus === 'running') {
                 $hasRunning = true;
-                if ($containerHealth === 'unhealthy') {
+                if ($containerHealth && $containerHealth === 'unhealthy') {
                     $hasUnhealthy = true;
                 }
             } elseif ($containerStatus === 'exited') {
@@ -113,8 +113,53 @@ class ComplexStatusCheck
             }
         }
 
+        // If all containers are excluded, calculate status from excluded containers
+        // but mark it with :excluded to indicate monitoring is disabled
         if ($relevantContainerCount === 0) {
-            return 'exited:healthy';
+            $excludedHasRunning = false;
+            $excludedHasRestarting = false;
+            $excludedHasUnhealthy = false;
+            $excludedHasExited = false;
+
+            foreach ($containers as $container) {
+                $labels = data_get($container, 'Config.Labels', []);
+                $serviceName = data_get($labels, 'com.docker.compose.service');
+
+                // Only process excluded containers
+                if (! $serviceName || ! $excludedContainers->contains($serviceName)) {
+                    continue;
+                }
+
+                $containerStatus = data_get($container, 'State.Status');
+                $containerHealth = data_get($container, 'State.Health.Status');
+
+                if ($containerStatus === 'restarting') {
+                    $excludedHasRestarting = true;
+                    $excludedHasUnhealthy = true;
+                } elseif ($containerStatus === 'running') {
+                    $excludedHasRunning = true;
+                    if ($containerHealth && $containerHealth === 'unhealthy') {
+                        $excludedHasUnhealthy = true;
+                    }
+                } elseif ($containerStatus === 'exited') {
+                    $excludedHasExited = true;
+                    $excludedHasUnhealthy = true;
+                }
+            }
+
+            if ($excludedHasRestarting) {
+                return 'degraded:excluded';
+            }
+
+            if ($excludedHasRunning && $excludedHasExited) {
+                return 'degraded:excluded';
+            }
+
+            if ($excludedHasRunning) {
+                return 'running:excluded';
+            }
+
+            return 'exited:excluded';
         }
 
         if ($hasRestarting) {

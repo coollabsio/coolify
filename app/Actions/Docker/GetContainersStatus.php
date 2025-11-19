@@ -98,11 +98,13 @@ class GetContainersStatus
                 $labels = data_get($container, 'Config.Labels');
             }
             $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
+            $containerHealth = data_get($container, 'State.Health.Status');
             if ($containerStatus === 'restarting') {
-                $containerStatus = "restarting ($containerHealth)";
+                $healthSuffix = $containerHealth ?? 'unknown';
+                $containerStatus = "restarting ($healthSuffix)";
             } else {
-                $containerStatus = "$containerStatus ($containerHealth)";
+                $healthSuffix = $containerHealth ?? 'unknown';
+                $containerStatus = "$containerStatus ($healthSuffix)";
             }
             $labels = Arr::undot(format_docker_labels_to_json($labels));
             $applicationId = data_get($labels, 'coolify.applicationId');

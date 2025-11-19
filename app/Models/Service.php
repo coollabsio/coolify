@@ -184,11 +184,13 @@ class Service extends BaseModel
 
         $complexStatus = null;
         $complexHealth = null;
+        $hasNonExcluded = false;
 
         foreach ($applications as $application) {
             if ($application->exclude_from_status) {
                 continue;
             }
+            $hasNonExcluded = true;
             $status = str($application->status)->before('(')->trim();
             $health = str($application->status)->between('(', ')')->trim();
             if ($complexStatus === 'degraded') {
@@ -218,6 +220,7 @@ class Service extends BaseModel
             if ($database->exclude_from_status) {
                 continue;
             }
+            $hasNonExcluded = true;
             $status = str($database->status)->before('(')->trim();
             $health = str($database->status)->between('(', ')')->trim();
             if ($complexStatus === 'degraded') {
@@ -244,9 +247,78 @@ class Service extends BaseModel
             }
         }
 
-        // If all services are excluded from status checks, return a default exited status
-        if ($complexStatus === null && $complexHealth === null) {
-            return 'exited:healthy';
+        // If all services are excluded from status checks, calculate status from excluded containers
+        // but mark it with :excluded to indicate monitoring is disabled
+        if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {
+            $excludedStatus = null;
+            $excludedHealth = null;
+
+            // Calculate status from excluded containers
+            foreach ($applications as $application) {
+                $status = str($application->status)->before('(')->trim();
+                $health = str($application->status)->between('(', ')')->trim();
+                if ($excludedStatus === 'degraded') {
+                    continue;
+                }
+                if ($status->startsWith('running')) {
+                    if ($excludedStatus === 'exited') {
+                        $excludedStatus = 'degraded';
+                    } else {
+                        $excludedStatus = 'running';
+                    }
+                } elseif ($status->startsWith('restarting')) {
+                    $excludedStatus = 'degraded';
+                } elseif ($status->startsWith('exited')) {
+                    $excludedStatus = 'exited';
+                }
+                if ($health->value() === 'healthy') {
+                    if ($excludedHealth === 'unhealthy') {
+                        continue;
+                    }
+                    $excludedHealth = 'healthy';
+                } else {
+                    $excludedHealth = 'unhealthy';
+                }
+            }
+
+            foreach ($databases as $database) {
+                $status = str($database->status)->before('(')->trim();
+                $health = str($database->status)->between('(', ')')->trim();
+                if ($excludedStatus === 'degraded') {
+                    continue;
+                }
+                if ($status->startsWith('running')) {
+                    if ($excludedStatus === 'exited') {
+                        $excludedStatus = 'degraded';
+                    } else {
+                        $excludedStatus = 'running';
+                    }
+                } elseif ($status->startsWith('restarting')) {
+                    $excludedStatus = 'degraded';
+                } elseif ($status->startsWith('exited')) {
+                    $excludedStatus = 'exited';
+                }
+                if ($health->value() === 'healthy') {
+                    if ($excludedHealth === 'unhealthy') {
+                        continue;
+                    }
+                    $excludedHealth = 'healthy';
+                } else {
+                    $excludedHealth = 'unhealthy';
+                }
+            }
+
+            // Return status with :excluded suffix to indicate monitoring is disabled
+            if ($excludedStatus && $excludedHealth) {
+                return "{$excludedStatus}:excluded";
+            }
+
+            // If no status was calculated at all (no containers exist), return unknown
+            if ($excludedStatus === null && $excludedHealth === null) {
+                return 'unknown:excluded';
+            }
+
+            return 'exited:excluded';
         }
 
         return "{$complexStatus}:{$complexHealth}";
