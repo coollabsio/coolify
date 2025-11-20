@@ -114,7 +114,7 @@
                                     $bgColor = $isError ? 'bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100/50 dark:hover:bg-red-800/30' : ($isWarning ? 'bg-yellow-50/50 dark:bg-yellow-900/20 hover:bg-yellow-100/50 dark:hover:bg-yellow-800/30' : ($isDebug ? 'bg-purple-50/50 dark:bg-purple-900/20 hover:bg-purple-100/50 dark:hover:bg-purple-800/30' : 'bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100/50 dark:hover:bg-blue-800/30'));
 
                                     // Check for timestamp at the beginning (ISO 8601 format)
-                                    $timestampPattern = '/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)\s+/';
+                                    $timestampPattern = '/^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)\s+/';
                                     $hasTimestamp = preg_match($timestampPattern, $line, $matches);
                                     $timestamp = $hasTimestamp ? $matches[1] : null;
                                     $logContent = $hasTimestamp ? preg_replace($timestampPattern, '', $line) : $line;
