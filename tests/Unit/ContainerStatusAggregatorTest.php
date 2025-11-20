@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\ContainerStatusAggregator;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->aggregator = new ContainerStatusAggregator;
@@ -459,5 +460,81 @@ describe('state priority enforcement', function () {
         $result = $this->aggregator->aggregateFromStrings($statuses);
 
         expect($result)->toBe('running:unknown');
+    });
+});
+
+describe('maxRestartCount validation', function () {
+    test('negative maxRestartCount is corrected to 0 in aggregateFromStrings', function () {
+        // Mock the Log facade to avoid "facade root not set" error in unit tests
+        Log::shouldReceive('warning')->once();
+
+        $statuses = collect(['exited']);
+
+        // With negative value, should be treated as 0 (no restarts)
+        $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: -5);
+
+        // Should return exited:unhealthy (not degraded) since corrected to 0
+        expect($result)->toBe('exited:unhealthy');
+    });
+
+    test('negative maxRestartCount is corrected to 0 in aggregateFromContainers', function () {
+        // Mock the Log facade to avoid "facade root not set" error in unit tests
+        Log::shouldReceive('warning')->once();
+
+        $containers = collect([
+            [
+                'State' => [
+                    'Status' => 'exited',
+                    'ExitCode' => 1,
+                ],
+            ],
+        ]);
+
+        // With negative value, should be treated as 0 (no restarts)
+        $result = $this->aggregator->aggregateFromContainers($containers, maxRestartCount: -10);
+
+        // Should return exited:unhealthy (not degraded) since corrected to 0
+        expect($result)->toBe('exited:unhealthy');
+    });
+
+    test('zero maxRestartCount works correctly', function () {
+        $statuses = collect(['exited']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 0);
+
+        // Zero is valid default - no crash loop detection
+        expect($result)->toBe('exited:unhealthy');
+    });
+
+    test('positive maxRestartCount works correctly', function () {
+        $statuses = collect(['exited']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 5);
+
+        // Positive value enables crash loop detection
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('crash loop detection still functions after validation', function () {
+        $statuses = collect(['exited']);
+
+        // Test with various positive restart counts
+        expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 1))
+            ->toBe('degraded:unhealthy');
+
+        expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 100))
+            ->toBe('degraded:unhealthy');
+
+        expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 999))
+            ->toBe('degraded:unhealthy');
+    });
+
+    test('default maxRestartCount parameter works', function () {
+        $statuses = collect(['exited']);
+
+        // Call without specifying maxRestartCount (should default to 0)
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('exited:unhealthy');
     });
 });

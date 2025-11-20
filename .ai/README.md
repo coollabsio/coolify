@@ -16,7 +16,7 @@ Essential project information and architecture:
 - **[Technology Stack](core/technology-stack.md)** - All versions, packages, and dependencies (Laravel 12.4.1, PHP 8.4.7, etc.)
 - **[Project Overview](core/project-overview.md)** - What Coolify is and how it works
 - **[Application Architecture](core/application-architecture.md)** - System design and component relationships
-- **[Deployment Architecture](core/deployment-architecture.md)** - How deployments work end-to-end
+- **[Deployment Architecture](core/deployment-architecture.md)** - How deployments work end-to-end, including Coolify Docker Compose extensions (custom fields)
 
 ### 💻 Development
 Day-to-day development practices:
@@ -84,6 +84,13 @@ Documentation about documentation:
 - Livewire 3 best practices
 - Pest testing patterns
 - Laravel conventions
+
+### Docker Compose Extensions
+→ [core/deployment-architecture.md](core/deployment-architecture.md#coolify-docker-compose-extensions)
+- Custom fields: `exclude_from_hc`, `content`, `isDirectory`
+- How to use inline file content
+- Health check exclusion patterns
+- Volume creation control
 
 ### Version Numbers
 → [core/technology-stack.md](core/technology-stack.md)

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Container Status Aggregator Service
@@ -35,6 +36,21 @@ class ContainerStatusAggregator
      */
     public function aggregateFromStrings(Collection $containerStatuses, int $maxRestartCount = 0): string
     {
+        // Validate maxRestartCount parameter
+        if ($maxRestartCount < 0) {
+            Log::warning('Negative maxRestartCount corrected to 0', [
+                'original_value' => $maxRestartCount,
+            ]);
+            $maxRestartCount = 0;
+        }
+
+        if ($maxRestartCount > 1000) {
+            Log::warning('High maxRestartCount detected', [
+                'maxRestartCount' => $maxRestartCount,
+                'containers' => $containerStatuses->count(),
+            ]);
+        }
+
         if ($containerStatuses->isEmpty()) {
             return 'exited:unhealthy';
         }
@@ -96,6 +112,21 @@ class ContainerStatusAggregator
      */
     public function aggregateFromContainers(Collection $containers, int $maxRestartCount = 0): string
     {
+        // Validate maxRestartCount parameter
+        if ($maxRestartCount < 0) {
+            Log::warning('Negative maxRestartCount corrected to 0', [
+                'original_value' => $maxRestartCount,
+            ]);
+            $maxRestartCount = 0;
+        }
+
+        if ($maxRestartCount > 1000) {
+            Log::warning('High maxRestartCount detected', [
+                'maxRestartCount' => $maxRestartCount,
+                'containers' => $containers->count(),
+            ]);
+        }
+
         if ($containers->isEmpty()) {
             return 'exited:unhealthy';
         }

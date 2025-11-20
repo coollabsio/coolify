@@ -1083,6 +1083,44 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     return $docker_compose;
 }
 
+/**
+ * Remove Coolify's custom Docker Compose fields from parsed YAML array
+ *
+ * Coolify extends Docker Compose with custom fields that are processed during
+ * parsing and deployment but must be removed before sending to Docker.
+ *
+ * Custom fields:
+ * - exclude_from_hc (service-level): Exclude service from health check monitoring
+ * - content (volume-level): Auto-create file with specified content during init
+ * - isDirectory / is_directory (volume-level): Mark bind mount as directory
+ *
+ * @param  array  $yamlCompose  Parsed Docker Compose array
+ * @return array Cleaned Docker Compose array with custom fields removed
+ */
+function stripCoolifyCustomFields(array $yamlCompose): array
+{
+    foreach ($yamlCompose['services'] ?? [] as $serviceName => $service) {
+        // Remove service-level custom fields
+        unset($yamlCompose['services'][$serviceName]['exclude_from_hc']);
+
+        // Remove volume-level custom fields (only for long syntax - arrays)
+        if (isset($service['volumes'])) {
+            foreach ($service['volumes'] as $volumeName => $volume) {
+                // Skip if volume is string (short syntax like 'db-data:/var/lib/postgresql/data')
+                if (! is_array($volume)) {
+                    continue;
+                }
+
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['content']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['isDirectory']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['is_directory']);
+            }
+        }
+    }
+
+    return $yamlCompose;
+}
+
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
     $uuid = Str::random(18);
@@ -1092,16 +1130,10 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
             throw new \Exception('Server not found');
         }
         $yaml_compose = Yaml::parse($compose);
-        foreach ($yaml_compose['services'] as $service_name => $service) {
-            if (! isset($service['volumes'])) {
-                continue;
-            }
-            foreach ($service['volumes'] as $volume_name => $volume) {
-                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
-                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
-                }
-            }
-        }
+
+        // Remove Coolify's custom fields before Docker validation
+        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
+
         $base64_compose = base64_encode(Yaml::dump($yaml_compose));
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",

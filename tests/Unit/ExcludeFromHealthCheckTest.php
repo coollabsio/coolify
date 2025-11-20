@@ -104,3 +104,51 @@ it('ensures UI handles excluded status in service heading buttons', function () 
         ->toContain('str($service->status)->contains(\'degraded\')')
         ->toContain('str($service->status)->contains(\'exited\')');
 });
+
+/**
+ * Unit tests for YAML validation in CalculatesExcludedStatus trait
+ */
+it('ensures YAML validation has proper exception handling for parse errors', function () {
+    $traitFile = file_get_contents(__DIR__.'/../../app/Traits/CalculatesExcludedStatus.php');
+
+    // Verify that ParseException is imported and caught separately from generic Exception
+    expect($traitFile)
+        ->toContain('use Symfony\Component\Yaml\Exception\ParseException')
+        ->toContain('use Illuminate\Support\Facades\Log')
+        ->toContain('} catch (ParseException $e) {')
+        ->toContain('} catch (\Exception $e) {');
+});
+
+it('ensures YAML validation logs parse errors with context', function () {
+    $traitFile = file_get_contents(__DIR__.'/../../app/Traits/CalculatesExcludedStatus.php');
+
+    // Verify that parse errors are logged with useful context (error message, line, snippet)
+    expect($traitFile)
+        ->toContain('Log::warning(\'Failed to parse Docker Compose YAML for health check exclusions\'')
+        ->toContain('\'error\' => $e->getMessage()')
+        ->toContain('\'line\' => $e->getParsedLine()')
+        ->toContain('\'snippet\' => $e->getSnippet()');
+});
+
+it('ensures YAML validation logs unexpected errors', function () {
+    $traitFile = file_get_contents(__DIR__.'/../../app/Traits/CalculatesExcludedStatus.php');
+
+    // Verify that unexpected errors are logged with error level
+    expect($traitFile)
+        ->toContain('Log::error(\'Unexpected error parsing Docker Compose YAML\'')
+        ->toContain('\'trace\' => $e->getTraceAsString()');
+});
+
+it('ensures YAML validation checks structure after parsing', function () {
+    $traitFile = file_get_contents(__DIR__.'/../../app/Traits/CalculatesExcludedStatus.php');
+
+    // Verify that parsed result is validated to be an array
+    expect($traitFile)
+        ->toContain('if (! is_array($dockerCompose)) {')
+        ->toContain('Log::warning(\'Docker Compose YAML did not parse to array\'');
+
+    // Verify that services is validated to be an array
+    expect($traitFile)
+        ->toContain('if (! is_array($services)) {')
+        ->toContain('Log::warning(\'Docker Compose services is not an array\'');
+});

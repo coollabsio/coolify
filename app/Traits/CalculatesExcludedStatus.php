@@ -4,6 +4,8 @@ namespace App\Traits;
 
 use App\Services\ContainerStatusAggregator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Yaml\Exception\ParseException;
 
 trait CalculatesExcludedStatus
 {
@@ -111,7 +113,26 @@ trait CalculatesExcludedStatus
 
         try {
             $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+
+            // Validate structure
+            if (! is_array($dockerCompose)) {
+                Log::warning('Docker Compose YAML did not parse to array', [
+                    'yaml_length' => strlen($dockerComposeRaw),
+                    'parsed_type' => gettype($dockerCompose),
+                ]);
+
+                return $excludedContainers;
+            }
+
             $services = data_get($dockerCompose, 'services', []);
+
+            if (! is_array($services)) {
+                Log::warning('Docker Compose services is not an array', [
+                    'services_type' => gettype($services),
+                ]);
+
+                return $excludedContainers;
+            }
 
             foreach ($services as $serviceName => $serviceConfig) {
                 $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
@@ -121,8 +142,23 @@ trait CalculatesExcludedStatus
                     $excludedContainers->push($serviceName);
                 }
             }
+        } catch (ParseException $e) {
+            // Specific YAML parsing errors
+            Log::warning('Failed to parse Docker Compose YAML for health check exclusions', [
+                'error' => $e->getMessage(),
+                'line' => $e->getParsedLine(),
+                'snippet' => $e->getSnippet(),
+            ]);
+
+            return $excludedContainers;
         } catch (\Exception $e) {
-            // If we can't parse, treat all containers as included
+            // Unexpected errors
+            Log::error('Unexpected error parsing Docker Compose YAML', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $excludedContainers;
         }
 
         return $excludedContainers;
