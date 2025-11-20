@@ -162,6 +162,12 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
+            if ($this->publicPort) {
+                $this->validate(['publicPort' => 'nullable|integer']);
+                $this->database->public_port = $this->publicPort;
+                $this->database->save();
+            }
+
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
