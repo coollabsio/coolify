@@ -130,13 +130,9 @@
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
                     </div>
-                    <div class="py-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
-                        the
-                        respective
-                        companies, and use of them does not imply any affiliation or endorsement.<br>Find more services
-                        <a class="dark:text-white underline" target="_blank"
-                            href="https://coolify.io/docs/services/overview">here</a>.
-                    </div>
+                    <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
+                        The respective trademarks mentioned here are owned by the respective companies, and use of them does not imply any affiliation or endorsement.
+                    </x-callout>
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="service in filteredServices" :key="service.name">
