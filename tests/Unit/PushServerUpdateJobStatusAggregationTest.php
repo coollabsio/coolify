@@ -105,3 +105,80 @@ it('preserves unknown status through sentinel updates', function () {
         ->toContain('} elseif ($hasUnknown) {')
         ->toContain('$aggregatedStatus = \'running (unknown)\';');
 });
+
+it('implements service multi-container aggregation', function () {
+    $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
+
+    // Verify service container collection exists
+    expect($jobFile)
+        ->toContain('public Collection $serviceContainerStatuses;')
+        ->toContain('$this->serviceContainerStatuses = collect();');
+
+    // Verify aggregateServiceContainerStatuses method exists
+    expect($jobFile)
+        ->toContain('private function aggregateServiceContainerStatuses()')
+        ->toContain('$this->aggregateServiceContainerStatuses();');
+
+    // Verify service aggregation uses same logic as applications
+    expect($jobFile)
+        ->toContain('$hasUnknown = false;');
+});
+
+it('services use same priority as applications', function () {
+    $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
+
+    // Both aggregation methods should use the same priority logic
+    $applicationAggregation = <<<'PHP'
+                if ($hasUnhealthy) {
+                    $aggregatedStatus = 'running (unhealthy)';
+                } elseif ($hasUnknown) {
+                    $aggregatedStatus = 'running (unknown)';
+                } else {
+                    $aggregatedStatus = 'running (healthy)';
+                }
+PHP;
+
+    // Count occurrences - should appear twice (once for apps, once for services)
+    $occurrences = substr_count($jobFile, $applicationAggregation);
+    expect($occurrences)->toBeGreaterThanOrEqual(2, 'Priority logic should appear for both applications and services');
+});
+
+it('collects service containers before aggregating', function () {
+    $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
+
+    // Verify service containers are collected, not immediately updated
+    expect($jobFile)
+        ->toContain('$key = $serviceId.\':\'.$subType.\':\'.$subId;')
+        ->toContain('$this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);');
+
+    // Verify aggregation happens after collection
+    expect($jobFile)
+        ->toContain('$this->aggregateMultiContainerStatuses();')
+        ->toContain('$this->aggregateServiceContainerStatuses();');
+});
+
+it('defaults to unknown when health_status is missing from Sentinel data', function () {
+    $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
+
+    // Verify we use null coalescing to default to 'unknown', not 'unhealthy'
+    // This is critical for containers without healthcheck defined
+    expect($jobFile)
+        ->toContain('$rawHealthStatus = data_get($container, \'health_status\');')
+        ->toContain('$containerHealth = $rawHealthStatus ?? \'unknown\';')
+        ->not->toContain('data_get($container, \'health_status\', \'unhealthy\')');
+});
+
+it('matches SSH path default health status behavior', function () {
+    $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
+    $getContainersFile = file_get_contents(__DIR__.'/../../app/Actions/Docker/GetContainersStatus.php');
+
+    // Both paths should default to 'unknown' when health status is missing
+    // Sentinel path: health_status field missing -> 'unknown'
+    expect($jobFile)->toContain('?? \'unknown\'');
+
+    // SSH path: State.Health.Status missing -> 'unknown'
+    expect($getContainersFile)->toContain('?? \'unknown\'');
+
+    // Neither should use 'unhealthy' as default for missing health status
+    expect($jobFile)->not->toContain('data_get($container, \'health_status\', \'unhealthy\')');
+});

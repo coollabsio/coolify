@@ -11,7 +11,6 @@ use App\Models\ServiceDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetContainersStatus
@@ -31,6 +30,8 @@ class GetContainersStatus
     protected ?Collection $applicationContainerStatuses;
 
     protected ?Collection $applicationContainerRestartCounts;
+
+    protected ?Collection $serviceContainerStatuses;
 
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
@@ -230,31 +231,22 @@ class GetContainersStatus
                     continue;
                 }
 
-                // Check if this container is excluded from health checks
+                // Store container status for aggregation
+                if (! isset($this->serviceContainerStatuses)) {
+                    $this->serviceContainerStatuses = collect();
+                }
+
+                $key = $serviceLabelId.':'.$subType.':'.$subId;
+                if (! $this->serviceContainerStatuses->has($key)) {
+                    $this->serviceContainerStatuses->put($key, collect());
+                }
+
                 $containerName = data_get($labels, 'com.docker.compose.service');
-                $isExcluded = false;
                 if ($containerName) {
-                    $dockerComposeRaw = data_get($parentService, 'docker_compose_raw');
-                    if ($dockerComposeRaw) {
-                        try {
-                            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
-                            $serviceConfig = data_get($dockerCompose, "services.{$containerName}", []);
-                            $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
-                            $restartPolicy = data_get($serviceConfig, 'restart', 'always');
-                            if ($excludeFromHc || $restartPolicy === 'no') {
-                                $isExcluded = true;
-                            }
-                        } catch (\Exception $e) {
-                            // If we can't parse, treat as not excluded
-                        }
-                    }
+                    $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
                 }
 
-                // Append :excluded suffix if container is excluded
-                if ($isExcluded) {
-                    $containerStatus = str_replace(')', ':excluded)', $containerStatus);
-                }
-
+                // Mark service as found
                 if ($subType === 'application') {
                     $service = $parentService->applications()->where('id', $subId)->first();
                 } else {
@@ -262,12 +254,6 @@ class GetContainersStatus
                 }
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
-                    $statusFromDb = $service->status;
-                    if ($statusFromDb !== $containerStatus) {
-                        $service->update(['status' => $containerStatus]);
-                    } else {
-                        $service->update(['last_online_at' => now()]);
-                    }
                 }
             }
         }
@@ -343,26 +329,9 @@ class GetContainersStatus
 
             if ($recentlyRestarted) {
                 // Keep it as degraded if it was recently in a crash loop
-                Log::debug('[STATUS-DEBUG] Recently restarted - keeping degraded', [
-                    'source' => 'GetContainersStatus (not running)',
-                    'app_id' => $application->id,
-                    'app_name' => $application->name,
-                    'old_status' => $application->status,
-                    'new_status' => 'degraded (unhealthy)',
-                    'restart_count' => $application->restart_count,
-                    'last_restart_at' => $application->last_restart_at,
-                ]);
                 $application->update(['status' => 'degraded (unhealthy)']);
             } else {
                 // Reset restart count when application exits completely
-                Log::debug('[STATUS-DEBUG] Application not running', [
-                    'source' => 'GetContainersStatus (not running)',
-                    'app_id' => $application->id,
-                    'app_name' => $application->name,
-                    'old_status' => $application->status,
-                    'new_status' => 'exited',
-                    'containers_exist' => ! $this->containers->isEmpty(),
-                ]);
                 $application->update([
                     'status' => 'exited',
                     'restart_count' => 0,
@@ -455,15 +424,6 @@ class GetContainersStatus
                     if ($aggregatedStatus) {
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $aggregatedStatus) {
-                            Log::debug('[STATUS-DEBUG] SSH status change', [
-                                'source' => 'GetContainersStatus',
-                                'app_id' => $application->id,
-                                'app_name' => $application->name,
-                                'old_status' => $statusFromDb,
-                                'new_status' => $aggregatedStatus,
-                                'container_statuses' => $containerStatuses->toArray(),
-                                'max_restart_count' => $maxRestartCount,
-                            ]);
                             $application->update(['status' => $aggregatedStatus]);
                         } else {
                             $application->update(['last_online_at' => now()]);
@@ -472,6 +432,9 @@ class GetContainersStatus
                 });
             }
         }
+
+        // Aggregate multi-container service statuses
+        $this->aggregateServiceContainerStatuses($services);
 
         ServiceChecked::dispatch($this->server->team->id);
     }
@@ -580,5 +543,134 @@ class GetContainersStatus
 
         // All containers are exited with no restart count - truly stopped
         return 'exited (unhealthy)';
+    }
+
+    private function aggregateServiceContainerStatuses($services)
+    {
+        if (! isset($this->serviceContainerStatuses) || $this->serviceContainerStatuses->isEmpty()) {
+            return;
+        }
+
+        foreach ($this->serviceContainerStatuses as $key => $containerStatuses) {
+            // Parse key: serviceId:subType:subId
+            [$serviceId, $subType, $subId] = explode(':', $key);
+
+            $service = $services->where('id', $serviceId)->first();
+            if (! $service) {
+                continue;
+            }
+
+            // Get the service sub-resource (ServiceApplication or ServiceDatabase)
+            $subResource = null;
+            if ($subType === 'application') {
+                $subResource = $service->applications()->where('id', $subId)->first();
+            } elseif ($subType === 'database') {
+                $subResource = $service->databases()->where('id', $subId)->first();
+            }
+
+            if (! $subResource) {
+                continue;
+            }
+
+            // Parse docker compose from service to check for excluded containers
+            $dockerComposeRaw = data_get($service, 'docker_compose_raw');
+            $excludedContainers = collect();
+
+            if ($dockerComposeRaw) {
+                try {
+                    $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+                    $servicesInCompose = data_get($dockerCompose, 'services', []);
+
+                    foreach ($servicesInCompose as $serviceName => $serviceConfig) {
+                        // Check if container should be excluded
+                        $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
+                        $restartPolicy = data_get($serviceConfig, 'restart', 'always');
+
+                        if ($excludeFromHc || $restartPolicy === 'no') {
+                            $excludedContainers->push($serviceName);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // If we can't parse, treat all containers as included
+                }
+            }
+
+            // Filter out excluded containers
+            $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
+                return ! $excludedContainers->contains($containerName);
+            });
+
+            // If all containers are excluded, don't update status
+            if ($relevantStatuses->isEmpty()) {
+                continue;
+            }
+
+            // Aggregate status using same logic as applications
+            $hasRunning = false;
+            $hasRestarting = false;
+            $hasUnhealthy = false;
+            $hasUnknown = false;
+            $hasExited = false;
+            $hasStarting = false;
+            $hasPaused = false;
+            $hasDead = false;
+
+            foreach ($relevantStatuses as $status) {
+                if (str($status)->contains('restarting')) {
+                    $hasRestarting = true;
+                } elseif (str($status)->contains('running')) {
+                    $hasRunning = true;
+                    if (str($status)->contains('unhealthy')) {
+                        $hasUnhealthy = true;
+                    }
+                    if (str($status)->contains('unknown')) {
+                        $hasUnknown = true;
+                    }
+                } elseif (str($status)->contains('exited')) {
+                    $hasExited = true;
+                    $hasUnhealthy = true;
+                } elseif (str($status)->contains('created') || str($status)->contains('starting')) {
+                    $hasStarting = true;
+                } elseif (str($status)->contains('paused')) {
+                    $hasPaused = true;
+                } elseif (str($status)->contains('dead') || str($status)->contains('removing')) {
+                    $hasDead = true;
+                }
+            }
+
+            $aggregatedStatus = null;
+            if ($hasRestarting) {
+                $aggregatedStatus = 'degraded (unhealthy)';
+            } elseif ($hasRunning && $hasExited) {
+                $aggregatedStatus = 'degraded (unhealthy)';
+            } elseif ($hasRunning) {
+                if ($hasUnhealthy) {
+                    $aggregatedStatus = 'running (unhealthy)';
+                } elseif ($hasUnknown) {
+                    $aggregatedStatus = 'running (unknown)';
+                } else {
+                    $aggregatedStatus = 'running (healthy)';
+                }
+            } elseif ($hasDead) {
+                $aggregatedStatus = 'degraded (unhealthy)';
+            } elseif ($hasPaused) {
+                $aggregatedStatus = 'paused (unknown)';
+            } elseif ($hasStarting) {
+                $aggregatedStatus = 'starting (unknown)';
+            } else {
+                // All containers are exited
+                $aggregatedStatus = 'exited (unhealthy)';
+            }
+
+            // Update service sub-resource status with aggregated result
+            if ($aggregatedStatus) {
+                $statusFromDb = $subResource->status;
+                if ($statusFromDb !== $aggregatedStatus) {
+                    $subResource->update(['status' => $aggregatedStatus]);
+                } else {
+                    $subResource->update(['last_online_at' => now()]);
+                }
+            }
+        }
     }
 }
