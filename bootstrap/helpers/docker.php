@@ -332,16 +332,24 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
 
     foreach ($domains as $loop => $domain) {
+        // Ensure domain has a scheme for proper parsing
+        if (!str_contains($domain, '://')) {
+            $domain = 'https://' . $domain;
+        }
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
-        $host_without_www = str($host)->replace('www.', '');
+        // Normalize path for consistent usage across labels (empty string => no path)
+        if ($path === '/' || $path === '') {
+            $normalizedPath = '';
+        } else {
+            $normalizedPath = str_starts_with($path, '/') ? $path : '/' . $path;
+        }
         $schema = $url->getScheme();
         $port = $url->getPort();
-        $handle = 'handle_path';
-        if (! $is_stripprefix_enabled) {
-            $handle = 'handle';
-        }
+        // Use normalizedPath when building rules and applying middlewares
+        // (buildTraefikRule will also normalize, but pass normalizedPath for consistency)
+        $rulePath = $normalizedPath;
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
         }
@@ -373,6 +381,36 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
 
     return $labels->sort();
+}
+
+function buildTraefikRule(?string $host, ?string $path): string
+{
+    $host = (string) ($host ?? '');
+    $path = (string) ($path ?? '');
+
+    // Normalize path: treat empty or "/" as no path
+    if ($path === '/' || $path === '') {
+        $path = '';
+    } else {
+        if (!str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+    }
+
+    $parts = [];
+    if ($host !== '') {
+        $parts[] = "Host(`{$host}`)";
+    }
+    if ($path !== '') {
+        $parts[] = "PathPrefix(`{$path}`)";
+    }
+
+    // If nothing valid was parsed, fallback to a catch-all path prefix
+    if (empty($parts)) {
+        return "PathPrefix(`/`)";
+    }
+
+    return implode(' && ', $parts);
 }
 
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
@@ -426,11 +464,24 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $uuid = new Cuid2;
             }
 
+            // Ensure domain has a scheme for proper parsing
+            if (!str_contains($domain, '://')) {
+                $domain = 'https://' . $domain;
+            }
             $url = Url::fromString($domain);
             $host = $url->getHost();
             $path = $url->getPath();
+            // Normalize path for consistent usage across labels (empty string => no path)
+            if ($path === '/' || $path === '') {
+                $normalizedPath = '';
+            } else {
+                $normalizedPath = str_starts_with($path, '/') ? $path : '/' . $path;
+            }
             $schema = $url->getScheme();
             $port = $url->getPort();
+            // Use normalizedPath when building rules and applying middlewares
+            // (buildTraefikRule will also normalize, but pass normalizedPath for consistency)
+            $rulePath = $normalizedPath;
             if (is_null($port) && ! is_null($onlyPort)) {
                 $port = $onlyPort;
             }
@@ -441,10 +492,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $https_label = "https-{$loop}-{$uuid}-{$service_name}";
             }
             if (str($image)->contains('ghost')) {
-                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
+                $ghostPrefix = $rulePath ?: '/';
+                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$ghostPrefix}/(.*)");
                 $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.replacement=/$1");
                 $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.handler=rewrite");
-                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.regexp=^{$path}/(.*)");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.regexp=^{$ghostPrefix}/(.*)");
                 $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.replacement=/$1");
             }
 
@@ -462,17 +514,18 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             ];
             if ($schema === 'https') {
                 // Set labels for https
-                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $rule = buildTraefikRule($host, $rulePath);
+                $labels->push("traefik.http.routers.{$https_label}.rule={$rule}");
                 $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
-                if ($path !== '/') {
+                if ($rulePath !== '') {
                     // Middleware handling
                     $middlewares = collect([]);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
-                        $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+                        $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$rulePath}");
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
@@ -530,7 +583,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
 
                 // Set labels for http (redirect to https)
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $rule = buildTraefikRule($host, $rulePath);
+                $labels->push("traefik.http.routers.{$http_label}.rule={$rule}");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
@@ -541,16 +595,17 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
             } else {
                 // Set labels for http
-                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $rule = buildTraefikRule($host, $rulePath);
+                $labels->push("traefik.http.routers.{$http_label}.rule={$rule}");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
-                if ($path !== '/') {
+                if ($rulePath !== '') {
                     $middlewares = collect([]);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
-                        $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+                        $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$rulePath}");
                         $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
