@@ -1,18 +1,18 @@
 <div x-data x-init="$wire.loadServers">
-    <div class="flex flex-col gap-4 lg:flex-row ">
-        <h1>New Resource</h1>
-        <div class="w-full pb-4 lg:w-96 lg:pb-0">
-            <x-forms.select wire:model.live="selectedEnvironment">
-                @foreach ($environments as $environment)
-                    <option value="{{ $environment->name }}">Environment: {{ $environment->name }}</option>
-                @endforeach
-            </x-forms.select>
-        </div>
-    </div>
-    <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
     <div x-data="searchResources()">
         @if ($current_step === 'type')
-            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-10 py-2 bg-white/95 dark:bg-base/95 backdrop-blur-sm">
+            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-0 py-4 backdrop-blur-sm border-b border-neutral-200 dark:border-coolgray-400">
+                <div class="flex flex-col gap-4 lg:flex-row mb-4">
+                    <h1>New Resource</h1>
+                    <div class="w-full lg:w-96">
+                        <x-forms.select wire:model.live="selectedEnvironment">
+                            @foreach ($environments as $environment)
+                                <option value="{{ $environment->name }}">Environment: {{ $environment->name }}</option>
+                            @endforeach
+                        </x-forms.select>
+                    </div>
+                </div>
+                <div class="mb-4">Deploy resources, like Applications, Databases, Services...</div>
                 <div class="flex gap-2 items-start">
                     <input autocomplete="off" x-ref="searchInput" class="input-sticky flex-1"
                         :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
