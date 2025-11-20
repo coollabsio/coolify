@@ -356,6 +356,8 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if (is_null($port) && $predefinedPort) {
             $port = $predefinedPort;
         }
+        $handle = "handle_path";
+        $host_without_www = str($host)->replaceFirst('www.', '');
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
