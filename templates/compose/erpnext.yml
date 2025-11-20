@@ -1,0 +1,73 @@
+# documentation: https://docs.erpnext.com/
+# slogan: ERPNext is the world's best free and open source ERP.
+# tags: business, apps, CRM, eCommerce, accounting, inventory, point of sale, project management, open-source
+# logo: svgs/erpnext.svg
+# port: 8080
+
+services:
+  app:
+    image: 'ibrahim317/single-site-erpnext:latest'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - 'env:/home/frappe/frappe-bench/env'
+      - 'sites:/home/frappe/frappe-bench/sites'
+      - 'logs:/home/frappe/frappe-bench/logs'
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - SERVICE_URL_APP_8080
+      - SITE_NAME=${SERVICE_FQDN_APP}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_CREATESITE}
+      - DB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+      - 'REDIS_CACHE=redis:6379'
+      - 'REDIS_QUEUE=redis:6379'
+      - SOCKETIO_PORT=9000
+      - RUN_CONFIGURE=${RUN_CONFIGURE:-1}
+      - RUN_CREATE_SITE=${RUN_CREATE_SITE:-1}
+      - RUN_MIGRATE=${RUN_MIGRATE:-1}
+      - 'BACKEND=localhost:8000'
+      - 'SOCKETIO=localhost:9000'
+      - UPSTREAM_REAL_IP_ADDRESS=localhost
+      - UPSTREAM_REAL_IP_HEADER=X-Forwarded-For
+      - UPSTREAM_REAL_IP_RECURSIVE=off
+      - PROXY_READ_TIMEOUT=120
+      - CLIENT_MAX_BODY_SIZE=50m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -f -H "Host: ${SERVICE_FQDN_APP}" http://localhost:8080/api/v2/method/ping || exit 1'
+      interval: 10s
+      timeout: 60s
+      retries: 90
+      start_period: 15m
+  db:
+    image: 'mariadb:10.6'
+    healthcheck:
+      test: 'mysqladmin ping -h localhost --password=$$MARIADB_ROOT_PASSWORD'
+      interval: 1s
+      retries: 20
+    command:
+      - '--character-set-server=utf8mb4'
+      - '--collation-server=utf8mb4_unicode_ci'
+      - '--skip-character-set-client-handshake'
+      - '--skip-innodb-read-only-compressed'
+    environment:
+      MARIADB_ROOT_PASSWORD: '${SERVICE_PASSWORD_MARIADBROOT}'
+    volumes:
+      - 'db-data:/var/lib/mysql'
+  redis:
+    image: 'redis:6.2-alpine'
+    volumes:
+      - 'redis-data:/data'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
