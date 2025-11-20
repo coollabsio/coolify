@@ -102,9 +102,41 @@
                     </div>
                 </div>
                 @if ($outputs)
-                    <pre id="logs" class="font-mono whitespace-pre-wrap break-all max-w-full">{{ $outputs }}</pre>
+                    <div id="logs" class="font-mono text-sm">
+                        @foreach(explode("\n", trim($outputs)) as $line)
+                            @if(!empty(trim($line)))
+                                @php
+                                    $lowerLine = strtolower($line);
+                                    $isError = str_contains($lowerLine, 'error') || str_contains($lowerLine, 'err') || str_contains($lowerLine, 'failed') || str_contains($lowerLine, 'exception');
+                                    $isWarning = str_contains($lowerLine, 'warn') || str_contains($lowerLine, 'warning') || str_contains($lowerLine, 'wrn');
+                                    $isDebug = str_contains($lowerLine, 'debug') || str_contains($lowerLine, 'dbg') || str_contains($lowerLine, 'trace');
+                                    $barColor = $isError ? 'bg-red-500 dark:bg-red-400' : ($isWarning ? 'bg-yellow-500 dark:bg-yellow-400' : ($isDebug ? 'bg-purple-500 dark:bg-purple-400' : 'bg-blue-500 dark:bg-blue-400'));
+                                    $bgColor = $isError ? 'bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100/50 dark:hover:bg-red-800/30' : ($isWarning ? 'bg-yellow-50/50 dark:bg-yellow-900/20 hover:bg-yellow-100/50 dark:hover:bg-yellow-800/30' : ($isDebug ? 'bg-purple-50/50 dark:bg-purple-900/20 hover:bg-purple-100/50 dark:hover:bg-purple-800/30' : 'bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100/50 dark:hover:bg-blue-800/30'));
+
+                                    // Check for timestamp at the beginning (ISO 8601 format)
+                                    $timestampPattern = '/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)\s+/';
+                                    $hasTimestamp = preg_match($timestampPattern, $line, $matches);
+                                    $timestamp = $hasTimestamp ? $matches[1] : null;
+                                    $logContent = $hasTimestamp ? preg_replace($timestampPattern, '', $line) : $line;
+                                @endphp
+                                <div class="flex items-start gap-2 py-1 px-2 rounded-sm">
+                                    <div class="w-1 {{ $barColor }} rounded-full flex-shrink-0 self-stretch"></div>
+                                    <div class="flex-1 {{ $bgColor }} py-1 px-2 -mx-2 rounded-sm">
+                                        @if($hasTimestamp)
+                                            <span class="text-xs text-gray-500 dark:text-gray-400 font-mono mr-2">{{ $timestamp }}</span>
+                                            <span class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
+                                        @else
+                                            <span class="whitespace-pre-wrap break-all">{{ $line }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
                 @else
-                    <pre id="logs" class="font-mono whitespace-pre-wrap break-all max-w-full">Refresh to get the logs...</pre>
+                    <div id="logs" class="font-mono text-sm py-4 px-2 text-gray-500 dark:text-gray-400">
+                        Refresh to get the logs...
+                    </div>
                 @endif
             </div>
         </div>
