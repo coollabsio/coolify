@@ -49,7 +49,7 @@
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+    @apply text-black border-2 border-coollabs dark:border-yellow-400 dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-yellow-400;
 }
 
 /* Focus */
