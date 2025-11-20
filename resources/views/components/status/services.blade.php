@@ -1,20 +1,37 @@
 @php
+    // Transform colon format to human-readable format for UI display
+    // running:healthy → Running (healthy)
+    // running:unhealthy:excluded → Running (unhealthy, excluded)
+    // exited:excluded → Exited (excluded)
     $isExcluded = str($complexStatus)->endsWith(':excluded');
-    $displayStatus = $isExcluded ? str($complexStatus)->beforeLast(':excluded') : $complexStatus;
+    $parts = explode(':', $complexStatus);
+
+    if ($isExcluded) {
+        if (count($parts) === 3) {
+            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+            $displayStatus = str($parts[0])->headline() . ' (' . $parts[1] . ', excluded)';
+        } else {
+            // No health status: exited:excluded → Exited (excluded)
+            $displayStatus = str($parts[0])->headline() . ' (excluded)';
+        }
+    } elseif (count($parts) >= 2 && !str($complexStatus)->startsWith('Proxy')) {
+        // Regular colon format: running:healthy → Running (healthy)
+        $displayStatus = str($parts[0])->headline() . ' (' . $parts[1] . ')';
+    } else {
+        // No transformation needed (simple status or already in parentheses format)
+        $displayStatus = str($complexStatus)->headline();
+    }
 @endphp
-@if (str($displayStatus)->contains('running'))
+@if (str($displayStatus)->lower()->contains('running'))
     <x-status.running :status="$displayStatus" />
-@elseif(str($displayStatus)->contains('starting'))
+@elseif(str($displayStatus)->lower()->contains('starting'))
     <x-status.restarting :status="$displayStatus" />
-@elseif(str($displayStatus)->contains('restarting'))
+@elseif(str($displayStatus)->lower()->contains('restarting'))
     <x-status.restarting :status="$displayStatus" />
-@elseif(str($displayStatus)->contains('degraded'))
+@elseif(str($displayStatus)->lower()->contains('degraded'))
     <x-status.degraded :status="$displayStatus" />
 @else
     <x-status.stopped :status="$displayStatus" />
-@endif
-@if ($isExcluded)
-    <span class="text-xs text-neutral-500 dark:text-neutral-400" title="All containers excluded from health monitoring">(Monitoring Disabled)</span>
 @endif
 @if (!str($complexStatus)->contains('exited') && $showRefreshButton)
     <button wire:loading.remove.delay.shortest wire:target="manualCheckStatus" title="Refresh Status" wire:click='manualCheckStatus'

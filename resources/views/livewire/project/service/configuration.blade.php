@@ -90,7 +90,31 @@
                                             @endcan
                                         </span>
                                     @endif
-                                    <div class="pt-2 text-xs">{{ $application->status }}</div>
+                                    @php
+                                        // Transform colon format to human-readable format
+                                        // running:healthy → Running (healthy)
+                                        // running:unhealthy:excluded → Running (unhealthy, excluded)
+                                        $appStatus = $application->status;
+                                        $isExcluded = str($appStatus)->endsWith(':excluded');
+                                        $parts = explode(':', $appStatus);
+
+                                        if ($isExcluded) {
+                                            if (count($parts) === 3) {
+                                                // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+                                                $appStatus = str($parts[0])->headline() . ' (' . $parts[1] . ', excluded)';
+                                            } else {
+                                                // No health status: exited:excluded → Exited (excluded)
+                                                $appStatus = str($parts[0])->headline() . ' (excluded)';
+                                            }
+                                        } elseif (count($parts) >= 2 && !str($appStatus)->startsWith('Proxy')) {
+                                            // Regular colon format: running:healthy → Running (healthy)
+                                            $appStatus = str($parts[0])->headline() . ' (' . $parts[1] . ')';
+                                        } else {
+                                            // Simple status or already in parentheses format
+                                            $appStatus = str($appStatus)->headline();
+                                        }
+                                    @endphp
+                                    <div class="pt-2 text-xs">{{ $appStatus }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
@@ -139,7 +163,31 @@
                                     @if ($database->description)
                                         <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
                                     @endif
-                                    <div class="text-xs">{{ $database->status }}</div>
+                                    @php
+                                        // Transform colon format to human-readable format
+                                        // running:healthy → Running (healthy)
+                                        // running:unhealthy:excluded → Running (unhealthy, excluded)
+                                        $dbStatus = $database->status;
+                                        $isExcluded = str($dbStatus)->endsWith(':excluded');
+                                        $parts = explode(':', $dbStatus);
+
+                                        if ($isExcluded) {
+                                            if (count($parts) === 3) {
+                                                // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+                                                $dbStatus = str($parts[0])->headline() . ' (' . $parts[1] . ', excluded)';
+                                            } else {
+                                                // No health status: exited:excluded → Exited (excluded)
+                                                $dbStatus = str($parts[0])->headline() . ' (excluded)';
+                                            }
+                                        } elseif (count($parts) >= 2 && !str($dbStatus)->startsWith('Proxy')) {
+                                            // Regular colon format: running:healthy → Running (healthy)
+                                            $dbStatus = str($parts[0])->headline() . ' (' . $parts[1] . ')';
+                                        } else {
+                                            // Simple status or already in parentheses format
+                                            $dbStatus = str($dbStatus)->headline();
+                                        }
+                                    @endphp
+                                    <div class="text-xs">{{ $dbStatus }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     @if ($database->isBackupSolutionAvailable() || $database->is_migrated)

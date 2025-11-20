@@ -14,7 +14,6 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Middleware\ApiAllowed;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -159,7 +158,6 @@ Route::group([
     'prefix' => 'v1',
 ], function () {
     Route::post('/sentinel/push', function () {
-        Log::info('Received Sentinel push request', ['ip' => request()->ip(), 'user_agent' => request()->header('User-Agent')]);
         $token = request()->header('Authorization');
         if (! $token) {
             return response()->json(['message' => 'Unauthorized'], 401);

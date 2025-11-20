@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -670,21 +669,23 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! $this->relationLoaded('additional_servers') || $this->additional_servers->count() === 0) {
-                    return $this->destination?->server?->isFunctional() ?? false;
+                // Check main server infrastructure health
+                $main_server_functional = $this->destination?->server?->isFunctional() ?? false;
+
+                if (! $main_server_functional) {
+                    return false;
                 }
 
-                $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                $main_server_status = $this->destination?->server?->isFunctional() ?? false;
-
-                foreach ($additional_servers_status as $status) {
-                    $server_status = str($status)->before(':')->value();
-                    if ($server_status !== 'running') {
-                        return false;
+                // Check additional servers infrastructure health (not container status!)
+                if ($this->relationLoaded('additional_servers') && $this->additional_servers->count() > 0) {
+                    foreach ($this->additional_servers as $server) {
+                        if (! $server->isFunctional()) {
+                            return false;  // Real server infrastructure problem
+                        }
                     }
                 }
 
-                return $main_server_status;
+                return true;
             }
         );
     }
@@ -703,13 +704,6 @@ class Application extends BaseModel
                     } else {
                         $status = $value;
                         $health = 'unhealthy';
-                        Log::debug('[STATUS-DEBUG] Status set without health - defaulting to unhealthy', [
-                            'source' => 'Application model accessor',
-                            'app_id' => $this->id,
-                            'app_name' => $this->name,
-                            'raw_value' => $value,
-                            'result' => "$status:$health",
-                        ]);
                     }
 
                     return "$status:$health";
@@ -723,13 +717,6 @@ class Application extends BaseModel
                     } else {
                         $status = $value;
                         $health = 'unhealthy';
-                        Log::debug('[STATUS-DEBUG] Status set without health (multi-server) - defaulting to unhealthy', [
-                            'source' => 'Application model accessor',
-                            'app_id' => $this->id,
-                            'app_name' => $this->name,
-                            'raw_value' => $value,
-                            'result' => "$status:$health",
-                        ]);
                     }
 
                     return "$status:$health";

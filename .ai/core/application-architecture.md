@@ -514,7 +514,7 @@ All status aggregation locations **MUST** follow the same priority:
 
 ### **Excluded Containers**
 
-When containers have `exclude_from_hc: true` flag:
+When containers have `exclude_from_hc: true` flag or `restart: no`:
 
 **Behavior**:
 - Status is still calculated from container state
@@ -525,47 +525,80 @@ When containers have `exclude_from_hc: true` flag:
 **Format**: `{actual-status}:excluded`
 **Examples**: `running:unknown:excluded`, `degraded:excluded`, `exited:excluded`
 
+**All-Excluded Scenario**:
+When ALL containers are excluded from health checks:
+- All three status update paths (PushServerUpdateJob, GetContainersStatus, ComplexStatusCheck) **MUST** calculate status from excluded containers
+- Status is returned with `:excluded` suffix (e.g., `running:healthy:excluded`)
+- **NEVER** skip status updates - always calculate from excluded containers
+- This ensures consistent status regardless of which update mechanism runs
+- Shared logic is in `app/Traits/CalculatesExcludedStatus.php`
+
 ### **Important Notes for Developers**
 
-⚠️ **CRITICAL**: When modifying container status logic:
+✅ **Container Status Aggregation Service**:
 
-1. **Update ALL four locations**:
-   - `GetContainersStatus.php` (SSH-based)
-   - `PushServerUpdateJob.php` (Sentinel-based)
-   - `ComplexStatusCheck.php` (multi-server)
-   - `Service.php` (service-level)
+The container status aggregation logic is centralized in `App\Services\ContainerStatusAggregator`.
 
-2. **Maintain consistent priority**:
-   - unhealthy > unknown > healthy
-   - Apply same logic across all paths
+**Status Format Standard**:
+- **Backend/Storage**: Colon format (`running:healthy`, `degraded:unhealthy`)
+- **UI/Display**: Transform to human format (`Running (Healthy)`, `Degraded (Unhealthy)`)
+
+1. **Using the ContainerStatusAggregator Service**:
+   - Import `App\Services\ContainerStatusAggregator` in any class needing status aggregation
+   - Two methods available:
+     - `aggregateFromStrings(Collection $statusStrings, int $maxRestartCount = 0)` - For pre-formatted status strings
+     - `aggregateFromContainers(Collection $containers, int $maxRestartCount = 0)` - For raw Docker container objects
+   - Returns colon format: `running:healthy`, `degraded:unhealthy`, etc.
+   - Automatically handles crash loop detection via `$maxRestartCount` parameter
+
+2. **State Machine Priority** (handled by service):
+   - Restarting → `degraded:unhealthy` (highest priority)
+   - Crash loop (exited with restarts) → `degraded:unhealthy`
+   - Mixed state (running + exited) → `degraded:unhealthy`
+   - Running → `running:unhealthy` / `running:unknown` / `running:healthy`
+   - Dead/Removing → `degraded:unhealthy`
+   - Paused → `paused:unknown`
+   - Starting/Created → `starting:unknown`
+   - Exited → `exited:unhealthy` (lowest priority)
 
 3. **Test both update paths**:
-   - Run unit tests: `./vendor/bin/pest tests/Unit/`
+   - Run unit tests: `./vendor/bin/pest tests/Unit/ContainerStatusAggregatorTest.php`
+   - Run integration tests: `./vendor/bin/pest tests/Unit/`
    - Test SSH updates (manual refresh)
    - Test Sentinel updates (wait 30 seconds)
 
-4. **Handle edge cases**:
-   - All containers excluded (`exclude_from_hc: true`)
-   - Mixed excluded/non-excluded containers
-   - Unknown health states
-   - Container crash loops (restart count)
+4. **Handle excluded containers**:
+   - All containers excluded (`exclude_from_hc: true`) - Use `CalculatesExcludedStatus` trait
+   - Mixed excluded/non-excluded containers - Filter then use `ContainerStatusAggregator`
+   - Containers with `restart: no` - Treated same as `exclude_from_hc: true`
+
+5. **Use shared trait for excluded containers**:
+   - Import `App\Traits\CalculatesExcludedStatus` in status calculation classes
+   - Use `getExcludedContainersFromDockerCompose()` to parse exclusions
+   - Use `calculateExcludedStatus()` for full Docker inspect objects (ComplexStatusCheck)
+   - Use `calculateExcludedStatusFromStrings()` for status strings (PushServerUpdateJob, GetContainersStatus)
 
 ### **Related Tests**
 
-- **[tests/Unit/ContainerHealthStatusTest.php](mdc:tests/Unit/ContainerHealthStatusTest.php)**: Health status aggregation
+- **[tests/Unit/ContainerStatusAggregatorTest.php](mdc:tests/Unit/ContainerStatusAggregatorTest.php)**: Core state machine logic (42 comprehensive tests)
+- **[tests/Unit/ContainerHealthStatusTest.php](mdc:tests/Unit/ContainerHealthStatusTest.php)**: Health status aggregation integration
 - **[tests/Unit/PushServerUpdateJobStatusAggregationTest.php](mdc:tests/Unit/PushServerUpdateJobStatusAggregationTest.php)**: Sentinel update logic
 - **[tests/Unit/ExcludeFromHealthCheckTest.php](mdc:tests/Unit/ExcludeFromHealthCheckTest.php)**: Excluded container handling
 
 ### **Common Bugs to Avoid**
 
-❌ **Bug**: Forgetting to track `$hasUnknown` flag
-✅ **Fix**: Initialize and check for "unknown" in all status aggregation
+✅ **Prevented by ContainerStatusAggregator Service**:
+- ❌ **Old Bug**: Forgetting to track `$hasUnknown` flag → ✅ Now centralized in service
+- ❌ **Old Bug**: Inconsistent priority across paths → ✅ Single source of truth
+- ❌ **Old Bug**: Forgetting to update all 4 locations → ✅ Only one location to update
 
-❌ **Bug**: Using ternary operator instead of if-elseif-else
-✅ **Fix**: Use explicit if-elseif-else to handle 3-way priority
+**Still Relevant**:
 
-❌ **Bug**: Updating only one path (SSH or Sentinel)
-✅ **Fix**: Always update all four status calculation locations
+❌ **Bug**: Forgetting to filter excluded containers before aggregation
+✅ **Fix**: Always use `CalculatesExcludedStatus` trait to filter before calling `ContainerStatusAggregator`
+
+❌ **Bug**: Not passing `$maxRestartCount` for crash loop detection
+✅ **Fix**: Calculate max restart count from containers and pass to `aggregateFromStrings()`/`aggregateFromContainers()`
 
 ❌ **Bug**: Not handling excluded containers with `:excluded` suffix
 ✅ **Fix**: Check for `:excluded` suffix in UI logic and button visibility

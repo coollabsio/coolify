@@ -3,11 +3,14 @@
 namespace App\Actions\Shared;
 
 use App\Models\Application;
+use App\Services\ContainerStatusAggregator;
+use App\Traits\CalculatesExcludedStatus;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ComplexStatusCheck
 {
     use AsAction;
+    use CalculatesExcludedStatus;
 
     public function handle(Application $application)
     {
@@ -61,179 +64,25 @@ class ComplexStatusCheck
     private function aggregateContainerStatuses($application, $containers)
     {
         $dockerComposeRaw = data_get($application, 'docker_compose_raw');
-        $excludedContainers = collect();
+        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
 
-        if ($dockerComposeRaw) {
-            try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
-                $services = data_get($dockerCompose, 'services', []);
-
-                foreach ($services as $serviceName => $serviceConfig) {
-                    $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
-                    $restartPolicy = data_get($serviceConfig, 'restart', 'always');
-
-                    if ($excludeFromHc || $restartPolicy === 'no') {
-                        $excludedContainers->push($serviceName);
-                    }
-                }
-            } catch (\Exception $e) {
-                // If we can't parse, treat all containers as included
-            }
-        }
-
-        $hasRunning = false;
-        $hasRestarting = false;
-        $hasUnhealthy = false;
-        $hasUnknown = false;
-        $hasExited = false;
-        $hasStarting = false;
-        $hasPaused = false;
-        $hasDead = false;
-        $relevantContainerCount = 0;
-
-        foreach ($containers as $container) {
+        // Filter non-excluded containers
+        $relevantContainers = collect($containers)->filter(function ($container) use ($excludedContainers) {
             $labels = data_get($container, 'Config.Labels', []);
             $serviceName = data_get($labels, 'com.docker.compose.service');
 
-            if ($serviceName && $excludedContainers->contains($serviceName)) {
-                continue;
-            }
-
-            $relevantContainerCount++;
-            $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status');
-
-            if ($containerStatus === 'restarting') {
-                $hasRestarting = true;
-                $hasUnhealthy = true;
-            } elseif ($containerStatus === 'running') {
-                $hasRunning = true;
-                if ($containerHealth === 'unhealthy') {
-                    $hasUnhealthy = true;
-                } elseif ($containerHealth === null) {
-                    $hasUnknown = true;
-                }
-            } elseif ($containerStatus === 'exited') {
-                $hasExited = true;
-                $hasUnhealthy = true;
-            } elseif ($containerStatus === 'created' || $containerStatus === 'starting') {
-                $hasStarting = true;
-            } elseif ($containerStatus === 'paused') {
-                $hasPaused = true;
-            } elseif ($containerStatus === 'dead' || $containerStatus === 'removing') {
-                $hasDead = true;
-            }
-        }
+            return ! ($serviceName && $excludedContainers->contains($serviceName));
+        });
 
         // If all containers are excluded, calculate status from excluded containers
         // but mark it with :excluded to indicate monitoring is disabled
-        if ($relevantContainerCount === 0) {
-            $excludedHasRunning = false;
-            $excludedHasRestarting = false;
-            $excludedHasUnhealthy = false;
-            $excludedHasUnknown = false;
-            $excludedHasExited = false;
-            $excludedHasStarting = false;
-            $excludedHasPaused = false;
-            $excludedHasDead = false;
-
-            foreach ($containers as $container) {
-                $labels = data_get($container, 'Config.Labels', []);
-                $serviceName = data_get($labels, 'com.docker.compose.service');
-
-                // Only process excluded containers
-                if (! $serviceName || ! $excludedContainers->contains($serviceName)) {
-                    continue;
-                }
-
-                $containerStatus = data_get($container, 'State.Status');
-                $containerHealth = data_get($container, 'State.Health.Status');
-
-                if ($containerStatus === 'restarting') {
-                    $excludedHasRestarting = true;
-                    $excludedHasUnhealthy = true;
-                } elseif ($containerStatus === 'running') {
-                    $excludedHasRunning = true;
-                    if ($containerHealth === 'unhealthy') {
-                        $excludedHasUnhealthy = true;
-                    } elseif ($containerHealth === null) {
-                        $excludedHasUnknown = true;
-                    }
-                } elseif ($containerStatus === 'exited') {
-                    $excludedHasExited = true;
-                    $excludedHasUnhealthy = true;
-                } elseif ($containerStatus === 'created' || $containerStatus === 'starting') {
-                    $excludedHasStarting = true;
-                } elseif ($containerStatus === 'paused') {
-                    $excludedHasPaused = true;
-                } elseif ($containerStatus === 'dead' || $containerStatus === 'removing') {
-                    $excludedHasDead = true;
-                }
-            }
-
-            if ($excludedHasRestarting) {
-                return 'degraded:excluded';
-            }
-
-            if ($excludedHasRunning && $excludedHasExited) {
-                return 'degraded:excluded';
-            }
-
-            if ($excludedHasRunning) {
-                if ($excludedHasUnhealthy) {
-                    return 'running:unhealthy:excluded';
-                } elseif ($excludedHasUnknown) {
-                    return 'running:unknown:excluded';
-                } else {
-                    return 'running:healthy:excluded';
-                }
-            }
-
-            if ($excludedHasDead) {
-                return 'degraded:excluded';
-            }
-
-            if ($excludedHasPaused) {
-                return 'paused:excluded';
-            }
-
-            if ($excludedHasStarting) {
-                return 'starting:excluded';
-            }
-
-            return 'exited:excluded';
+        if ($relevantContainers->isEmpty()) {
+            return $this->calculateExcludedStatus($containers, $excludedContainers);
         }
 
-        if ($hasRestarting) {
-            return 'degraded:unhealthy';
-        }
+        // Use ContainerStatusAggregator service for state machine logic
+        $aggregator = new ContainerStatusAggregator;
 
-        if ($hasRunning && $hasExited) {
-            return 'degraded:unhealthy';
-        }
-
-        if ($hasRunning) {
-            if ($hasUnhealthy) {
-                return 'running:unhealthy';
-            } elseif ($hasUnknown) {
-                return 'running:unknown';
-            } else {
-                return 'running:healthy';
-            }
-        }
-
-        if ($hasDead) {
-            return 'degraded:unhealthy';
-        }
-
-        if ($hasPaused) {
-            return 'paused:unknown';
-        }
-
-        if ($hasStarting) {
-            return 'starting:unknown';
-        }
-
-        return 'exited:unhealthy';
+        return $aggregator->aggregateFromContainers($relevantContainers);
     }
 }

@@ -13,17 +13,23 @@
 it('ensures ComplexStatusCheck returns excluded status when all containers excluded', function () {
     $complexStatusCheckFile = file_get_contents(__DIR__.'/../../app/Actions/Shared/ComplexStatusCheck.php');
 
-    // Check that when all containers are excluded, the status calculation
-    // processes excluded containers and returns status with :excluded suffix
+    // Check that when all containers are excluded, ComplexStatusCheck uses the trait
     expect($complexStatusCheckFile)
         ->toContain('// If all containers are excluded, calculate status from excluded containers')
         ->toContain('// but mark it with :excluded to indicate monitoring is disabled')
-        ->toContain('if ($relevantContainerCount === 0) {')
-        ->toContain("return 'running:unhealthy:excluded';")
-        ->toContain("return 'running:unknown:excluded';")
-        ->toContain("return 'running:healthy:excluded';")
+        ->toContain('if ($relevantContainers->isEmpty()) {')
+        ->toContain('return $this->calculateExcludedStatus($containers, $excludedContainers);');
+
+    // Check that the trait uses ContainerStatusAggregator and appends :excluded suffix
+    $traitFile = file_get_contents(__DIR__.'/../../app/Traits/CalculatesExcludedStatus.php');
+    expect($traitFile)
+        ->toContain('ContainerStatusAggregator')
+        ->toContain('appendExcludedSuffix')
+        ->toContain('$aggregator->aggregateFromContainers($excludedOnly)')
         ->toContain("return 'degraded:excluded';")
-        ->toContain("return 'exited:excluded';");
+        ->toContain("return 'paused:excluded';")
+        ->toContain("return 'exited:excluded';")
+        ->toContain('return "$status:excluded";'); // For running:healthy:excluded
 });
 
 it('ensures Service model returns excluded status when all services excluded', function () {
@@ -32,64 +38,59 @@ it('ensures Service model returns excluded status when all services excluded', f
     // Check that when all services are excluded from status checks,
     // the Service model calculates real status and returns it with :excluded suffix
     expect($serviceModelFile)
-        ->toContain('// If all services are excluded from status checks, calculate status from excluded containers')
-        ->toContain('// but mark it with :excluded to indicate monitoring is disabled')
-        ->toContain('if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {')
-        ->toContain('// Calculate status from excluded containers')
-        ->toContain('return "{$excludedStatus}:excluded";')
-        ->toContain("return 'exited:excluded';");
+        ->toContain('exclude_from_status')
+        ->toContain(':excluded')
+        ->toContain('CalculatesExcludedStatus');
 });
 
-it('ensures Service model returns unknown:excluded when no containers exist', function () {
+it('ensures Service model returns unknown:unknown:excluded when no containers exist', function () {
     $serviceModelFile = file_get_contents(__DIR__.'/../../app/Models/Service.php');
 
     // Check that when a service has no applications or databases at all,
-    // the Service model returns 'unknown:excluded' instead of 'exited:excluded'
+    // the Service model returns 'unknown:unknown:excluded' instead of 'exited:unhealthy:excluded'
     // This prevents misleading status display when containers don't exist
     expect($serviceModelFile)
         ->toContain('// If no status was calculated at all (no containers exist), return unknown')
         ->toContain('if ($excludedStatus === null && $excludedHealth === null) {')
-        ->toContain("return 'unknown:excluded';");
+        ->toContain("return 'unknown:unknown:excluded';");
 });
 
-it('ensures GetContainersStatus returns null when all containers excluded', function () {
+it('ensures GetContainersStatus calculates excluded status when all containers excluded', function () {
     $getContainersStatusFile = file_get_contents(__DIR__.'/../../app/Actions/Docker/GetContainersStatus.php');
 
     // Check that when all containers are excluded, the aggregateApplicationStatus
-    // method returns null to avoid updating status
+    // method calculates and returns status with :excluded suffix
     expect($getContainersStatusFile)
-        ->toContain('// If all containers are excluded, don\'t update status')
-        ->toContain("if (\$relevantStatuses->isEmpty()) {\n            return null;\n        }");
+        ->toContain('// If all containers are excluded, calculate status from excluded containers')
+        ->toContain('if ($relevantStatuses->isEmpty()) {')
+        ->toContain('return $this->calculateExcludedStatusFromStrings($containerStatuses);');
 });
 
 it('ensures exclude_from_hc flag is properly checked in ComplexStatusCheck', function () {
     $complexStatusCheckFile = file_get_contents(__DIR__.'/../../app/Actions/Shared/ComplexStatusCheck.php');
 
-    // Verify that exclude_from_hc is properly parsed from docker-compose
+    // Verify that exclude_from_hc is parsed using trait helper
     expect($complexStatusCheckFile)
-        ->toContain('$excludeFromHc = data_get($serviceConfig, \'exclude_from_hc\', false);')
-        ->toContain('if ($excludeFromHc || $restartPolicy === \'no\') {')
-        ->toContain('$excludedContainers->push($serviceName);');
+        ->toContain('$excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);');
 });
 
 it('ensures exclude_from_hc flag is properly checked in GetContainersStatus', function () {
     $getContainersStatusFile = file_get_contents(__DIR__.'/../../app/Actions/Docker/GetContainersStatus.php');
 
-    // Verify that exclude_from_hc is properly parsed from docker-compose
+    // Verify that exclude_from_hc is parsed using trait helper
     expect($getContainersStatusFile)
-        ->toContain('$excludeFromHc = data_get($serviceConfig, \'exclude_from_hc\', false);')
-        ->toContain('if ($excludeFromHc || $restartPolicy === \'no\') {')
-        ->toContain('$excludedContainers->push($serviceName);');
+        ->toContain('$excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);');
 });
 
 it('ensures UI displays excluded status correctly in status component', function () {
     $servicesStatusFile = file_get_contents(__DIR__.'/../../resources/views/components/status/services.blade.php');
 
-    // Verify that the status component detects :excluded suffix and shows monitoring disabled message
+    // Verify that the status component transforms :excluded suffix to (excluded) for better display
     expect($servicesStatusFile)
         ->toContain('$isExcluded = str($complexStatus)->endsWith(\':excluded\');')
-        ->toContain('$displayStatus = $isExcluded ? str($complexStatus)->beforeLast(\':excluded\') : $complexStatus;')
-        ->toContain('(Monitoring Disabled)');
+        ->toContain('$parts = explode(\':\', $complexStatus);')
+        ->toContain('// Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)')
+        ->toContain('// No health status: exited:excluded → Exited (excluded)');
 });
 
 it('ensures UI handles excluded status in service heading buttons', function () {
