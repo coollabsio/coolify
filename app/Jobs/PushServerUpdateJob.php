@@ -110,6 +110,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         $this->containers = collect(data_get($data, 'containers'));
 
+        Log::debug('[STATUS-DEBUG] Raw Sentinel data received', [
+            'source' => 'PushServerUpdateJob',
+            'container_count' => $this->containers->count(),
+            'containers' => $this->containers->toArray(),
+        ]);
+        ray('Raw Sentinel containers:', $this->containers->toArray());
+
         $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
         ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
 
@@ -146,6 +153,24 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $containerStatus = "$containerStatus ($containerHealth)";
             $labels = collect(data_get($container, 'labels'));
             $coolify_managed = $labels->has('coolify.managed');
+
+            Log::debug('[STATUS-DEBUG] Processing container from Sentinel', [
+                'source' => 'PushServerUpdateJob (loop)',
+                'container_name' => data_get($container, 'name'),
+                'container_status' => $containerStatus,
+                'labels' => $labels->toArray(),
+                'has_coolify_managed' => $coolify_managed,
+            ]);
+
+            if (! $coolify_managed) {
+                Log::debug('[STATUS-DEBUG] Container skipped - not coolify managed', [
+                    'source' => 'PushServerUpdateJob',
+                    'container_name' => data_get($container, 'name'),
+                ]);
+
+                continue;
+            }
+
             if ($coolify_managed) {
                 $name = data_get($container, 'name');
                 if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
@@ -166,6 +191,19 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                             $containerName = $labels->get('com.docker.compose.service');
                             if ($containerName) {
                                 $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                                Log::debug('[STATUS-DEBUG] Container added to applicationContainerStatuses', [
+                                    'source' => 'PushServerUpdateJob',
+                                    'application_id' => $applicationId,
+                                    'container_name' => $containerName,
+                                    'container_status' => $containerStatus,
+                                ]);
+                            } else {
+                                Log::debug('[STATUS-DEBUG] Container skipped - no com.docker.compose.service label', [
+                                    'source' => 'PushServerUpdateJob',
+                                    'container_name' => data_get($container, 'name'),
+                                    'application_id' => $applicationId,
+                                    'labels' => $labels->toArray(),
+                                ]);
                             }
                         } else {
                             $previewKey = $applicationId.':'.$pullRequestId;
@@ -224,12 +262,22 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function aggregateMultiContainerStatuses()
     {
+        Log::debug('[STATUS-DEBUG] Starting aggregation of multi-container application statuses', [
+            'source' => 'PushServerUpdateJob',
+        ]);
+        ray('Starting aggregation of multi-container application statuses');
+        ray($this->applicationContainerStatuses->toArray());
         if ($this->applicationContainerStatuses->isEmpty()) {
             return;
         }
 
         foreach ($this->applicationContainerStatuses as $applicationId => $containerStatuses) {
             $application = $this->applications->where('id', $applicationId)->first();
+            Log::debug('[STATUS-DEBUG] Processing application for aggregation', [
+                'source' => 'PushServerUpdateJob',
+                'app_id' => $applicationId,
+                'container_statuses' => $containerStatuses->toArray(),
+            ]);
             if (! $application) {
                 continue;
             }
@@ -297,22 +345,22 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 // All containers are exited
                 $aggregatedStatus = 'exited (unhealthy)';
             }
-
+            Log::debug('[STATUS-DEBUG] Sentinel status change', [
+                'source' => 'PushServerUpdateJob',
+                'app_id' => $application->id,
+                'app_name' => $application->name,
+                'old_status' => $application->status,
+                'new_status' => $aggregatedStatus,
+                'container_statuses' => $relevantStatuses->toArray(),
+                'flags' => [
+                    'hasRunning' => $hasRunning,
+                    'hasUnhealthy' => $hasUnhealthy,
+                    'hasUnknown' => $hasUnknown,
+                ],
+            ]);
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
-                Log::debug('[STATUS-DEBUG] Sentinel status change', [
-                    'source' => 'PushServerUpdateJob',
-                    'app_id' => $application->id,
-                    'app_name' => $application->name,
-                    'old_status' => $application->status,
-                    'new_status' => $aggregatedStatus,
-                    'container_statuses' => $relevantStatuses->toArray(),
-                    'flags' => [
-                        'hasRunning' => $hasRunning,
-                        'hasUnhealthy' => $hasUnhealthy,
-                        'hasUnknown' => $hasUnknown,
-                    ],
-                ]);
+
                 $application->status = $aggregatedStatus;
                 $application->save();
             }
