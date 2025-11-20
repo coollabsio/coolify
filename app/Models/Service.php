@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Services\ContainerStatusAggregator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -173,6 +174,21 @@ class Service extends BaseModel
         instant_remote_process(["docker network rm {$this->uuid}"], $server, false);
     }
 
+    /**
+     * Calculate the service's aggregate status from its applications and databases.
+     *
+     * This method aggregates status from Eloquent model relationships (not Docker containers).
+     * It differs from the CalculatesExcludedStatus trait which works with Docker container objects
+     * during container inspection. This accessor runs on-demand for UI display and works with
+     * already-stored status strings from the database.
+     *
+     * Status format: "{status}:{health}" or "{status}:{health}:excluded"
+     * - Status values: running, exited, degraded, starting, paused, restarting
+     * - Health values: healthy, unhealthy, unknown
+     * - :excluded suffix: Indicates all containers are excluded from health monitoring
+     *
+     * @return string The aggregate status in format "status:health" or "status:health:excluded"
+     */
     public function getStatusAttribute()
     {
         if ($this->isStarting()) {
@@ -182,232 +198,95 @@ class Service extends BaseModel
         $applications = $this->applications;
         $databases = $this->databases;
 
-        $complexStatus = null;
-        $complexHealth = null;
-        $hasNonExcluded = false;
-
-        foreach ($applications as $application) {
-            if ($application->exclude_from_status) {
-                continue;
-            }
-            $status = str($application->status)->before('(')->trim();
-            $health = str($application->status)->between('(', ')')->trim();
-
-            // Skip containers with :excluded suffix (they are excluded from health checks)
-            if ($health->contains(':excluded')) {
-                continue;
-            }
-
-            $hasNonExcluded = true;
-            if ($complexStatus === 'degraded') {
-                continue;
-            }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
-                if ($complexStatus === null) {
-                    $complexStatus = 'starting';
-                }
-            } elseif ($status->startsWith('paused')) {
-                if ($complexStatus === null) {
-                    $complexStatus = 'paused';
-                }
-            } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
-                $complexStatus = 'degraded';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } elseif ($health->value() === 'unknown') {
-                if ($complexHealth !== 'unhealthy') {
-                    $complexHealth = 'unknown';
-                }
-            } else {
-                $complexHealth = 'unhealthy';
-            }
-        }
-        foreach ($databases as $database) {
-            if ($database->exclude_from_status) {
-                continue;
-            }
-            $status = str($database->status)->before('(')->trim();
-            $health = str($database->status)->between('(', ')')->trim();
-
-            // Skip containers with :excluded suffix (they are excluded from health checks)
-            if ($health->contains(':excluded')) {
-                continue;
-            }
-
-            $hasNonExcluded = true;
-            if ($complexStatus === 'degraded') {
-                continue;
-            }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
-                if ($complexStatus === null) {
-                    $complexStatus = 'starting';
-                }
-            } elseif ($status->startsWith('paused')) {
-                if ($complexStatus === null) {
-                    $complexStatus = 'paused';
-                }
-            } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
-                $complexStatus = 'degraded';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } elseif ($health->value() === 'unknown') {
-                if ($complexHealth !== 'unhealthy') {
-                    $complexHealth = 'unknown';
-                }
-            } else {
-                $complexHealth = 'unhealthy';
-            }
-        }
+        [$complexStatus, $complexHealth, $hasNonExcluded] = $this->aggregateResourceStatuses(
+            $applications,
+            $databases,
+            excludedOnly: false
+        );
 
         // If all services are excluded from status checks, calculate status from excluded containers
         // but mark it with :excluded to indicate monitoring is disabled
         if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {
-            $excludedStatus = null;
-            $excludedHealth = null;
-
-            // Calculate status from excluded containers
-            foreach ($applications as $application) {
-                $status = str($application->status)->before('(')->trim();
-                $health = str($application->status)->between('(', ')')->trim();
-
-                // Only process containers with :excluded suffix (or truly excluded ones)
-                if (! $health->contains(':excluded') && ! $application->exclude_from_status) {
-                    continue;
-                }
-
-                // Strip :excluded suffix for health comparison
-                $health = str($health)->replace(':excluded', '');
-
-                if ($excludedStatus === 'degraded') {
-                    continue;
-                }
-                if ($status->startsWith('running')) {
-                    if ($excludedStatus === 'exited') {
-                        $excludedStatus = 'degraded';
-                    } else {
-                        $excludedStatus = 'running';
-                    }
-                } elseif ($status->startsWith('restarting')) {
-                    $excludedStatus = 'degraded';
-                } elseif ($status->startsWith('exited')) {
-                    $excludedStatus = 'exited';
-                } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
-                    if ($excludedStatus === null) {
-                        $excludedStatus = 'starting';
-                    }
-                } elseif ($status->startsWith('paused')) {
-                    if ($excludedStatus === null) {
-                        $excludedStatus = 'paused';
-                    }
-                } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
-                    $excludedStatus = 'degraded';
-                }
-                if ($health->value() === 'healthy') {
-                    if ($excludedHealth === 'unhealthy') {
-                        continue;
-                    }
-                    $excludedHealth = 'healthy';
-                } elseif ($health->value() === 'unknown') {
-                    if ($excludedHealth !== 'unhealthy') {
-                        $excludedHealth = 'unknown';
-                    }
-                } else {
-                    $excludedHealth = 'unhealthy';
-                }
-            }
-
-            foreach ($databases as $database) {
-                $status = str($database->status)->before('(')->trim();
-                $health = str($database->status)->between('(', ')')->trim();
-
-                // Only process containers with :excluded suffix (or truly excluded ones)
-                if (! $health->contains(':excluded') && ! $database->exclude_from_status) {
-                    continue;
-                }
-
-                // Strip :excluded suffix for health comparison
-                $health = str($health)->replace(':excluded', '');
-
-                if ($excludedStatus === 'degraded') {
-                    continue;
-                }
-                if ($status->startsWith('running')) {
-                    if ($excludedStatus === 'exited') {
-                        $excludedStatus = 'degraded';
-                    } else {
-                        $excludedStatus = 'running';
-                    }
-                } elseif ($status->startsWith('restarting')) {
-                    $excludedStatus = 'degraded';
-                } elseif ($status->startsWith('exited')) {
-                    $excludedStatus = 'exited';
-                } elseif ($status->startsWith('created') || $status->startsWith('starting')) {
-                    if ($excludedStatus === null) {
-                        $excludedStatus = 'starting';
-                    }
-                } elseif ($status->startsWith('paused')) {
-                    if ($excludedStatus === null) {
-                        $excludedStatus = 'paused';
-                    }
-                } elseif ($status->startsWith('dead') || $status->startsWith('removing')) {
-                    $excludedStatus = 'degraded';
-                }
-                if ($health->value() === 'healthy') {
-                    if ($excludedHealth === 'unhealthy') {
-                        continue;
-                    }
-                    $excludedHealth = 'healthy';
-                } elseif ($health->value() === 'unknown') {
-                    if ($excludedHealth !== 'unhealthy') {
-                        $excludedHealth = 'unknown';
-                    }
-                } else {
-                    $excludedHealth = 'unhealthy';
-                }
-            }
+            [$excludedStatus, $excludedHealth] = $this->aggregateResourceStatuses(
+                $applications,
+                $databases,
+                excludedOnly: true
+            );
 
             // Return status with :excluded suffix to indicate monitoring is disabled
             if ($excludedStatus && $excludedHealth) {
-                return "{$excludedStatus}:excluded";
+                return "{$excludedStatus}:{$excludedHealth}:excluded";
             }
 
             // If no status was calculated at all (no containers exist), return unknown
             if ($excludedStatus === null && $excludedHealth === null) {
-                return 'unknown:excluded';
+                return 'unknown:unknown:excluded';
             }
 
-            return 'exited:excluded';
+            return 'exited:unhealthy:excluded';
         }
 
         return "{$complexStatus}:{$complexHealth}";
+    }
+
+    /**
+     * Aggregate status and health from collections of applications and databases.
+     *
+     * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
+     * It processes container status strings stored in the database (not live Docker data).
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
+     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
+     * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
+     */
+    private function aggregateResourceStatuses($applications, $databases, bool $excludedOnly = false): array
+    {
+        $hasNonExcluded = false;
+        $statusStrings = collect();
+
+        // Process both applications and databases using the same logic
+        $resources = $applications->concat($databases);
+
+        foreach ($resources as $resource) {
+            $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
+
+            // Filter based on excludedOnly flag
+            if ($excludedOnly && ! $isExcluded) {
+                continue;
+            }
+            if (! $excludedOnly && $isExcluded) {
+                continue;
+            }
+
+            if (! $excludedOnly) {
+                $hasNonExcluded = true;
+            }
+
+            // Strip :excluded suffix before aggregation (it's in the 3rd part of "status:health:excluded")
+            $status = str($resource->status)->before(':excluded')->toString();
+            $statusStrings->push($status);
+        }
+
+        // If no status strings collected, return nulls
+        if ($statusStrings->isEmpty()) {
+            return $excludedOnly ? [null, null] : [null, null, $hasNonExcluded];
+        }
+
+        // Use ContainerStatusAggregator service for state machine logic
+        $aggregator = new ContainerStatusAggregator;
+        $aggregatedStatus = $aggregator->aggregateFromStrings($statusStrings);
+
+        // Parse the aggregated "status:health" string
+        $parts = explode(':', $aggregatedStatus);
+        $status = $parts[0] ?? null;
+        $health = $parts[1] ?? null;
+
+        if ($excludedOnly) {
+            return [$status, $health];
+        }
+
+        return [$status, $health, $hasNonExcluded];
     }
 
     public function extraFields()
