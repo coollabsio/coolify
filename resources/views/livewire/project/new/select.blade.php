@@ -66,44 +66,49 @@
             <div x-show="loading">Loading...</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
-                <h4 x-show="filteredGitBasedApplications.length > 0">Git Based</h4>
-                <div x-show="filteredGitBasedApplications.length > 0"
-                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
-                    <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                        <div x-on:click='setType(application.id)'
-                            :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
-                            <x-resource-view>
-                                <x-slot:title><span x-text="application.name"></span></x-slot>
-                                    <x-slot:description>
-                                        <span x-html="window.sanitizeHTML(application.description)"></span>
-                                        </x-slot>
-                                        <x-slot:logo>
-                                            <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
-                                                :src="application.logo">
-                                        </x-slot:logo>
-                            </x-resource-view>
+                <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div x-show="filteredGitBasedApplications.length > 0" class="space-y-4">
+                        <h4>Git Based</h4>
+                        <div class="grid justify-start grid-cols-1 gap-4 text-left">
+                            <template x-for="application in filteredGitBasedApplications" :key="application.name">
+                                <div x-on:click='setType(application.id)'
+                                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
+                                    <x-resource-view>
+                                        <x-slot:title><span x-text="application.name"></span></x-slot>
+                                            <x-slot:description>
+                                                <span x-html="window.sanitizeHTML(application.description)"></span>
+                                                </x-slot>
+                                                <x-slot:logo>
+                                                    <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                        :src="application.logo">
+                                                </x-slot:logo>
+                                    </x-resource-view>
+                                </div>
+                            </template>
                         </div>
-                    </template>
-                </div>
-                <h4 x-show="filteredDockerBasedApplications.length > 0">Docker Based</h4>
-                <div x-show="filteredDockerBasedApplications.length > 0"
-                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
-                    <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                        <div x-on:click="setType(application.id)"
-                            :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
-                            <x-resource-view>
-                                <x-slot:title><span x-text="application.name"></span></x-slot>
-                                    <x-slot:description><span x-text="application.description"></span></x-slot>
-                                        <x-slot:logo> <img
-                                                class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
-                                                :src="application.logo"></x-slot>
-                            </x-resource-view>
+                    </div>
+                    <div x-show="filteredDockerBasedApplications.length > 0" class="space-y-4">
+                        <h4>Docker Based</h4>
+                        <div class="grid justify-start grid-cols-1 gap-4 text-left">
+                            <template x-for="application in filteredDockerBasedApplications" :key="application.name">
+                                <div x-on:click="setType(application.id)"
+                                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
+                                    <x-resource-view>
+                                        <x-slot:title><span x-text="application.name"></span></x-slot>
+                                            <x-slot:description><span x-text="application.description"></span></x-slot>
+                                                <x-slot:logo> <img
+                                                        class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                                        :src="application.logo"></x-slot>
+                                    </x-resource-view>
+                                </div>
+                            </template>
                         </div>
-                    </template>
+                    </div>
                 </div>
-                <h2 x-show="filteredDatabases.length > 0">Databases</h2>
+                <div x-show="filteredDatabases.length > 0" class="mt-8">
+                    <h2 class="mb-4">Databases</h2>
                 <div x-show="filteredDatabases.length > 0"
-                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
+                    class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                     <template x-for="database in filteredDatabases" :key="database.id">
                         <div x-on:click="setType(database.id)"
                             :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
@@ -119,7 +124,8 @@
                         </div>
                     </template>
                 </div>
-                <div x-show="filteredServices.length > 0">
+                </div>
+                <div x-show="filteredServices.length > 0" class="mt-8">
                     <div class="flex items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
@@ -132,7 +138,7 @@
                             href="https://coolify.io/docs/services/overview">here</a>.
                     </div>
 
-                    <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
+                    <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="service in filteredServices" :key="service.name">
                             <div x-on:click="setType('one-click-service-' + service.name)"
                                 :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
