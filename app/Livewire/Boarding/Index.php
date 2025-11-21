@@ -321,6 +321,21 @@ class Index extends Component
         }
 
         try {
+            // Check prerequisites
+            $prerequisitesInstalled = $this->createdServer->validatePrerequisites();
+            if (! $prerequisitesInstalled) {
+                $this->createdServer->installPrerequisites();
+                // Recheck after installation
+                $prerequisitesInstalled = $this->createdServer->validatePrerequisites();
+                if (! $prerequisitesInstalled) {
+                    throw new \Exception('Prerequisites (git, curl, jq) could not be installed. Please install them manually.');
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError(error: $e, livewire: $this);
+        }
+
+        try {
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {

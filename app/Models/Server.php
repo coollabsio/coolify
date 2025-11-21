@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
@@ -1182,6 +1184,16 @@ $schema://$host {
     public function installDocker()
     {
         return InstallDocker::run($this);
+    }
+
+    public function validatePrerequisites(): bool
+    {
+        return ValidatePrerequisites::run($this);
+    }
+
+    public function installPrerequisites()
+    {
+        return InstallPrerequisites::run($this);
     }
 
     public function validateDockerEngine($throwError = false)

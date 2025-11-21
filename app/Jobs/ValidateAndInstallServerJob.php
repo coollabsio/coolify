@@ -72,6 +72,37 @@ class ValidateAndInstallServerJob implements ShouldQueue
                 return;
             }
 
+            // Check and install prerequisites
+            $prerequisitesInstalled = $this->server->validatePrerequisites();
+            if (! $prerequisitesInstalled) {
+                if ($this->numberOfTries >= $this->maxTries) {
+                    $errorMessage = 'Prerequisites (git, curl, jq) could not be installed after '.$this->maxTries.' attempts. Please install them manually before continuing.';
+                    $this->server->update([
+                        'validation_logs' => $errorMessage,
+                        'is_validating' => false,
+                    ]);
+                    Log::error('ValidateAndInstallServer: Prerequisites installation failed after max tries', [
+                        'server_id' => $this->server->id,
+                        'attempts' => $this->numberOfTries,
+                    ]);
+
+                    return;
+                }
+
+                Log::info('ValidateAndInstallServer: Installing prerequisites', [
+                    'server_id' => $this->server->id,
+                    'attempt' => $this->numberOfTries + 1,
+                ]);
+
+                // Install prerequisites
+                $this->server->installPrerequisites();
+
+                // Retry validation after installation
+                self::dispatch($this->server, $this->numberOfTries + 1)->delay(now()->addSeconds(30));
+
+                return;
+            }
+
             // Check if Docker is installed
             $dockerInstalled = $this->server->validateDockerEngine();
             $dockerComposeInstalled = $this->server->validateDockerCompose();
