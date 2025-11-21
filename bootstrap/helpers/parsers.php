@@ -1595,7 +1595,11 @@ function serviceParser(Service $resource): Collection
                     $urlFor = $parsed['service_name'];
                 }
                 $port = $parsed['port'];
-                if (blank($savedService->fqdn)) {
+
+                // Only ServiceApplication has fqdn column, ServiceDatabase does not
+                $isServiceApplication = $savedService instanceof ServiceApplication;
+
+                if ($isServiceApplication && blank($savedService->fqdn)) {
                     if ($fqdnFor) {
                         $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     } else {
@@ -1606,9 +1610,21 @@ function serviceParser(Service $resource): Collection
                     } else {
                         $url = generateUrl($server, "{$savedService->name}-$uuid");
                     }
-                } else {
+                } elseif ($isServiceApplication) {
                     $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
                     $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                } else {
+                    // For ServiceDatabase, generate fqdn/url without saving to the model
+                    if ($fqdnFor) {
+                        $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
+                    } else {
+                        $fqdn = generateFqdn(server: $server, random: "{$savedService->name}-$uuid", parserVersion: $resource->compose_parsing_version);
+                    }
+                    if ($urlFor) {
+                        $url = generateUrl($server, "$urlFor-$uuid");
+                    } else {
+                        $url = generateUrl($server, "{$savedService->name}-$uuid");
+                    }
                 }
 
                 if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
@@ -1626,7 +1642,8 @@ function serviceParser(Service $resource): Collection
                 if ($url && $port) {
                     $urlWithPort = "$url:$port";
                 }
-                if (is_null($savedService->fqdn)) {
+                // Only save fqdn to ServiceApplication, not ServiceDatabase
+                if ($isServiceApplication && is_null($savedService->fqdn)) {
                     if ((int) $resource->compose_parsing_version >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
                         if ($fqdnFor) {
                             $savedService->fqdn = $fqdnWithPort;
