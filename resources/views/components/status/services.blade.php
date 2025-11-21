@@ -1,26 +1,5 @@
 @php
-    // Transform colon format to human-readable format for UI display
-    // running:healthy → Running (healthy)
-    // running:unhealthy:excluded → Running (unhealthy, excluded)
-    // exited:excluded → Exited (excluded)
-    $isExcluded = str($complexStatus)->endsWith(':excluded');
-    $parts = explode(':', $complexStatus);
-
-    if ($isExcluded) {
-        if (count($parts) === 3) {
-            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
-            $displayStatus = str($parts[0])->headline() . ' (' . $parts[1] . ', excluded)';
-        } else {
-            // No health status: exited:excluded → Exited (excluded)
-            $displayStatus = str($parts[0])->headline() . ' (excluded)';
-        }
-    } elseif (count($parts) >= 2 && !str($complexStatus)->startsWith('Proxy')) {
-        // Regular colon format: running:healthy → Running (healthy)
-        $displayStatus = str($parts[0])->headline() . ' (' . $parts[1] . ')';
-    } else {
-        // No transformation needed (simple status or already in parentheses format)
-        $displayStatus = str($complexStatus)->headline();
-    }
+    $displayStatus = formatContainerStatus($complexStatus);
 @endphp
 @if (str($displayStatus)->lower()->contains('running'))
     <x-status.running :status="$displayStatus" />
