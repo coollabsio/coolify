@@ -399,3 +399,165 @@ it('should handle multiple ports for same service', function () {
     // 5. SERVICE_URL_API_8080
     // 6. SERVICE_FQDN_API_8080
 });
+
+it('detects SERVICE_URL variables in map-style environment format', function () {
+    $yaml = <<<'YAML'
+services:
+  trigger:
+    environment:
+      SERVICE_URL_TRIGGER_3000: ""
+      SERVICE_FQDN_DB: localhost
+      OTHER_VAR: value
+YAML;
+
+    $dockerCompose = Yaml::parse($yaml);
+    $serviceConfig = data_get($dockerCompose, 'services.trigger');
+    $environment = data_get($serviceConfig, 'environment', []);
+
+    $templateVariableNames = [];
+    foreach ($environment as $key => $value) {
+        if (is_int($key) && is_string($value)) {
+            // List-style
+            $envVarName = str($value)->before('=')->trim();
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        } elseif (is_string($key)) {
+            // Map-style
+            $envVarName = str($key);
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        }
+    }
+
+    expect($templateVariableNames)->toHaveCount(2);
+    expect($templateVariableNames)->toContain('SERVICE_URL_TRIGGER_3000');
+    expect($templateVariableNames)->toContain('SERVICE_FQDN_DB');
+    expect($templateVariableNames)->not->toContain('OTHER_VAR');
+});
+
+it('handles multiple map-style SERVICE_URL and SERVICE_FQDN variables', function () {
+    $yaml = <<<'YAML'
+services:
+  app:
+    environment:
+      SERVICE_URL_APP_3000: ""
+      SERVICE_FQDN_API: api.local
+      SERVICE_URL_WEB: ""
+      OTHER_VAR: value
+YAML;
+
+    $dockerCompose = Yaml::parse($yaml);
+    $serviceConfig = data_get($dockerCompose, 'services.app');
+    $environment = data_get($serviceConfig, 'environment', []);
+
+    $templateVariableNames = [];
+    foreach ($environment as $key => $value) {
+        if (is_int($key) && is_string($value)) {
+            // List-style
+            $envVarName = str($value)->before('=')->trim();
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        } elseif (is_string($key)) {
+            // Map-style
+            $envVarName = str($key);
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        }
+    }
+
+    expect($templateVariableNames)->toHaveCount(3);
+    expect($templateVariableNames)->toContain('SERVICE_URL_APP_3000');
+    expect($templateVariableNames)->toContain('SERVICE_FQDN_API');
+    expect($templateVariableNames)->toContain('SERVICE_URL_WEB');
+    expect($templateVariableNames)->not->toContain('OTHER_VAR');
+});
+
+it('does not detect SERVICE_URL references in map-style values', function () {
+    $yaml = <<<'YAML'
+services:
+  app:
+    environment:
+      SERVICE_URL_APP_3000: ""
+      NEXT_PUBLIC_URL: ${SERVICE_URL_APP}
+      API_ENDPOINT: ${SERVICE_URL_API}
+YAML;
+
+    $dockerCompose = Yaml::parse($yaml);
+    $serviceConfig = data_get($dockerCompose, 'services.app');
+    $environment = data_get($serviceConfig, 'environment', []);
+
+    $templateVariableNames = [];
+    foreach ($environment as $key => $value) {
+        if (is_int($key) && is_string($value)) {
+            // List-style
+            $envVarName = str($value)->before('=')->trim();
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        } elseif (is_string($key)) {
+            // Map-style
+            $envVarName = str($key);
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        }
+    }
+
+    // Should only detect the direct declaration, not references in values
+    expect($templateVariableNames)->toHaveCount(1);
+    expect($templateVariableNames)->toContain('SERVICE_URL_APP_3000');
+    expect($templateVariableNames)->not->toContain('SERVICE_URL_APP');
+    expect($templateVariableNames)->not->toContain('SERVICE_URL_API');
+    expect($templateVariableNames)->not->toContain('NEXT_PUBLIC_URL');
+    expect($templateVariableNames)->not->toContain('API_ENDPOINT');
+});
+
+it('handles map-style with abbreviated service names', function () {
+    // Simulating the langfuse.yaml case with map-style
+    $yaml = <<<'YAML'
+services:
+  langfuse:
+    environment:
+      SERVICE_URL_LANGFUSE_3000: ${SERVICE_URL_LANGFUSE_3000}
+      DATABASE_URL: postgres://...
+YAML;
+
+    $dockerCompose = Yaml::parse($yaml);
+    $serviceConfig = data_get($dockerCompose, 'services.langfuse');
+    $environment = data_get($serviceConfig, 'environment', []);
+
+    $templateVariableNames = [];
+    foreach ($environment as $key => $value) {
+        if (is_int($key) && is_string($value)) {
+            // List-style
+            $envVarName = str($value)->before('=')->trim();
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        } elseif (is_string($key)) {
+            // Map-style
+            $envVarName = str($key);
+            if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                $templateVariableNames[] = $envVarName->value();
+            }
+        }
+    }
+
+    expect($templateVariableNames)->toHaveCount(1);
+    expect($templateVariableNames)->toContain('SERVICE_URL_LANGFUSE_3000');
+    expect($templateVariableNames)->not->toContain('DATABASE_URL');
+});
+
+it('verifies updateCompose helper has dual-format handling', function () {
+    $servicesFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/services.php');
+
+    // Check that both formats are handled
+    expect($servicesFile)->toContain('is_int($key) && is_string($value)');
+    expect($servicesFile)->toContain('List-style');
+    expect($servicesFile)->toContain('elseif (is_string($key))');
+    expect($servicesFile)->toContain('Map-style');
+});

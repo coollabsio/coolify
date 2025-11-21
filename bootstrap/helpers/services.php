@@ -123,13 +123,20 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $environment = data_get($serviceConfig, 'environment', []);
         $templateVariableNames = [];
 
-        foreach ($environment as $envVar) {
-            if (is_string($envVar)) {
+        foreach ($environment as $key => $value) {
+            if (is_int($key) && is_string($value)) {
+                // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
                 // Extract variable name (before '=' if present)
-                $envVarName = str($envVar)->before('=')->trim();
+                $envVarName = str($value)->before('=')->trim();
                 // Only include if it's a direct declaration (not a reference like ${VAR})
                 // Direct declarations look like: SERVICE_URL_APP or SERVICE_URL_APP_3000
                 // References look like: NEXT_PUBLIC_URL=${SERVICE_URL_APP}
+                if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                    $templateVariableNames[] = $envVarName->value();
+                }
+            } elseif (is_string($key)) {
+                // Map-style: "SERVICE_URL_APP_3000: value" or "SERVICE_FQDN_DB: localhost"
+                $envVarName = str($key);
                 if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
                     $templateVariableNames[] = $envVarName->value();
                 }
