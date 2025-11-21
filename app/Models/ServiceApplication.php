@@ -208,10 +208,25 @@ class ServiceApplication extends BaseModel
             // Extract SERVICE_URL and SERVICE_FQDN variables DIRECTLY DECLARED in this service's environment
             // (not variables that are merely referenced with ${VAR} syntax)
             $portFound = null;
-            foreach ($environment as $envVar) {
-                if (is_string($envVar)) {
+            foreach ($environment as $key => $value) {
+                if (is_int($key) && is_string($value)) {
+                    // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
                     // Extract variable name (before '=' if present)
-                    $envVarName = str($envVar)->before('=')->trim();
+                    $envVarName = str($value)->before('=')->trim();
+
+                    // Only process direct declarations
+                    if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        // Parse to check if it has a port suffix
+                        $parsed = parseServiceEnvironmentVariable($envVarName->value());
+                        if ($parsed['has_port'] && $parsed['port']) {
+                            // Found a port-specific variable for this service
+                            $portFound = (int) $parsed['port'];
+                            break;
+                        }
+                    }
+                } elseif (is_string($key)) {
+                    // Map-style: "SERVICE_URL_APP_3000: value" or "SERVICE_FQDN_DB: localhost"
+                    $envVarName = str($key);
 
                     // Only process direct declarations
                     if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
