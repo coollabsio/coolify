@@ -1186,7 +1186,12 @@ $schema://$host {
         return InstallDocker::run($this);
     }
 
-    public function validatePrerequisites(): bool
+    /**
+     * Validate that required commands are available on the server.
+     *
+     * @return array{success: bool, missing: array<string>, found: array<string>}
+     */
+    public function validatePrerequisites(): array
     {
         return ValidatePrerequisites::run($this);
     }

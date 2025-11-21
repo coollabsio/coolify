@@ -115,11 +115,13 @@ class ValidateAndInstall extends Component
 
     public function validatePrerequisites()
     {
-        $this->prerequisites_installed = $this->server->validatePrerequisites();
-        if (! $this->prerequisites_installed) {
+        $validationResult = $this->server->validatePrerequisites();
+        $this->prerequisites_installed = $validationResult['success'];
+        if (! $validationResult['success']) {
             if ($this->install) {
                 if ($this->number_of_tries == $this->max_tries) {
-                    $this->error = 'Prerequisites (git, curl, jq) could not be installed. Please install them manually before continuing.';
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    $this->error = "Prerequisites ({$missingCommands}) could not be installed. Please install them manually before continuing.";
                     $this->server->update([
                         'validation_logs' => $this->error,
                     ]);
@@ -136,7 +138,8 @@ class ValidateAndInstall extends Component
                     return;
                 }
             } else {
-                $this->error = 'Prerequisites (git, curl, jq) are not installed. Please install them before continuing.';
+                $missingCommands = implode(', ', $validationResult['missing']);
+                $this->error = "Prerequisites ({$missingCommands}) are not installed. Please install them before continuing.";
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);

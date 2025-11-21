@@ -45,9 +45,10 @@ class ValidateServer
             throw new \Exception($this->error);
         }
 
-        $prerequisitesInstalled = $server->validatePrerequisites();
-        if (! $prerequisitesInstalled) {
-            $this->error = 'Prerequisites (git, curl, jq) are not installed. Please install them before continuing or use the validation with installation endpoint.';
+        $validationResult = $server->validatePrerequisites();
+        if (! $validationResult['success']) {
+            $missingCommands = implode(', ', $validationResult['missing']);
+            $this->error = "Prerequisites ({$missingCommands}) are not installed. Please install them before continuing or use the validation with installation endpoint.";
             $server->update([
                 'validation_logs' => $this->error,
             ]);

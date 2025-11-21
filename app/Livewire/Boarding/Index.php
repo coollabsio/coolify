@@ -322,13 +322,14 @@ class Index extends Component
 
         try {
             // Check prerequisites
-            $prerequisitesInstalled = $this->createdServer->validatePrerequisites();
-            if (! $prerequisitesInstalled) {
+            $validationResult = $this->createdServer->validatePrerequisites();
+            if (! $validationResult['success']) {
                 $this->createdServer->installPrerequisites();
                 // Recheck after installation
-                $prerequisitesInstalled = $this->createdServer->validatePrerequisites();
-                if (! $prerequisitesInstalled) {
-                    throw new \Exception('Prerequisites (git, curl, jq) could not be installed. Please install them manually.');
+                $validationResult = $this->createdServer->validatePrerequisites();
+                if (! $validationResult['success']) {
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    throw new \Exception("Prerequisites ({$missingCommands}) could not be installed. Please install them manually.");
                 }
             }
         } catch (\Throwable $e) {

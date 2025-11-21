@@ -73,10 +73,11 @@ class ValidateAndInstallServerJob implements ShouldQueue
             }
 
             // Check and install prerequisites
-            $prerequisitesInstalled = $this->server->validatePrerequisites();
-            if (! $prerequisitesInstalled) {
+            $validationResult = $this->server->validatePrerequisites();
+            if (! $validationResult['success']) {
                 if ($this->numberOfTries >= $this->maxTries) {
-                    $errorMessage = 'Prerequisites (git, curl, jq) could not be installed after '.$this->maxTries.' attempts. Please install them manually before continuing.';
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    $errorMessage = "Prerequisites ({$missingCommands}) could not be installed after {$this->maxTries} attempts. Please install them manually before continuing.";
                     $this->server->update([
                         'validation_logs' => $errorMessage,
                         'is_validating' => false,
@@ -84,6 +85,8 @@ class ValidateAndInstallServerJob implements ShouldQueue
                     Log::error('ValidateAndInstallServer: Prerequisites installation failed after max tries', [
                         'server_id' => $this->server->id,
                         'attempts' => $this->numberOfTries,
+                        'missing_commands' => $validationResult['missing'],
+                        'found_commands' => $validationResult['found'],
                     ]);
 
                     return;
@@ -92,6 +95,8 @@ class ValidateAndInstallServerJob implements ShouldQueue
                 Log::info('ValidateAndInstallServer: Installing prerequisites', [
                     'server_id' => $this->server->id,
                     'attempt' => $this->numberOfTries + 1,
+                    'missing_commands' => $validationResult['missing'],
+                    'found_commands' => $validationResult['found'],
                 ]);
 
                 // Install prerequisites

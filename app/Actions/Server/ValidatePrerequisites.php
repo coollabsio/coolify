@@ -11,17 +11,30 @@ class ValidatePrerequisites
 
     public string $jobQueue = 'high';
 
-    public function handle(Server $server): bool
+    /**
+     * Validate that required commands are available on the server.
+     *
+     * @return array{success: bool, missing: array<string>, found: array<string>}
+     */
+    public function handle(Server $server): array
     {
         $requiredCommands = ['git', 'curl', 'jq'];
+        $missing = [];
+        $found = [];
 
         foreach ($requiredCommands as $cmd) {
-            $found = instant_remote_process(["command -v {$cmd}"], $server, false);
-            if (! $found) {
-                return false;
+            $result = instant_remote_process(["command -v {$cmd}"], $server, false);
+            if (! $result) {
+                $missing[] = $cmd;
+            } else {
+                $found[] = $cmd;
             }
         }
 
-        return true;
+        return [
+            'success' => empty($missing),
+            'missing' => $missing,
+            'found' => $found,
+        ];
     }
 }
