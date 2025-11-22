@@ -7,7 +7,7 @@
 
 services:
   paymenter:
-    image: 'ghcr.io/paymenter/paymenter:latest'
+    image: 'ghcr.io/paymenter/paymenter:v1.4.5'
     volumes:
       - 'app_logs:/app/storage/logs'
       - 'app_public:/app/storage/public'
