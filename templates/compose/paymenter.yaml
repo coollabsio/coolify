@@ -9,11 +9,11 @@ services:
   paymenter:
     image: 'ghcr.io/paymenter/paymenter:v1.4.5'
     volumes:
-      - 'app_logs:/app/storage/logs'
+      'app_logs:/app/storage/logs'
       - 'app_public:/app/storage/public'
       - 'extenstions:/app/extensions'
       - 'themes:/app/themes'
-      - 'app_storage_public:/app/storage/app/public'
+      - 'app_storage_public:/app/public/storage'
     environment:
       SERVICE_URL_PAYMENTER: '${SERVICE_URL_PAYMENTER_80}'
       DB_DATABASE: '${MYSQL_DATABASE:-paymenter-db}'
