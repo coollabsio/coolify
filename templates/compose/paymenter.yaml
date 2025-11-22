@@ -43,7 +43,7 @@ services:
       timeout: 1s
       retries: 3
   mariadb:
-    image: 'mariadb:11'
+    image: 'mariadb:11.8'
     volumes:
       - 'paymenter_mariadb_data:/var/lib/mysql'
     environment:
