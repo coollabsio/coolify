@@ -42,7 +42,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                    ' Service names must not contain shell metacharacters.',
+                ' Service names must not contain shell metacharacters.',
                 0,
                 $e
             );
@@ -71,7 +71,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                                 } catch (\Exception $e) {
                                     throw new \Exception(
                                         'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                            ' Please use safe path names without shell metacharacters.',
+                                        ' Please use safe path names without shell metacharacters.',
                                         0,
                                         $e
                                     );
@@ -87,7 +87,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.',
+                                    ' Please use safe path names without shell metacharacters.',
                                     0,
                                     $e
                                 );
@@ -329,7 +329,7 @@ function parseDockerVolumeString(string $volumeString): array
                 // Re-throw with more context about the volume string
                 throw new \Exception(
                     'Invalid Docker volume definition: '.$e->getMessage().
-                        ' Please use safe path names without shell metacharacters.'
+                    ' Please use safe path names without shell metacharacters.'
                 );
             }
         }
@@ -346,7 +346,7 @@ function parseDockerVolumeString(string $volumeString): array
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker volume definition: '.$e->getMessage().
-                    ' Please use safe path names without shell metacharacters.'
+                ' Please use safe path names without shell metacharacters.'
             );
         }
     }
@@ -412,7 +412,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                    ' Service names must not contain shell metacharacters.'
+                ' Service names must not contain shell metacharacters.'
             );
         }
 
@@ -741,7 +741,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.'
+                                    ' Please use safe path names without shell metacharacters.'
                                 );
                             }
                         }
@@ -752,7 +752,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } catch (\Exception $e) {
                             throw new \Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
+                                ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
@@ -866,6 +866,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
+                    } else {
+                        // Preserve custom volume drivers as-is without renaming or creating LocalPersistentVolume
+                        // The volume definition already exists in top-level volumes section
+                        // The volume will be added to $volumesParsed below to preserve it in the service
                     }
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
@@ -1442,7 +1446,7 @@ function serviceParser(Service $resource): Collection
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                    ' Service names must not contain shell metacharacters.'
+                ' Service names must not contain shell metacharacters.'
             );
         }
 
@@ -1946,7 +1950,7 @@ function serviceParser(Service $resource): Collection
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.'
+                                    ' Please use safe path names without shell metacharacters.'
                                 );
                             }
                         }
@@ -1957,7 +1961,7 @@ function serviceParser(Service $resource): Collection
                         } catch (\Exception $e) {
                             throw new \Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
+                                ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
@@ -2065,6 +2069,10 @@ function serviceParser(Service $resource): Collection
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
+                    } else {
+                        // Preserve custom volume drivers as-is without renaming or creating LocalPersistentVolume
+                        // The volume definition already exists in top-level volumes section
+                        // The volume will be added to $volumesParsed below to preserve it in the service
                     }
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));

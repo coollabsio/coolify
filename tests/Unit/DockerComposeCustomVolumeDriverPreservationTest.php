@@ -29,7 +29,7 @@ it('ensures custom volume drivers are preserved instead of skipped', function ()
 it('verifies custom volume driver preservation logic exists in both parsing locations', function () {
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
-    // Count occurrences of the preservation logic - should appear twice (two locations)
+    // Count occurrences of the preservation logic
     $preservationCount = substr_count($parsersFile, '// Preserve custom volume drivers as-is without renaming or creating LocalPersistentVolume');
     expect($preservationCount)->toBe(2, 'Custom volume driver preservation logic should exist in both parsing locations');
 });
