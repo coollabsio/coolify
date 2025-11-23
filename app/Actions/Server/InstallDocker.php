@@ -96,6 +96,16 @@ class InstallDocker
                     'command -v git >/dev/null || zypper install -y git',
                     'command -v jq >/dev/null || zypper install -y jq',
                 ]);
+            } elseif ($supported_os_type->contains('arch')) {
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'pacman -Syyy --noconfirm',
+                    'pacman -S archlinux-keyring --noconfirm',
+                    'command -v curl >/dev/null || pacman -S curl --noconfirm',
+                    'command -v wget >/dev/null || pacman -S wget --noconfirm',
+                    'command -v git >/dev/null || pacman -S git --noconfirm',
+                    'command -v jq >/dev/null || pacman -S jq --noconfirm',
+                ]);
             } else {
                 throw new \Exception('Unsupported OS');
             }
@@ -109,6 +119,8 @@ class InstallDocker
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('arch')) {
+                $command = $command->merge([$this->getArchDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -172,6 +184,15 @@ class InstallDocker
             'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && '.
             'zypper refresh && '.
             'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
+            'systemctl start docker && '.
+            'systemctl enable docker'.
+            ')';
+    }
+
+    private function getArchDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'pacman -S docker --noconfirm && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
             ')';
