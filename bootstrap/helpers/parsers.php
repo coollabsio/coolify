@@ -42,7 +42,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                ' Service names must not contain shell metacharacters.',
+                    ' Service names must not contain shell metacharacters.',
                 0,
                 $e
             );
@@ -71,7 +71,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                                 } catch (\Exception $e) {
                                     throw new \Exception(
                                         'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.',
+                                            ' Please use safe path names without shell metacharacters.',
                                         0,
                                         $e
                                     );
@@ -87,7 +87,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.',
+                                        ' Please use safe path names without shell metacharacters.',
                                     0,
                                     $e
                                 );
@@ -329,7 +329,7 @@ function parseDockerVolumeString(string $volumeString): array
                 // Re-throw with more context about the volume string
                 throw new \Exception(
                     'Invalid Docker volume definition: '.$e->getMessage().
-                    ' Please use safe path names without shell metacharacters.'
+                        ' Please use safe path names without shell metacharacters.'
                 );
             }
         }
@@ -346,7 +346,7 @@ function parseDockerVolumeString(string $volumeString): array
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.'
+                    ' Please use safe path names without shell metacharacters.'
             );
         }
     }
@@ -412,7 +412,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                ' Service names must not contain shell metacharacters.'
+                    ' Service names must not contain shell metacharacters.'
             );
         }
 
@@ -741,7 +741,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
+                                        ' Please use safe path names without shell metacharacters.'
                                 );
                             }
                         }
@@ -752,7 +752,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } catch (\Exception $e) {
                             throw new \Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                ' Please use safe path names without shell metacharacters.'
+                                    ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
@@ -820,49 +820,53 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    // Check if this is a custom volume driver that should be preserved as-is
+                    // Any volume with driver_opts.type (cifs, nfs, tmpfs, etc.) should not be renamed
+                    $isCustomVolumeDriver = false;
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
-                            continue;
+                        if (data_get($temp, 'driver_opts.type')) {
+                            $isCustomVolumeDriver = true;
                         }
                     }
-                    $slugWithoutUuid = Str::slug($source, '-');
-                    $name = "{$uuid}_{$slugWithoutUuid}";
 
-                    if ($isPullRequest) {
-                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
-                    }
-                    if (is_string($volume)) {
-                        $parsed = parseDockerVolumeString($volume);
-                        $source = $parsed['source'];
-                        $target = $parsed['target'];
-                        $source = $name;
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (! $isCustomVolumeDriver) {
+                        // Process regular volumes with renaming and LocalPersistentVolume creation
+                        $slugWithoutUuid = Str::slug($source, '-');
+                        $name = "{$uuid}_{$slugWithoutUuid}";
+
+                        if ($isPullRequest) {
+                            $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                         }
-                    } elseif (is_array($volume)) {
-                        data_set($volume, 'source', $name);
+                        if (is_string($volume)) {
+                            $parsed = parseDockerVolumeString($volume);
+                            $source = $parsed['source'];
+                            $target = $parsed['target'];
+                            $source = $name;
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } elseif (is_array($volume)) {
+                            data_set($volume, 'source', $name);
+                        }
+                        $topLevel->get('volumes')->put($name, [
+                            'name' => $name,
+                        ]);
+                        LocalPersistentVolume::updateOrCreate(
+                            [
+                                'name' => $name,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ],
+                            [
+                                'name' => $name,
+                                'mount_path' => $target,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ]
+                        );
                     }
-                    $topLevel->get('volumes')->put($name, [
-                        'name' => $name,
-                    ]);
-                    LocalPersistentVolume::updateOrCreate(
-                        [
-                            'name' => $name,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ],
-                        [
-                            'name' => $name,
-                            'mount_path' => $target,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ]
-                    );
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
@@ -1438,7 +1442,7 @@ function serviceParser(Service $resource): Collection
         } catch (\Exception $e) {
             throw new \Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
-                ' Service names must not contain shell metacharacters.'
+                    ' Service names must not contain shell metacharacters.'
             );
         }
 
@@ -1747,7 +1751,6 @@ function serviceParser(Service $resource): Collection
                         'value' => $fqdn,
                         'is_preview' => false,
                     ]);
-
                 } elseif ($command->value() === 'URL') {
                     $urlFor = $key->after('SERVICE_URL_')->lower()->value();
                     $url = generateUrl(server: $server, random: str($urlFor)->replace('_', '-')->value()."-$uuid");
@@ -1775,7 +1778,6 @@ function serviceParser(Service $resource): Collection
                         'value' => $url,
                         'is_preview' => false,
                     ]);
-
                 } else {
                     $value = generateEnvValue($command, $resource);
                     $resource->environment_variables()->firstOrCreate([
@@ -1944,7 +1946,7 @@ function serviceParser(Service $resource): Collection
                             } catch (\Exception $e) {
                                 throw new \Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
+                                        ' Please use safe path names without shell metacharacters.'
                                 );
                             }
                         }
@@ -1955,7 +1957,7 @@ function serviceParser(Service $resource): Collection
                         } catch (\Exception $e) {
                             throw new \Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                ' Please use safe path names without shell metacharacters.'
+                                    ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
@@ -2020,46 +2022,50 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    // Check if this is a custom volume driver that should be preserved as-is
+                    // Any volume with driver_opts.type (cifs, nfs, tmpfs, etc.) should not be renamed
+                    $isCustomVolumeDriver = false;
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
-                            continue;
+                        if (data_get($temp, 'driver_opts.type')) {
+                            $isCustomVolumeDriver = true;
                         }
                     }
-                    $slugWithoutUuid = Str::slug($source, '-');
-                    $name = "{$uuid}_{$slugWithoutUuid}";
 
-                    if (is_string($volume)) {
-                        $parsed = parseDockerVolumeString($volume);
-                        $source = $parsed['source'];
-                        $target = $parsed['target'];
-                        $source = $name;
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (! $isCustomVolumeDriver) {
+                        // Process regular volumes with renaming and LocalPersistentVolume creation
+                        $slugWithoutUuid = Str::slug($source, '-');
+                        $name = "{$uuid}_{$slugWithoutUuid}";
+
+                        if (is_string($volume)) {
+                            $parsed = parseDockerVolumeString($volume);
+                            $source = $parsed['source'];
+                            $target = $parsed['target'];
+                            $source = $name;
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } elseif (is_array($volume)) {
+                            data_set($volume, 'source', $name);
                         }
-                    } elseif (is_array($volume)) {
-                        data_set($volume, 'source', $name);
+                        $topLevel->get('volumes')->put($name, [
+                            'name' => $name,
+                        ]);
+                        LocalPersistentVolume::updateOrCreate(
+                            [
+                                'name' => $name,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ],
+                            [
+                                'name' => $name,
+                                'mount_path' => $target,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ]
+                        );
                     }
-                    $topLevel->get('volumes')->put($name, [
-                        'name' => $name,
-                    ]);
-                    LocalPersistentVolume::updateOrCreate(
-                        [
-                            'name' => $name,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ],
-                        [
-                            'name' => $name,
-                            'mount_path' => $target,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ]
-                    );
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
