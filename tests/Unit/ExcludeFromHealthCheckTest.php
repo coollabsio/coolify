@@ -28,7 +28,7 @@ it('ensures ComplexStatusCheck returns excluded status when all containers exclu
         ->toContain('$aggregator->aggregateFromContainers($excludedOnly)')
         ->toContain("return 'degraded:excluded';")
         ->toContain("return 'paused:excluded';")
-        ->toContain("return 'exited:excluded';")
+        ->toContain("return 'exited';")
         ->toContain('return "$status:excluded";'); // For running:healthy:excluded
 });
 
@@ -47,7 +47,7 @@ it('ensures Service model returns unknown:unknown:excluded when no containers ex
     $serviceModelFile = file_get_contents(__DIR__.'/../../app/Models/Service.php');
 
     // Check that when a service has no applications or databases at all,
-    // the Service model returns 'unknown:unknown:excluded' instead of 'exited:unhealthy:excluded'
+    // the Service model returns 'unknown:unknown:excluded' instead of 'exited'
     // This prevents misleading status display when containers don't exist
     expect($serviceModelFile)
         ->toContain('// If no status was calculated at all (no containers exist), return unknown')
@@ -85,12 +85,9 @@ it('ensures exclude_from_hc flag is properly checked in GetContainersStatus', fu
 it('ensures UI displays excluded status correctly in status component', function () {
     $servicesStatusFile = file_get_contents(__DIR__.'/../../resources/views/components/status/services.blade.php');
 
-    // Verify that the status component transforms :excluded suffix to (excluded) for better display
+    // Verify that the status component uses formatContainerStatus helper to display status
     expect($servicesStatusFile)
-        ->toContain('$isExcluded = str($complexStatus)->endsWith(\':excluded\');')
-        ->toContain('$parts = explode(\':\', $complexStatus);')
-        ->toContain('// Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)')
-        ->toContain('// No health status: exited:excluded → Exited (excluded)');
+        ->toContain('formatContainerStatus($complexStatus)');
 });
 
 it('ensures UI handles excluded status in service heading buttons', function () {

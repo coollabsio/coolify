@@ -7,7 +7,7 @@
 
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n:1.114.4
+    image: docker.n8n.io/n8nio/n8n:1.119.2
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -46,7 +46,7 @@ services:
       retries: 10
 
   n8n-worker:
-    image: docker.n8n.io/n8nio/n8n:1.114.4
+    image: docker.n8n.io/n8nio/n8n:1.119.2
     command: worker
     environment:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}

@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table already exists (handles upgrades from v444 where this migration
+        // was named 2025_10_10_120000_create_webhook_notification_settings_table.php)
+        if (Schema::hasTable('webhook_notification_settings')) {
+            return;
+        }
+
         Schema::create('webhook_notification_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();

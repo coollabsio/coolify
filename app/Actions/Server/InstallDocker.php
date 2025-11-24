@@ -59,8 +59,6 @@ class InstallDocker
         $command = collect([]);
         if (isDev() && $server->id === 0) {
             $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'sleep 1',
                 "echo 'Installing Docker Engine...'",
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
                 'sleep 4',
@@ -70,45 +68,6 @@ class InstallDocker
 
             return remote_process($command, $server);
         } else {
-            if ($supported_os_type->contains('debian')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'apt-get update -y',
-                    'command -v curl >/dev/null || apt install -y curl',
-                    'command -v wget >/dev/null || apt install -y wget',
-                    'command -v git >/dev/null || apt install -y git',
-                    'command -v jq >/dev/null || apt install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('rhel')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'command -v curl >/dev/null || dnf install -y curl',
-                    'command -v wget >/dev/null || dnf install -y wget',
-                    'command -v git >/dev/null || dnf install -y git',
-                    'command -v jq >/dev/null || dnf install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('sles')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'zypper update -y',
-                    'command -v curl >/dev/null || zypper install -y curl',
-                    'command -v wget >/dev/null || zypper install -y wget',
-                    'command -v git >/dev/null || zypper install -y git',
-                    'command -v jq >/dev/null || zypper install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('arch')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'pacman -Syyy --noconfirm',
-                    'pacman -S archlinux-keyring --noconfirm',
-                    'command -v curl >/dev/null || pacman -S curl --noconfirm',
-                    'command -v wget >/dev/null || pacman -S wget --noconfirm',
-                    'command -v git >/dev/null || pacman -S git --noconfirm',
-                    'command -v jq >/dev/null || pacman -S jq --noconfirm',
-                ]);
-            } else {
-                throw new \Exception('Unsupported OS');
-            }
             $command = $command->merge([
                 "echo 'Installing Docker Engine...'",
             ]);
@@ -192,7 +151,7 @@ class InstallDocker
     private function getArchDockerInstallCommand(): string
     {
         return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
-            'pacman -S docker --noconfirm && '.
+            'pacman -S docker docker-compose docker-buildx --noconfirm && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
             ')';

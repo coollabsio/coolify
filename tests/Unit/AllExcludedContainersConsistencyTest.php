@@ -136,7 +136,7 @@ it('ensures excluded status format is consistent across all paths', function () 
         ->toContain("return 'degraded:excluded';")
         ->toContain("return 'paused:excluded';")
         ->toContain("return 'starting:excluded';")
-        ->toContain("return 'exited:excluded';")
+        ->toContain("return 'exited';")
         ->toContain('return "$status:excluded";'); // For running:healthy:excluded, running:unhealthy:excluded, etc.
 });
 
@@ -179,7 +179,7 @@ it('ensures calculateExcludedStatus uses ContainerStatusAggregator', function ()
         ->toContain("return 'degraded:excluded';")
         ->toContain("return 'paused:excluded';")
         ->toContain("return 'starting:excluded';")
-        ->toContain("return 'exited:excluded';")
+        ->toContain("return 'exited';")
         ->toContain('return "$status:excluded";'); // For running:healthy:excluded
 });
 
@@ -199,7 +199,7 @@ it('ensures calculateExcludedStatusFromStrings uses ContainerStatusAggregator', 
         ->toContain("return 'degraded:excluded';")
         ->toContain("return 'paused:excluded';")
         ->toContain("return 'starting:excluded';")
-        ->toContain("return 'exited:excluded';")
+        ->toContain("return 'exited';")
         ->toContain('return "$status:excluded";'); // For running:healthy:excluded
 });
 

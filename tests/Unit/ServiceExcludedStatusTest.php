@@ -73,7 +73,7 @@ describe('Service Excluded Status Calculation', function () {
         $service->shouldReceive('isStarting')->andReturn(false);
 
         $app1 = makeResource('running:healthy', excludeFromStatus: false);
-        $app2 = makeResource('exited:unhealthy', excludeFromStatus: true);
+        $app2 = makeResource('exited', excludeFromStatus: true);
 
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1, $app2]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
@@ -87,7 +87,7 @@ describe('Service Excluded Status Calculation', function () {
         $service->shouldReceive('isStarting')->andReturn(false);
 
         $app1 = makeResource('running:healthy', excludeFromStatus: false);
-        $app2 = makeResource('exited:unhealthy', excludeFromStatus: false);
+        $app2 = makeResource('exited', excludeFromStatus: false);
 
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1, $app2]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
@@ -224,7 +224,7 @@ describe('Service Excluded Status Calculation', function () {
         $service->shouldReceive('isStarting')->andReturn(false);
 
         $app1 = makeResource('running:healthy', excludeFromStatus: false);
-        $app2 = makeResource('exited:unhealthy:excluded', excludeFromStatus: false);
+        $app2 = makeResource('exited:excluded', excludeFromStatus: false);
 
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1, $app2]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
@@ -245,7 +245,7 @@ describe('Service Excluded Status Calculation', function () {
         expect($service->status)->toBe('running:healthy:excluded');
     });
 
-    it('returns exited:unhealthy:excluded when excluded containers have no valid status', function () {
+    it('returns exited when excluded containers have no valid status', function () {
         $service = Mockery::mock(Service::class)->makePartial();
         $service->shouldReceive('isStarting')->andReturn(false);
 
@@ -254,7 +254,7 @@ describe('Service Excluded Status Calculation', function () {
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
 
-        expect($service->status)->toBe('exited:unhealthy:excluded');
+        expect($service->status)->toBe('exited');
     });
 
     it('handles all excluded containers with degraded state', function () {
@@ -262,7 +262,7 @@ describe('Service Excluded Status Calculation', function () {
         $service->shouldReceive('isStarting')->andReturn(false);
 
         $app1 = makeResource('running:healthy', excludeFromStatus: true);
-        $app2 = makeResource('exited:unhealthy', excludeFromStatus: true);
+        $app2 = makeResource('exited', excludeFromStatus: true);
 
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1, $app2]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
@@ -286,12 +286,12 @@ describe('Service Excluded Status Calculation', function () {
         $service = Mockery::mock(Service::class)->makePartial();
         $service->shouldReceive('isStarting')->andReturn(false);
 
-        $app1 = makeResource('exited:unhealthy', excludeFromStatus: false);
+        $app1 = makeResource('exited', excludeFromStatus: false);
 
         $service->shouldReceive('getAttribute')->with('applications')->andReturn(collect([$app1]));
         $service->shouldReceive('getAttribute')->with('databases')->andReturn(collect());
 
-        expect($service->status)->toBe('exited:unhealthy');
+        expect($service->status)->toBe('exited');
     });
 
     it('prefers running over starting status', function () {

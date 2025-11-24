@@ -14,7 +14,10 @@ use Visus\Cuid2\Cuid2;
 
 class Index extends Component
 {
-    protected $listeners = ['refreshBoardingIndex' => 'validateServer'];
+    protected $listeners = [
+        'refreshBoardingIndex' => 'validateServer',
+        'prerequisitesInstalled' => 'handlePrerequisitesInstalled',
+    ];
 
     #[\Livewire\Attributes\Url(as: 'step', history: true)]
     public string $currentState = 'welcome';
@@ -75,6 +78,10 @@ class Index extends Component
     public bool $serverReachable = true;
 
     public ?string $minDockerVersion = null;
+
+    public int $prerequisiteInstallAttempts = 0;
+
+    public int $maxPrerequisiteInstallAttempts = 3;
 
     public function mount()
     {
@@ -320,6 +327,62 @@ class Index extends Component
             return handleError(error: $e, livewire: $this);
         }
 
+        try {
+            // Check prerequisites
+            $validationResult = $this->createdServer->validatePrerequisites();
+            if (! $validationResult['success']) {
+                // Check if we've exceeded max attempts
+                if ($this->prerequisiteInstallAttempts >= $this->maxPrerequisiteInstallAttempts) {
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    throw new \Exception("Prerequisites ({$missingCommands}) could not be installed after {$this->maxPrerequisiteInstallAttempts} attempts. Please install them manually.");
+                }
+
+                // Start async installation and wait for completion via ActivityMonitor
+                $activity = $this->createdServer->installPrerequisites();
+                $this->prerequisiteInstallAttempts++;
+                $this->dispatch('activityMonitor', $activity->id, 'prerequisitesInstalled');
+
+                // Return early - handlePrerequisitesInstalled() will be called when installation completes
+                return;
+            }
+
+            // Prerequisites are already installed, continue with validation
+            $this->continueValidation();
+        } catch (\Throwable $e) {
+            return handleError(error: $e, livewire: $this);
+        }
+    }
+
+    public function handlePrerequisitesInstalled()
+    {
+        try {
+            // Revalidate prerequisites after installation completes
+            $validationResult = $this->createdServer->validatePrerequisites();
+            if (! $validationResult['success']) {
+                // Installation completed but prerequisites still missing - retry
+                $missingCommands = implode(', ', $validationResult['missing']);
+
+                if ($this->prerequisiteInstallAttempts >= $this->maxPrerequisiteInstallAttempts) {
+                    throw new \Exception("Prerequisites ({$missingCommands}) could not be installed after {$this->maxPrerequisiteInstallAttempts} attempts. Please install them manually.");
+                }
+
+                // Try again
+                $activity = $this->createdServer->installPrerequisites();
+                $this->prerequisiteInstallAttempts++;
+                $this->dispatch('activityMonitor', $activity->id, 'prerequisitesInstalled');
+
+                return;
+            }
+
+            // Prerequisites validated successfully - continue with Docker validation
+            $this->continueValidation();
+        } catch (\Throwable $e) {
+            return handleError(error: $e, livewire: $this);
+        }
+    }
+
+    private function continueValidation()
+    {
         try {
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);

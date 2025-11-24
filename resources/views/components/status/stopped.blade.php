@@ -4,18 +4,30 @@
 ])
 @php
     // Handle both colon format (backend) and parentheses format (from services.blade.php)
-    // exited:unhealthy → Exited (unhealthy)
-    // exited (unhealthy) → exited (unhealthy) (already formatted, display as-is)
+    // For exited containers, health status is hidden (health checks don't run on stopped containers)
+    // exited:unhealthy → Exited
+    // exited (unhealthy) → Exited
 
     if (str($status)->contains('(')) {
         // Already in parentheses format from services.blade.php - use as-is
         $displayStatus = $status;
         $healthStatus = str($status)->after('(')->before(')')->trim()->value();
+
+        // Don't show health status for exited containers (health checks don't run on stopped containers)
+        if (str($displayStatus)->lower()->contains('exited')) {
+            $displayStatus = str($status)->before('(')->trim()->headline();
+            $healthStatus = null;
+        }
     } elseif (str($status)->contains(':')) {
         // Colon format from backend - transform it
         $parts = explode(':', $status);
         $displayStatus = str($parts[0])->headline();
         $healthStatus = $parts[1] ?? null;
+
+        // Don't show health status for exited containers (health checks don't run on stopped containers)
+        if (str($displayStatus)->lower()->contains('exited')) {
+            $healthStatus = null;
+        }
     } else {
         // Simple status without health
         $displayStatus = str($status)->headline();

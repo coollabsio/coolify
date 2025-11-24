@@ -105,6 +105,20 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function handle()
     {
+        // Defensive initialization for Collection properties to handle queue deserialization edge cases
+        $this->serviceContainerStatuses ??= collect();
+        $this->applicationContainerStatuses ??= collect();
+        $this->foundApplicationIds ??= collect();
+        $this->foundDatabaseUuids ??= collect();
+        $this->foundServiceApplicationIds ??= collect();
+        $this->foundApplicationPreviewsIds ??= collect();
+        $this->foundServiceDatabaseIds ??= collect();
+        $this->allApplicationIds ??= collect();
+        $this->allDatabaseUuids ??= collect();
+        $this->allTcpProxyUuids ??= collect();
+        $this->allServiceApplicationIds ??= collect();
+        $this->allServiceDatabaseIds ??= collect();
+
         // TODO: Swarm is not supported yet
         if (! $this->data) {
             throw new \Exception('No data provided');
@@ -148,7 +162,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $containerStatus = data_get($container, 'state', 'exited');
             $rawHealthStatus = data_get($container, 'health_status');
             $containerHealth = $rawHealthStatus ?? 'unknown';
-            $containerStatus = "$containerStatus:$containerHealth";
+            // Only append health status if container is not exited
+            if ($containerStatus !== 'exited') {
+                $containerStatus = "$containerStatus:$containerHealth";
+            }
             $labels = collect(data_get($container, 'labels'));
             $coolify_managed = $labels->has('coolify.managed');
 

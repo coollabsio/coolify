@@ -86,7 +86,7 @@ trait CalculatesExcludedStatus
         }
 
         if (str($status)->startsWith('exited')) {
-            return 'exited:excluded';
+            return 'exited';
         }
 
         // For running states, keep the health status: "running:healthy:excluded"

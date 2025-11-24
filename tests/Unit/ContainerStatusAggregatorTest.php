@@ -8,10 +8,10 @@ beforeEach(function () {
 });
 
 describe('aggregateFromStrings', function () {
-    test('returns exited:unhealthy for empty collection', function () {
+    test('returns exited for empty collection', function () {
         $result = $this->aggregator->aggregateFromStrings(collect());
 
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns running:healthy for single healthy running container', function () {
@@ -78,12 +78,12 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('returns exited:unhealthy for exited containers without restart count', function () {
+    test('returns exited for exited containers without restart count', function () {
         $statuses = collect(['exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 0);
 
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns degraded:unhealthy for dead container', function () {
@@ -200,10 +200,10 @@ describe('aggregateFromStrings', function () {
 });
 
 describe('aggregateFromContainers', function () {
-    test('returns exited:unhealthy for empty collection', function () {
+    test('returns exited for empty collection', function () {
         $result = $this->aggregator->aggregateFromContainers(collect());
 
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns running:healthy for single healthy running container', function () {
@@ -299,7 +299,7 @@ describe('aggregateFromContainers', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('returns exited:unhealthy for exited containers without restart count', function () {
+    test('returns exited for exited containers without restart count', function () {
         $containers = collect([
             (object) [
                 'State' => (object) [
@@ -310,7 +310,7 @@ describe('aggregateFromContainers', function () {
 
         $result = $this->aggregator->aggregateFromContainers($containers, maxRestartCount: 0);
 
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns degraded:unhealthy for dead container', function () {
@@ -473,8 +473,8 @@ describe('maxRestartCount validation', function () {
         // With negative value, should be treated as 0 (no restarts)
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: -5);
 
-        // Should return exited:unhealthy (not degraded) since corrected to 0
-        expect($result)->toBe('exited:unhealthy');
+        // Should return exited (not degraded) since corrected to 0
+        expect($result)->toBe('exited');
     });
 
     test('negative maxRestartCount is corrected to 0 in aggregateFromContainers', function () {
@@ -493,8 +493,8 @@ describe('maxRestartCount validation', function () {
         // With negative value, should be treated as 0 (no restarts)
         $result = $this->aggregator->aggregateFromContainers($containers, maxRestartCount: -10);
 
-        // Should return exited:unhealthy (not degraded) since corrected to 0
-        expect($result)->toBe('exited:unhealthy');
+        // Should return exited (not degraded) since corrected to 0
+        expect($result)->toBe('exited');
     });
 
     test('zero maxRestartCount works correctly', function () {
@@ -503,7 +503,7 @@ describe('maxRestartCount validation', function () {
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 0);
 
         // Zero is valid default - no crash loop detection
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('positive maxRestartCount works correctly', function () {
@@ -535,6 +535,6 @@ describe('maxRestartCount validation', function () {
         // Call without specifying maxRestartCount (should default to 0)
         $result = $this->aggregator->aggregateFromStrings($statuses);
 
-        expect($result)->toBe('exited:unhealthy');
+        expect($result)->toBe('exited');
     });
 });
