@@ -148,7 +148,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $containerStatus = data_get($container, 'state', 'exited');
             $rawHealthStatus = data_get($container, 'health_status');
             $containerHealth = $rawHealthStatus ?? 'unknown';
-            $containerStatus = "$containerStatus:$containerHealth";
+            // Only append health status if container is not exited
+            if ($containerStatus !== 'exited') {
+                $containerStatus = "$containerStatus:$containerHealth";
+            }
             $labels = collect(data_get($container, 'labels'));
             $coolify_managed = $labels->has('coolify.managed');
 

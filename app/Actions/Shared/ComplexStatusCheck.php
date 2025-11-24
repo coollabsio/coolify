@@ -20,11 +20,11 @@ class ComplexStatusCheck
             $is_main_server = $application->destination->server->id === $server->id;
             if (! $server->isFunctional()) {
                 if ($is_main_server) {
-                    $application->update(['status' => 'exited:unhealthy']);
+                    $application->update(['status' => 'exited']);
 
                     continue;
                 } else {
-                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited']);
 
                     continue;
                 }
@@ -49,11 +49,11 @@ class ComplexStatusCheck
                 }
             } else {
                 if ($is_main_server) {
-                    $application->update(['status' => 'exited:unhealthy']);
+                    $application->update(['status' => 'exited']);
 
                     continue;
                 } else {
-                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited']);
 
                     continue;
                 }

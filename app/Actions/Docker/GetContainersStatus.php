@@ -107,6 +107,8 @@ class GetContainersStatus
             if ($containerStatus === 'restarting') {
                 $healthSuffix = $containerHealth ?? 'unknown';
                 $containerStatus = "restarting:$healthSuffix";
+            } elseif ($containerStatus === 'exited') {
+                // Keep as-is, no health suffix for exited containers
             } else {
                 $healthSuffix = $containerHealth ?? 'unknown';
                 $containerStatus = "$containerStatus:$healthSuffix";
@@ -332,7 +334,7 @@ class GetContainersStatus
 
             if ($recentlyRestarted) {
                 // Keep it as degraded if it was recently in a crash loop
-                $application->update(['status' => 'degraded (unhealthy)']);
+                $application->update(['status' => 'degraded:unhealthy']);
             } else {
                 // Reset restart count when application exits completely
                 $application->update([

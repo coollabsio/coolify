@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Log;
  * 5. Dead/Removing → degraded:unhealthy
  * 6. Paused → paused:unknown
  * 7. Starting/Created → starting:unknown
- * 8. Exited → exited:unhealthy
+ * 8. Exited → exited
  */
 class ContainerStatusAggregator
 {
@@ -52,7 +52,7 @@ class ContainerStatusAggregator
         }
 
         if ($containerStatuses->isEmpty()) {
-            return 'exited:unhealthy';
+            return 'exited';
         }
 
         // Initialize state flags
@@ -79,7 +79,6 @@ class ContainerStatusAggregator
                 }
             } elseif (str($status)->contains('exited')) {
                 $hasExited = true;
-                $hasUnhealthy = true;
             } elseif (str($status)->contains('created') || str($status)->contains('starting')) {
                 $hasStarting = true;
             } elseif (str($status)->contains('paused')) {
@@ -128,7 +127,7 @@ class ContainerStatusAggregator
         }
 
         if ($containers->isEmpty()) {
-            return 'exited:unhealthy';
+            return 'exited';
         }
 
         // Initialize state flags
@@ -157,7 +156,6 @@ class ContainerStatusAggregator
                 }
             } elseif ($state === 'exited') {
                 $hasExited = true;
-                $hasUnhealthy = true;
             } elseif ($state === 'created' || $state === 'starting') {
                 $hasStarting = true;
             } elseif ($state === 'paused') {
@@ -248,6 +246,6 @@ class ContainerStatusAggregator
         }
 
         // Priority 8: All containers exited (no restart count = truly stopped)
-        return 'exited:unhealthy';
+        return 'exited';
     }
 }

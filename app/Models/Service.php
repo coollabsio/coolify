@@ -223,7 +223,12 @@ class Service extends BaseModel
                 return 'unknown:unknown:excluded';
             }
 
-            return 'exited:unhealthy:excluded';
+            return 'exited';
+        }
+
+        // If health is null/empty, return just the status without trailing colon
+        if ($complexHealth === null || $complexHealth === '') {
+            return $complexStatus;
         }
 
         return "{$complexStatus}:{$complexHealth}";
