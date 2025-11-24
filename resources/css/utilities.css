@@ -32,7 +32,20 @@
 }
 
 @utility input-sticky {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 dark:bg-coolgray-100 dark:text-white disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 focus-visible:outline-none;
+    box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #e5e5e5;
+
+    &:where(.dark, .dark *) {
+        box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #242424;
+    }
+
+    &:focus-visible {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 1px #e5e5e5;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 1px #242424;
+    }
 }
 
 @utility input-sticky-active {
@@ -46,20 +59,49 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-2 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 dark:bg-coolgray-100 dark:text-white disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40;
+    box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;
+
+    &:where(.dark, .dark *) {
+        box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #242424;
+    }
+
+    &:disabled {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):disabled {
+        box-shadow: none;
+    }
 }
 
 /* Readonly */
 @utility input {
-    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply focus-visible:outline-none;
+
+    &:focus-visible {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424;
+    }
+
+    &:read-only {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):read-only {
+        box-shadow: none;
+    }
 }
 
 @utility select {
     @apply w-full;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply focus-visible:outline-none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23000000'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
@@ -68,6 +110,14 @@
 
     &:where(.dark, .dark *) {
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23ffffff'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
+    }
+
+    &:focus-visible {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424;
     }
 }
 

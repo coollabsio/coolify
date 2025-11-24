@@ -514,84 +514,96 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $key = str($key);
                 $value = replaceVariables($value);
                 $command = parseCommandFromMagicEnvVariable($key);
-                if ($command->value() === 'FQDN') {
-                    $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
-                    $originalFqdnFor = str($fqdnFor)->replace('_', '-');
-                    if (str($fqdnFor)->contains('-')) {
-                        $fqdnFor = str($fqdnFor)->replace('-', '_')->replace('.', '_');
+                if ($command->value() === 'FQDN' || $command->value() === 'URL') {
+                    // ALWAYS create BOTH SERVICE_URL and SERVICE_FQDN pairs regardless of which one is in template
+                    $parsed = parseServiceEnvironmentVariable($key->value());
+                    $serviceName = $parsed['service_name'];
+                    $port = $parsed['port'];
+
+                    // Extract case-preserved service name from template
+                    $strKey = str($key->value());
+                    if ($parsed['has_port']) {
+                        if ($strKey->startsWith('SERVICE_URL_')) {
+                            $serviceNamePreserved = $strKey->after('SERVICE_URL_')->beforeLast('_')->value();
+                        } else {
+                            $serviceNamePreserved = $strKey->after('SERVICE_FQDN_')->beforeLast('_')->value();
+                        }
+                    } else {
+                        if ($strKey->startsWith('SERVICE_URL_')) {
+                            $serviceNamePreserved = $strKey->after('SERVICE_URL_')->value();
+                        } else {
+                            $serviceNamePreserved = $strKey->after('SERVICE_FQDN_')->value();
+                        }
                     }
-                    // Generated FQDN & URL
-                    $fqdn = generateFqdn(server: $server, random: "$originalFqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
-                    $url = generateUrl(server: $server, random: "$originalFqdnFor-$uuid");
+
+                    $originalServiceName = str($serviceName)->replace('_', '-')->value();
+                    // Always normalize service names to match docker_compose_domains lookup
+                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+
+                    // Generate BOTH FQDN & URL
+                    $fqdn = generateFqdn(server: $server, random: "$originalServiceName-$uuid", parserVersion: $resource->compose_parsing_version);
+                    $url = generateUrl(server: $server, random: "$originalServiceName-$uuid");
+
+                    // IMPORTANT: SERVICE_FQDN env vars should NOT contain scheme (host only)
+                    // But $fqdn variable itself may contain scheme (used for database domain field)
+                    // Strip scheme for environment variable values
+                    $fqdnValueForEnv = str($fqdn)->after('://')->value();
+
+                    // Append port if specified
+                    $urlWithPort = $url;
+                    $fqdnValueForEnvWithPort = $fqdnValueForEnv;
+                    if ($port && is_numeric($port)) {
+                        $urlWithPort = "$url:$port";
+                        $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
+                    }
+
+                    // ALWAYS create base SERVICE_FQDN variable (host only, no scheme)
                     $resource->environment_variables()->firstOrCreate([
-                        'key' => $key->value(),
+                        'key' => "SERVICE_FQDN_{$serviceNamePreserved}",
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
-                        'value' => $fqdn,
+                        'value' => $fqdnValueForEnv,
                         'is_preview' => false,
                     ]);
-                    if ($resource->build_pack === 'dockercompose') {
-                        // Check if a service with this name actually exists
-                        $serviceExists = false;
-                        foreach ($services as $serviceName => $service) {
-                            $transformedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
-                            if ($transformedServiceName === $fqdnFor) {
-                                $serviceExists = true;
-                                break;
-                            }
-                        }
 
-                        // Only add domain if the service exists
-                        if ($serviceExists) {
-                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                            $domainExists = data_get($domains->get($fqdnFor), 'domain');
-                            $envExists = $resource->environment_variables()->where('key', $key->value())->first();
-                            if (str($domainExists)->replace('http://', '')->replace('https://', '')->value() !== $envExists->value) {
-                                $envExists->update([
-                                    'value' => $url,
-                                ]);
-                            }
-                            if (is_null($domainExists)) {
-                                // Put URL in the domains array instead of FQDN
-                                $domains->put((string) $fqdnFor, [
-                                    'domain' => $url,
-                                ]);
-                                $resource->docker_compose_domains = $domains->toJson();
-                                $resource->save();
-                            }
-                        }
-                    }
-                } elseif ($command->value() === 'URL') {
-                    // SERVICE_URL_APP or SERVICE_URL_APP_3000
-                    // Detect if there's a port suffix
-                    $parsed = parseServiceEnvironmentVariable($key->value());
-                    $urlFor = $parsed['service_name'];
-                    $port = $parsed['port'];
-                    $originalUrlFor = str($urlFor)->replace('_', '-');
-                    if (str($urlFor)->contains('-')) {
-                        $urlFor = str($urlFor)->replace('-', '_')->replace('.', '_');
-                    }
-                    $url = generateUrl(server: $server, random: "$originalUrlFor-$uuid");
-                    // Append port if specified
-                    $urlWithPort = $url;
-                    if ($port && is_numeric($port)) {
-                        $urlWithPort = "$url:$port";
-                    }
+                    // ALWAYS create base SERVICE_URL variable (with scheme)
                     $resource->environment_variables()->firstOrCreate([
-                        'key' => $key->value(),
+                        'key' => "SERVICE_URL_{$serviceNamePreserved}",
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
                         'is_preview' => false,
                     ]);
+
+                    // If port-specific, ALSO create port-specific pairs
+                    if ($parsed['has_port'] && $port) {
+                        $resource->environment_variables()->firstOrCreate([
+                            'key' => "SERVICE_FQDN_{$serviceNamePreserved}_{$port}",
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
+                        ], [
+                            'value' => $fqdnValueForEnvWithPort,
+                            'is_preview' => false,
+                        ]);
+
+                        $resource->environment_variables()->firstOrCreate([
+                            'key' => "SERVICE_URL_{$serviceNamePreserved}_{$port}",
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
+                        ], [
+                            'value' => $urlWithPort,
+                            'is_preview' => false,
+                        ]);
+                    }
+
                     if ($resource->build_pack === 'dockercompose') {
                         // Check if a service with this name actually exists
                         $serviceExists = false;
-                        foreach ($services as $serviceName => $service) {
-                            $transformedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
-                            if ($transformedServiceName === $urlFor) {
+                        foreach ($services as $serviceNameKey => $service) {
+                            $transformedServiceName = str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value();
+                            if ($transformedServiceName === $serviceName) {
                                 $serviceExists = true;
                                 break;
                             }
@@ -600,16 +612,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         // Only add domain if the service exists
                         if ($serviceExists) {
                             $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                            $domainExists = data_get($domains->get($urlFor), 'domain');
-                            $envExists = $resource->environment_variables()->where('key', $key->value())->first();
-                            if ($domainExists !== $envExists->value) {
-                                $envExists->update([
-                                    'value' => $urlWithPort,
-                                ]);
-                            }
+                            $domainExists = data_get($domains->get($serviceName), 'domain');
+
+                            // Update domain using URL with port if applicable
+                            $domainValue = $port ? $urlWithPort : $url;
+
                             if (is_null($domainExists)) {
-                                $domains->put((string) $urlFor, [
-                                    'domain' => $urlWithPort,
+                                $domains->put($serviceName, [
+                                    'domain' => $domainValue,
                                 ]);
                                 $resource->docker_compose_domains = $domains->toJson();
                                 $resource->save();
@@ -1584,92 +1594,115 @@ function serviceParser(Service $resource): Collection
             }
             // Get magic environments where we need to preset the FQDN / URL
             if ($key->startsWith('SERVICE_FQDN_') || $key->startsWith('SERVICE_URL_')) {
-                // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
+                // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000 or SERVICE_URL_APP or SERVICE_URL_APP_3000
+                // ALWAYS create BOTH SERVICE_URL and SERVICE_FQDN pairs regardless of which one is in template
                 $parsed = parseServiceEnvironmentVariable($key->value());
-                if ($key->startsWith('SERVICE_FQDN_')) {
-                    $urlFor = null;
-                    $fqdnFor = $parsed['service_name'];
-                }
-                if ($key->startsWith('SERVICE_URL_')) {
-                    $fqdnFor = null;
-                    $urlFor = $parsed['service_name'];
-                }
-                $port = $parsed['port'];
-                if (blank($savedService->fqdn)) {
-                    if ($fqdnFor) {
-                        $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
+
+                // Extract service name preserving original case from template
+                $strKey = str($key->value());
+                if ($parsed['has_port']) {
+                    if ($strKey->startsWith('SERVICE_URL_')) {
+                        $serviceName = $strKey->after('SERVICE_URL_')->beforeLast('_')->value();
+                    } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+                        $serviceName = $strKey->after('SERVICE_FQDN_')->beforeLast('_')->value();
                     } else {
-                        $fqdn = generateFqdn(server: $server, random: "{$savedService->name}-$uuid", parserVersion: $resource->compose_parsing_version);
-                    }
-                    if ($urlFor) {
-                        $url = generateUrl($server, "$urlFor-$uuid");
-                    } else {
-                        $url = generateUrl($server, "{$savedService->name}-$uuid");
+                        continue;
                     }
                 } else {
+                    if ($strKey->startsWith('SERVICE_URL_')) {
+                        $serviceName = $strKey->after('SERVICE_URL_')->value();
+                    } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+                        $serviceName = $strKey->after('SERVICE_FQDN_')->value();
+                    } else {
+                        continue;
+                    }
+                }
+
+                $port = $parsed['port'];
+                $fqdnFor = $parsed['service_name'];
+
+                // Only ServiceApplication has fqdn column, ServiceDatabase does not
+                $isServiceApplication = $savedService instanceof ServiceApplication;
+
+                if ($isServiceApplication && blank($savedService->fqdn)) {
+                    $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
+                    $url = generateUrl($server, "$fqdnFor-$uuid");
+                } elseif ($isServiceApplication) {
                     $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
                     $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                } else {
+                    // For ServiceDatabase, generate fqdn/url without saving to the model
+                    $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
+                    $url = generateUrl($server, "$fqdnFor-$uuid");
                 }
+
+                // IMPORTANT: SERVICE_FQDN env vars should NOT contain scheme (host only)
+                // But $fqdn variable itself may contain scheme (used for database domain field)
+                // Strip scheme for environment variable values
+                $fqdnValueForEnv = str($fqdn)->after('://')->value();
 
                 if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
                         $fqdn = "$fqdn$path";
                         $url = "$url$path";
+                        $fqdnValueForEnv = "$fqdnValueForEnv$path";
                     }
                 }
-                $fqdnWithPort = $fqdn;
+
                 $urlWithPort = $url;
+                $fqdnValueForEnvWithPort = $fqdnValueForEnv;
                 if ($fqdn && $port) {
-                    $fqdnWithPort = "$fqdn:$port";
+                    $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
                 }
                 if ($url && $port) {
                     $urlWithPort = "$url:$port";
                 }
-                if (is_null($savedService->fqdn)) {
+
+                // Only save fqdn to ServiceApplication, not ServiceDatabase
+                if ($isServiceApplication && is_null($savedService->fqdn)) {
+                    // Save URL (with scheme) to database, not FQDN
                     if ((int) $resource->compose_parsing_version >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
-                        if ($fqdnFor) {
-                            $savedService->fqdn = $fqdnWithPort;
-                        }
-                        if ($urlFor) {
-                            $savedService->fqdn = $urlWithPort;
-                        }
+                        $savedService->fqdn = $urlWithPort;
                     } else {
-                        $savedService->fqdn = $fqdnWithPort;
+                        $savedService->fqdn = $urlWithPort;
                     }
                     $savedService->save();
                 }
-                if (! $parsed['has_port']) {
+
+                // ALWAYS create BOTH base SERVICE_URL and SERVICE_FQDN pairs (without port)
+                $resource->environment_variables()->updateOrCreate([
+                    'key' => "SERVICE_FQDN_{$serviceName}",
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'value' => $fqdnValueForEnv,
+                    'is_preview' => false,
+                ]);
+
+                $resource->environment_variables()->updateOrCreate([
+                    'key' => "SERVICE_URL_{$serviceName}",
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'value' => $url,
+                    'is_preview' => false,
+                ]);
+
+                // For port-specific variables, ALSO create port-specific pairs
+                // If template variable has port, create both URL and FQDN with port suffix
+                if ($parsed['has_port'] && $port) {
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => $key->value(),
+                        'key' => "SERVICE_FQDN_{$serviceName}_{$port}",
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
-                        'value' => $fqdn,
+                        'value' => $fqdnValueForEnvWithPort,
                         'is_preview' => false,
                     ]);
+
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => $key->value(),
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $url,
-                        'is_preview' => false,
-                    ]);
-                }
-                if ($parsed['has_port']) {
-                    // For port-specific variables (e.g., SERVICE_FQDN_UMAMI_3000),
-                    // keep the port suffix in the key and use the URL with port
-                    $resource->environment_variables()->updateOrCreate([
-                        'key' => $key->value(),
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $fqdnWithPort,
-                        'is_preview' => false,
-                    ]);
-                    $resource->environment_variables()->updateOrCreate([
-                        'key' => $key->value(),
+                        'key' => "SERVICE_URL_{$serviceName}_{$port}",
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [

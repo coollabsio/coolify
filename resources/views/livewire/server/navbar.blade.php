@@ -1,5 +1,5 @@
 <div class="pb-6">
-    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen>
+    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
             <livewire:activity-monitor header="Logs" fullHeight />
@@ -56,112 +56,106 @@
     <div class="navbar-main">
         <nav
             class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
-            <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
-                href="{{ route('server.show', [
-                    'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+            <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
+    'server_uuid' => data_get($server, 'uuid'),
+]) }}">
                 Configuration
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
-                <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }}"
-                    href="{{ route('server.proxy', [
-                        'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
-                    Proxy
-                </a>
-            @endif
-            <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}"
-                href="{{ route('server.resources', [
+                        <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
+                            Proxy
+                            @if ($this->hasTraefikOutdated)
+                                <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="currentColor"
+                                        d="M236.8 188.09L149.35 36.22a24.76 24.76 0 0 0-42.7 0L19.2 188.09a23.51 23.51 0 0 0 0 23.72A24.35 24.35 0 0 0 40.55 224h174.9a24.35 24.35 0 0 0 21.33-12.19a23.51 23.51 0 0 0 .02-23.72m-13.87 15.71a8.5 8.5 0 0 1-7.48 4.2H40.55a8.5 8.5 0 0 1-7.48-4.2a7.59 7.59 0 0 1 0-7.72l87.45-151.87a8.75 8.75 0 0 1 15 0l87.45 151.87a7.59 7.59 0 0 1-.04 7.72M120 144v-40a8 8 0 0 1 16 0v40a8 8 0 0 1-16 0m20 36a12 12 0 1 1-12-12a12 12 0 0 1 12 12" />
+                                </svg>
+                            @endif
+                        </a>
+            @endif
+            <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}" href="{{ route('server.resources', [
+    'server_uuid' => data_get($server, 'uuid'),
+]) }}">
                 Resources
             </a>
             @can('canAccessTerminal')
-                <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('server.command', [
-                        'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
-                    Terminal
-                </a>
+                        <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}" href="{{ route('server.command', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}">
+                            Terminal
+                        </a>
             @endcan
             @can('update', $server)
-                <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
-                    href="{{ route('server.security.patches', [
-                        'server_uuid' => data_get($server, 'uuid'),
-                    ]) }}">
-                    Security
-                </a>
+                        <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}">
+                            Security
+                        </a>
             @endcan
         </nav>
         <div class="order-first sm:order-last">
             <div>
                 @if ($server->proxySet())
-                    <x-slide-over fullScreen @startproxy.window="slideOverOpen = true">
-                        <x-slot:title>Proxy Status</x-slot:title>
-                        <x-slot:content>
-                            <livewire:activity-monitor header="Logs" />
-                        </x-slot:content>
-                    </x-slide-over>
                     @if ($proxyStatus === 'running')
-                        <div class="flex gap-2">
-                            <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
-                                <x-loading text="Checking Traefik dashboard" />
-                            </div>
-                            @if ($traefikDashboardAvailable)
-                                <button>
-                                    <a target="_blank" href="http://{{ $serverIp }}:8080">
-                                        Traefik Dashboard
-                                        <x-external-link />
-                                    </a>
-                                </button>
-                            @endif
-                            <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
-                                submitAction="restart" :actions="[
-                                    'This proxy will be stopped and started again.',
-                                    'All resources hosted on coolify will be unavailable during the restart.',
-                                ]" :confirmWithText="false" :confirmWithPassword="false"
-                                step2ButtonText="Restart Proxy" :dispatchEvent="true" dispatchEventType="restartEvent">
-                                <x-slot:button-title>
-                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <g fill="none" stroke="currentColor" stroke-linecap="round"
-                                            stroke-linejoin="round" stroke-width="2">
+                            <div class="flex gap-2">
+                                <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
+                                    <x-loading text="Checking Traefik dashboard" />
+                                </div>
+                                @if ($traefikDashboardAvailable)
+                                    <button>
+                                        <a target="_blank" href="http://{{ $serverIp }}:8080">
+                                            Traefik Dashboard
+                                            <x-external-link />
+                                        </a>
+                                    </button>
+                                @endif
+                                <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
+                                    submitAction="restart" :actions="[
+                            'This proxy will be stopped and started again.',
+                            'All resources hosted on coolify will be unavailable during the restart.',
+                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
+                                    :dispatchEvent="true" dispatchEventType="restartEvent">
+                                    <x-slot:button-title>
+                                        <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                            xmlns="http://www.w3.org/2000/svg">
+                                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                                stroke-width="2">
+                                                <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                                <path d="M20 4v5h-5" />
+                                            </g>
+                                        </svg>
+                                        Restart Proxy
+                                    </x-slot:button-title>
+                                </x-modal-confirmation>
+                                <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
+                                    submitAction="stop(true)" :actions="[
+                            'The coolify proxy will be stopped.',
+                            'All resources hosted on coolify will be unavailable.',
+                        ]" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Stop Proxy" :dispatchEvent="true"
+                                    dispatchEventType="stopEvent">
+                                    <x-slot:button-title>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                            <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                            </path>
                                             <path
-                                                d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                            <path d="M20 4v5h-5" />
-                                        </g>
-                                    </svg>
-                                    Restart Proxy
-                                </x-slot:button-title>
-                            </x-modal-confirmation>
-                            <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
-                                submitAction="stop(true)" :actions="[
-                                    'The coolify proxy will be stopped.',
-                                    'All resources hosted on coolify will be unavailable.',
-                                ]" :confirmWithText="false" :confirmWithPassword="false"
-                                step2ButtonText="Stop Proxy" :dispatchEvent="true" dispatchEventType="stopEvent">
-                                <x-slot:button-title>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error"
-                                        viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                                        stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path
-                                            d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                        </path>
-                                        <path
-                                            d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                        </path>
-                                    </svg>
-                                    Stop Proxy
-                                </x-slot:button-title>
-                            </x-modal-confirmation>
-                        </div>
+                                                d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                            </path>
+                                        </svg>
+                                        Stop Proxy
+                                    </x-slot:button-title>
+                                </x-modal-confirmation>
+                            </div>
                     @else
                         <button @click="$wire.dispatch('checkProxyEvent')" class="gap-2 button">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
-                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                stroke-linecap="round" stroke-linejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
@@ -170,27 +164,27 @@
                     @endif
                 @endif
                 @script
-                    <script>
-                        $wire.$on('checkProxyEvent', () => {
-                            try {
-                                $wire.$call('checkProxy');
-                            } catch (error) {
-                                console.error(error);
-                                $wire.$dispatch('error', 'Failed to check proxy status. Please try again.');
-                            }
-                        });
-                        $wire.$on('restartEvent', () => {
-                            $wire.$dispatch('info', 'Initiating proxy restart.');
-                            $wire.$call('restart');
-                        });
-                        $wire.$on('startProxy', () => {
-                            window.dispatchEvent(new CustomEvent('startproxy'))
-                            $wire.$call('startProxy');
-                        });
-                        $wire.$on('stopEvent', () => {
-                            $wire.$call('stop');
-                        });
-                    </script>
+                <script>
+                    $wire.$on('checkProxyEvent', () => {
+                        try {
+                            $wire.$call('checkProxy');
+                        } catch (error) {
+                            console.error(error);
+                            $wire.$dispatch('error', 'Failed to check proxy status. Please try again.');
+                        }
+                    });
+                    $wire.$on('restartEvent', () => {
+                        window.dispatchEvent(new CustomEvent('startproxy'))
+                        $wire.$call('restart');
+                    });
+                    $wire.$on('startProxy', () => {
+                        window.dispatchEvent(new CustomEvent('startproxy'))
+                        $wire.$call('startProxy');
+                    });
+                    $wire.$on('stopEvent', () => {
+                        $wire.$call('stop');
+                    });
+                </script>
                 @endscript
             </div>
         </div>

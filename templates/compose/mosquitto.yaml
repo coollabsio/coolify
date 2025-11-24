@@ -34,7 +34,7 @@ services:
       fi &&
       echo ''require_certificate ''$REQUIRE_CERTIFICATE >> /mosquitto/config/mosquitto.conf &&
       echo ''allow_anonymous ''$ALLOW_ANONYMOUS >> /mosquitto/config/mosquitto.conf;
-      if [ -n ''$SERVICE_USER_MOSQUITTO''] && [ -n ''$SERVICE_PASSWORD_MOSQUITTO'' ]; then
+      if [ -n ''$SERVICE_USER_MOSQUITTO'' ] && [ -n ''$SERVICE_PASSWORD_MOSQUITTO'' ]; then
       echo ''password_file /mosquitto/config/passwords'' >> /mosquitto/config/mosquitto.conf &&
       touch /mosquitto/config/passwords &&
       chmod 0700 /mosquitto/config/passwords &&

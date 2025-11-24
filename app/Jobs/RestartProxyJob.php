@@ -31,12 +31,12 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            StopProxy::run($this->server);
+            StopProxy::run($this->server, restarting: true);
 
             $this->server->proxy->force_stop = false;
             $this->server->save();
 
-            StartProxy::run($this->server, force: true);
+            StartProxy::run($this->server, force: true, restarting: true);
 
         } catch (\Throwable $e) {
             return handleError($e);

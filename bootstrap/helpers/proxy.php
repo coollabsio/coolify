@@ -334,3 +334,93 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
 
     return $config;
 }
+
+function getExactTraefikVersionFromContainer(Server $server): ?string
+{
+    try {
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Checking for exact version");
+
+        // Method A: Execute traefik version command (most reliable)
+        $versionCommand = "docker exec coolify-proxy traefik version 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Running: {$versionCommand}");
+
+        $output = instant_remote_process([$versionCommand], $server, false);
+
+        if (! empty(trim($output))) {
+            $version = trim($output);
+            Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Detected exact version from command: {$version}");
+
+            return $version;
+        }
+
+        // Method B: Try OCI label as fallback
+        $labelCommand = "docker inspect coolify-proxy --format '{{index .Config.Labels \"org.opencontainers.image.version\"}}' 2>/dev/null";
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Trying OCI label");
+
+        $label = instant_remote_process([$labelCommand], $server, false);
+
+        if (! empty(trim($label))) {
+            // Extract version number from label (might have 'v' prefix)
+            if (preg_match('/(\d+\.\d+\.\d+)/', trim($label), $matches)) {
+                Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Detected from OCI label: {$matches[1]}");
+
+                return $matches[1];
+            }
+        }
+
+        Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Could not detect exact version");
+
+        return null;
+    } catch (\Exception $e) {
+        Log::error("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
+
+        return null;
+    }
+}
+
+function getTraefikVersionFromDockerCompose(Server $server): ?string
+{
+    try {
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Starting version detection");
+
+        // Try to get exact version from running container (e.g., "3.6.0")
+        $exactVersion = getExactTraefikVersionFromContainer($server);
+        if ($exactVersion) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Using exact version: {$exactVersion}");
+
+            return $exactVersion;
+        }
+
+        // Fallback: Check image tag (current method)
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Falling back to image tag detection");
+
+        $containerName = 'coolify-proxy';
+        $inspectCommand = "docker inspect {$containerName} --format '{{.Config.Image}}' 2>/dev/null";
+
+        $image = instant_remote_process([$inspectCommand], $server, false);
+
+        if (empty(trim($image))) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Container '{$containerName}' not found or not running");
+
+            return null;
+        }
+
+        $image = trim($image);
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Running container image: {$image}");
+
+        // Extract version from image string (e.g., "traefik:v3.6" or "traefik:3.6.0" or "traefik:latest")
+        if (preg_match('/traefik:(v?\d+\.\d+(?:\.\d+)?|latest)/i', $image, $matches)) {
+            Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Extracted version from image tag: {$matches[1]}");
+
+            return $matches[1];
+        }
+
+        Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Image format doesn't match expected pattern: {$image}");
+
+        return null;
+    } catch (\Exception $e) {
+        Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
+
+        return null;
+    }
+}

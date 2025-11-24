@@ -66,7 +66,7 @@
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
                                             @can('update', $service)
-                                                <x-modal-input title="Edit Domains" :closeOutside="false">
+                                                <x-modal-input title="Edit Domains" :closeOutside="false" minWidth="32rem" maxWidth="40rem">
                                                     <x-slot:content>
                                                         <span class="cursor-pointer">
                                                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -90,7 +90,7 @@
                                             @endcan
                                         </span>
                                     @endif
-                                    <div class="pt-2 text-xs">{{ $application->status }}</div>
+                                        <div class="pt-2 text-xs">{{ formatContainerStatus($application->status) }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
@@ -139,7 +139,7 @@
                                     @if ($database->description)
                                         <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
                                     @endif
-                                    <div class="text-xs">{{ $database->status }}</div>
+                                        <div class="text-xs">{{ formatContainerStatus($database->status) }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
                                     @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
