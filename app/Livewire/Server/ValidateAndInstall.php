@@ -132,7 +132,7 @@ class ValidateAndInstall extends Component
                         $this->installationStep = 'Prerequisites';
                         $activity = $this->server->installPrerequisites();
                         $this->number_of_tries++;
-                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
 
                     return;
@@ -168,7 +168,7 @@ class ValidateAndInstall extends Component
                         $this->installationStep = 'Docker';
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
 
                     return;
