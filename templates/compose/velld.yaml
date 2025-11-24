@@ -8,7 +8,7 @@ services:
   api:
     image: ghcr.io/dendianugerah/velld/api:sha-ce8b88c
     environment:
-      - SERVICE_URL_API_8080
+      - SERVICE_URL_API_8080=
       - JWT_SECRET=${SERVICE_HEX_32_JWT}
       - ENCRYPTION_KEY=${SERVICE_HEX_32_ENCRYPTION}
       - ADMIN_USERNAME_CREDENTIAL=${ADMIN_USERNAME_CREDENTIAL:-admin}
@@ -33,7 +33,7 @@ services:
   web:
     image: ghcr.io/dendianugerah/velld/web:sha-ce8b88c
     environment:
-      - SERVICE_URL_VELLD_3000
+      - SERVICE_URL_VELLD_3000=
       - NEXT_PUBLIC_API_URL=$SERVICE_URL_API # Needs to be accessible by a browser
       - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
     depends_on:
