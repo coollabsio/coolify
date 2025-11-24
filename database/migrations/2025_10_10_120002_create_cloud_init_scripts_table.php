@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if table already exists (handles upgrades from v444 where this migration
+        // was named 2025_10_10_120000_create_cloud_init_scripts_table.php)
+        if (Schema::hasTable('cloud_init_scripts')) {
+            return;
+        }
+
         Schema::create('cloud_init_scripts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->onDelete('cascade');
