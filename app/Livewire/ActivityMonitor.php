@@ -28,11 +28,19 @@ class ActivityMonitor extends Component
 
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
 
-    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null)
+    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null, $header = null)
     {
+        // Reset event dispatched flag for new activity
+        self::$eventDispatched = false;
+
         $this->activityId = $activityId;
         $this->eventToDispatch = $eventToDispatch;
         $this->eventData = $eventData;
+
+        // Update header if provided
+        if ($header !== null) {
+            $this->header = $header;
+        }
 
         $this->hydrateActivity();
 

@@ -59,8 +59,6 @@ class InstallDocker
         $command = collect([]);
         if (isDev() && $server->id === 0) {
             $command = $command->merge([
-                "echo 'Installing Prerequisites...'",
-                'sleep 1',
                 "echo 'Installing Docker Engine...'",
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
                 'sleep 4',
@@ -70,42 +68,6 @@ class InstallDocker
 
             return remote_process($command, $server);
         } else {
-            if ($supported_os_type->contains('debian')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'apt-get update -y',
-                    'command -v curl >/dev/null || apt install -y curl',
-                    'command -v wget >/dev/null || apt install -y wget',
-                    'command -v git >/dev/null || apt install -y git',
-                    'command -v jq >/dev/null || apt install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('rhel')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'command -v curl >/dev/null || dnf install -y curl',
-                    'command -v wget >/dev/null || dnf install -y wget',
-                    'command -v git >/dev/null || dnf install -y git',
-                    'command -v jq >/dev/null || dnf install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('sles')) {
-                $command = $command->merge([
-                    "echo 'Installing Prerequisites...'",
-                    'zypper update -y',
-                    'command -v curl >/dev/null || zypper install -y curl',
-                    'command -v wget >/dev/null || zypper install -y wget',
-                    'command -v git >/dev/null || zypper install -y git',
-                    'command -v jq >/dev/null || zypper install -y jq',
-                ]);
-            } elseif ($supported_os_type->contains('nixos')) {
-                $command = $command->merge([
-                    "echo 'Checking NixOS Docker configuration...'",
-                    'command -v docker >/dev/null || echo "Docker not found. Please add Docker to your NixOS configuration."',
-                    'command -v git >/dev/null || echo "Git not found. Please add git to your NixOS configuration."',
-                    'command -v jq >/dev/null || echo "jq not found. Please add jq to your NixOS configuration."',
-                ]);
-            } else {
-                throw new \Exception('Unsupported OS');
-            }
             $command = $command->merge([
                 "echo 'Installing Docker Engine...'",
             ]);

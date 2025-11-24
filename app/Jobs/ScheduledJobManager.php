@@ -52,7 +52,7 @@ class ScheduledJobManager implements ShouldQueue
     {
         return [
             (new WithoutOverlapping('scheduled-job-manager'))
-                ->expireAfter(60)   // Lock expires after 1 minute to prevent stale locks
+                ->expireAfter(90)   // Lock expires after 90s to handle high-load environments with many tasks
                 ->dontRelease(),    // Don't re-queue on lock conflict
         ];
     }

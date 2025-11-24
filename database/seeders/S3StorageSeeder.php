@@ -20,6 +20,7 @@ class S3StorageSeeder extends Seeder
             'bucket' => 'local',
             'endpoint' => 'http://coolify-minio:9000',
             'team_id' => 0,
+            'is_usable' => true,
         ]);
     }
 }

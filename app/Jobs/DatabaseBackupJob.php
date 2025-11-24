@@ -23,6 +23,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 use Visus\Cuid2\Cuid2;
@@ -30,6 +31,8 @@ use Visus\Cuid2\Cuid2;
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $maxExceptions = 1;
 
     public ?Team $team = null;
 
@@ -74,7 +77,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
-        $this->timeout = $backup->timeout;
+        $this->timeout = $backup->timeout ?? 3600;
     }
 
     public function handle(): void
@@ -661,15 +664,34 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        Log::channel('scheduled-errors')->error('DatabaseBackup permanently failed', [
+            'job' => 'DatabaseBackupJob',
+            'backup_id' => $this->backup->uuid,
+            'database' => $this->database?->name ?? 'unknown',
+            'database_type' => get_class($this->database ?? new \stdClass),
+            'server' => $this->server?->name ?? 'unknown',
+            'total_attempts' => $this->attempts(),
+            'error' => $exception?->getMessage(),
+            'trace' => $exception?->getTraceAsString(),
+        ]);
+
         $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
 
         if ($log) {
             $log->update([
                 'status' => 'failed',
-                'message' => 'Job failed: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
                 'size' => 0,
                 'filename' => null,
+                'finished_at' => Carbon::now(),
             ]);
+        }
+
+        // Notify team about permanent failure
+        if ($this->team) {
+            $databaseName = $log?->database_name ?? 'unknown';
+            $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $output, $databaseName));
         }
     }
 }

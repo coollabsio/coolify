@@ -109,6 +109,11 @@ class ServiceApplication extends BaseModel
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
 
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
     public function fqdns(): Attribute
     {
         return Attribute::make(
@@ -173,5 +178,78 @@ class ServiceApplication extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return false;
+    }
+
+    /**
+     * Get the required port for this service application.
+     * Extracts port from SERVICE_URL_* or SERVICE_FQDN_* environment variables
+     * stored at the Service level, filtering by normalized container name.
+     * Falls back to service-level port if no port-specific variable is found.
+     */
+    public function getRequiredPort(): ?int
+    {
+        try {
+            // Normalize container name same way as variable creation
+            // (uppercase, replace - and . with _)
+            $normalizedName = str($this->name)
+                ->upper()
+                ->replace('-', '_')
+                ->replace('.', '_')
+                ->value();
+            // Get all environment variables from the service
+            $serviceEnvVars = $this->service->environment_variables()->get();
+
+            // Look for SERVICE_FQDN_* or SERVICE_URL_* variables that match this container
+            foreach ($serviceEnvVars as $envVar) {
+                $key = str($envVar->key);
+
+                // Check if this is a SERVICE_FQDN_* or SERVICE_URL_* variable
+                if (! $key->startsWith('SERVICE_FQDN_') && ! $key->startsWith('SERVICE_URL_')) {
+                    continue;
+                }
+                // Extract the part after SERVICE_FQDN_ or SERVICE_URL_
+                if ($key->startsWith('SERVICE_FQDN_')) {
+                    $suffix = $key->after('SERVICE_FQDN_');
+                } else {
+                    $suffix = $key->after('SERVICE_URL_');
+                }
+
+                // Check if this variable starts with our normalized container name
+                // Format: {NORMALIZED_NAME}_{PORT} or just {NORMALIZED_NAME}
+                if (! $suffix->startsWith($normalizedName)) {
+                    \Log::debug('[ServiceApplication::getRequiredPort] Suffix does not match container', [
+                        'expected_start' => $normalizedName,
+                        'actual_suffix' => $suffix->value(),
+                    ]);
+
+                    continue;
+                }
+
+                // Check if there's a port suffix after the container name
+                // The suffix should be exactly NORMALIZED_NAME or NORMALIZED_NAME_PORT
+                $afterName = $suffix->after($normalizedName)->value();
+
+                // If there's content after the name, it should start with underscore
+                if ($afterName !== '' && str($afterName)->startsWith('_')) {
+                    // Extract port: _3210 -> 3210
+                    $port = str($afterName)->after('_')->value();
+                    // Validate that the extracted port is numeric
+                    if (is_numeric($port)) {
+                        \Log::debug('[ServiceApplication::getRequiredPort] MATCH FOUND - Returning port', [
+                            'port' => (int) $port,
+                        ]);
+
+                        return (int) $port;
+                    }
+                }
+            }
+
+            // Fall back to service-level port if no port-specific variable is found
+            $fallbackPort = $this->service->getRequiredPort();
+
+            return $fallbackPort;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

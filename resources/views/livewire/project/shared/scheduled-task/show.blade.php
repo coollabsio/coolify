@@ -35,6 +35,8 @@
                 <x-forms.input placeholder="Name" id="name" label="Name" required />
                 <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" required />
                 <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
+                <x-forms.input type="number" placeholder="300" id="timeout"
+                    helper="Maximum execution time in seconds (60-3600)." label="Timeout (seconds)" required />
                 @if ($type === 'application')
                     <x-forms.input placeholder="php"
                         helper="You can leave this empty if your resource only has one container." id="container"
