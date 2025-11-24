@@ -206,6 +206,7 @@ class ServicesController extends Controller
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
                         'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                        'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                     ],
                 ),
             ),
@@ -243,7 +244,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'is_container_label_escape_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -267,6 +268,7 @@ class ServicesController extends Controller
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
+            'is_container_label_escape_enabled' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -354,6 +356,8 @@ class ServicesController extends Controller
                 if ($oneClickServiceName === 'cloudflared') {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
+                $isContainerLabelEscapeEnabled = $request->has('is_container_label_escape_enabled') ? $request->boolean('is_container_label_escape_enabled') : true;
+                data_set($servicePayload, 'is_container_label_escape_enabled', $isContainerLabelEscapeEnabled);
                 $service = Service::create($servicePayload);
                 $service->name = "$oneClickServiceName-".$service->uuid;
                 $service->save();
@@ -396,7 +400,7 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'is_container_label_escape_enabled'];
 
             $validator = customApiValidator($request->all(), [
                 'project_uuid' => 'string|required',
@@ -409,6 +413,7 @@ class ServicesController extends Controller
                 'instant_deploy' => 'boolean',
                 'connect_to_docker_network' => 'boolean',
                 'docker_compose_raw' => 'string|required',
+                'is_container_label_escape_enabled' => 'boolean',
             ]);
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -490,6 +495,7 @@ class ServicesController extends Controller
 
             $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
             $instantDeploy = $request->instant_deploy ?? false;
+            $isContainerLabelEscapeEnabled = $request->has('is_container_label_escape_enabled') ? $request->boolean('is_container_label_escape_enabled') : true;
 
             $service = new Service;
             $service->name = $request->name ?? 'service-'.str()->random(10);
@@ -500,6 +506,7 @@ class ServicesController extends Controller
             $service->destination_id = $destination->id;
             $service->destination_type = $destination->getMorphClass();
             $service->connect_to_docker_network = $connectToDockerNetwork;
+            $service->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
             $service->save();
 
             $service->parse(isNew: true);
@@ -700,6 +707,7 @@ class ServicesController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -759,7 +767,7 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'is_container_label_escape_enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -767,6 +775,7 @@ class ServicesController extends Controller
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|nullable',
+            'is_container_label_escape_enabled' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -827,6 +836,9 @@ class ServicesController extends Controller
         }
         if ($request->has('connect_to_docker_network')) {
             $service->connect_to_docker_network = $request->connect_to_docker_network;
+        }
+        if ($request->has('is_container_label_escape_enabled')) {
+            $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
         }
         $service->save();
 
