@@ -49,7 +49,7 @@ x-shared-env: &shared-api-env
 
 services:
   opnform-api:
-    image: jhumanj/opnform-api:1.10.2
+    image: jhumanj/opnform-api:1.12.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -76,7 +76,7 @@ services:
       start_period: 60s
 
   api-worker:
-    image: jhumanj/opnform-api:1.10.2
+    image: jhumanj/opnform-api:1.12.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -97,7 +97,7 @@ services:
       start_period: 30s
 
   api-scheduler:
-    image: jhumanj/opnform-api:1.10.2
+    image: jhumanj/opnform-api:1.12.1
     volumes:
       - api-storage:/usr/share/nginx/html/storage
     environment:
@@ -121,7 +121,7 @@ services:
       start_period: 70s # Allow time for first scheduled run and cache write
 
   opnform-ui:
-    image: jhumanj/opnform-client:1.10.2
+    image: jhumanj/opnform-client:1.12.1
     environment:
       - NUXT_PUBLIC_APP_URL=/
       - NUXT_PUBLIC_API_BASE=/api
