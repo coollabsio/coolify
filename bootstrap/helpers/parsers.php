@@ -536,9 +536,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $originalServiceName = str($serviceName)->replace('_', '-');
+                    $originalServiceName = str($serviceName)->replace('_', '-')->value();
                     // Always normalize service names to match docker_compose_domains lookup
-                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_');
+                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
 
                     // Generate BOTH FQDN & URL
                     $fqdn = generateFqdn(server: $server, random: "$originalServiceName-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -618,7 +618,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $domainValue = $port ? $urlWithPort : $url;
 
                             if (is_null($domainExists)) {
-                                $domains->put((string) $serviceName, [
+                                $domains->put($serviceName, [
                                     'domain' => $domainValue,
                                 ]);
                                 $resource->docker_compose_domains = $domains->toJson();
