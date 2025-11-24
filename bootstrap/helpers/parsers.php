@@ -537,9 +537,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
 
                     $originalServiceName = str($serviceName)->replace('_', '-');
-                    if (str($serviceName)->contains('-')) {
-                        $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_');
-                    }
+                    // Always normalize service names to match docker_compose_domains lookup
+                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_');
 
                     // Generate BOTH FQDN & URL
                     $fqdn = generateFqdn(server: $server, random: "$originalServiceName-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -552,11 +551,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                     // Append port if specified
                     $urlWithPort = $url;
-                    $fqdnWithPort = $fqdn;
                     $fqdnValueForEnvWithPort = $fqdnValueForEnv;
                     if ($port && is_numeric($port)) {
                         $urlWithPort = "$url:$port";
-                        $fqdnWithPort = "$fqdn:$port";
                         $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
                     }
 
@@ -1668,11 +1665,9 @@ function serviceParser(Service $resource): Collection
                     }
                 }
 
-                $fqdnWithPort = $fqdn;
                 $urlWithPort = $url;
                 $fqdnValueForEnvWithPort = $fqdnValueForEnv;
                 if ($fqdn && $port) {
-                    $fqdnWithPort = "$fqdn:$port";
                     $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
                 }
                 if ($url && $port) {
