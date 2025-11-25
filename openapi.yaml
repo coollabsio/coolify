@@ -5584,7 +5584,7 @@ paths:
               schema:
                 type: array
                 items:
-                  properties: { uuid: { type: string, example: app-uuid-123 }, name: { type: string, example: n8n }, fqdn: { type: string, example: 'n8n.example.com:5678' }, image: { type: string, example: 'docker.n8n.io/n8nio/n8n:latest' }, status: { type: string, example: running } }
+                  properties: { uuid: { type: string, example: app-uuid-123 }, name: { type: string, example: n8n }, human_name: { type: string, example: 'N8N Workflow Automation' }, description: { type: string, example: 'Production workflow automation server' }, fqdn: { type: string, example: 'n8n.example.com:5678' }, image: { type: string, example: 'docker.n8n.io/n8nio/n8n:latest' }, status: { type: string, example: running }, exclude_from_status: { type: boolean, example: false }, is_log_drain_enabled: { type: boolean, example: false }, is_gzip_enabled: { type: boolean, example: true }, is_stripprefix_enabled: { type: boolean, example: true } }
                   type: object
         '401':
           $ref: '#/components/responses/401'
@@ -5598,7 +5598,7 @@ paths:
       tags:
         - Services
       summary: 'Update Application'
-      description: 'Update service application by UUID. Allows updating the FQDN (domain) of a service application.'
+      description: 'Update service application by UUID. Allows updating application settings including domains, image, and configuration flags.'
       operationId: update-application-by-service-uuid
       parameters:
         -
@@ -5628,6 +5628,34 @@ paths:
                   type: string
                   description: 'Fully qualified domain name with optional port. Multiple domains can be comma-separated.'
                   example: 'app.example.com:8080'
+                human_name:
+                  type: string
+                  description: 'Human-readable name for the application.'
+                  example: 'My Application'
+                description:
+                  type: string
+                  description: 'Description of the application.'
+                  example: 'Production web application'
+                image:
+                  type: string
+                  description: 'Docker image to use. WARNING: Changing the image may corrupt data.'
+                  example: 'nginx:latest'
+                exclude_from_status:
+                  type: boolean
+                  description: 'Exclude this application from service status monitoring.'
+                  example: false
+                is_log_drain_enabled:
+                  type: boolean
+                  description: 'Enable log draining to configured endpoint. Server must have log drain enabled.'
+                  example: false
+                is_gzip_enabled:
+                  type: boolean
+                  description: 'Enable gzip compression in proxy.'
+                  example: true
+                is_stripprefix_enabled:
+                  type: boolean
+                  description: 'Enable path prefix stripping in proxy.'
+                  example: true
               type: object
       responses:
         '200':
@@ -5637,9 +5665,16 @@ paths:
               schema:
                 properties:
                   uuid: { type: string, description: 'Application UUID.' }
-                  name: { type: string, description: 'Application name.' }
-                  fqdn: { type: string, description: 'Updated FQDN.' }
-                  message: { type: string, example: 'Application updated. Restart service to apply changes.' }
+                  name: { type: string, description: 'Application internal name.' }
+                  human_name: { type: string, description: 'Human-readable name.' }
+                  description: { type: string, description: 'Application description.' }
+                  fqdn: { type: string, description: 'Application domains.' }
+                  image: { type: string, description: 'Docker image.' }
+                  exclude_from_status: { type: boolean, description: 'Status monitoring exclusion.' }
+                  is_log_drain_enabled: { type: boolean, description: 'Log drain status.' }
+                  is_gzip_enabled: { type: boolean, description: 'Gzip compression status.' }
+                  is_stripprefix_enabled: { type: boolean, description: 'Strip prefix status.' }
+                  message: { type: string, example: 'Application updated successfully. Restart the service to apply changes.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'

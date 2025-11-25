@@ -1420,9 +1420,15 @@ class ServicesController extends Controller
                                 properties: [
                                     'uuid' => ['type' => 'string', 'example' => 'app-uuid-123'],
                                     'name' => ['type' => 'string', 'example' => 'n8n'],
+                                    'human_name' => ['type' => 'string', 'example' => 'N8N Workflow Automation'],
+                                    'description' => ['type' => 'string', 'example' => 'Production workflow automation server'],
                                     'fqdn' => ['type' => 'string', 'example' => 'n8n.example.com:5678'],
                                     'image' => ['type' => 'string', 'example' => 'docker.n8n.io/n8nio/n8n:latest'],
                                     'status' => ['type' => 'string', 'example' => 'running'],
+                                    'exclude_from_status' => ['type' => 'boolean', 'example' => false],
+                                    'is_log_drain_enabled' => ['type' => 'boolean', 'example' => false],
+                                    'is_gzip_enabled' => ['type' => 'boolean', 'example' => true],
+                                    'is_stripprefix_enabled' => ['type' => 'boolean', 'example' => true],
                                 ]
                             )
                         )
@@ -1457,9 +1463,15 @@ class ServicesController extends Controller
             return [
                 'uuid' => $app->uuid,
                 'name' => $app->name,
+                'human_name' => $app->human_name,
+                'description' => $app->description,
                 'fqdn' => $app->fqdn,
                 'image' => $app->image,
                 'status' => $app->status,
+                'exclude_from_status' => $app->exclude_from_status,
+                'is_log_drain_enabled' => $app->is_log_drain_enabled,
+                'is_gzip_enabled' => $app->is_gzip_enabled,
+                'is_stripprefix_enabled' => $app->is_stripprefix_enabled,
             ];
         });
 
@@ -1468,7 +1480,7 @@ class ServicesController extends Controller
 
     #[OA\Patch(
         summary: 'Update Application',
-        description: 'Update service application by UUID. Allows updating the FQDN (domain) of a service application.',
+        description: 'Update service application by UUID. Allows updating application settings including domains, image, and configuration flags.',
         path: '/services/{uuid}/applications/{app_uuid}',
         operationId: 'update-application-by-service-uuid',
         security: [
@@ -1511,6 +1523,41 @@ class ServicesController extends Controller
                                 'description' => 'Fully qualified domain name with optional port. Multiple domains can be comma-separated.',
                                 'example' => 'app.example.com:8080',
                             ],
+                            'human_name' => [
+                                'type' => 'string',
+                                'description' => 'Human-readable name for the application.',
+                                'example' => 'My Application',
+                            ],
+                            'description' => [
+                                'type' => 'string',
+                                'description' => 'Description of the application.',
+                                'example' => 'Production web application',
+                            ],
+                            'image' => [
+                                'type' => 'string',
+                                'description' => 'Docker image to use. WARNING: Changing the image may corrupt data.',
+                                'example' => 'nginx:latest',
+                            ],
+                            'exclude_from_status' => [
+                                'type' => 'boolean',
+                                'description' => 'Exclude this application from service status monitoring.',
+                                'example' => false,
+                            ],
+                            'is_log_drain_enabled' => [
+                                'type' => 'boolean',
+                                'description' => 'Enable log draining to configured endpoint. Server must have log drain enabled.',
+                                'example' => false,
+                            ],
+                            'is_gzip_enabled' => [
+                                'type' => 'boolean',
+                                'description' => 'Enable gzip compression in proxy.',
+                                'example' => true,
+                            ],
+                            'is_stripprefix_enabled' => [
+                                'type' => 'boolean',
+                                'description' => 'Enable path prefix stripping in proxy.',
+                                'example' => true,
+                            ],
                         ],
                     ),
                 ),
@@ -1527,9 +1574,16 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'uuid' => ['type' => 'string', 'description' => 'Application UUID.'],
-                                'name' => ['type' => 'string', 'description' => 'Application name.'],
-                                'fqdn' => ['type' => 'string', 'description' => 'Updated FQDN.'],
-                                'message' => ['type' => 'string', 'example' => 'Application updated. Restart service to apply changes.'],
+                                'name' => ['type' => 'string', 'description' => 'Application internal name.'],
+                                'human_name' => ['type' => 'string', 'description' => 'Human-readable name.'],
+                                'description' => ['type' => 'string', 'description' => 'Application description.'],
+                                'fqdn' => ['type' => 'string', 'description' => 'Application domains.'],
+                                'image' => ['type' => 'string', 'description' => 'Docker image.'],
+                                'exclude_from_status' => ['type' => 'boolean', 'description' => 'Status monitoring exclusion.'],
+                                'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Log drain status.'],
+                                'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Gzip compression status.'],
+                                'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Strip prefix status.'],
+                                'message' => ['type' => 'string', 'example' => 'Application updated successfully. Restart the service to apply changes.'],
                             ]
                         )
                     ),
@@ -1594,10 +1648,26 @@ class ServicesController extends Controller
 
         $this->authorize('update', $application);
 
-        $allowedFields = ['fqdn'];
+        $allowedFields = [
+            'fqdn',
+            'human_name',
+            'description',
+            'image',
+            'exclude_from_status',
+            'is_log_drain_enabled',
+            'is_gzip_enabled',
+            'is_stripprefix_enabled',
+        ];
 
         $validator = customApiValidator($request->all(), [
             'fqdn' => 'string|nullable',
+            'human_name' => 'string|nullable',
+            'description' => 'string|nullable',
+            'image' => 'string|nullable',
+            'exclude_from_status' => 'boolean',
+            'is_log_drain_enabled' => 'boolean',
+            'is_gzip_enabled' => 'boolean',
+            'is_stripprefix_enabled' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -1667,10 +1737,70 @@ class ServicesController extends Controller
             $service->parse();
         }
 
+        // Update other fields if provided
+        $needsRegeneration = false;
+
+        if ($request->has('human_name')) {
+            $application->human_name = $request->human_name;
+            $needsRegeneration = true;
+        }
+
+        if ($request->has('description')) {
+            $application->description = $request->description;
+        }
+
+        if ($request->has('image')) {
+            $application->image = $request->image;
+            $needsRegeneration = true;
+        }
+
+        if ($request->has('exclude_from_status')) {
+            $application->exclude_from_status = $request->exclude_from_status;
+        }
+
+        if ($request->has('is_log_drain_enabled')) {
+            // Check if server has log drain enabled
+            if ($request->is_log_drain_enabled && ! $service->destination->server->isLogDrainEnabled()) {
+                return response()->json([
+                    'message' => 'Log drain is not enabled on the server.',
+                    'errors' => [
+                        'is_log_drain_enabled' => 'Log drain must be enabled on the server before enabling it on the application.',
+                    ],
+                ], 422);
+            }
+            $application->is_log_drain_enabled = $request->is_log_drain_enabled;
+        }
+
+        if ($request->has('is_gzip_enabled')) {
+            $application->is_gzip_enabled = $request->is_gzip_enabled;
+            $needsRegeneration = true;
+        }
+
+        if ($request->has('is_stripprefix_enabled')) {
+            $application->is_stripprefix_enabled = $request->is_stripprefix_enabled;
+            $needsRegeneration = true;
+        }
+
+        // Save all changes
+        $application->save();
+
+        // Regenerate configuration if needed
+        if ($needsRegeneration && ! $request->has('fqdn')) {
+            updateCompose($application);
+            $service->parse();
+        }
+
         return response()->json([
             'uuid' => $application->uuid,
             'name' => $application->name,
+            'human_name' => $application->human_name,
+            'description' => $application->description,
             'fqdn' => $application->fqdn,
+            'image' => $application->image,
+            'exclude_from_status' => $application->exclude_from_status,
+            'is_log_drain_enabled' => $application->is_log_drain_enabled,
+            'is_gzip_enabled' => $application->is_gzip_enabled,
+            'is_stripprefix_enabled' => $application->is_stripprefix_enabled,
             'message' => 'Application updated successfully. Restart the service to apply changes.',
         ]);
     }
