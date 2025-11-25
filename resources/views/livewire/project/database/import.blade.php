@@ -148,7 +148,7 @@
 
                     <div x-show="filename && !error" class="pt-6">
                         <h3>File Information</h3>
-                        <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
+                        <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
                         <div class="pt-2">
                             <x-modal-confirmation title="Restore Database from File?" buttonTitle="Restore from File"
                                 submitAction="runImport" isErrorButton>

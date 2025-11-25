@@ -210,7 +210,7 @@
             wire:loading.attr="disabled"
             type="{{ $type }}"
             @disabled($disabled)
-            @if ($htmlId !== 'null') id={{ $htmlId }} @endif
+            @if ($htmlId !== 'null') id="{{ $htmlId }}" @endif
             name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) autofocus @endif>

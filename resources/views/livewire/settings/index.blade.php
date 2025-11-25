@@ -9,7 +9,7 @@
             <form wire:submit='submit' class="flex flex-col">
                 <div class="flex items-center gap-2">
                     <h2>General</h2>
-                    <x-forms.button type="submit">
+                    <x-forms.button canGate="update" :canResource="$settings" type="submit">
                         Save
                     </x-forms.button>
                 </div>
@@ -18,10 +18,10 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input id="fqdn" label="Domain"
+                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="Domain"
                                 helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
                                 placeholder="https://coolify.yourdomain.com" />
-                            <x-forms.input id="instance_name" label="Name" placeholder="Coolify"
+                            <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name" placeholder="Coolify"
                                 helper="Custom name for your Coolify instance, shown in the URL." />
                             <div class="w-full" x-data="{
                             open: false,
@@ -71,10 +71,10 @@
                             </div>
                         </div>
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input id="public_ipv4" type="password" label="Instance's Public IPv4"
+                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password" label="Instance's Public IPv4"
                                 helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
                                 placeholder="1.2.3.4" autocomplete="new-password" />
-                            <x-forms.input id="public_ipv6" type="password" label="Instance's Public IPv6"
+                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password" label="Instance's Public IPv6"
                                 helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
                                 placeholder="2001:db8::1" autocomplete="new-password" />
                         </div>
@@ -86,11 +86,9 @@
                             </div>
                         @endif
                         @if(isDev())
-
-                                <x-forms.input id="dev_helper_version" label="Dev Helper Version (Development Only)"
-                                    helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
-                                    placeholder="{{ config('constants.coolify.helper_version') }}" />
-                            </div>
+                            <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="Dev Helper Version (Development Only)"
+                                helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
+                                placeholder="{{ config('constants.coolify.helper_version') }}" />
                         @endif
                 </div>
             </form>

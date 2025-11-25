@@ -13,6 +13,92 @@ class Import extends Component
 {
     use AuthorizesRequests;
 
+    /**
+     * Validate that a string is safe for use as an S3 bucket name.
+     * Allows alphanumerics, dots, dashes, and underscores.
+     */
+    private function validateBucketName(string $bucket): bool
+    {
+        return preg_match('/^[a-zA-Z0-9.\-_]+$/', $bucket) === 1;
+    }
+
+    /**
+     * Validate that a string is safe for use as an S3 path.
+     * Allows alphanumerics, dots, dashes, underscores, slashes, and common file characters.
+     */
+    private function validateS3Path(string $path): bool
+    {
+        // Must not be empty
+        if (empty($path)) {
+            return false;
+        }
+
+        // Must not contain dangerous shell metacharacters or command injection patterns
+        $dangerousPatterns = [
+            '..', // Directory traversal
+            '$(', // Command substitution
+            '`',  // Backtick command substitution
+            '|',  // Pipe
+            ';',  // Command separator
+            '&',  // Background/AND
+            '>',  // Redirect
+            '<',  // Redirect
+            "\n", // Newline
+            "\r", // Carriage return
+            "\0", // Null byte
+            "'",  // Single quote
+            '"',  // Double quote
+            '\\', // Backslash
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            if (str_contains($path, $pattern)) {
+                return false;
+            }
+        }
+
+        // Allow alphanumerics, dots, dashes, underscores, slashes, spaces, plus, equals, at
+        return preg_match('/^[a-zA-Z0-9.\-_\/\s+@=]+$/', $path) === 1;
+    }
+
+    /**
+     * Validate that a string is safe for use as a file path on the server.
+     */
+    private function validateServerPath(string $path): bool
+    {
+        // Must be an absolute path
+        if (! str_starts_with($path, '/')) {
+            return false;
+        }
+
+        // Must not contain dangerous shell metacharacters or command injection patterns
+        $dangerousPatterns = [
+            '..', // Directory traversal
+            '$(', // Command substitution
+            '`',  // Backtick command substitution
+            '|',  // Pipe
+            ';',  // Command separator
+            '&',  // Background/AND
+            '>',  // Redirect
+            '<',  // Redirect
+            "\n", // Newline
+            "\r", // Carriage return
+            "\0", // Null byte
+            "'",  // Single quote
+            '"',  // Double quote
+            '\\', // Backslash
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            if (str_contains($path, $pattern)) {
+                return false;
+            }
+        }
+
+        // Allow alphanumerics, dots, dashes, underscores, slashes, and spaces
+        return preg_match('/^[a-zA-Z0-9.\-_\/\s]+$/', $path) === 1;
+    }
+
     public bool $unsupported = false;
 
     public $resource;
@@ -160,8 +246,16 @@ EOD;
     public function checkFile()
     {
         if (filled($this->customLocation)) {
+            // Validate the custom location to prevent command injection
+            if (! $this->validateServerPath($this->customLocation)) {
+                $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+                return;
+            }
+
             try {
-                $result = instant_remote_process(["ls -l {$this->customLocation}"], $this->server, throwError: false);
+                $escapedPath = escapeshellarg($this->customLocation);
+                $result = instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false);
                 if (blank($result)) {
                     $this->dispatch('error', 'The file does not exist or has been deleted.');
 
@@ -197,8 +291,15 @@ EOD;
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
             } elseif (filled($this->customLocation)) {
+                // Validate the custom location to prevent command injection
+                if (! $this->validateServerPath($this->customLocation)) {
+                    $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters.');
+
+                    return;
+                }
                 $tmpPath = '/tmp/restore_'.$this->resource->uuid;
-                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$tmpPath}";
+                $escapedCustomLocation = escapeshellarg($this->customLocation);
+                $this->importCommands[] = "docker cp {$escapedCustomLocation} {$this->container}:{$tmpPath}";
             } else {
                 $this->dispatch('error', 'The file does not exist or has been deleted.');
 
@@ -208,38 +309,7 @@ EOD;
             // Copy the restore command to a script file
             $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
 
-            switch ($this->resource->getMorphClass()) {
-                case \App\Models\StandaloneMariadb::class:
-                    $restoreCommand = $this->mariadbRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
-                    } else {
-                        $restoreCommand .= " < {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandaloneMysql::class:
-                    $restoreCommand = $this->mysqlRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
-                    } else {
-                        $restoreCommand .= " < {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandalonePostgresql::class:
-                    $restoreCommand = $this->postgresqlRestoreCommand;
-                    if ($this->dumpAll) {
-                        $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
-                    } else {
-                        $restoreCommand .= " {$tmpPath}";
-                    }
-                    break;
-                case \App\Models\StandaloneMongodb::class:
-                    $restoreCommand = $this->mongodbRestoreCommand;
-                    if ($this->dumpAll === false) {
-                        $restoreCommand .= "{$tmpPath}";
-                    }
-                    break;
-            }
+            $restoreCommand = $this->buildRestoreCommand($tmpPath);
 
             $restoreCommandBase64 = base64_encode($restoreCommand);
             $this->importCommands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
@@ -311,8 +381,25 @@ EOD;
             return;
         }
 
+        // Clean the path (remove leading slash if present)
+        $cleanPath = ltrim($this->s3Path, '/');
+
+        // Validate the S3 path early to prevent command injection in subsequent operations
+        if (! $this->validateS3Path($cleanPath)) {
+            $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+            return;
+        }
+
         try {
             $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+
+            // Validate bucket name early
+            if (! $this->validateBucketName($s3Storage->bucket)) {
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+
+                return;
+            }
 
             // Test connection
             $s3Storage->testConnection();
@@ -327,9 +414,6 @@ EOD;
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => true,
             ]);
-
-            // Clean the path (remove leading slash if present)
-            $cleanPath = ltrim($this->s3Path, '/');
 
             // Check if file exists
             if (! $disk->exists($cleanPath)) {
@@ -375,8 +459,22 @@ EOD;
             $bucket = $s3Storage->bucket;
             $endpoint = $s3Storage->endpoint;
 
+            // Validate bucket name to prevent command injection
+            if (! $this->validateBucketName($bucket)) {
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+
+                return;
+            }
+
             // Clean the S3 path
             $cleanPath = ltrim($this->s3Path, '/');
+
+            // Validate the S3 path to prevent command injection
+            if (! $this->validateS3Path($cleanPath)) {
+                $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+                return;
+            }
 
             // Get helper image
             $helperImage = config('constants.coolify.helper_image');
@@ -410,11 +508,15 @@ EOD;
             $escapedSecret = escapeshellarg($secret);
             $commands[] = "docker exec {$containerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
 
-            // 4. Check file exists in S3
-            $commands[] = "docker exec {$containerName} mc stat s3temp/{$bucket}/{$cleanPath}";
+            // 4. Check file exists in S3 (bucket and path already validated above)
+            $escapedBucket = escapeshellarg($bucket);
+            $escapedCleanPath = escapeshellarg($cleanPath);
+            $escapedS3Source = escapeshellarg("s3temp/{$bucket}/{$cleanPath}");
+            $commands[] = "docker exec {$containerName} mc stat {$escapedS3Source}";
 
             // 5. Download from S3 to helper container (progress shown by default)
-            $commands[] = "docker exec {$containerName} mc cp s3temp/{$bucket}/{$cleanPath} {$helperTmpPath}";
+            $escapedHelperTmpPath = escapeshellarg($helperTmpPath);
+            $commands[] = "docker exec {$containerName} mc cp {$escapedS3Source} {$escapedHelperTmpPath}";
 
             // 6. Copy from helper to server, then immediately to database container
             $commands[] = "docker cp {$containerName}:{$helperTmpPath} {$serverTmpPath}";

@@ -129,7 +129,7 @@ class Form extends Component
             $this->storage->refresh();
             $this->isUsable = $this->storage->is_usable;
 
-            $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
+            $this->dispatch('error', 'Failed to test connection.', $e->getMessage());
         }
     }
 
