@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\S3Storage;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +55,15 @@ class Import extends Component
 
     public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
+    // S3 Restore properties
+    public $availableS3Storages = [];
+
+    public ?int $s3StorageId = null;
+
+    public string $s3Path = '';
+
+    public ?int $s3FileSize = null;
+
     public function getListeners()
     {
         $userId = Auth::id();
@@ -65,11 +75,9 @@ class Import extends Component
 
     public function mount()
     {
-        if (isDev()) {
-            $this->customLocation = '/data/coolify/pg-dump-all-1736245863.gz';
-        }
         $this->parameters = get_route_parameters();
         $this->getContainers();
+        $this->loadAvailableS3Storages();
     }
 
     public function updatedDumpAll($value)
@@ -179,22 +187,22 @@ EOD;
         try {
             $this->importRunning = true;
             $this->importCommands = [];
-            if (filled($this->customLocation)) {
-                $backupFileName = '/tmp/restore_'.$this->resource->uuid;
-                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$backupFileName}";
-                $tmpPath = $backupFileName;
-            } else {
-                $backupFileName = "upload/{$this->resource->uuid}/restore";
-                $path = Storage::path($backupFileName);
-                if (! Storage::exists($backupFileName)) {
-                    $this->dispatch('error', 'The file does not exist or has been deleted.');
+            $backupFileName = "upload/{$this->resource->uuid}/restore";
 
-                    return;
-                }
+            // Check if an uploaded file exists first (takes priority over custom location)
+            if (Storage::exists($backupFileName)) {
+                $path = Storage::path($backupFileName);
                 $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
                 instant_scp($path, $tmpPath, $this->server);
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
+            } elseif (filled($this->customLocation)) {
+                $tmpPath = '/tmp/restore_'.$this->resource->uuid;
+                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$tmpPath}";
+            } else {
+                $this->dispatch('error', 'The file does not exist or has been deleted.');
+
+                return;
             }
 
             // Copy the restore command to a script file
@@ -248,7 +256,10 @@ EOD;
                     'container' => $this->container,
                     'serverId' => $this->server->id,
                 ]);
+
+                // Dispatch activity to the monitor and open slide-over
                 $this->dispatch('activityMonitor', $activity->id);
+                $this->dispatch('databaserestore');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -256,5 +267,233 @@ EOD;
             $this->filename = null;
             $this->importCommands = [];
         }
+    }
+
+    public function loadAvailableS3Storages()
+    {
+        try {
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
+                ->where('is_usable', true)
+                ->get();
+        } catch (\Throwable $e) {
+            $this->availableS3Storages = collect();
+        }
+    }
+
+    public function updatedS3Path($value)
+    {
+        // Reset validation state when path changes
+        $this->s3FileSize = null;
+
+        // Ensure path starts with a slash
+        if ($value !== null && $value !== '') {
+            $this->s3Path = str($value)->trim()->start('/')->value();
+        }
+    }
+
+    public function updatedS3StorageId()
+    {
+        // Reset validation state when storage changes
+        $this->s3FileSize = null;
+    }
+
+    public function checkS3File()
+    {
+        if (! $this->s3StorageId) {
+            $this->dispatch('error', 'Please select an S3 storage.');
+
+            return;
+        }
+
+        if (blank($this->s3Path)) {
+            $this->dispatch('error', 'Please provide an S3 path.');
+
+            return;
+        }
+
+        try {
+            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+
+            // Test connection
+            $s3Storage->testConnection();
+
+            // Build S3 disk configuration
+            $disk = Storage::build([
+                'driver' => 's3',
+                'region' => $s3Storage->region,
+                'key' => $s3Storage->key,
+                'secret' => $s3Storage->secret,
+                'bucket' => $s3Storage->bucket,
+                'endpoint' => $s3Storage->endpoint,
+                'use_path_style_endpoint' => true,
+            ]);
+
+            // Clean the path (remove leading slash if present)
+            $cleanPath = ltrim($this->s3Path, '/');
+
+            // Check if file exists
+            if (! $disk->exists($cleanPath)) {
+                $this->dispatch('error', 'File not found in S3. Please check the path.');
+
+                return;
+            }
+
+            // Get file size
+            $this->s3FileSize = $disk->size($cleanPath);
+
+            $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
+        } catch (\Throwable $e) {
+            $this->s3FileSize = null;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function restoreFromS3()
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! $this->s3StorageId || blank($this->s3Path)) {
+            $this->dispatch('error', 'Please select S3 storage and provide a path first.');
+
+            return;
+        }
+
+        if (is_null($this->s3FileSize)) {
+            $this->dispatch('error', 'Please check the file first by clicking "Check File".');
+
+            return;
+        }
+
+        try {
+            $this->importRunning = true;
+
+            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
+
+            $key = $s3Storage->key;
+            $secret = $s3Storage->secret;
+            $bucket = $s3Storage->bucket;
+            $endpoint = $s3Storage->endpoint;
+
+            // Clean the S3 path
+            $cleanPath = ltrim($this->s3Path, '/');
+
+            // Get helper image
+            $helperImage = config('constants.coolify.helper_image');
+            $latestVersion = getHelperVersion();
+            $fullImageName = "{$helperImage}:{$latestVersion}";
+
+            // Get the database destination network
+            $destinationNetwork = $this->resource->destination->network ?? 'coolify';
+
+            // Generate unique names for this operation
+            $containerName = "s3-restore-{$this->resource->uuid}";
+            $helperTmpPath = '/tmp/'.basename($cleanPath);
+            $serverTmpPath = "/tmp/s3-restore-{$this->resource->uuid}-".basename($cleanPath);
+            $containerTmpPath = "/tmp/restore_{$this->resource->uuid}-".basename($cleanPath);
+            $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
+
+            // Prepare all commands in sequence
+            $commands = [];
+
+            // 1. Clean up any existing helper container and temp files from previous runs
+            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+            $commands[] = "docker exec {$this->container} rm -f {$containerTmpPath} {$scriptPath} 2>/dev/null || true";
+
+            // 2. Start helper container on the database network
+            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} {$fullImageName} sleep 3600";
+
+            // 3. Configure S3 access in helper container
+            $escapedEndpoint = escapeshellarg($endpoint);
+            $escapedKey = escapeshellarg($key);
+            $escapedSecret = escapeshellarg($secret);
+            $commands[] = "docker exec {$containerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+
+            // 4. Check file exists in S3
+            $commands[] = "docker exec {$containerName} mc stat s3temp/{$bucket}/{$cleanPath}";
+
+            // 5. Download from S3 to helper container (progress shown by default)
+            $commands[] = "docker exec {$containerName} mc cp s3temp/{$bucket}/{$cleanPath} {$helperTmpPath}";
+
+            // 6. Copy from helper to server, then immediately to database container
+            $commands[] = "docker cp {$containerName}:{$helperTmpPath} {$serverTmpPath}";
+            $commands[] = "docker cp {$serverTmpPath} {$this->container}:{$containerTmpPath}";
+
+            // 7. Cleanup helper container and server temp file immediately (no longer needed)
+            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+            $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+
+            // 8. Build and execute restore command inside database container
+            $restoreCommand = $this->buildRestoreCommand($containerTmpPath);
+
+            $restoreCommandBase64 = base64_encode($restoreCommand);
+            $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
+            $commands[] = "chmod +x {$scriptPath}";
+            $commands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
+
+            // 9. Execute restore and cleanup temp files immediately after completion
+            $commands[] = "docker exec {$this->container} sh -c '{$scriptPath} && rm -f {$containerTmpPath} {$scriptPath}'";
+            $commands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
+
+            // Execute all commands with cleanup event (as safety net for edge cases)
+            $activity = remote_process($commands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
+                'containerName' => $containerName,
+                'serverTmpPath' => $serverTmpPath,
+                'scriptPath' => $scriptPath,
+                'containerTmpPath' => $containerTmpPath,
+                'container' => $this->container,
+                'serverId' => $this->server->id,
+            ]);
+
+            // Dispatch activity to the monitor and open slide-over
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('databaserestore');
+            $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
+        } catch (\Throwable $e) {
+            $this->importRunning = false;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function buildRestoreCommand(string $tmpPath): string
+    {
+        switch ($this->resource->getMorphClass()) {
+            case \App\Models\StandaloneMariadb::class:
+                $restoreCommand = $this->mariadbRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
+                } else {
+                    $restoreCommand .= " < {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandaloneMysql::class:
+                $restoreCommand = $this->mysqlRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
+                } else {
+                    $restoreCommand .= " < {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandalonePostgresql::class:
+                $restoreCommand = $this->postgresqlRestoreCommand;
+                if ($this->dumpAll) {
+                    $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
+                } else {
+                    $restoreCommand .= " {$tmpPath}";
+                }
+                break;
+            case \App\Models\StandaloneMongodb::class:
+                $restoreCommand = $this->mongodbRestoreCommand;
+                if ($this->dumpAll === false) {
+                    $restoreCommand .= "{$tmpPath}";
+                }
+                break;
+            default:
+                $restoreCommand = '';
+        }
+
+        return $restoreCommand;
     }
 }

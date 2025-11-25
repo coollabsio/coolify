@@ -120,8 +120,15 @@ class Form extends Component
 
             $this->storage->testConnection(shouldSave: true);
 
+            // Update component property to reflect the new validation status
+            $this->isUsable = $this->storage->is_usable;
+
             return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
+            // Refresh model and sync to get the latest state
+            $this->storage->refresh();
+            $this->isUsable = $this->storage->is_usable;
+
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
         }
     }
