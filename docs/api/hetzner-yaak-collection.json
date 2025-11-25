@@ -1,0 +1,284 @@
+{
+  "name": "Coolify Hetzner Provisioning API",
+  "description": "Complete API collection for Hetzner server provisioning in Coolify",
+  "requests": [
+    {
+      "name": "1. Create Hetzner Cloud Token",
+      "method": "POST",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "content": "{\n  \"provider\": \"hetzner\",\n  \"token\": \"YOUR_HETZNER_API_TOKEN\",\n  \"name\": \"My Hetzner Token\"\n}"
+      }
+    },
+    {
+      "name": "2. List Cloud Provider Tokens",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "3. Get Cloud Provider Token",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens/{{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "4. Update Cloud Token Name",
+      "method": "PATCH",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens/{{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "content": "{\n  \"name\": \"Updated Token Name\"\n}"
+      }
+    },
+    {
+      "name": "5. Validate Cloud Token",
+      "method": "POST",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens/{{CLOUD_TOKEN_UUID}}/validate",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "6. Delete Cloud Token",
+      "method": "DELETE",
+      "url": "{{COOLIFY_URL}}/api/v1/cloud-tokens/{{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "7. Get Hetzner Locations",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/hetzner/locations?cloud_provider_token_id={{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "8. Get Hetzner Server Types",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/hetzner/server-types?cloud_provider_token_id={{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "9. Get Hetzner Images",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/hetzner/images?cloud_provider_token_id={{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "10. Get Hetzner SSH Keys",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/hetzner/ssh-keys?cloud_provider_token_id={{CLOUD_TOKEN_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "11. Get Private Keys (for server creation)",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/security/keys",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "12. Create Hetzner Server (Minimal)",
+      "method": "POST",
+      "url": "{{COOLIFY_URL}}/api/v1/servers/hetzner",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "content": "{\n  \"cloud_provider_token_id\": \"{{CLOUD_TOKEN_UUID}}\",\n  \"location\": \"nbg1\",\n  \"server_type\": \"cx11\",\n  \"image\": 67794396,\n  \"private_key_uuid\": \"{{PRIVATE_KEY_UUID}}\"\n}"
+      }
+    },
+    {
+      "name": "13. Create Hetzner Server (Full Options)",
+      "method": "POST",
+      "url": "{{COOLIFY_URL}}/api/v1/servers/hetzner",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "content": "{\n  \"cloud_provider_token_id\": \"{{CLOUD_TOKEN_UUID}}\",\n  \"location\": \"nbg1\",\n  \"server_type\": \"cx11\",\n  \"image\": 67794396,\n  \"name\": \"my-server\",\n  \"private_key_uuid\": \"{{PRIVATE_KEY_UUID}}\",\n  \"enable_ipv4\": true,\n  \"enable_ipv6\": false,\n  \"hetzner_ssh_key_ids\": [],\n  \"cloud_init_script\": \"#cloud-config\\npackages:\\n  - docker.io\",\n  \"instant_validate\": true\n}"
+      }
+    },
+    {
+      "name": "14. Get Server Details",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/servers/{{SERVER_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "15. List All Servers",
+      "method": "GET",
+      "url": "{{COOLIFY_URL}}/api/v1/servers",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "name": "16. Delete Server",
+      "method": "DELETE",
+      "url": "{{COOLIFY_URL}}/api/v1/servers/{{SERVER_UUID}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{API_TOKEN}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "name": "Development",
+      "variables": {
+        "COOLIFY_URL": "http://localhost",
+        "API_TOKEN": "root",
+        "CLOUD_TOKEN_UUID": "",
+        "PRIVATE_KEY_UUID": "",
+        "SERVER_UUID": ""
+      }
+    },
+    {
+      "name": "Production",
+      "variables": {
+        "COOLIFY_URL": "https://your-coolify-instance.com",
+        "API_TOKEN": "your-production-token",
+        "CLOUD_TOKEN_UUID": "",
+        "PRIVATE_KEY_UUID": "",
+        "SERVER_UUID": ""
+      }
+    }
+  ]
+}
