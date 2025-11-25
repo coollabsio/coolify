@@ -45,9 +45,15 @@ return new class extends Migration
         DB::table('teams')->chunkById(100, function ($teams) {
             foreach ($teams as $team) {
                 try {
-                    DB::table('webhook_notification_settings')->updateOrInsert(
-                        ['team_id' => $team->id],
-                        [
+                    // Check if settings already exist for this team
+                    $exists = DB::table('webhook_notification_settings')
+                        ->where('team_id', $team->id)
+                        ->exists();
+
+                    if (! $exists) {
+                        // Only insert if no settings exist - don't overwrite existing preferences
+                        DB::table('webhook_notification_settings')->insert([
+                            'team_id' => $team->id,
                             'webhook_enabled' => false,
                             'webhook_url' => null,
                             'deployment_success_webhook_notifications' => false,
@@ -64,8 +70,8 @@ return new class extends Migration
                             'server_unreachable_webhook_notifications' => true,
                             'server_patch_webhook_notifications' => false,
                             'traefik_outdated_webhook_notifications' => true,
-                        ]
-                    );
+                        ]);
+                    }
                 } catch (\Throwable $e) {
                     Log::error('Error creating webhook notification settings for team '.$team->id.': '.$e->getMessage());
                 }
