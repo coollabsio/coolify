@@ -969,6 +969,23 @@ $schema://$host {
         return $this->belongsTo(Team::class);
     }
 
+    public function runnerSources()
+    {
+        return $this->belongsToMany(GitHubRunnerSource::class, 'github_runner_servers')
+            ->withPivot('is_active')
+            ->withTimestamps();
+    }
+
+    public function runners()
+    {
+        return $this->hasMany(GitHubRunner::class);
+    }
+
+    public function isRunnerServer(): bool
+    {
+        return $this->runnerSources()->exists();
+    }
+
     public function isProxyShouldRun()
     {
         // TODO: Do we need "|| $this->proxy->force_stop" here?

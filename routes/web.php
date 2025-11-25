@@ -54,6 +54,9 @@ use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfiguration
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
+use App\Livewire\Server\RunnerSource\Create as RunnerSourceCreate;
+use App\Livewire\Server\RunnerSource\Index as RunnerSourceIndex;
+use App\Livewire\Server\RunnerSource\Show as RunnerSourceShow;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Show as ServerShow;
@@ -247,6 +250,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
     // Route::get('/server/new', ServerCreate::class)->name('server.create');
+
+    Route::get('/runner-sources', RunnerSourceIndex::class)->name('server.runner-source.index');
+    Route::get('/runner-source/create', RunnerSourceCreate::class)->name('server.runner-source.create');
+    Route::get('/runner-source/{source_uuid}', RunnerSourceShow::class)->name('server.runner-source.show');
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
