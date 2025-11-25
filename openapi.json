@@ -7415,6 +7415,11 @@
                                         "example": false,
                                         "description": "Instant validate."
                                     },
+                                    "start_proxy": {
+                                        "type": "boolean",
+                                        "example": true,
+                                        "description": "Automatically start proxy after validation. Defaults to same value as instant_validate. Ignored for build servers."
+                                    },
                                     "proxy_type": {
                                         "type": "string",
                                         "enum": [
@@ -7626,6 +7631,10 @@
                                     "instant_validate": {
                                         "type": "boolean",
                                         "description": "Instant validate."
+                                    },
+                                    "start_proxy": {
+                                        "type": "boolean",
+                                        "description": "Automatically start proxy. Ignored for build servers."
                                     },
                                     "proxy_type": {
                                         "type": "string",

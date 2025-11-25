@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
@@ -12,6 +14,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 use Stringable;
 
@@ -415,6 +418,7 @@ class ServersController extends Controller
                         'private_key_uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the private key.'],
                         'is_build_server' => ['type' => 'boolean', 'example' => false, 'description' => 'Is build server.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
+                        'start_proxy' => ['type' => 'boolean', 'example' => true, 'description' => 'Automatically start proxy after validation. Defaults to same value as instant_validate. Ignored for build servers.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
                     ],
                 ),
@@ -455,7 +459,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'start_proxy', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -475,6 +479,7 @@ class ServersController extends Controller
             'user' => 'string|nullable',
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
+            'start_proxy' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
         ]);
 
@@ -506,6 +511,10 @@ class ServersController extends Controller
         }
         if (is_null($request->instant_validate)) {
             $request->offsetSet('instant_validate', false);
+        }
+        if (is_null($request->start_proxy)) {
+            // Default start_proxy to true when instant_validate is true
+            $request->offsetSet('start_proxy', $request->instant_validate);
         }
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
@@ -546,6 +555,21 @@ class ServersController extends Controller
             ValidateServer::dispatch($server);
         }
 
+        // Start proxy if requested and not a build server
+        if ($request->start_proxy && ! $request->is_build_server) {
+            try {
+                $proxyShouldRun = CheckProxy::run($server, false);
+                if ($proxyShouldRun) {
+                    StartProxy::dispatch($server);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Proxy startup failed after API server creation', [
+                    'server_uuid' => $server->uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return response()->json([
             'uuid' => $server->uuid,
         ])->setStatusCode(201);
@@ -579,6 +603,7 @@ class ServersController extends Controller
                         'private_key_uuid' => ['type' => 'string', 'description' => 'The UUID of the private key.'],
                         'is_build_server' => ['type' => 'boolean', 'description' => 'Is build server.'],
                         'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
+                        'start_proxy' => ['type' => 'boolean', 'description' => 'Automatically start proxy. Ignored for build servers.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
                     ],
                 ),
@@ -616,7 +641,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'start_proxy', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -636,6 +661,7 @@ class ServersController extends Controller
             'user' => 'string|nullable',
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
+            'start_proxy' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
         ]);
 
@@ -675,6 +701,21 @@ class ServersController extends Controller
         }
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
+        }
+
+        // Start proxy if requested and not a build server
+        if ($request->start_proxy && ! $server->isBuildServer()) {
+            try {
+                $proxyShouldRun = CheckProxy::run($server, false);
+                if ($proxyShouldRun) {
+                    StartProxy::dispatch($server);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Proxy startup failed after API server update', [
+                    'server_uuid' => $server->uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
