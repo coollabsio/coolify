@@ -3154,6 +3154,118 @@ function generateDockerComposeServiceName(mixed $services, int $pullRequestId = 
     return $collection;
 }
 
+function formatBytes(?int $bytes, int $precision = 2): string
+{
+    if ($bytes === null || $bytes === 0) {
+        return '0 B';
+    }
+
+    // Handle negative numbers
+    if ($bytes < 0) {
+        return '0 B';
+    }
+
+    $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    $base = 1024;
+    $exponent = floor(log($bytes) / log($base));
+    $exponent = min($exponent, count($units) - 1);
+
+    $value = $bytes / pow($base, $exponent);
+
+    return round($value, $precision).' '.$units[$exponent];
+}
+
+/**
+ * Validates that a file path is safely within the /tmp/ directory.
+ * Protects against path traversal attacks by resolving the real path
+ * and verifying it stays within /tmp/.
+ *
+ * Note: On macOS, /tmp is often a symlink to /private/tmp, which is handled.
+ */
+function isSafeTmpPath(?string $path): bool
+{
+    if (blank($path)) {
+        return false;
+    }
+
+    // URL decode to catch encoded traversal attempts
+    $decodedPath = urldecode($path);
+
+    // Minimum length check - /tmp/x is 6 chars
+    if (strlen($decodedPath) < 6) {
+        return false;
+    }
+
+    // Must start with /tmp/
+    if (! str($decodedPath)->startsWith('/tmp/')) {
+        return false;
+    }
+
+    // Quick check for obvious traversal attempts
+    if (str($decodedPath)->contains('..')) {
+        return false;
+    }
+
+    // Check for null bytes (directory traversal technique)
+    if (str($decodedPath)->contains("\0")) {
+        return false;
+    }
+
+    // Remove any trailing slashes for consistent validation
+    $normalizedPath = rtrim($decodedPath, '/');
+
+    // Normalize the path by removing redundant separators and resolving . and ..
+    // We'll do this manually since realpath() requires the path to exist
+    $parts = explode('/', $normalizedPath);
+    $resolvedParts = [];
+
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            // Skip empty parts (from //) and current directory references
+            continue;
+        } elseif ($part === '..') {
+            // Parent directory - this should have been caught earlier but double-check
+            return false;
+        } else {
+            $resolvedParts[] = $part;
+        }
+    }
+
+    $resolvedPath = '/'.implode('/', $resolvedParts);
+
+    // Final check: resolved path must start with /tmp/
+    // And must have at least one component after /tmp/
+    if (! str($resolvedPath)->startsWith('/tmp/') || $resolvedPath === '/tmp') {
+        return false;
+    }
+
+    // Resolve the canonical /tmp path (handles symlinks like /tmp -> /private/tmp on macOS)
+    $canonicalTmpPath = realpath('/tmp');
+    if ($canonicalTmpPath === false) {
+        // If /tmp doesn't exist, something is very wrong, but allow non-existing paths
+        $canonicalTmpPath = '/tmp';
+    }
+
+    // Calculate dirname once to avoid redundant calls
+    $dirPath = dirname($resolvedPath);
+
+    // If the directory exists, resolve it via realpath to catch symlink attacks
+    if (is_dir($dirPath)) {
+        // For existing paths, resolve to absolute path to catch symlinks
+        $realDir = realpath($dirPath);
+        if ($realDir === false) {
+            return false;
+        }
+
+        // Check if the real directory is within /tmp (or its canonical path)
+        if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /**
  * Transform colon-delimited status format to human-readable parentheses format.
  *

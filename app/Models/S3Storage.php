@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
@@ -39,6 +40,19 @@ class S3Storage extends BaseModel
     public function awsUrl()
     {
         return "{$this->endpoint}/{$this->bucket}";
+    }
+
+    protected function path(): Attribute
+    {
+        return Attribute::make(
+            set: function (?string $value) {
+                if ($value === null || $value === '') {
+                    return null;
+                }
+
+                return str($value)->trim()->start('/')->value();
+            }
+        );
     }
 
     public function testConnection(bool $shouldSave = false)
