@@ -13,6 +13,7 @@ services:
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
       - WEBHOOK_URL=${SERVICE_URL_N8N}
       - N8N_HOST=${SERVICE_URL_N8N}
+      - N8N_PROTOCOL=https
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
       - TZ=${TZ:-Europe/Berlin}
       - DB_TYPE=postgresdb
