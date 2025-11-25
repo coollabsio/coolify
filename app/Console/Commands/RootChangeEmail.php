@@ -31,10 +31,16 @@ class RootChangeEmail extends Command
         $email = $this->ask('Give me a new email for root user');
         $this->info('Updating root email...');
         try {
-            User::find(0)->update(['email' => $email]);
+            $rootUser = User::find(0);
+            if (!$rootUser) {
+                $this->error('Root user not found. Please ensure the root user exists.');
+
+                return;
+            }
+            $rootUser->update(['email' => $email]);
             $this->info('Root user\'s email updated successfully.');
         } catch (\Exception $e) {
-            $this->error('Failed to update root user\'s email.');
+            $this->error('Failed to update root user\'s email: '.$e->getMessage());
 
             return;
         }
