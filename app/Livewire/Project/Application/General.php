@@ -641,8 +641,6 @@ class General extends Component
             $this->application->settings->is_static = false;
             $this->application->settings->save();
         } else {
-            $this->portsExposes = '3000';
-            $this->application->ports_exposes = '3000';
             $this->resetDefaultLabels(false);
         }
         if ($this->buildPack === 'dockercompose') {
@@ -654,18 +652,6 @@ class General extends Component
                 $this->application->settings->save();
             } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
-            }
-        } else {
-            // Clear Docker Compose specific data when switching away from dockercompose
-            if ($this->application->getOriginal('build_pack') === 'dockercompose') {
-                $this->application->docker_compose_domains = null;
-                $this->application->docker_compose_raw = null;
-
-                // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
             }
         }
         if ($this->buildPack === 'static') {
@@ -1018,5 +1004,42 @@ class General extends Component
             'matches' => $isMatch,
             'isEmpty' => $isEmpty,
         ];
+    }
+
+    public function getDockerComposeBuildCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomBuildCommand) {
+            return '';
+        }
+
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
+        // Build-time env path references ApplicationDeploymentJob::BUILD_TIME_ENV_PATH as source of truth
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomBuildCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+        );
+    }
+
+    public function getDockerComposeStartCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomStartCommand) {
+            return '';
+        }
+
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Placeholder {workdir}/.env shows it's the workdir .env file (runtime env, not build-time)
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomStartCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            '{workdir}/.env'
+        );
     }
 }

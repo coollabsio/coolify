@@ -33,6 +33,9 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                     // New version available
                     $settings->update(['new_version_available' => true]);
                     File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
+
+                    // Invalidate cache to ensure fresh data is loaded
+                    invalidate_versions_cache();
                 } else {
                     $settings->update(['new_version_available' => false]);
                 }

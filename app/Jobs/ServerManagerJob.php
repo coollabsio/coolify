@@ -87,7 +87,7 @@ class ServerManagerJob implements ShouldQueue
                     Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
                         'server_id' => $server->id,
                         'server_name' => $server->name,
-                        'error' => $e->getMessage(),
+                        'error' => get_class($e).': '.$e->getMessage(),
                     ]);
                 }
             });
@@ -103,7 +103,7 @@ class ServerManagerJob implements ShouldQueue
                 Log::channel('scheduled-errors')->error('Error processing server tasks', [
                     'server_id' => $server->id,
                     'server_name' => $server->name,
-                    'error' => $e->getMessage(),
+                    'error' => get_class($e).': '.$e->getMessage(),
                 ]);
             }
         }

@@ -176,6 +176,39 @@ class Application extends BaseModel
             if (count($payload) > 0) {
                 $application->forceFill($payload);
             }
+
+            // Buildpack switching cleanup logic
+            if ($application->isDirty('build_pack')) {
+                $originalBuildPack = $application->getOriginal('build_pack');
+
+                // Clear Docker Compose specific data when switching away from dockercompose
+                if ($originalBuildPack === 'dockercompose') {
+                    $application->docker_compose_domains = null;
+                    $application->docker_compose_raw = null;
+
+                    // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
+                    $application->environment_variables()
+                        ->where(function ($q) {
+                            $q->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                                ->orWhere('key', 'LIKE', 'SERVICE_URL_%');
+                        })
+                        ->delete();
+                    $application->environment_variables_preview()
+                        ->where(function ($q) {
+                            $q->where('key', 'LIKE', 'SERVICE_FQDN_%')
+                                ->orWhere('key', 'LIKE', 'SERVICE_URL_%');
+                        })
+                        ->delete();
+                }
+
+                // Clear Dockerfile specific data when switching away from dockerfile
+                if ($originalBuildPack === 'dockerfile') {
+                    $application->dockerfile = null;
+                    $application->dockerfile_location = null;
+                    $application->dockerfile_target_build = null;
+                    $application->custom_healthcheck_found = false;
+                }
+            }
         });
         static::created(function ($application) {
             ApplicationSetting::create([
@@ -636,21 +669,23 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! $this->relationLoaded('additional_servers') || $this->additional_servers->count() === 0) {
-                    return $this->destination?->server?->isFunctional() ?? false;
+                // Check main server infrastructure health
+                $main_server_functional = $this->destination?->server?->isFunctional() ?? false;
+
+                if (! $main_server_functional) {
+                    return false;
                 }
 
-                $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                $main_server_status = $this->destination?->server?->isFunctional() ?? false;
-
-                foreach ($additional_servers_status as $status) {
-                    $server_status = str($status)->before(':')->value();
-                    if ($server_status !== 'running') {
-                        return false;
+                // Check additional servers infrastructure health (not container status!)
+                if ($this->relationLoaded('additional_servers') && $this->additional_servers->count() > 0) {
+                    foreach ($this->additional_servers as $server) {
+                        if (! $server->isFunctional()) {
+                            return false;  // Real server infrastructure problem
+                        }
                     }
                 }
 
-                return $main_server_status;
+                return true;
             }
         );
     }

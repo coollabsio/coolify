@@ -5,9 +5,9 @@
 ])
 @if (str($resource->status)->startsWith('running'))
     <x-status.running :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
-@elseif(str($resource->status)->startsWith('restarting') ||
-        str($resource->status)->startsWith('starting') ||
-        str($resource->status)->startsWith('degraded'))
+@elseif(str($resource->status)->startsWith('degraded'))
+    <x-status.degraded :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
+@elseif(str($resource->status)->startsWith('restarting') || str($resource->status)->startsWith('starting'))
     <x-status.restarting :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
 @else
     <x-status.stopped :status="$resource->status" />

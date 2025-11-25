@@ -189,65 +189,66 @@ class ServiceApplication extends BaseModel
     public function getRequiredPort(): ?int
     {
         try {
-            // Normalize container name same way as variable creation
-            // (uppercase, replace - and . with _)
-            $normalizedName = str($this->name)
-                ->upper()
-                ->replace('-', '_')
-                ->replace('.', '_')
-                ->value();
-            // Get all environment variables from the service
-            $serviceEnvVars = $this->service->environment_variables()->get();
+            // Parse the Docker Compose to find SERVICE_URL/SERVICE_FQDN variables DIRECTLY DECLARED
+            // for this specific service container (not just referenced from other containers)
+            $dockerComposeRaw = data_get($this->service, 'docker_compose_raw');
+            if (! $dockerComposeRaw) {
+                // Fall back to service-level port if no compose file
+                return $this->service->getRequiredPort();
+            }
 
-            // Look for SERVICE_FQDN_* or SERVICE_URL_* variables that match this container
-            foreach ($serviceEnvVars as $envVar) {
-                $key = str($envVar->key);
+            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+            $serviceConfig = data_get($dockerCompose, "services.{$this->name}");
+            if (! $serviceConfig) {
+                return $this->service->getRequiredPort();
+            }
 
-                // Check if this is a SERVICE_FQDN_* or SERVICE_URL_* variable
-                if (! $key->startsWith('SERVICE_FQDN_') && ! $key->startsWith('SERVICE_URL_')) {
-                    continue;
-                }
-                // Extract the part after SERVICE_FQDN_ or SERVICE_URL_
-                if ($key->startsWith('SERVICE_FQDN_')) {
-                    $suffix = $key->after('SERVICE_FQDN_');
-                } else {
-                    $suffix = $key->after('SERVICE_URL_');
-                }
+            $environment = data_get($serviceConfig, 'environment', []);
 
-                // Check if this variable starts with our normalized container name
-                // Format: {NORMALIZED_NAME}_{PORT} or just {NORMALIZED_NAME}
-                if (! $suffix->startsWith($normalizedName)) {
-                    \Log::debug('[ServiceApplication::getRequiredPort] Suffix does not match container', [
-                        'expected_start' => $normalizedName,
-                        'actual_suffix' => $suffix->value(),
-                    ]);
+            // Extract SERVICE_URL and SERVICE_FQDN variables DIRECTLY DECLARED in this service's environment
+            // (not variables that are merely referenced with ${VAR} syntax)
+            $portFound = null;
+            foreach ($environment as $key => $value) {
+                if (is_int($key) && is_string($value)) {
+                    // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
+                    // Extract variable name (before '=' if present)
+                    $envVarName = str($value)->before('=')->trim();
 
-                    continue;
-                }
+                    // Only process direct declarations
+                    if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        // Parse to check if it has a port suffix
+                        $parsed = parseServiceEnvironmentVariable($envVarName->value());
+                        if ($parsed['has_port'] && $parsed['port']) {
+                            // Found a port-specific variable for this service
+                            $portFound = (int) $parsed['port'];
+                            break;
+                        }
+                    }
+                } elseif (is_string($key)) {
+                    // Map-style: "SERVICE_URL_APP_3000: value" or "SERVICE_FQDN_DB: localhost"
+                    $envVarName = str($key);
 
-                // Check if there's a port suffix after the container name
-                // The suffix should be exactly NORMALIZED_NAME or NORMALIZED_NAME_PORT
-                $afterName = $suffix->after($normalizedName)->value();
-
-                // If there's content after the name, it should start with underscore
-                if ($afterName !== '' && str($afterName)->startsWith('_')) {
-                    // Extract port: _3210 -> 3210
-                    $port = str($afterName)->after('_')->value();
-                    // Validate that the extracted port is numeric
-                    if (is_numeric($port)) {
-                        \Log::debug('[ServiceApplication::getRequiredPort] MATCH FOUND - Returning port', [
-                            'port' => (int) $port,
-                        ]);
-
-                        return (int) $port;
+                    // Only process direct declarations
+                    if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        // Parse to check if it has a port suffix
+                        $parsed = parseServiceEnvironmentVariable($envVarName->value());
+                        if ($parsed['has_port'] && $parsed['port']) {
+                            // Found a port-specific variable for this service
+                            $portFound = (int) $parsed['port'];
+                            break;
+                        }
                     }
                 }
             }
 
-            // Fall back to service-level port if no port-specific variable is found
-            $fallbackPort = $this->service->getRequiredPort();
+            // If a port was found in the template, return it
+            if ($portFound !== null) {
+                return $portFound;
+            }
 
-            return $fallbackPort;
+            // No port-specific variables found for this service, return null
+            // (DO NOT fall back to service-level port, as that applies to all services)
+            return null;
         } catch (\Throwable $e) {
             return null;
         }

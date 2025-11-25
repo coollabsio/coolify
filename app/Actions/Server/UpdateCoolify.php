@@ -2,7 +2,6 @@
 
 namespace App\Actions\Server;
 
-use App\Jobs\PullHelperImageJob;
 use App\Models\Server;
 use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -50,7 +49,9 @@ class UpdateCoolify
 
     private function update()
     {
-        PullHelperImageJob::dispatch($this->server);
+        $helperImage = config('constants.coolify.helper_image');
+        $latest_version = getHelperVersion();
+        instant_remote_process(["docker pull -q {$helperImage}:{$latest_version}"], $this->server, false);
 
         $image = config('constants.coolify.registry_url').'/coollabsio/coolify:'.$this->latestVersion;
         instant_remote_process(["docker pull -q $image"], $this->server, false);
