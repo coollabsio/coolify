@@ -14,6 +14,8 @@ class EnvVarInput extends Component
 
     public ?string $htmlId = null;
 
+    public array $scopeUrls = [];
+
     public function __construct(
         public ?string $id = null,
         public ?string $name = null,
@@ -33,6 +35,8 @@ class EnvVarInput extends Component
         public mixed $canResource = null,
         public bool $autoDisable = true,
         public array $availableVars = [],
+        public ?string $projectUuid = null,
+        public ?string $environmentUuid = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {
@@ -67,6 +71,18 @@ class EnvVarInput extends Component
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
+
+        $this->scopeUrls = [
+            'team' => route('shared-variables.team.index'),
+            'project' => route('shared-variables.project.index'),
+            'environment' => $this->projectUuid && $this->environmentUuid
+                ? route('shared-variables.environment.show', [
+                    'project_uuid' => $this->projectUuid,
+                    'environment_uuid' => $this->environmentUuid,
+                ])
+                : route('shared-variables.environment.index'),
+            'default' => route('shared-variables.index'),
+        ];
 
         return view('components.forms.env-var-input');
     }

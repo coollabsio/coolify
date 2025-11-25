@@ -18,6 +18,7 @@
             currentScope: null,
             availableScopes: ['team', 'project', 'environment'],
             availableVars: @js($availableVars),
+            scopeUrls: @js($scopeUrls),
 
             isAutocompleteDisabled() {
                 const hasAnyVars = Object.values(this.availableVars).some(vars => vars.length > 0);
@@ -28,13 +29,14 @@
                 const input = this.$refs.input;
                 if (!input) return;
 
+                const value = input.value || '';
+
                 if (this.isAutocompleteDisabled()) {
                     this.showDropdown = false;
                     return;
                 }
 
                 this.cursorPosition = input.selectionStart || 0;
-                const value = input.value || '';
                 const textBeforeCursor = value.substring(0, this.cursorPosition);
 
                 const openBraces = '{' + '{';
@@ -107,14 +109,7 @@
             },
 
             getScopeUrl(scope) {
-                if (scope === 'team') {
-                    return '/shared-variables/team';
-                } else if (scope === 'project') {
-                    return '/shared-variables/projects';
-                } else if (scope === 'environment') {
-                    return '/shared-variables/environments';
-                }
-                return '/shared-variables';
+                return this.scopeUrls[scope] || this.scopeUrls['default'];
             },
 
             selectSuggestion(suggestion) {

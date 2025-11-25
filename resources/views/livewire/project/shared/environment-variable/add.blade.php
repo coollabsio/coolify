@@ -3,7 +3,9 @@
     <x-forms.textarea x-show="$wire.is_multiline === true" x-cloak id="value" label="Value" required />
     <x-forms.env-var-input x-show="$wire.is_multiline === false" x-cloak placeholder="production" id="value"
         x-bind:label="$wire.is_multiline === false && 'Value'" required
-        :availableVars="$shared ? [] : $this->availableSharedVariables" />
+        :availableVars="$shared ? [] : $this->availableSharedVariables"
+        :projectUuid="data_get($parameters, 'project_uuid')"
+        :environmentUuid="data_get($parameters, 'environment_uuid')" />
 
     @if (!$shared)
         <div x-show="$wire.is_multiline === false" x-cloak class="text-xs text-neutral-500 dark:text-neutral-400 -mt-1">
