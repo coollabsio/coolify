@@ -27,21 +27,21 @@ class S3RestoreJobFinished
 
             // Ensure helper container is removed (may already be gone from inline cleanup)
             if (filled($containerName)) {
-                $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
+                $commands[] = 'docker rm -f '.escapeshellarg($containerName).' 2>/dev/null || true';
             }
 
             // Clean up server temp file if still exists (should already be cleaned)
             if (isSafeTmpPath($serverTmpPath)) {
-                $commands[] = "rm -f {$serverTmpPath} 2>/dev/null || true";
+                $commands[] = 'rm -f '.escapeshellarg($serverTmpPath).' 2>/dev/null || true';
             }
 
             // Clean up any remaining files in database container (may already be cleaned)
             if (filled($container)) {
                 if (isSafeTmpPath($containerTmpPath)) {
-                    $commands[] = "docker exec {$container} rm -f {$containerTmpPath} 2>/dev/null || true";
+                    $commands[] = 'docker exec '.escapeshellarg($container).' rm -f '.escapeshellarg($containerTmpPath).' 2>/dev/null || true';
                 }
                 if (isSafeTmpPath($scriptPath)) {
-                    $commands[] = "docker exec {$container} rm -f {$scriptPath} 2>/dev/null || true";
+                    $commands[] = 'docker exec '.escapeshellarg($container).' rm -f '.escapeshellarg($scriptPath).' 2>/dev/null || true';
                 }
             }
 

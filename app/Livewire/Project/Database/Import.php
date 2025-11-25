@@ -280,6 +280,23 @@ EOD;
         }
     }
 
+    public function updatedS3Path($value)
+    {
+        // Reset validation state when path changes
+        $this->s3FileSize = null;
+
+        // Ensure path starts with a slash
+        if ($value !== null && $value !== '') {
+            $this->s3Path = str($value)->trim()->start('/')->value();
+        }
+    }
+
+    public function updatedS3StorageId()
+    {
+        // Reset validation state when storage changes
+        $this->s3FileSize = null;
+    }
+
     public function checkS3File()
     {
         if (! $this->s3StorageId) {

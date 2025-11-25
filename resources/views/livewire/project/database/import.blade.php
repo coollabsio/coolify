@@ -173,7 +173,7 @@
                     <div x-show="restoreType === 's3'" class="pt-6">
                         <h3>Restore from S3</h3>
                         <div class="flex flex-col gap-2 pt-2">
-                            <x-forms.select label="S3 Storage" wire:model="s3StorageId">
+                            <x-forms.select label="S3 Storage" wire:model.live="s3StorageId">
                                 <option value="">Select S3 Storage</option>
                                 @foreach ($availableS3Storages as $storage)
                                     <option value="{{ $storage->id }}">{{ $storage->name }}
@@ -186,7 +186,8 @@
 
                             <x-forms.input label="S3 File Path (within bucket)"
                                 helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
-                                placeholder="/backups/database-backup.gz" wire:model='s3Path'></x-forms.input>
+                                placeholder="/backups/database-backup.gz" wire:model.blur='s3Path'
+                                wire:keydown.enter='checkS3File'></x-forms.input>
 
                             <div class="flex gap-2">
                                 <x-forms.button class="w-full" wire:click='checkS3File' x-bind:disabled="!s3StorageId || !s3Path">

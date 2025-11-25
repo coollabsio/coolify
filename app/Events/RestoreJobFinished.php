@@ -22,11 +22,11 @@ class RestoreJobFinished
             $commands = [];
 
             if (isSafeTmpPath($scriptPath)) {
-                $commands[] = "docker exec {$container} sh -c 'rm {$scriptPath} 2>/dev/null || true'";
+                $commands[] = "docker exec {$container} sh -c 'rm ".escapeshellarg($scriptPath)." 2>/dev/null || true'";
             }
 
             if (isSafeTmpPath($tmpPath)) {
-                $commands[] = "docker exec {$container} sh -c 'rm {$tmpPath} 2>/dev/null || true'";
+                $commands[] = "docker exec {$container} sh -c 'rm ".escapeshellarg($tmpPath)." 2>/dev/null || true'";
             }
 
             if (! empty($commands)) {

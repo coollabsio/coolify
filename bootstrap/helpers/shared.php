@@ -3292,18 +3292,16 @@ function isSafeTmpPath(?string $path): bool
     $dirPath = dirname($resolvedPath);
 
     // If the directory exists, resolve it via realpath to catch symlink attacks
-    if (file_exists($resolvedPath) || is_dir($dirPath)) {
+    if (is_dir($dirPath)) {
         // For existing paths, resolve to absolute path to catch symlinks
-        if (is_dir($dirPath)) {
-            $realDir = realpath($dirPath);
-            if ($realDir === false) {
-                return false;
-            }
+        $realDir = realpath($dirPath);
+        if ($realDir === false) {
+            return false;
+        }
 
-            // Check if the real directory is within /tmp (or its canonical path)
-            if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
-                return false;
-            }
+        // Check if the real directory is within /tmp (or its canonical path)
+        if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
+            return false;
         }
     }
 
