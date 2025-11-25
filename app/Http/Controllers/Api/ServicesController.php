@@ -11,8 +11,10 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 class ServicesController extends Controller
@@ -1381,6 +1383,296 @@ class ServicesController extends Controller
         $env->forceDelete();
 
         return response()->json(['message' => 'Environment variable deleted.']);
+    }
+
+    #[OA\Get(
+        summary: 'List Applications',
+        description: 'List all applications for a service by UUID.',
+        path: '/services/{uuid}/applications',
+        operationId: 'list-applications-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All applications by service UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'uuid' => ['type' => 'string', 'example' => 'app-uuid-123'],
+                                    'name' => ['type' => 'string', 'example' => 'n8n'],
+                                    'fqdn' => ['type' => 'string', 'example' => 'n8n.example.com:5678'],
+                                    'image' => ['type' => 'string', 'example' => 'docker.n8n.io/n8nio/n8n:latest'],
+                                    'status' => ['type' => 'string', 'example' => 'running'],
+                                ]
+                            )
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function applications(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('view', $service);
+
+        $applications = $service->applications()->get()->map(function ($app) {
+            return [
+                'uuid' => $app->uuid,
+                'name' => $app->name,
+                'fqdn' => $app->fqdn,
+                'image' => $app->image,
+                'status' => $app->status,
+            ];
+        });
+
+        return response()->json($applications);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Application',
+        description: 'Update service application by UUID. Allows updating the FQDN (domain) of a service application.',
+        path: '/services/{uuid}/applications/{app_uuid}',
+        operationId: 'update-application-by-service-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'app_uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Application data to update.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'fqdn' => [
+                                'type' => 'string',
+                                'description' => 'Fully qualified domain name with optional port. Multiple domains can be comma-separated.',
+                                'example' => 'app.example.com:8080',
+                            ],
+                        ],
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application updated successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'description' => 'Application UUID.'],
+                                'name' => ['type' => 'string', 'description' => 'Application name.'],
+                                'fqdn' => ['type' => 'string', 'description' => 'Updated FQDN.'],
+                                'message' => ['type' => 'string', 'example' => 'Application updated. Restart service to apply changes.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflict detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflict detected.'],
+                                'conflicts' => ['type' => 'array', 'items' => ['type' => 'object']],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_application(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        // Find the service
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        // Find the application
+        $application = ServiceApplication::where('service_id', $service->id)
+            ->where('uuid', $request->app_uuid)
+            ->first();
+
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $allowedFields = ['fqdn'];
+
+        $validator = customApiValidator($request->all(), [
+            'fqdn' => 'string|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        // Update FQDN if provided
+        if ($request->has('fqdn')) {
+            $fqdn = str($request->fqdn)->trim();
+
+            // Clean up domain format
+            $fqdn = $fqdn->replaceEnd(',', '')->replaceStart(',', '')->trim();
+
+            // Validate and normalize domain format
+            try {
+                $domains = $fqdn->explode(',')->map(function ($domain) {
+                    $domain = trim($domain);
+                    if (! empty($domain)) {
+                        Url::fromString($domain, ['http', 'https']);
+
+                        return str($domain)->lower();
+                    }
+
+                    return null;
+                })->filter();
+
+                $fqdn = $domains->unique()->implode(',');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Invalid domain format.',
+                    'errors' => [
+                        'fqdn' => 'The provided domain format is invalid. Expected format: domain.com or domain.com:port',
+                    ],
+                ], 422);
+            }
+
+            // Check for domain conflicts
+            $application->fqdn = $fqdn;
+            $result = checkDomainUsage(resource: $application);
+
+            if ($result['hasConflicts']) {
+                return response()->json([
+                    'message' => 'Domain conflict detected. The domain is already in use by another resource.',
+                    'conflicts' => $result['conflicts'],
+                ], 409);
+            }
+
+            // Update FQDN
+            $application->fqdn = $fqdn;
+            $application->save();
+
+            // Regenerate environment variables
+            updateCompose($application);
+
+            // Regenerate docker-compose configuration
+            $service->parse();
+        }
+
+        return response()->json([
+            'uuid' => $application->uuid,
+            'name' => $application->name,
+            'fqdn' => $application->fqdn,
+            'message' => 'Application updated successfully. Restart the service to apply changes.',
+        ]);
     }
 
     #[OA\Get(

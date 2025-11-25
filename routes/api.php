@@ -149,6 +149,9 @@ Route::group([
     Route::patch('/services/{uuid}/envs', [ServicesController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/envs/{env_uuid}', [ServicesController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
 
+    Route::get('/services/{uuid}/applications', [ServicesController::class, 'applications'])->middleware(['api.ability:read']);
+    Route::patch('/services/{uuid}/applications/{app_uuid}', [ServicesController::class, 'update_application'])->middleware(['api.ability:write']);
+
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:write']);

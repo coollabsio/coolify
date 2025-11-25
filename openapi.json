@@ -8751,6 +8751,192 @@
                 ]
             }
         },
+        "\/services\/{uuid}\/applications": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "List Applications",
+                "description": "List all applications for a service by UUID.",
+                "operationId": "list-applications-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All applications by service UUID.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string",
+                                                "example": "app-uuid-123"
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "example": "n8n"
+                                            },
+                                            "fqdn": {
+                                                "type": "string",
+                                                "example": "n8n.example.com:5678"
+                                            },
+                                            "image": {
+                                                "type": "string",
+                                                "example": "docker.n8n.io\/n8nio\/n8n:latest"
+                                            },
+                                            "status": {
+                                                "type": "string",
+                                                "example": "running"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/applications\/{app_uuid}": {
+            "patch": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Update Application",
+                "description": "Update service application by UUID. Allows updating the FQDN (domain) of a service application.",
+                "operationId": "update-application-by-service-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "app_uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Application data to update.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "fqdn": {
+                                        "type": "string",
+                                        "description": "Fully qualified domain name with optional port. Multiple domains can be comma-separated.",
+                                        "example": "app.example.com:8080"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Application updated successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string",
+                                            "description": "Application UUID."
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Application name."
+                                        },
+                                        "fqdn": {
+                                            "type": "string",
+                                            "description": "Updated FQDN."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Application updated. Restart service to apply changes."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Domain conflict detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflict detected."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/services\/{uuid}\/start": {
             "get": {
                 "tags": [
