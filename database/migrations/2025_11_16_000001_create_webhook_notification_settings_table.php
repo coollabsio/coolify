@@ -35,7 +35,6 @@ return new class extends Migration
                 $table->boolean('server_reachable_webhook_notifications')->default(false);
                 $table->boolean('server_unreachable_webhook_notifications')->default(true);
                 $table->boolean('server_patch_webhook_notifications')->default(false);
-                $table->boolean('traefik_outdated_webhook_notifications')->default(true);
 
                 $table->unique(['team_id']);
             });
