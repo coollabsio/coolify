@@ -1864,6 +1864,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $helperImage = "{$helperImage}:".getHelperVersion();
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
+
+        // Sync Docker registries to server before deployment
+        syncDockerRegistriesToServer($this->server);
+
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
         $env_flags = $this->generate_docker_env_flags_for_secrets();

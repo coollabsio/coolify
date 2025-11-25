@@ -1337,3 +1337,144 @@ function injectDockerComposeFlags(string $command, string $composeFilePath, stri
     // Replace only first occurrence to avoid modifying comments/strings/chained commands
     return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
 }
+
+/**
+ * Generate Docker config.json content from server's active registries
+ *
+ * @param  Server  $server  The server with registry configurations
+ * @return string JSON content for ~/.docker/config.json
+ */
+function generateDockerConfigJson(Server $server): string
+{
+    $auths = [];
+
+    foreach ($server->dockerRegistries()->active()->get() as $registry) {
+        $auth = base64_encode("{$registry->username}:{$registry->password}");
+        $auths[$registry->registry_url] = [
+            'auth' => $auth,
+        ];
+    }
+
+    $config = [
+        'auths' => $auths,
+    ];
+
+    return json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+}
+
+/**
+ * Sync Docker registries to server's ~/.docker/config.json file
+ *
+ * @param  Server  $server  The server to sync registries to
+ * @return bool Whether the sync was successful
+ */
+function syncDockerRegistriesToServer(Server $server): bool
+{
+    try {
+        $configJson = generateDockerConfigJson($server);
+        $serverUserHomeDir = instant_remote_process(['echo $HOME'], $server);
+        $dockerConfigPath = "{$serverUserHomeDir}/.docker/config.json";
+
+        // Create .docker directory if it doesn't exist
+        instant_remote_process([
+            "mkdir -p {$serverUserHomeDir}/.docker",
+            "chmod 700 {$serverUserHomeDir}/.docker",
+        ], $server);
+
+        // Write config.json
+        $base64Config = base64_encode($configJson);
+        instant_remote_process([
+            "echo '{$base64Config}' | base64 -d > {$dockerConfigPath}",
+            "chmod 600 {$dockerConfigPath}",
+        ], $server);
+
+        return true;
+    } catch (\Throwable $e) {
+        ray('Failed to sync Docker registries: '.$e->getMessage());
+
+        return false;
+    }
+}
+
+/**
+ * Import existing Docker config.json from server
+ *
+ * @param  Server  $server  The server to import from
+ * @return array Parsed auth configurations
+ */
+function importDockerConfigFromServer(Server $server): array
+{
+    try {
+        $serverUserHomeDir = instant_remote_process(['echo $HOME'], $server);
+        $dockerConfigPath = "{$serverUserHomeDir}/.docker/config.json";
+
+        // Check if config.json exists
+        $exists = instant_remote_process([
+            "test -f {$dockerConfigPath} && echo 'OK' || echo 'NOK'",
+        ], $server);
+
+        if ($exists !== 'OK') {
+            return [];
+        }
+
+        // Read and parse config.json
+        $configContent = instant_remote_process([
+            "cat {$dockerConfigPath}",
+        ], $server);
+
+        $config = json_decode($configContent, true);
+
+        if (! $config || ! isset($config['auths'])) {
+            return [];
+        }
+
+        $registries = [];
+        foreach ($config['auths'] as $registryUrl => $authConfig) {
+            if (isset($authConfig['auth'])) {
+                $decoded = base64_decode($authConfig['auth']);
+                if (strpos($decoded, ':') !== false) {
+                    [$username, $password] = explode(':', $decoded, 2);
+                    $registries[] = [
+                        'registry_url' => $registryUrl,
+                        'username' => $username,
+                        'password' => $password,
+                    ];
+                }
+            }
+        }
+
+        return $registries;
+    } catch (\Throwable $e) {
+        ray('Failed to import Docker config: '.$e->getMessage());
+
+        return [];
+    }
+}
+
+/**
+ * Validate Docker registry credentials
+ *
+ * @param  Server  $server  The server to test on
+ * @param  string  $registryUrl  Registry URL
+ * @param  string  $username  Username
+ * @param  string  $password  Password
+ * @return bool Whether credentials are valid
+ */
+function validateDockerRegistryCredentials(Server $server, string $registryUrl, string $username, string $password): bool
+{
+    try {
+        $escapedPassword = escapeshellarg($password);
+        $escapedUsername = escapeshellarg($username);
+        $escapedRegistry = escapeshellarg($registryUrl);
+
+        // Try to login to verify credentials
+        $result = instant_remote_process([
+            "echo {$escapedPassword} | docker login {$escapedRegistry} -u {$escapedUsername} --password-stdin 2>&1",
+            "docker logout {$escapedRegistry} 2>&1",
+        ], $server, throwError: false);
+
+        return str_contains($result, 'Login Succeeded');
+    } catch (\Throwable $e) {
+        return false;
+    }
+}

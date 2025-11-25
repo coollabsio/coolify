@@ -17,6 +17,9 @@
     <a class="menu-item {{ $activeMenu === 'ca-certificate' ? 'menu-item-active' : '' }}"
         href="{{ route('server.ca-certificate', ['server_uuid' => $server->uuid]) }}">CA Certificate
     </a>
+    <a class="menu-item {{ $activeMenu === 'docker-registries' ? 'menu-item-active' : '' }}"
+        href="{{ route('server.docker-registries', ['server_uuid' => $server->uuid]) }}">Docker Registries
+    </a>
     @if (!$server->isLocalhost())
         <a class="menu-item {{ $activeMenu === 'cloudflare-tunnel' ? 'menu-item-active' : '' }}"
             href="{{ route('server.cloudflare-tunnel', ['server_uuid' => $server->uuid]) }}">Cloudflare

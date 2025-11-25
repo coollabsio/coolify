@@ -274,6 +274,11 @@ class Server extends BaseModel
         return $this->hasMany(DockerCleanupExecution::class);
     }
 
+    public function dockerRegistries()
+    {
+        return $this->hasMany(DockerRegistry::class);
+    }
+
     public function proxySet()
     {
         return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
