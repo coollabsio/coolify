@@ -129,8 +129,11 @@ export function initializeTerminalComponent() {
             },
 
             clearAllTimers() {
-                [this.keepAliveInterval, this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId, this.resizeTimeout]
-                    .forEach(timer => timer && clearInterval(timer));
+                if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+                if (this.reconnectInterval) clearTimeout(this.reconnectInterval);
+                if (this.connectionTimeoutId) clearTimeout(this.connectionTimeoutId);
+                if (this.pingTimeoutId) clearTimeout(this.pingTimeoutId);
+                if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
                 this.keepAliveInterval = null;
                 this.reconnectInterval = null;
                 this.connectionTimeoutId = null;
@@ -193,7 +196,7 @@ export function initializeTerminalComponent() {
                     window.terminalConfig = {};
                 }
 
-                const predefined = window.terminalConfig
+                const predefined = window.terminalConfig;
                 const connectionString = {
                     protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
                     host: window.location.hostname,
@@ -355,7 +358,10 @@ export function initializeTerminalComponent() {
                     }
                     this.terminalActive = true;
                     this.term.focus();
-                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
+                    const viewport = document.querySelector('.xterm-viewport');
+                    if (viewport) {
+                        viewport.classList.add('scrollbar', 'rounded-sm');
+                    }
 
                     // Initial resize after terminal is ready
                     this.resizeTerminal();

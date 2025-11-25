@@ -47,7 +47,7 @@
                 protocol: "{{ config('constants.terminal.protocol') }}",
                 host: "{{ config('constants.terminal.host') }}",
                 port: "{{ config('constants.terminal.port') }}"
-            }
+            };
         </script>
     @endscript
 </div>
