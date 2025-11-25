@@ -47,6 +47,11 @@
                     return;
                 }
 
+                if (lastBraceIndex > 0 && textBeforeCursor[lastBraceIndex - 1] === '{') {
+                    this.showDropdown = false;
+                    return;
+                }
+
                 const textAfterBrace = textBeforeCursor.substring(lastBraceIndex);
                 const closeBraces = '}' + '}';
                 if (textAfterBrace.includes(closeBraces)) {
@@ -156,6 +161,7 @@
 
             handleKeydown(event) {
                 if (!this.showDropdown) return;
+                if (!this.suggestions || this.suggestions.length === 0) return;
 
                 if (event.key === 'ArrowDown') {
                     event.preventDefault();
@@ -222,12 +228,6 @@
                        target="_blank">
                         Add <span x-text="currentScope"></span> variables →
                     </a>
-                </div>
-            </template>
-
-            <template x-if="suggestions.length === 0 && !currentScope">
-                <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                    No suggestions
                 </div>
             </template>
 
