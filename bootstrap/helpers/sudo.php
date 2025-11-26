@@ -31,6 +31,20 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
                 'true',
                 'if',
                 'fi',
+                'for',
+                'do',
+                'done',
+                'while',
+                'until',
+                'case',
+                'esac',
+                'select',
+                'then',
+                'else',
+                'elif',
+                'break',
+                'continue',
+                '#',
             ])
         ) {
             return "sudo $line";
