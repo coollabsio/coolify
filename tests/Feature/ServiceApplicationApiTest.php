@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -7,6 +11,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // Create InstanceSettings (required by the system) with API enabled
+    InstanceSettings::create([
+        'id' => 0,
+        'is_api_enabled' => true,
+    ]);
+
     // Create a team with owner
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -15,9 +25,32 @@ beforeEach(function () {
     // Set current team in session for token creation
     session(['currentTeam' => $this->team]);
 
-    // Create an API token for the user
+    // Create an API token for the user with team_id
     $this->token = $this->user->createToken('test-token', ['*']);
+    $this->token->accessToken->team_id = $this->team->id;
+    $this->token->accessToken->save();
     $this->bearerToken = $this->token->plainTextToken;
+
+    // Create a project and environment for service tests
+    $this->project = Project::create([
+        'name' => 'Test Project',
+        'team_id' => $this->team->id,
+    ]);
+
+    $this->environment = Environment::create([
+        'name' => 'production-'.uniqid(),
+        'project_id' => $this->project->id,
+    ]);
+
+    // Create a service for testing
+    $this->service = Service::create([
+        'name' => 'test-service',
+        'environment_id' => $this->environment->id,
+        'server_id' => 1, // Mock server ID
+        'destination_id' => 1,
+        'destination_type' => 'App\Models\StandaloneDocker',
+        'docker_compose_raw' => 'version: "3.8"',
+    ]);
 });
 
 describe('GET /api/v1/services/{uuid}/applications', function () {
@@ -63,11 +96,12 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
         ])->patchJson(
-            '/api/v1/services/service-uuid/applications/non-existent-uuid',
+            "/api/v1/services/{$this->service->uuid}/applications/non-existent-uuid",
             ['fqdn' => 'test.example.com']
         );
 
         $response->assertStatus(404);
+        $response->assertJson(['message' => 'Application not found.']);
     });
 
     test('validates fqdn format', function () {
