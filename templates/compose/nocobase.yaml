@@ -1,0 +1,42 @@
+# documentation: https://docs.nocobase.com/
+# slogan: NocoBase is the most extensible AI-powered no-code/low-code platform.
+# category: development
+# tags: nocode, lowcode, database, builder
+# logo: svgs/nocobase.png
+# port: 80
+
+services:
+  nocobase:
+    image: "nocobase/nocobase:latest"
+    environment:
+      - APP_KEY=$SERVICE_PASSWORD_64_APPKEY
+      - DB_DIALECT=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${POSTGRES_DB:-nocobase}
+      - DB_USER=$SERVICE_USER_POSTGRES
+      - DB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - SERVICE_URL_NOCOBASE
+    volumes:
+      - "nocobase-storage:/app/nocobase/storage"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  postgres:
+    image: "postgres:14-alpine"
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-nocobase}
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

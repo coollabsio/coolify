@@ -2882,6 +2882,21 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "nocobase": {
+        "documentation": "https://docs.nocobase.com/?utm_source=coolify.io",
+        "slogan": "NocoBase is the most extensible AI-powered no-code/low-code platform.",
+        "compose": "c2VydmljZXM6CiAgbm9jb2Jhc2U6CiAgICBpbWFnZTogJ25vY29iYXNlL25vY29iYXNlOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIEFQUF9LRVk9JFNFUlZJQ0VfUEFTU1dPUkRfNjRfQVBQS0VZCiAgICAgIC0gREJfRElBTEVDVD1wb3N0Z3JlcwogICAgICAtIERCX0hPU1Q9cG9zdGdyZXMKICAgICAgLSBEQl9QT1JUPTU0MzIKICAgICAgLSAnREJfREFUQUJBU0U9JHtQT1NUR1JFU19EQjotbm9jb2Jhc2V9JwogICAgICAtIERCX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIERCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICAgIC0gU0VSVklDRV9VUkxfTk9DT0JBU0UKICAgIHZvbHVtZXM6CiAgICAgIC0gJ25vY29iYXNlLXN0b3JhZ2U6L2FwcC9ub2NvYmFzZS9zdG9yYWdlJwogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MC9hcGkvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE0LWFscGluZScKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LW5vY29iYXNlfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3Bvc3RncmVzLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "nocode",
+            "lowcode",
+            "database",
+            "builder"
+        ],
+        "category": "development",
+        "logo": "svgs/nocobase.png",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "nocodb": {
         "documentation": "https://nocodb.com/?utm_source=coolify.io",
         "slogan": "NocoDB is an open source Airtable alternative. Turns any MySQL, PostgreSQL, SQL Server, SQLite & MariaDB into a smart-spreadsheet.",
