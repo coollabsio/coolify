@@ -984,6 +984,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             }
         }
         if ($option === '--entrypoint') {
+            $value = null;
             // Match --entrypoint=value or --entrypoint value
             // Handle quoted strings with escaped quotes: --entrypoint "python -c \"print('hi')\""
             // Pattern matches: double-quoted (with escapes), single-quoted (with escapes), or unquoted values
@@ -1007,7 +1008,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 }
             }
 
-            if (isset($value) && trim($value) !== '') {
+            if ($value && trim($value) !== '') {
                 $options[$option][] = $value;
                 $options[$option] = array_values(array_unique($options[$option]));
             }
