@@ -14,6 +14,14 @@ paths:
       summary: List
       description: 'List all applications.'
       operationId: list-applications
+      parameters:
+        -
+          name: tag
+          in: query
+          description: 'Filter applications by tag name.'
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: 'Get all applications.'

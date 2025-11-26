@@ -64,6 +64,17 @@ class ApplicationsController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'tag',
+                in: 'query',
+                description: 'Filter applications by tag name.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -94,13 +105,19 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $applications = collect();
-        $applications->push($projects->pluck('applications')->flatten());
-        $applications = $applications->flatten();
-        $applications = $applications->map(function ($application) {
-            return $this->removeSensitiveData($application);
-        });
+
+        $tagName = $request->query('tag');
+
+        $applications = Application::ownedByCurrentTeamAPI($teamId)
+            ->when($tagName, function ($query, $tagName) {
+                $query->whereHas('tags', function ($query) use ($tagName) {
+                    $query->where('name', $tagName);
+                });
+            })
+            ->get()
+            ->map(function ($application) {
+                return $this->removeSensitiveData($application);
+            });
 
         return response()->json($applications);
     }
