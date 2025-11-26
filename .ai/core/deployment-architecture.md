@@ -337,14 +337,14 @@ ARG SOURCE_COMMIT=abc123  # (if include_source_commit_in_build is true)
 
 **Files:**
 - `app/Jobs/ApplicationDeploymentJob.php`:
-  - `set_coolify_variables()` - SOURCE_COMMIT conditional (~line 1960)
-  - `generate_coolify_env_variables()` - SOURCE_COMMIT conditional for forBuildTime
-  - `generate_env_variables()` - SOURCE_COMMIT conditional (~line 2340)
-  - `add_build_env_variables_to_dockerfile()` - ARG injection toggle (~line 3358)
-  - `modify_dockerfiles_for_compose()` - Docker Compose ARG injection (~line 3530)
-- `app/Models/ApplicationSetting.php` - Boolean casts
-- `app/Livewire/Project/Application/Advanced.php` - UI binding
-- `resources/views/livewire/project/application/advanced.blade.php` - Checkboxes
+  - `set_coolify_variables()` - Conditionally adds SOURCE_COMMIT to Docker build context based on `include_source_commit_in_build` setting
+  - `generate_coolify_env_variables(bool $forBuildTime)` - Distinguishes build-time vs. runtime variables; excludes cache-busting variables like SOURCE_COMMIT from build context unless explicitly enabled
+  - `generate_env_variables()` - Populates `$this->env_args` with build-time ARG values, respecting `include_source_commit_in_build` toggle
+  - `add_build_env_variables_to_dockerfile()` - Injects ARG statements into Dockerfiles after FROM instructions; skips injection if `inject_build_args_to_dockerfile` is disabled
+  - `modify_dockerfiles_for_compose()` - Applies ARG injection to Docker Compose service Dockerfiles; respects `inject_build_args_to_dockerfile` toggle
+- `app/Models/ApplicationSetting.php` - Defines `inject_build_args_to_dockerfile` and `include_source_commit_in_build` boolean properties
+- `app/Livewire/Project/Application/Advanced.php` - Livewire component providing UI bindings for cache preservation toggles
+- `resources/views/livewire/project/application/advanced.blade.php` - Checkbox UI elements for user-facing toggles
 
 **Note:** Docker Compose services without a `build:` section (image-only) are automatically skipped.
 
@@ -506,7 +506,7 @@ services:
 - `templates/compose/chaskiq.yaml` - Entrypoint script
 
 **Implementation:**
-- Parsed: `bootstrap/helpers/parsers.php` (line 717)
+- Parsed: `bootstrap/helpers/parsers.php` in `parseCompose()` function (handles `content` field extraction)
 - Storage: `app/Models/LocalFileVolume.php`
 - Validation: `tests/Unit/StripCoolifyCustomFieldsTest.php`
 
@@ -559,7 +559,7 @@ services:
 - Pre-creating mount points before container starts
 
 **Implementation:**
-- Parsed: `bootstrap/helpers/parsers.php` (line 718)
+- Parsed: `bootstrap/helpers/parsers.php` in `parseCompose()` function (handles `is_directory`/`isDirectory` field extraction)
 - Storage: `app/Models/LocalFileVolume.php` (`is_directory` column)
 - Validation: `tests/Unit/StripCoolifyCustomFieldsTest.php`
 
