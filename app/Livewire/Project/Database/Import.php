@@ -133,6 +133,8 @@ class Import extends Component
 
     public string $customLocation = '';
 
+    public ?int $activityId = null;
+
     public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
 
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
@@ -156,7 +158,13 @@ class Import extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'slideOverClosed' => 'resetActivityId',
         ];
+    }
+
+    public function resetActivityId()
+    {
+        $this->activityId = null;
     }
 
     public function mount()
@@ -326,6 +334,9 @@ EOD;
                     'container' => $this->container,
                     'serverId' => $this->server->id,
                 ]);
+
+                // Track the activity ID
+                $this->activityId = $activity->id;
 
                 // Dispatch activity to the monitor and open slide-over
                 $this->dispatch('activityMonitor', $activity->id);
@@ -547,6 +558,9 @@ EOD;
                 'container' => $this->container,
                 'serverId' => $this->server->id,
             ]);
+
+            // Track the activity ID
+            $this->activityId = $activity->id;
 
             // Dispatch activity to the monitor and open slide-over
             $this->dispatch('activityMonitor', $activity->id);
