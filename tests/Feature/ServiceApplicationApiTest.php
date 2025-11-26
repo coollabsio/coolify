@@ -4,6 +4,7 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -235,48 +236,143 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
 
 describe('API Endpoint Response Structure', function () {
     test('GET endpoint returns proper JSON structure when service exists', function () {
-        // This test documents expected response structure
-        // Actual testing would require full service setup
+        // Create actual ServiceApplications for the test
+        $app1 = ServiceApplication::create([
+            'name' => 'web',
+            'service_id' => $this->service->id,
+            'fqdn' => 'app.example.com:8080',
+            'image' => 'nginx:latest',
+            'human_name' => 'Web Server',
+            'description' => 'Main web application',
+            'exclude_from_status' => false,
+            'is_log_drain_enabled' => false,
+            'is_gzip_enabled' => true,
+            'is_stripprefix_enabled' => false,
+        ]);
 
-        // Expected structure when service exists:
-        // [
-        //   {
-        //     "uuid": "string",
-        //     "name": "string",
-        //     "human_name": "string",
-        //     "description": "string",
-        //     "fqdn": "string",
-        //     "image": "string",
-        //     "status": "string",
-        //     "exclude_from_status": boolean,
-        //     "is_log_drain_enabled": boolean,
-        //     "is_gzip_enabled": boolean,
-        //     "is_stripprefix_enabled": boolean
-        //   }
-        // ]
+        $app2 = ServiceApplication::create([
+            'name' => 'api',
+            'service_id' => $this->service->id,
+            'fqdn' => 'api.example.com',
+            'image' => 'node:18',
+            'human_name' => 'API Server',
+            'description' => null,
+            'exclude_from_status' => true,
+            'is_log_drain_enabled' => false,
+            'is_gzip_enabled' => false,
+            'is_stripprefix_enabled' => true,
+        ]);
 
-        expect(true)->toBeTrue();
-    })->skip('Documentation test - requires full service setup');
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson("/api/v1/services/{$this->service->uuid}/applications");
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(2);
+
+        // Verify first application structure
+        $response->assertJsonFragment([
+            'uuid' => $app1->uuid,
+            'name' => 'web',
+            'human_name' => 'Web Server',
+            'description' => 'Main web application',
+            'fqdn' => 'app.example.com:8080',
+            'image' => 'nginx:latest',
+            'exclude_from_status' => false,
+            'is_log_drain_enabled' => false,
+            'is_gzip_enabled' => true,
+            'is_stripprefix_enabled' => false,
+        ]);
+
+        // Verify second application structure
+        $response->assertJsonFragment([
+            'uuid' => $app2->uuid,
+            'name' => 'api',
+            'human_name' => 'API Server',
+            'fqdn' => 'api.example.com',
+            'image' => 'node:18',
+        ]);
+
+        // Verify response has all required fields
+        $response->assertJsonStructure([
+            '*' => [
+                'uuid',
+                'name',
+                'human_name',
+                'description',
+                'fqdn',
+                'image',
+                'status',
+                'exclude_from_status',
+                'is_log_drain_enabled',
+                'is_gzip_enabled',
+                'is_stripprefix_enabled',
+            ],
+        ]);
+    });
 
     test('PATCH endpoint returns proper JSON structure on success', function () {
-        // This test documents expected response structure
-        // Actual testing would require full service setup
+        // Create actual ServiceApplication for the test
+        $app = ServiceApplication::create([
+            'name' => 'database',
+            'service_id' => $this->service->id,
+            'fqdn' => 'db.example.com',
+            'image' => 'postgres:15',
+            'human_name' => 'Database',
+            'description' => 'PostgreSQL database',
+            'exclude_from_status' => false,
+            'is_log_drain_enabled' => false,
+            'is_gzip_enabled' => false,
+            'is_stripprefix_enabled' => false,
+        ]);
 
-        // Expected response when successful:
-        // {
-        //   "uuid": "string",
-        //   "name": "string",
-        //   "human_name": "string",
-        //   "description": "string",
-        //   "fqdn": "string",
-        //   "image": "string",
-        //   "exclude_from_status": boolean,
-        //   "is_log_drain_enabled": boolean,
-        //   "is_gzip_enabled": boolean,
-        //   "is_stripprefix_enabled": boolean,
-        //   "message": "Application updated successfully. Restart the service to apply changes."
-        // }
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson(
+            "/api/v1/services/{$this->service->uuid}/applications/{$app->uuid}",
+            [
+                'fqdn' => 'http://database.example.com:5432',
+                'human_name' => 'Primary Database',
+                'description' => 'Production PostgreSQL instance',
+                'is_gzip_enabled' => true,
+            ]
+        );
 
-        expect(true)->toBeTrue();
-    })->skip('Documentation test - requires full service setup');
+        $response->assertStatus(200);
+
+        // Verify all fields are returned
+        $response->assertJsonStructure([
+            'uuid',
+            'name',
+            'human_name',
+            'description',
+            'fqdn',
+            'image',
+            'exclude_from_status',
+            'is_log_drain_enabled',
+            'is_gzip_enabled',
+            'is_stripprefix_enabled',
+            'message',
+        ]);
+
+        // Verify updated values
+        $response->assertJson([
+            'uuid' => $app->uuid,
+            'name' => 'database',
+            'human_name' => 'Primary Database',
+            'description' => 'Production PostgreSQL instance',
+            'fqdn' => 'http://database.example.com:5432',
+            'image' => 'postgres:15',
+            'is_gzip_enabled' => true,
+            'message' => 'Application updated successfully. Restart the service to apply changes.',
+        ]);
+
+        // Verify unchanged values
+        $response->assertJson([
+            'exclude_from_status' => false,
+            'is_log_drain_enabled' => false,
+            'is_stripprefix_enabled' => false,
+        ]);
+    });
 });
