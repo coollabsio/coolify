@@ -99,10 +99,9 @@ class Show extends Component
     private function handleBulkSubmit()
     {
         $variables = parseEnvFormatToArray($this->variables);
+        $changesMade = false;
 
-        DB::transaction(function () use ($variables) {
-            $changesMade = false;
-
+        DB::transaction(function () use ($variables, &$changesMade) {
             // Delete removed variables
             $deletedCount = $this->deleteRemovedVariables($variables);
             if ($deletedCount > 0) {
@@ -114,11 +113,12 @@ class Show extends Component
             if ($updatedCount > 0) {
                 $changesMade = true;
             }
-
-            if ($changesMade) {
-                $this->dispatch('success', 'Environment variables updated.');
-            }
         });
+
+        // Only dispatch success after transaction has committed
+        if ($changesMade) {
+            $this->dispatch('success', 'Environment variables updated.');
+        }
     }
 
     private function deleteRemovedVariables($variables)
