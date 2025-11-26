@@ -1648,6 +1648,43 @@ class ServicesController extends Controller
 
         $this->authorize('update', $application);
 
+        $validationResult = $this->validateApplicationUpdateRequest($request);
+        if ($validationResult) {
+            return $validationResult;
+        }
+
+        if ($request->has('fqdn')) {
+            $fqdnResult = $this->updateApplicationFqdn($application, $service, $request->fqdn);
+            if ($fqdnResult) {
+                return $fqdnResult;
+            }
+        }
+
+        $fieldsResult = $this->updateApplicationFields($application, $service, $request);
+        if ($fieldsResult) {
+            return $fieldsResult;
+        }
+
+        return response()->json([
+            'uuid' => $application->uuid,
+            'name' => $application->name,
+            'human_name' => $application->human_name,
+            'description' => $application->description,
+            'fqdn' => $application->fqdn,
+            'image' => $application->image,
+            'exclude_from_status' => $application->exclude_from_status,
+            'is_log_drain_enabled' => $application->is_log_drain_enabled,
+            'is_gzip_enabled' => $application->is_gzip_enabled,
+            'is_stripprefix_enabled' => $application->is_stripprefix_enabled,
+            'message' => 'Application updated successfully. Restart the service to apply changes.',
+        ]);
+    }
+
+    /**
+     * Validate the application update request
+     */
+    private function validateApplicationUpdateRequest(Request $request): ?\Illuminate\Http\JsonResponse
+    {
         $allowedFields = [
             'fqdn',
             'human_name',
@@ -1685,59 +1722,71 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        // Update FQDN if provided
-        if ($request->has('fqdn')) {
-            $fqdn = str($request->fqdn)->trim();
+        return null;
+    }
 
-            // Clean up domain format
-            $fqdn = $fqdn->replaceEnd(',', '')->replaceStart(',', '')->trim();
+    /**
+     * Update the application FQDN
+     */
+    private function updateApplicationFqdn(ServiceApplication $application, Service $service, ?string $fqdn): ?\Illuminate\Http\JsonResponse
+    {
+        $fqdn = str($fqdn)->trim();
 
-            // Validate and normalize domain format
-            try {
-                $domains = $fqdn->explode(',')->map(function ($domain) {
-                    $domain = trim($domain);
-                    if (! empty($domain)) {
-                        Url::fromString($domain, ['http', 'https']);
+        // Clean up domain format
+        $fqdn = $fqdn->replaceEnd(',', '')->replaceStart(',', '')->trim();
 
-                        return str($domain)->lower();
-                    }
+        // Validate and normalize domain format
+        try {
+            $domains = $fqdn->explode(',')->map(function ($domain) {
+                $domain = trim($domain);
+                if (! empty($domain)) {
+                    Url::fromString($domain, ['http', 'https']);
 
-                    return null;
-                })->filter();
+                    return str($domain)->lower();
+                }
 
-                $fqdn = $domains->unique()->implode(',');
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'message' => 'Invalid domain format.',
-                    'errors' => [
-                        'fqdn' => 'The provided domain format is invalid. Expected format: domain.com or domain.com:port',
-                    ],
-                ], 422);
-            }
+                return null;
+            })->filter();
 
-            // Check for domain conflicts
-            $application->fqdn = $fqdn;
-            $result = checkDomainUsage(resource: $application);
-
-            if ($result['hasConflicts']) {
-                return response()->json([
-                    'message' => 'Domain conflict detected. The domain is already in use by another resource.',
-                    'conflicts' => $result['conflicts'],
-                ], 409);
-            }
-
-            // Update FQDN
-            $application->fqdn = $fqdn;
-            $application->save();
-
-            // Regenerate environment variables
-            updateCompose($application);
-
-            // Regenerate docker-compose configuration
-            $service->parse();
+            $fqdn = $domains->unique()->implode(',');
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Invalid domain format.',
+                'errors' => [
+                    'fqdn' => 'The provided domain format is invalid. Expected format: domain.com or domain.com:port',
+                ],
+            ], 422);
         }
 
-        // Update other fields if provided
+        // Check for domain conflicts
+        $application->fqdn = $fqdn;
+        $result = checkDomainUsage(resource: $application);
+
+        if ($result['hasConflicts']) {
+            return response()->json([
+                'message' => 'Domain conflict detected. The domain is already in use by another resource.',
+                'conflicts' => $result['conflicts'],
+            ], 409);
+        }
+
+        // Update FQDN
+        $application->fqdn = $fqdn;
+        $application->save();
+
+        // Regenerate environment variables
+        updateCompose($application);
+
+        // Regenerate docker-compose configuration
+        $service->parse();
+
+        return null;
+    }
+
+    /**
+     * Update application fields and regenerate configuration if needed
+     */
+    private function updateApplicationFields(ServiceApplication $application, Service $service, Request $request): ?\Illuminate\Http\JsonResponse
+    {
         $needsRegeneration = false;
 
         if ($request->has('human_name')) {
@@ -1790,19 +1839,7 @@ class ServicesController extends Controller
             $service->parse();
         }
 
-        return response()->json([
-            'uuid' => $application->uuid,
-            'name' => $application->name,
-            'human_name' => $application->human_name,
-            'description' => $application->description,
-            'fqdn' => $application->fqdn,
-            'image' => $application->image,
-            'exclude_from_status' => $application->exclude_from_status,
-            'is_log_drain_enabled' => $application->is_log_drain_enabled,
-            'is_gzip_enabled' => $application->is_gzip_enabled,
-            'is_stripprefix_enabled' => $application->is_stripprefix_enabled,
-            'message' => 'Application updated successfully. Restart the service to apply changes.',
-        ]);
+        return null;
     }
 
     #[OA\Get(
