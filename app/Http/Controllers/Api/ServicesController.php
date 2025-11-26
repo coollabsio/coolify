@@ -1653,14 +1653,16 @@ class ServicesController extends Controller
             return $validationResult;
         }
 
+        $fqdnNeedsRegeneration = false;
         if ($request->has('fqdn')) {
-            $fqdnResult = $this->updateApplicationFqdn($application, $service, $request->fqdn);
-            if ($fqdnResult) {
+            $fqdnResult = $this->updateApplicationFqdn($application, $request->fqdn);
+            if ($fqdnResult instanceof \Illuminate\Http\JsonResponse) {
                 return $fqdnResult;
             }
+            $fqdnNeedsRegeneration = true;
         }
 
-        $fieldsResult = $this->updateApplicationFields($application, $service, $request);
+        $fieldsResult = $this->updateApplicationFields($application, $service, $request, $fqdnNeedsRegeneration);
         if ($fieldsResult) {
             return $fieldsResult;
         }
@@ -1726,9 +1728,9 @@ class ServicesController extends Controller
     }
 
     /**
-     * Update the application FQDN
+     * Validate and assign the application FQDN (does not save)
      */
-    private function updateApplicationFqdn(ServiceApplication $application, Service $service, ?string $fqdn): ?\Illuminate\Http\JsonResponse
+    private function updateApplicationFqdn(ServiceApplication $application, ?string $fqdn): ?\Illuminate\Http\JsonResponse
     {
         $fqdn = str($fqdn)->trim();
 
@@ -1769,25 +1771,16 @@ class ServicesController extends Controller
             ], 409);
         }
 
-        // Update FQDN
-        $application->fqdn = $fqdn;
-        $application->save();
-
-        // Regenerate environment variables
-        updateCompose($application);
-
-        // Regenerate docker-compose configuration
-        $service->parse();
-
+        // FQDN is assigned but not saved - will be saved with other fields
         return null;
     }
 
     /**
-     * Update application fields and regenerate configuration if needed
+     * Update application fields and regenerate configuration if needed (single save)
      */
-    private function updateApplicationFields(ServiceApplication $application, Service $service, Request $request): ?\Illuminate\Http\JsonResponse
+    private function updateApplicationFields(ServiceApplication $application, Service $service, Request $request, bool $fqdnNeedsRegeneration): ?\Illuminate\Http\JsonResponse
     {
-        $needsRegeneration = false;
+        $needsRegeneration = $fqdnNeedsRegeneration;
 
         if ($request->has('human_name')) {
             $application->human_name = $request->human_name;
@@ -1830,11 +1823,11 @@ class ServicesController extends Controller
             $needsRegeneration = true;
         }
 
-        // Save all changes
+        // Save all changes once
         $application->save();
 
         // Regenerate configuration if needed
-        if ($needsRegeneration && ! $request->has('fqdn')) {
+        if ($needsRegeneration) {
             updateCompose($application);
             $service->parse();
         }
