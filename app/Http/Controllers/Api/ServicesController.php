@@ -1648,21 +1648,22 @@ class ServicesController extends Controller
 
         $this->authorize('update', $application);
 
+        // Validate request fields
         $validationResult = $this->validateApplicationUpdateRequest($request);
         if ($validationResult) {
             return $validationResult;
         }
 
-        $fqdnNeedsRegeneration = false;
+        // Update FQDN if present (saves and regenerates config)
         if ($request->has('fqdn')) {
-            $fqdnResult = $this->updateApplicationFqdn($application, $request->fqdn);
-            if ($fqdnResult instanceof \Illuminate\Http\JsonResponse) {
+            $fqdnResult = $this->updateApplicationFqdn($application, $service, $request->fqdn);
+            if ($fqdnResult) {
                 return $fqdnResult;
             }
-            $fqdnNeedsRegeneration = true;
         }
 
-        $fieldsResult = $this->updateApplicationFields($application, $service, $request, $fqdnNeedsRegeneration);
+        // Update other fields (saves and regenerates config if needed)
+        $fieldsResult = $this->updateApplicationFields($application, $service, $request);
         if ($fieldsResult) {
             return $fieldsResult;
         }
@@ -1728,9 +1729,9 @@ class ServicesController extends Controller
     }
 
     /**
-     * Validate and assign the application FQDN (does not save)
+     * Validate, assign, save the application FQDN and regenerate configuration
      */
-    private function updateApplicationFqdn(ServiceApplication $application, ?string $fqdn): ?\Illuminate\Http\JsonResponse
+    private function updateApplicationFqdn(ServiceApplication $application, Service $service, string $fqdn): ?\Illuminate\Http\JsonResponse
     {
         $fqdn = str($fqdn)->trim();
 
@@ -1761,26 +1762,33 @@ class ServicesController extends Controller
         }
 
         // Check for domain conflicts
+        $originalFqdn = $application->fqdn;
         $application->fqdn = $fqdn;
         $result = checkDomainUsage(resource: $application);
 
         if ($result['hasConflicts']) {
+            $application->fqdn = $originalFqdn; // Restore original on conflict
+
             return response()->json([
                 'message' => 'Domain conflict detected. The domain is already in use by another resource.',
                 'conflicts' => $result['conflicts'],
             ], 409);
         }
 
-        // FQDN is assigned but not saved - will be saved with other fields
+        // Save and regenerate configuration
+        $application->save();
+        updateCompose($application);
+        $service->parse();
+
         return null;
     }
 
     /**
-     * Update application fields and regenerate configuration if needed (single save)
+     * Update application fields and regenerate configuration if needed (excluding FQDN)
      */
-    private function updateApplicationFields(ServiceApplication $application, Service $service, Request $request, bool $fqdnNeedsRegeneration): ?\Illuminate\Http\JsonResponse
+    private function updateApplicationFields(ServiceApplication $application, Service $service, Request $request): ?\Illuminate\Http\JsonResponse
     {
-        $needsRegeneration = $fqdnNeedsRegeneration;
+        $needsRegeneration = false;
 
         if ($request->has('human_name')) {
             $application->human_name = $request->human_name;
@@ -1826,8 +1834,8 @@ class ServicesController extends Controller
         // Save all changes once
         $application->save();
 
-        // Regenerate configuration if needed
-        if ($needsRegeneration) {
+        // Regenerate configuration if needed and fqdn was not updated (fqdn handles its own regeneration)
+        if ($needsRegeneration && ! $request->has('fqdn')) {
             updateCompose($application);
             $service->parse();
         }
