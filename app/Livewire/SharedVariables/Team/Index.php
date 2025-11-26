@@ -51,6 +51,7 @@ class Index extends Component
 
     public function switch()
     {
+        $this->authorize('view', $this->team);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         $this->getDevView();
     }
@@ -90,10 +91,9 @@ class Index extends Component
     private function handleBulkSubmit()
     {
         $variables = parseEnvFormatToArray($this->variables);
+        $changesMade = false;
 
-        DB::transaction(function () use ($variables) {
-            $changesMade = false;
-
+        DB::transaction(function () use ($variables, &$changesMade) {
             // Delete removed variables
             $deletedCount = $this->deleteRemovedVariables($variables);
             if ($deletedCount > 0) {
@@ -105,11 +105,11 @@ class Index extends Component
             if ($updatedCount > 0) {
                 $changesMade = true;
             }
-
-            if ($changesMade) {
-                $this->dispatch('success', 'Environment variables updated.');
-            }
         });
+
+        if ($changesMade) {
+            $this->dispatch('success', 'Environment variables updated.');
+        }
     }
 
     private function deleteRemovedVariables($variables)

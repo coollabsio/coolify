@@ -57,6 +57,7 @@ class Show extends Component
 
     public function switch()
     {
+        $this->authorize('view', $this->project);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         $this->getDevView();
     }
@@ -97,25 +98,19 @@ class Show extends Component
     {
         $variables = parseEnvFormatToArray($this->variables);
 
-        DB::transaction(function () use ($variables) {
-            $changesMade = false;
-
+        $changesMade = DB::transaction(function () use ($variables) {
             // Delete removed variables
             $deletedCount = $this->deleteRemovedVariables($variables);
-            if ($deletedCount > 0) {
-                $changesMade = true;
-            }
 
             // Update or create variables
             $updatedCount = $this->updateOrCreateVariables($variables);
-            if ($updatedCount > 0) {
-                $changesMade = true;
-            }
 
-            if ($changesMade) {
-                $this->dispatch('success', 'Environment variables updated.');
-            }
+            return $deletedCount > 0 || $updatedCount > 0;
         });
+
+        if ($changesMade) {
+            $this->dispatch('success', 'Environment variables updated.');
+        }
     }
 
     private function deleteRemovedVariables($variables)

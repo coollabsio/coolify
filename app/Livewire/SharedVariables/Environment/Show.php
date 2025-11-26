@@ -60,6 +60,7 @@ class Show extends Component
 
     public function switch()
     {
+        $this->authorize('view', $this->environment);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         $this->getDevView();
     }
