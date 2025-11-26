@@ -20,21 +20,11 @@
             availableVars: @js($availableVars),
             scopeUrls: @js($scopeUrls),
 
-            isAutocompleteDisabled() {
-                const hasAnyVars = Object.values(this.availableVars).some(vars => vars.length > 0);
-                return !hasAnyVars;
-            },
-
             handleInput() {
                 const input = this.$refs.input;
                 if (!input) return;
 
                 const value = input.value || '';
-
-                if (this.isAutocompleteDisabled()) {
-                    this.showDropdown = false;
-                    return;
-                }
 
                 this.cursorPosition = input.selectionStart || 0;
                 const textBeforeCursor = value.substring(0, this.cursorPosition);
