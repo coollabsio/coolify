@@ -1,0 +1,29 @@
+# documentation: https://github.com/theotherp/nzbhydra2
+# slogan: NZBHydra2 is a meta search for newznab indexers and torznab trackers which can be used as source for tools like Sonarr, Radarr, Lidarr, couchPotato etc.
+# category: media
+# tags: media,request,sonarr,radarr
+# logo: svgs/nzbhydra2.svg
+# port: 5076
+
+services:
+  nzbhydra2:
+    image: 'lscr.io/linuxserver/nzbhydra2:latest'
+    container_name: nzbhydra2
+    environment:
+      - SERVICE_URL_NZBHYDRA2_5076
+      - _APP_URL=$SERVICE_URL_NZBHYDRA2
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - 'nzbhydra2-config:/config'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:5076/actuator/health/ping'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    restart: unless-stopped
