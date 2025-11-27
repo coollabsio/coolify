@@ -80,9 +80,11 @@
                                 @if ($isSharedVariable)
                                     <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
                                 @else
-                                    <x-forms.checkbox disabled id="is_buildtime"
-                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                        label="Available at Buildtime" />
+                                    @if (!$env->is_nixpacks)
+                                        <x-forms.checkbox disabled id="is_buildtime"
+                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                            label="Available at Buildtime" />
+                                    @endif
                                     <x-forms.checkbox disabled id="is_runtime"
                                         helper="Make this variable available in the running container at runtime."
                                         label="Available at Runtime" />
@@ -230,9 +232,11 @@
                                 @if ($isSharedVariable)
                                     <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
                                 @else
-                                    <x-forms.checkbox disabled id="is_buildtime"
-                                        helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                        label="Available at Buildtime" />
+                                    @if (!$env->is_nixpacks)
+                                        <x-forms.checkbox disabled id="is_buildtime"
+                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                            label="Available at Buildtime" />
+                                    @endif
                                     <x-forms.checkbox disabled id="is_runtime"
                                         helper="Make this variable available in the running container at runtime."
                                         label="Available at Runtime" />
