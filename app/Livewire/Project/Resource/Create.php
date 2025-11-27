@@ -102,13 +102,22 @@ class Create extends Component
                             }
                         });
                     }
-                    $service->parse(isNew: true);
+                     $service->parse(isNew: true);
 
-                    return redirect()->route('project.service.configuration', [
-                        'service_uuid' => $service->uuid,
-                        'environment_uuid' => $environment->uuid,
-                        'project_uuid' => $project->uuid,
-                    ]);
+                     // For Beszel service disable gzip (fixes realtime not working issue)
+                     if ($oneClickServiceName === 'beszel') {
+                         $appService = $service->applications()->whereName('beszel')->first();
+                         if ($appService) {
+                             $appService->is_gzip_enabled = false;
+                             $appService->save();
+                         }
+                     }
+
+                     return redirect()->route('project.service.configuration', [
+                         'service_uuid' => $service->uuid,
+                         'environment_uuid' => $environment->uuid,
+                         'project_uuid' => $project->uuid,
+                     ]);
                 }
             }
             $this->type = $type->value();
