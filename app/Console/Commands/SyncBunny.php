@@ -50,6 +50,7 @@ class SyncBunny extends Command
 
             // Clone the repository
             $this->info('Cloning coolify-cdn repository...');
+            $output = [];
             exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to clone repository: '.implode("\n", $output));
@@ -59,6 +60,7 @@ class SyncBunny extends Command
 
             // Create feature branch
             $this->info('Creating feature branch...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to create branch: '.implode("\n", $output));
@@ -96,6 +98,7 @@ class SyncBunny extends Command
 
             // Stage and commit
             $this->info('Committing changes...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to stage changes: '.implode("\n", $output));
@@ -133,6 +136,7 @@ class SyncBunny extends Command
 
             // Push to remote
             $this->info('Pushing branch to remote...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to push branch: '.implode("\n", $output));
@@ -146,6 +150,7 @@ class SyncBunny extends Command
             $prTitle = 'Update releases.json - '.date('Y-m-d H:i:s');
             $prBody = 'Automated update of releases.json with latest '.count($releases).' releases from GitHub API';
             $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
             exec($prCommand, $output, $returnCode);
 
             // Clean up
@@ -211,6 +216,7 @@ class SyncBunny extends Command
 
             // 3. Clone the repository
             $this->info('Cloning coolify-cdn repository...');
+            $output = [];
             exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to clone repository: '.implode("\n", $output));
@@ -220,6 +226,7 @@ class SyncBunny extends Command
 
             // 4. Create feature branch
             $this->info('Creating feature branch...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to create branch: '.implode("\n", $output));
@@ -274,6 +281,7 @@ class SyncBunny extends Command
 
             // 7. Stage both files
             $this->info('Staging changes...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json '.escapeshellarg($versionsTargetPath).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to stage changes: '.implode("\n", $output));
@@ -303,6 +311,7 @@ class SyncBunny extends Command
             // 9. Commit changes
             $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
             $commitMessage = "Update releases.json and $envLabel versions.json to $actualVersion - ".date('Y-m-d H:i:s');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to commit changes: '.implode("\n", $output));
@@ -313,6 +322,7 @@ class SyncBunny extends Command
 
             // 10. Push to remote
             $this->info('Pushing branch to remote...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to push branch: '.implode("\n", $output));
@@ -326,6 +336,7 @@ class SyncBunny extends Command
             $prTitle = "Update releases.json and $envLabel versions.json to $actualVersion - ".date('Y-m-d H:i:s');
             $prBody = "Automated update:\n- releases.json with latest ".count($releases)." releases from GitHub API\n- $envLabel versions.json to version $actualVersion";
             $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
             exec($prCommand, $output, $returnCode);
 
             // 12. Clean up
