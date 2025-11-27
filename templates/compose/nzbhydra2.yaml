@@ -16,7 +16,7 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
     volumes:
-      - 'nzbhydra2-config:/config'
+      - 'nzbhydra2-data:/config'
     healthcheck:
       test:
         - CMD
