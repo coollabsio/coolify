@@ -1,0 +1,33 @@
+# documentation: https://nzbget.com/documentation/
+# slogan: NZBGet is an advanced NZB downloader designed to efficiently retrieve articles from Usenet newsgroups.
+# category: media
+# tags: media,request,sonarr,radarr
+# logo: svgs/nzbget.svg
+# port: 6789
+
+services:
+  nzbget:
+    image: 'lscr.io/linuxserver/nzbget:latest'
+    container_name: nzbget
+    environment:
+      - SERVICE_FQDN_NZBGET_6789
+      - _APP_URL=$SERVICE_FQDN_NZBGET
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - NZBGET_USER=nzbget
+      - NZBGET_PASS=tegbzn6789
+    volumes:
+      - 'nzbget-data:/config'
+#      - '/data/downloads:/downloads'
+#      - '/data/content:/content'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:6789/jsonrpc'
+      interval: 1m30s
+      timeout: 10s
+      retries: 3

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="vector-effect: non-scaling-stroke;" viewBox="182.47 40.33 528 528">
+ <defs style="vector-effect: non-scaling-stroke;">
+  <linearGradient style="vector-effect: non-scaling-stroke;" y2="0" x2="1" y1="0" x1="0" id="svg_11">
+   <stop style="vector-effect: non-scaling-stroke;" offset="0" stop-opacity="0.98828" stop-color="#fafafa"/>
+   <stop style="vector-effect: non-scaling-stroke;" offset="1" stop-opacity="0.98828" stop-color="#333733"/>
+  </linearGradient>
+ </defs>
+ <g>
+  <ellipse transform="rotate(90 446.474 304.333)" stroke="#000" stroke-width="0" ry="263.99999" rx="264" id="svg_12" cy="304.33312" cx="446.47417" fill="url(#svg_11)"/>
+  <ellipse style="vector-effect: non-scaling-stroke;" stroke="#000" transform="rotate(-90 445.474 305)" stroke-width="0" ry="239.66666" rx="239.8589" id="svg_9" cy="304.99977" cx="445.47418" fill="url(#svg_11)"/>
+  <ellipse style="vector-effect: non-scaling-stroke;" stroke="#000" stroke-width="0" ry="226" rx="226" id="svg_6" cy="303.33311" cx="445.33311" fill="#37d134"/>
+  <path style="vector-effect: non-scaling-stroke;" stroke="#000" transform="rotate(-180 446.843 376.485)" id="svg_2" d="m330.34323,434.81804l116.49998,-116.66662l116.49998,116.66662l-232.99996,0z" fill="#000000"/>
+  <rect style="vector-effect: non-scaling-stroke;" stroke="#000" id="svg_3" height="51.33332" width="94.66664" y="266.66647" x="398.66641" fill="#000000"/>
+  <path style="vector-effect: non-scaling-stroke;" stroke="#000" id="svg_4" d="m399.33309,215.33316l92.66665,0l0,33.33332l-92.66665,0l0,-33.33332z" fill="#000000"/>
+  <path style="vector-effect: non-scaling-stroke;" stroke="#000" id="svg_5" d="m399.33309,163.99984l92.66664,0l0,33.33332l-92.66664,0l0,-33.33332z" fill="#000000"/>
+ </g>
+</svg>
