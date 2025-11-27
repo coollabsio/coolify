@@ -14,13 +14,29 @@
         </div>
     @endif
 
-    <section>
-        <h3 class="pb-2">Projects</h3>
+    <section class="-mt-2">
+        <div class="flex items-center gap-2 pb-2">
+            <h3>Projects</h3>
+            @if ($projects->count() > 0)
+                <x-modal-input buttonTitle="Add" title="New Project">
+                    <x-slot:content>
+                        <button
+                            class="flex items-center justify-center size-4 text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                            <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </button>
+                    </x-slot:content>
+                    <livewire:project.add-empty />
+                </x-modal-input>
+            @endif
+        </div>
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="gap-2 border cursor-pointer box group"
-                        wire:click="navigateToProject('{{ $project->uuid }}')">
+                    <div class="relative gap-2 cursor-pointer box group">
+                        <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
                                 <div class="box-title">{{ $project->name }}</div>
@@ -28,20 +44,20 @@
                                     {{ $project->description }}
                                 </div>
                             </div>
-                            <div class="flex items-center justify-center gap-2 text-xs font-bold">
+                            <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
                                 @if ($project->environments->first())
                                     @can('createAnyResource')
-                                        <a class="hover:underline" wire:click.stop
+                                        <a class="hover:underline"
                                             href="{{ route('project.resource.create', [
                                                 'project_uuid' => $project->uuid,
                                                 'environment_uuid' => $project->environments->first()->uuid,
                                             ]) }}">
-                                            <span class="p-2 font-bold">+ Add Resource</span>
+                                            + Add Resource
                                         </a>
                                     @endcan
                                 @endif
                                 @can('update', $project)
-                                    <a class="hover:underline" wire:click.stop
+                                    <a class="hover:underline"
                                         href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                         Settings
                                     </a>
@@ -65,7 +81,23 @@
     </section>
 
     <section>
-        <h3 class="pb-2">Servers</h3>
+        <div class="flex items-center gap-2 pb-2">
+            <h3>Servers</h3>
+            @if ($servers->count() > 0 && $privateKeys->count() > 0)
+                <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
+                    <x-slot:content>
+                        <button
+                            class="flex items-center justify-center size-4 text-white rounded hover:bg-coolgray-400 dark:hover:bg-coolgray-300 cursor-pointer">
+                            <svg class="size-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </button>
+                    </x-slot:content>
+                    <livewire:server.create />
+                </x-modal-input>
+            @endif
+        </div>
         @if ($servers->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($servers as $server)
@@ -125,52 +157,4 @@
             @endif
         @endif
     </section>
-
-    @if ($servers->count() > 0 && $projects->count() > 0)
-        <section>
-            <div class="flex items-start gap-2">
-                <h3 class="pb-2">Deployments</h3>
-                @if (count($deploymentsPerServer) > 0)
-                    <x-loading />
-                @endif
-                @can('cleanupDeploymentQueue', Application::class)
-                    <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
-                        submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
-                        step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
-                        dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
-                @endcan
-            </div>
-            <div wire:poll.3000ms="loadDeployments" class="grid grid-cols-1">
-                @forelse ($deploymentsPerServer as $serverName => $deployments)
-                    <h4 class="pb-2">{{ $serverName }}</h4>
-                    <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-                        @foreach ($deployments as $deployment)
-                            <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                                'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                                'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                                'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                            ])>
-                                <div class="flex flex-col justify-center mx-6">
-                                    <div class="box-title">
-                                        {{ data_get($deployment, 'application_name') }}
-                                    </div>
-                                    @if (data_get($deployment, 'pull_request_id') !== 0)
-                                        <div class="box-description">
-                                            PR #{{ data_get($deployment, 'pull_request_id') }}
-                                        </div>
-                                    @endif
-                                    <div class="box-description">
-                                        {{ str(data_get($deployment, 'status'))->headline() }}
-                                    </div>
-                                </div>
-                                <div class="flex-1"></div>
-                            </a>
-                        @endforeach
-                    </div>
-                @empty
-                    <div>No deployments running.</div>
-                @endforelse
-            </div>
-        </section>
-    @endif
 </div>

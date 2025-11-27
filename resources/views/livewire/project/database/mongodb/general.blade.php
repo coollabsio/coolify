@@ -7,9 +7,9 @@
             </x-forms.button>
         </div>
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="database.name" canGate="update" :canResource="$database" />
-            <x-forms.input label="Description" id="database.description" canGate="update" :canResource="$database" />
-            <x-forms.input label="Image" id="database.image" required canGate="update" :canResource="$database"
+            <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
+            <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+            <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/mongo'>https://hub.docker.com/_/mongo</a>" />
         </div>
         <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
@@ -17,36 +17,36 @@
         </div>
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
-                <x-forms.input label="Initial Username" id="database.mongo_initdb_root_username"
+                <x-forms.input label="Initial Username" id="mongoInitdbRootUsername"
                     placeholder="If empty: postgres"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Password" id="database.mongo_initdb_root_password" type="password"
+                <x-forms.input label="Initial Password" id="mongoInitdbRootPassword" type="password"
                     required
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work."
                     canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Database" id="database.mongo_initdb_database"
+                <x-forms.input label="Initial Database" id="mongoInitdbDatabase"
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
             <div class="flex xl:flex-row flex-col gap-2 pb-2">
-                <x-forms.input required label="Username" id="database.mongo_initdb_root_username"
+                <x-forms.input required label="Username" id="mongoInitdbRootUsername"
                     placeholder="If empty: postgres" canGate="update" :canResource="$database" />
-                <x-forms.input label="Password" id="database.mongo_initdb_root_password" type="password" required
+                <x-forms.input label="Password" id="mongoInitdbRootPassword" type="password" required
                     canGate="update" :canResource="$database" />
-                <x-forms.input required label="Database" id="database.mongo_initdb_database"
+                <x-forms.input required label="Database" id="mongoInitdbDatabase"
                     placeholder="If empty, it will be the same as Username." canGate="update" :canResource="$database" />
             </div>
         @endif
         <x-forms.input
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-            id="database.custom_docker_run_options" label="Custom Docker Options" canGate="update" :canResource="$database" />
+            id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
+                <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
                     canGate="update" :canResource="$database" />
             </div>
@@ -64,7 +64,7 @@
             <div class="flex items-center justify-between py-2">
                 <div class="flex items-center justify-between w-full">
                     <h3>SSL Configuration</h3>
-                    @if ($database->enable_ssl)
+                    @if ($enableSsl)
                         <x-modal-confirmation title="Regenerate SSL Certificates"
                             buttonTitle="Regenerate SSL Certificates" :actions="[
                                 'The SSL certificate of this database will be regenerated.',
@@ -74,7 +74,7 @@
                     @endif
                 </div>
             </div>
-            @if ($database->enable_ssl && $certificateValidUntil)
+            @if ($enableSsl && $certificateValidUntil)
                 <span class="text-sm">Valid until:
                     @if (now()->gt($certificateValidUntil))
                         <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
@@ -91,20 +91,20 @@
             <div class="flex flex-col gap-2">
                 <div class="w-64">
                     @if (str($database->status)->contains('exited'))
-                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
-                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" canGate="update"
+                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
+                            wire:model.live="enableSsl" instantSave="instantSaveSSL" canGate="update"
                             :canResource="$database" />
                     @else
-                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
-                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
+                        <x-forms.checkbox id="enableSsl" label="Enable SSL"
+                            wire:model.live="enableSsl" instantSave="instantSaveSSL" disabled
                             helper="Database should be stopped to change this settings." canGate="update"
                             :canResource="$database" />
                     @endif
                 </div>
-                @if ($database->enable_ssl)
+                @if ($enableSsl)
                     <div class="mx-2">
                         @if (str($database->status)->contains('exited'))
-                            <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
+                            <x-forms.select id="sslMode" label="SSL Mode" wire:model.live="sslMode"
                                 instantSave="instantSaveSSL"
                                 helper="Choose the SSL verification mode for MongoDB connections" canGate="update"
                                 :canResource="$database">
@@ -115,7 +115,7 @@
                                 </option>
                             </x-forms.select>
                         @else
-                            <x-forms.select id="database.ssl_mode" label="SSL Mode" instantSave="instantSaveSSL"
+                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL"
                                 disabled helper="Database should be stopped to change this settings." canGate="update"
                                 :canResource="$database">
                                 <option value="allow" title="Allow insecure connections">allow (insecure)</option>
@@ -148,18 +148,18 @@
                             </x-slide-over>
                         @endif
                     </div>
-                    <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available"
+                    <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                         canGate="update" :canResource="$database" />
                 </div>
-                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                    id="database.public_port" label="Public Port" canGate="update" :canResource="$database" />
+                <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
+                    id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
             </div>
-            <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="database.mongo_conf"
+            <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="mongoConf"
                 canGate="update" :canResource="$database" />
             <h3 class="pt-4">Advanced</h3>
             <div class="flex flex-col">
                 <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                    instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs"
+                    instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs"
                     canGate="update" :canResource="$database" />
             </div>
         </div>

@@ -18,24 +18,12 @@ class Index extends Component
     public function mount()
     {
         $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
-        $this->projects = Project::ownedByCurrentTeam()->get()->map(function ($project) {
-            $project->settingsRoute = route('project.edit', ['project_uuid' => $project->uuid]);
-            $project->canUpdate = auth()->user()->can('update', $project);
-
-            return $project;
-        });
+        $this->projects = Project::ownedByCurrentTeam()->get();
         $this->servers = Server::ownedByCurrentTeam()->count();
     }
 
     public function render()
     {
         return view('livewire.project.index');
-    }
-
-    public function navigateToProject($projectUuid)
-    {
-        $project = collect($this->projects)->firstWhere('uuid', $projectUuid);
-
-        return $this->redirect($project->navigateTo(), navigate: false);
     }
 }

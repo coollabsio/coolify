@@ -18,6 +18,7 @@ use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class FileStorage extends Component
@@ -34,12 +35,20 @@ class FileStorage extends Component
 
     public bool $permanently_delete = true;
 
+    public bool $isReadOnly = false;
+
+    #[Validate(['nullable'])]
+    public ?string $content = null;
+
+    #[Validate(['required', 'boolean'])]
+    public bool $isBasedOnGit = false;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
-        'fileStorage.content' => 'nullable',
-        'fileStorage.is_based_on_git' => 'required|boolean',
+        'content' => 'nullable',
+        'isBasedOnGit' => 'required|boolean',
     ];
 
     public function mount()
@@ -51,6 +60,26 @@ class FileStorage extends Component
         } else {
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
+        }
+
+        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->syncData();
+    }
+
+    public function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->validate();
+
+            // Sync to model
+            $this->fileStorage->content = $this->content;
+            $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+
+            $this->fileStorage->save();
+        } else {
+            // Sync from model
+            $this->content = $this->fileStorage->content;
+            $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
         }
     }
 
@@ -78,6 +107,7 @@ class FileStorage extends Component
             $this->authorize('update', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
+            $this->syncData();
             $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -144,14 +174,18 @@ class FileStorage extends Component
         try {
             $this->validate();
             if ($this->fileStorage->is_directory) {
-                $this->fileStorage->content = null;
+                $this->content = null;
             }
+            // Sync component properties to model
+            $this->fileStorage->content = $this->content;
+            $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
+            $this->syncData();
 
             return handleError($e, $this);
         }

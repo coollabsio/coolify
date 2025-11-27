@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use OpenApi\Attributes as OA;
 
@@ -19,6 +20,7 @@ use OpenApi\Attributes as OA;
 )]
 class Environment extends BaseModel
 {
+    use ClearsGlobalSearchCache;
     use HasSafeStringAttribute;
 
     protected $guarded = [];
@@ -31,6 +33,11 @@ class Environment extends BaseModel
                 $shared_variable->delete();
             }
         });
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function isEmpty()

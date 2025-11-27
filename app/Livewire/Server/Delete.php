@@ -16,6 +16,8 @@ class Delete extends Component
 
     public Server $server;
 
+    public bool $delete_from_hetzner = false;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -41,8 +43,15 @@ class Delete extends Component
 
                 return;
             }
+
             $this->server->delete();
-            DeleteServer::dispatch($this->server);
+            DeleteServer::dispatch(
+                $this->server->id,
+                $this->delete_from_hetzner,
+                $this->server->hetzner_server_id,
+                $this->server->cloud_provider_token_id,
+                $this->server->team_id
+            );
 
             return redirect()->route('server.index');
         } catch (\Throwable $e) {
@@ -52,6 +61,18 @@ class Delete extends Component
 
     public function render()
     {
-        return view('livewire.server.delete');
+        $checkboxes = [];
+
+        if ($this->server->hetzner_server_id) {
+            $checkboxes[] = [
+                'id' => 'delete_from_hetzner',
+                'label' => 'Also delete server from Hetzner Cloud',
+                'default_warning' => 'The actual server on Hetzner Cloud will NOT be deleted.',
+            ];
+        }
+
+        return view('livewire.server.delete', [
+            'checkboxes' => $checkboxes,
+        ]);
     }
 }

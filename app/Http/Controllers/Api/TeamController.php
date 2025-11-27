@@ -179,6 +179,8 @@ class TeamController extends Controller
         $members = $team->members;
         $members->makeHidden([
             'pivot',
+            'email_change_code',
+            'email_change_code_expires_at',
         ]);
 
         return response()->json(
@@ -264,6 +266,8 @@ class TeamController extends Controller
         $team = auth()->user()->currentTeam();
         $team->members->makeHidden([
             'pivot',
+            'email_change_code',
+            'email_change_code_expires_at',
         ]);
 
         return response()->json(

@@ -15,10 +15,15 @@ services:
     volumes:
       - huly-db:/data/db
   minio:
-    image: "minio/minio"
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     command: server /data --address ":9000" --console-address ":9001"
     volumes:
-      - huly-files:/data
+      - huly-files:/data      
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   elastic:
     image: "elasticsearch:7.14.2"
     command: |

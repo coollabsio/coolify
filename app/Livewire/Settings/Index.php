@@ -35,11 +35,16 @@ class Index extends Component
     #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
+    #[Validate('nullable|string|max:50')]
+    public ?string $dev_helper_version = null;
+
     public array $domainConflicts = [];
 
     public bool $showDomainConflictModal = false;
 
     public bool $forceSaveDomains = false;
+
+    public $buildActivityId = null;
 
     public function render()
     {
@@ -60,6 +65,7 @@ class Index extends Component
         $this->public_ipv4 = $this->settings->public_ipv4;
         $this->public_ipv6 = $this->settings->public_ipv6;
         $this->instance_timezone = $this->settings->instance_timezone;
+        $this->dev_helper_version = $this->settings->dev_helper_version;
     }
 
     #[Computed]
@@ -81,6 +87,7 @@ class Index extends Component
         $this->settings->public_ipv4 = $this->public_ipv4;
         $this->settings->public_ipv6 = $this->public_ipv6;
         $this->settings->instance_timezone = $this->instance_timezone;
+        $this->settings->dev_helper_version = $this->dev_helper_version;
         if ($isSave) {
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
@@ -115,7 +122,7 @@ class Index extends Component
             $this->validate();
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
-                if (! validate_dns_entry($this->fqdn, $this->server)) {
+                if (! validateDNSEntry($this->fqdn, $this->server)) {
                     $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
@@ -142,6 +149,39 @@ class Index extends Component
             if (! $error_show) {
                 $this->dispatch('success', 'Instance settings updated successfully!');
             }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function buildHelperImage()
+    {
+        try {
+            if (! isDev()) {
+                $this->dispatch('error', 'Building helper image is only available in development mode.');
+
+                return;
+            }
+
+            $version = $this->dev_helper_version ?: config('constants.coolify.helper_version');
+            if (empty($version)) {
+                $this->dispatch('error', 'Please specify a version to build.');
+
+                return;
+            }
+
+            $buildCommand = "docker build -t ghcr.io/coollabsio/coolify-helper:{$version} -f docker/coolify-helper/Dockerfile .";
+
+            $activity = remote_process(
+                command: [$buildCommand],
+                server: $this->server,
+                type: 'build-helper-image'
+            );
+
+            $this->buildActivityId = $activity->id;
+            $this->dispatch('activityMonitor', $activity->id);
+
+            $this->dispatch('success', "Building coolify-helper:{$version}...");
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

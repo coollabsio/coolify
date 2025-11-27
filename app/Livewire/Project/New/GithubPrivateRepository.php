@@ -55,7 +55,7 @@ class GithubPrivateRepository extends Component
     public ?string $publish_directory = null;
 
     // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
@@ -143,7 +143,13 @@ class GithubPrivateRepository extends Component
 
     protected function loadBranchByPage()
     {
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
+        $response = Http::GitHub($this->github_app->api_url, $this->token)
+            ->timeout(20)
+            ->retry(3, 200, throw: false)
+            ->get("/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches", [
+                'per_page' => 100,
+                'page' => $this->page,
+            ]);
         $json = $response->json();
         if ($response->status() !== 200) {
             return $this->dispatch('error', $json['message']);
@@ -192,6 +198,7 @@ class GithubPrivateRepository extends Component
                 'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
+                'base_directory' => $this->base_directory,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
@@ -206,7 +213,6 @@ class GithubPrivateRepository extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application['docker_compose_location'] = $this->docker_compose_location;
-                $application['base_directory'] = $this->base_directory;
             }
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;

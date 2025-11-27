@@ -102,7 +102,6 @@ class CheckUpdates
                     ];
             }
         } catch (\Throwable $e) {
-            ray('Error:', $e->getMessage());
 
             return [
                 'osId' => $osId,

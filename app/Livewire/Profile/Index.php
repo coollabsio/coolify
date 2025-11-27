@@ -78,6 +78,8 @@ class Index extends Component
                 'new_email' => ['required', 'email', 'unique:users,email'],
             ]);
 
+            $this->new_email = strtolower($this->new_email);
+
             // Skip rate limiting in development mode
             if (! isDev()) {
                 // Rate limit by current user's email (1 request per 2 minutes)
@@ -90,7 +92,7 @@ class Index extends Component
                 }
 
                 // Rate limit by new email address (3 requests per hour per email)
-                $newEmailKey = 'email-change:email:'.md5(strtolower($this->new_email));
+                $newEmailKey = 'email-change:email:'.md5($this->new_email);
                 if (! RateLimiter::attempt($newEmailKey, 3, function () {}, 3600)) {
                     $this->dispatch('error', 'This email address has received too many verification requests. Please try again later.');
 

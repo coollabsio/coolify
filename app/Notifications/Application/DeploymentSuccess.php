@@ -205,4 +205,30 @@ class DeploymentSuccess extends CustomEmailNotification
             color: SlackMessage::successColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $data = [
+            'success' => true,
+            'message' => 'New version successfully deployed',
+            'event' => 'deployment_success',
+            'application_name' => $this->application_name,
+            'application_uuid' => $this->application->uuid,
+            'deployment_uuid' => $this->deployment_uuid,
+            'deployment_url' => $this->deployment_url,
+            'project' => data_get($this->application, 'environment.project.name'),
+            'environment' => $this->environment_name,
+        ];
+
+        if ($this->preview) {
+            $data['pull_request_id'] = $this->preview->pull_request_id;
+            $data['preview_fqdn'] = $this->preview->fqdn;
+        }
+
+        if ($this->fqdn) {
+            $data['fqdn'] = $this->fqdn;
+        }
+
+        return $data;
+    }
 }
