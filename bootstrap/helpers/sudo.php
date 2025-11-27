@@ -30,7 +30,12 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         $bashKeywords = [
             'cd',
             'command',
+            'declare',
             'echo',
+            'export',
+            'local',
+            'readonly',
+            'return',
             'true',
             'if',
             'fi',
