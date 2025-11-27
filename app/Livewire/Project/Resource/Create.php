@@ -113,6 +113,18 @@ class Create extends Component
                          }
                      }
 
+                     // For Appwrite services, disable strip prefix for services that handle domain requests
+                     if ($oneClickServiceName === 'appwrite') {
+                         $servicesToDisableStripPrefix = ['appwrite', 'appwrite-console', 'appwrite-realtime'];
+                         foreach ($servicesToDisableStripPrefix as $serviceName) {
+                             $appService = $service->applications()->whereName($serviceName)->first();
+                             if ($appService) {
+                                 $appService->is_stripprefix_enabled = false;
+                                 $appService->save();
+                             }
+                         }
+                     }
+
                      return redirect()->route('project.service.configuration', [
                          'service_uuid' => $service->uuid,
                          'environment_uuid' => $environment->uuid,
