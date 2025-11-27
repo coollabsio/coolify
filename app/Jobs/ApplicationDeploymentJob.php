@@ -1409,6 +1409,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $envs->push($key.'='.escapeBashEnvValue($item));
         });
 
+        // Add all variables from nixpacks plan if this is a nixpacks build
+        // These include NIXPACKS_* variables and other build-time variables detected by nixpacks
+        if ($this->build_pack === 'nixpacks' &&
+            isset($this->nixpacks_plan_json) &&
+            $this->nixpacks_plan_json->isNotEmpty()) {
+
+            $planVariables = data_get($this->nixpacks_plan_json, 'variables', []);
+
+            if (! empty($planVariables)) {
+                if (isDev()) {
+                    $this->application_deployment_queue->addLogEntry('[DEBUG] Adding '.count($planVariables).' nixpacks plan variables to buildtime.env');
+                }
+
+                foreach ($planVariables as $key => $value) {
+                    // Skip COOLIFY_* and SERVICE_* as they're already added
+                    if (str_starts_with($key, 'COOLIFY_') || str_starts_with($key, 'SERVICE_')) {
+                        continue;
+                    }
+
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs->push($key.'='.$escapedValue);
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Nixpacks var: {$key}={$escapedValue}");
+                    }
+                }
+            }
+        }
+
         // Add SERVICE_NAME variables for Docker Compose builds
         if ($this->build_pack === 'dockercompose') {
             if ($this->pull_request_id === 0) {
@@ -1462,10 +1491,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Add build-time user variables only
+        // Add user-defined build-time variables (these override nixpacks plan values if there's a conflict)
         if ($this->pull_request_id === 0) {
             $sorted_environment_variables = $this->application->environment_variables()
-                ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
@@ -1507,7 +1535,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $sorted_environment_variables = $this->application->environment_variables_preview()
-                ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
