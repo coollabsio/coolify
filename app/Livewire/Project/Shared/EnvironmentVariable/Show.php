@@ -184,6 +184,7 @@ class Show extends Component
 
             $this->serialize();
             $this->syncData(true);
+            $this->syncData(false);
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
