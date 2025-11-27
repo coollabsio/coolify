@@ -202,7 +202,8 @@ class CleanupNames extends Command
 
             exec($command, $output, $returnCode);
         } catch (\Exception $e) {
-            // Silently continue
+            // Log failure but continue - backup is optional safeguard
+            Log::warning('Name cleanup backup failed', ['error' => $e->getMessage()]);
         }
     }
 
