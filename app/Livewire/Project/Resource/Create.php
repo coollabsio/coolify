@@ -81,7 +81,7 @@ class Create extends Component
                         'destination_id' => $destination->id,
                         'destination_type' => $destination->getMorphClass(),
                     ];
-                    if ($oneClickServiceName === 'cloudflared' || $oneClickServiceName === 'pgadmin') {
+                    if ($oneClickServiceName === 'cloudflared' || $oneClickServiceName === 'pgadmin' || $oneClickServiceName === 'postgresus') {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
                     $service = Service::create($service_payload);
