@@ -107,6 +107,15 @@ class BackupEdit extends Component
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->disable_local_backup = $this->disableLocalBackup;
             $this->backup->s3_storage_id = $this->s3StorageId;
+
+            // Validate databases_to_backup to prevent command injection
+            if (filled($this->databasesToBackup)) {
+                $databases = str($this->databasesToBackup)->explode(',');
+                foreach ($databases as $db) {
+                    validateShellSafePath(trim($db), 'database name');
+                }
+            }
+
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;

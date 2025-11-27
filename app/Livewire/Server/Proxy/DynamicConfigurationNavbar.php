@@ -26,12 +26,19 @@ class DynamicConfigurationNavbar extends Component
         $proxy_path = $this->server->proxyPath();
         $proxy_type = $this->server->proxyType();
         $file = str_replace('|', '.', $fileName);
+
+        // Validate filename to prevent command injection
+        validateShellSafePath($file, 'proxy configuration filename');
+
         if ($proxy_type === 'CADDY' && $file === 'Caddyfile') {
             $this->dispatch('error', 'Cannot delete Caddyfile.');
 
             return;
         }
-        instant_remote_process(["rm -f {$proxy_path}/dynamic/{$file}"], $this->server);
+
+        $fullPath = "{$proxy_path}/dynamic/{$file}";
+        $escapedPath = escapeshellarg($fullPath);
+        instant_remote_process(["rm -f {$escapedPath}"], $this->server);
         if ($proxy_type === 'CADDY') {
             $this->server->reloadCaddy();
         }
