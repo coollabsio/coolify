@@ -111,8 +111,18 @@ class BackupEdit extends Component
             // Validate databases_to_backup to prevent command injection
             if (filled($this->databasesToBackup)) {
                 $databases = str($this->databasesToBackup)->explode(',');
-                foreach ($databases as $db) {
-                    validateShellSafePath(trim($db), 'database name');
+                foreach ($databases as $index => $db) {
+                    $dbName = trim($db);
+                    try {
+                        validateShellSafePath($dbName, 'database name');
+                    } catch (\Exception $e) {
+                        // Provide specific error message indicating which database failed validation
+                        $position = $index + 1;
+                        throw new \Exception(
+                            "Database #{$position} ('{$dbName}') validation failed: ".
+                            $e->getMessage()
+                        );
+                    }
                 }
             }
 

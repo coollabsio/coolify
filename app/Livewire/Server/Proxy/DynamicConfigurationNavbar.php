@@ -25,6 +25,11 @@ class DynamicConfigurationNavbar extends Component
         $this->authorize('update', $this->server);
         $proxy_path = $this->server->proxyPath();
         $proxy_type = $this->server->proxyType();
+
+        // Decode filename: pipes are used to encode dots for Livewire property binding
+        // (e.g., 'my|service.yaml' -> 'my.service.yaml')
+        // This must happen BEFORE validation because validateShellSafePath() correctly
+        // rejects pipe characters as dangerous shell metacharacters
         $file = str_replace('|', '.', $fileName);
 
         // Validate filename to prevent command injection
