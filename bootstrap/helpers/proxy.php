@@ -108,6 +108,37 @@ function connectProxyToNetworks(Server $server)
 
     return $commands->flatten();
 }
+
+/**
+ * Ensures all required networks exist before docker compose up.
+ * This must be called BEFORE docker compose up since the compose file declares networks as external.
+ *
+ * @param  Server  $server  The server to ensure networks on
+ * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
+ */
+function ensureProxyNetworksExist(Server $server)
+{
+    ['allNetworks' => $networks] = collectDockerNetworksByServer($server);
+
+    if ($server->isSwarm()) {
+        $commands = $networks->map(function ($network) {
+            return [
+                "echo 'Ensuring network $network exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable $network",
+            ];
+        });
+    } else {
+        $commands = $networks->map(function ($network) {
+            return [
+                "echo 'Ensuring network $network exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable $network",
+            ];
+        });
+    }
+
+    return $commands->flatten();
+}
+
 function extractCustomProxyCommands(Server $server, string $existing_config): array
 {
     $custom_commands = [];
