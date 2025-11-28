@@ -120,8 +120,7 @@
                 </div>
                 <div x-show="filteredDatabases.length > 0" class="mt-8">
                     <h2 class="mb-4">Databases</h2>
-                    <div x-show="filteredDatabases.length > 0"
-                        class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+                    <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="database in filteredDatabases" :key="database.id">
                             <div x-on:click="setType(database.id)"
                                 :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
