@@ -25,7 +25,7 @@ class StandaloneClickhouse extends BaseModel
         static::created(function ($database) {
             LocalPersistentVolume::create([
                 'name' => 'clickhouse-data-'.$database->uuid,
-                'mount_path' => '/bitnami/clickhouse',
+                'mount_path' => '/var/lib/clickhouse',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
@@ -246,8 +246,8 @@ class StandaloneClickhouse extends BaseModel
             get: function () {
                 $encodedUser = rawurlencode($this->clickhouse_admin_user);
                 $encodedPass = rawurlencode($this->clickhouse_admin_password);
-
-                return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$this->clickhouse_db}";
+                $database = $this->clickhouse_db ?? 'default';
+                return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$database}";
             },
         );
     }
@@ -263,8 +263,8 @@ class StandaloneClickhouse extends BaseModel
                     }
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
-
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->clickhouse_db}";
+                    $database = $this->clickhouse_db ?? 'default';
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
                 }
 
                 return null;
