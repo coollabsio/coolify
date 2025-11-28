@@ -93,6 +93,10 @@
             modalOpen: false,
             showProgress: false,
             currentStatus: '',
+            checkHealthInterval: null,
+            checkIfIamDeadInterval: null,
+            healthCheckAttempts: 0,
+            startTime: null,
             confirmed() {
                 this.showProgress = true;
                 this.$wire.$call('upgrade')
@@ -102,43 +106,78 @@
                     event.returnValue = '';
                 });
             },
+            getReviveStatusMessage(elapsedMinutes, attempts) {
+                if (elapsedMinutes === 0) {
+                    return `Waiting for Coolify to come back online... (attempt ${attempts})`;
+                } else if (elapsedMinutes < 2) {
+                    return `Waiting for Coolify to come back online... (${elapsedMinutes} minute${elapsedMinutes !== 1 ? 's' : ''} elapsed)`;
+                } else if (elapsedMinutes < 5) {
+                    return `Update in progress, this may take several minutes... (${elapsedMinutes} minutes elapsed)`;
+                } else if (elapsedMinutes < 10) {
+                    return `Large updates can take 10+ minutes. Please be patient... (${elapsedMinutes} minutes elapsed)`;
+                } else {
+                    return `Still updating. If this takes longer than 15 minutes, please check server logs... (${elapsedMinutes} minutes elapsed)`;
+                }
+            },
             revive() {
-                if (checkHealthInterval) return true;
+                if (this.checkHealthInterval) return true;
+                this.healthCheckAttempts = 0;
+                this.startTime = Date.now();
                 console.log('Checking server\'s health...')
-                checkHealthInterval = setInterval(() => {
+                this.checkHealthInterval = setInterval(() => {
+                    this.healthCheckAttempts++;
+                    const elapsedMinutes = Math.floor((Date.now() - this.startTime) / 60000);
                     fetch('/api/health')
                         .then(response => {
                             if (response.ok) {
                                 this.currentStatus =
-                                    'Coolify is back online. Reloading this page (you can manually reload if its not done automatically)...';
-                                if (checkHealthInterval) clearInterval(
-                                    checkHealthInterval);
+                                    'Coolify is back online. Reloading this page in 5 seconds...';
+                                if (this.checkHealthInterval) {
+                                    clearInterval(this.checkHealthInterval);
+                                    this.checkHealthInterval = null;
+                                }
                                 setTimeout(() => {
                                     window.location.reload();
                                 }, 5000)
                             } else {
-                                this.currentStatus =
-                                    "Waiting for Coolify to come back from the dead..."
+                                this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this
+                                    .healthCheckAttempts);
                             }
                         })
+                        .catch(error => {
+                            console.error('Health check failed:', error);
+                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this
+                                .healthCheckAttempts);
+                        });
                 }, 2000);
             },
             upgrade() {
-                if (checkIfIamDeadInterval || this.$wire.showProgress) return true;
-                this.currentStatus = 'Pulling new images and updating Coolify.';
-                checkIfIamDeadInterval = setInterval(() => {
+                if (this.checkIfIamDeadInterval || this.$wire.showProgress) return true;
+                this.currentStatus = 'Update in progress. Pulling new images and preparing to restart Coolify...';
+                this.checkIfIamDeadInterval = setInterval(() => {
                     fetch('/api/health')
                         .then(response => {
                             if (response.ok) {
-                                this.currentStatus = "Waiting for the update process..."
-                            } else {
                                 this.currentStatus =
-                                    "Update done, restarting Coolify & waiting until it is revived!"
-                                if (checkIfIamDeadInterval) clearInterval(
-                                    checkIfIamDeadInterval);
+                                    "Update in progress. Pulling new images and preparing to restart Coolify..."
+                            } else {
+                                this.currentStatus = "Coolify is restarting with the new version..."
+                                if (this.checkIfIamDeadInterval) {
+                                    clearInterval(this.checkIfIamDeadInterval);
+                                    this.checkIfIamDeadInterval = null;
+                                }
                                 this.revive();
                             }
                         })
+                        .catch(error => {
+                            console.error('Health check failed:', error);
+                            this.currentStatus = "Coolify is restarting with the new version..."
+                            if (this.checkIfIamDeadInterval) {
+                                clearInterval(this.checkIfIamDeadInterval);
+                                this.checkIfIamDeadInterval = null;
+                            }
+                            this.revive();
+                        });
                 }, 2000);
             }
 
