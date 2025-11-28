@@ -118,6 +118,26 @@ services:
       - dev_minio_data:/data
     networks:
       - coolify
+  minio-init:
+    image: minio/mc:latest
+    pull_policy: always
+    container_name: coolify-minio-init
+    restart: no
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      until mc alias set local http://coolify-minio:9000 minioadmin minioadmin 2>/dev/null; do
+        echo 'MinIO not ready yet, waiting...';
+        sleep 2;
+      done;
+      echo 'MinIO is ready, creating bucket if needed...';
+      mc mb local/local --ignore-existing;
+      echo 'MinIO initialization complete - bucket local is ready';
+      "
+    networks:
+      - coolify
 
 volumes:
   dev_backups_data:

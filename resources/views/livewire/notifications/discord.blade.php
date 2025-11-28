@@ -80,6 +80,8 @@
                     label="Server Unreachable" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchDiscordNotifications"
                     label="Server Patching" />
+                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedDiscordNotifications"
+                    label="Traefik Proxy Outdated" />
             </div>
         </div>
     </div>

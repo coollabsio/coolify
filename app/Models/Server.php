@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
@@ -31,6 +33,51 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * @property array{
+ *     current: string,
+ *     latest: string,
+ *     type: 'patch_update'|'minor_upgrade',
+ *     checked_at: string,
+ *     newer_branch_target?: string,
+ *     newer_branch_latest?: string,
+ *     upgrade_target?: string
+ * }|null $traefik_outdated_info Traefik version tracking information.
+ *
+ * This JSON column stores information about outdated Traefik proxy versions on this server.
+ * The structure varies depending on the type of update available:
+ *
+ * **For patch updates** (e.g., 3.5.0 → 3.5.2):
+ * ```php
+ * [
+ *     'current' => '3.5.0',              // Current version (without 'v' prefix)
+ *     'latest' => '3.5.2',               // Latest patch version available
+ *     'type' => 'patch_update',          // Update type identifier
+ *     'checked_at' => '2025-11-14T10:00:00Z',  // ISO8601 timestamp
+ *     'newer_branch_target' => 'v3.6',   // (Optional) Available major/minor version
+ *     'newer_branch_latest' => '3.6.2'   // (Optional) Latest version in that branch
+ * ]
+ * ```
+ *
+ * **For minor/major upgrades** (e.g., 3.5.6 → 3.6.2):
+ * ```php
+ * [
+ *     'current' => '3.5.6',              // Current version
+ *     'latest' => '3.6.2',               // Latest version in target branch
+ *     'type' => 'minor_upgrade',         // Update type identifier
+ *     'upgrade_target' => 'v3.6',        // Target branch (with 'v' prefix)
+ *     'checked_at' => '2025-11-14T10:00:00Z'  // ISO8601 timestamp
+ * ]
+ * ```
+ *
+ * **Null value**: Set to null when:
+ * - Server is fully up-to-date with the latest version
+ * - Traefik image uses the 'latest' tag (no fixed version tracking)
+ * - No Traefik version detected on the server
+ *
+ * @see \App\Jobs\CheckTraefikVersionForServerJob Where this data is populated
+ * @see \App\Livewire\Server\Proxy Where this data is read and displayed
+ */
 #[OA\Schema(
     description: 'Server model',
     type: 'object',
@@ -142,6 +189,7 @@ class Server extends BaseModel
 
     protected $casts = [
         'proxy' => SchemalessAttributes::class,
+        'traefik_outdated_info' => 'array',
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
@@ -167,6 +215,8 @@ class Server extends BaseModel
         'hetzner_server_id',
         'hetzner_server_status',
         'is_validating',
+        'detected_traefik_version',
+        'traefik_outdated_info',
     ];
 
     protected $guarded = [];
@@ -520,6 +570,11 @@ $schema://$host {
     public function scopeWithProxy(): Builder
     {
         return $this->proxy->modelScope();
+    }
+
+    public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
+    {
+        return $query->where('proxy->type', $proxyType);
     }
 
     public function isLocalhost()
@@ -1129,6 +1184,21 @@ $schema://$host {
     public function installDocker()
     {
         return InstallDocker::run($this);
+    }
+
+    /**
+     * Validate that required commands are available on the server.
+     *
+     * @return array{success: bool, missing: array<string>, found: array<string>}
+     */
+    public function validatePrerequisites(): array
+    {
+        return ValidatePrerequisites::run($this);
+    }
+
+    public function installPrerequisites()
+    {
+        return InstallPrerequisites::run($this);
     }
 
     public function validateDockerEngine($throwError = false)

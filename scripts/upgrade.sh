@@ -11,9 +11,9 @@ ENV_FILE="/data/coolify/source/.env"
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
 
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
+curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production
 
 # Backup existing .env file before making any changes
 if [ "$SKIP_BACKUP" != "true" ]; then
