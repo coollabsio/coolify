@@ -230,7 +230,7 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get(config('constants.coolify.versions_url'));
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
