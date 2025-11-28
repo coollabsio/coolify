@@ -339,3 +339,55 @@ function parseServiceEnvironmentVariable(string $key): array
         'has_port' => $hasPort,
     ];
 }
+
+/**
+ * Apply service-specific application prerequisites after service parse.
+ *
+ * This function configures application-level settings that are required for
+ * specific one-click services to work correctly (e.g., disabling gzip for Beszel,
+ * disabling strip prefix for Appwrite services).
+ *
+ * Must be called AFTER $service->parse() since it requires applications to exist.
+ *
+ * @param Service $service The service to apply prerequisites to
+ * @return void
+ */
+function applyServiceApplicationPrerequisites(Service $service): void
+{
+    try {
+        // Extract service name from service name (format: "servicename-uuid")
+        $serviceName = str($service->name)->before('-')->value();
+
+        // Apply gzip disabling if needed
+        if (array_key_exists($serviceName, NEEDS_TO_DISABLE_GZIP)) {
+            $applicationNames = NEEDS_TO_DISABLE_GZIP[$serviceName];
+            foreach ($applicationNames as $applicationName) {
+                $application = $service->applications()->whereName($applicationName)->first();
+                if ($application) {
+                    $application->is_gzip_enabled = false;
+                    $application->save();
+                }
+            }
+        }
+
+        // Apply stripprefix disabling if needed
+        if (array_key_exists($serviceName, NEEDS_TO_DISABLE_STRIPPREFIX)) {
+            $applicationNames = NEEDS_TO_DISABLE_STRIPPREFIX[$serviceName];
+            foreach ($applicationNames as $applicationName) {
+                $application = $service->applications()->whereName($applicationName)->first();
+                if ($application) {
+                    $application->is_stripprefix_enabled = false;
+                    $application->save();
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        // Log error but don't throw - prerequisites are nice-to-have, not critical
+        Log::error('Failed to apply service application prerequisites', [
+            'service_id' => $service->id,
+            'service_name' => $service->name,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+    }
+}
