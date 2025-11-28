@@ -152,7 +152,7 @@
                 }, 2000);
             },
             upgrade() {
-                if (this.checkIfIamDeadInterval || this.$wire.showProgress) return true;
+                if (this.checkIfIamDeadInterval || this.showProgress) return true;
                 this.currentStatus = 'Update in progress. Pulling new images and preparing to restart Coolify...';
                 this.checkIfIamDeadInterval = setInterval(() => {
                     fetch('/api/health')
