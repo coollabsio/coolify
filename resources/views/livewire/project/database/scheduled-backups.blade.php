@@ -71,14 +71,18 @@
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             @if ($backup->latest_log)
                                 @if (data_get($backup->latest_log, 'status') === 'running')
-                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
-                                        Running for {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
+                                    <span
+                                        title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
+                                        Running for
+                                        {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
                                     </span>
                                 @else
-                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
+                                    <span
+                                        title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
                                         {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
                                         ({{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }})
-                                        • {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
+                                        •
+                                        {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
                                     </span>
                                 @endif
                                 @if (data_get($backup->latest_log, 'status') === 'success')
@@ -155,14 +159,18 @@
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             @if ($backup->latest_log)
                                 @if (data_get($backup->latest_log, 'status') === 'running')
-                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
-                                        Running for {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
+                                    <span
+                                        title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
+                                        Running for
+                                        {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
                                     </span>
                                 @else
-                                    <span title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
+                                    <span
+                                        title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}">
                                         {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
                                         ({{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }})
-                                        • {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
+                                        •
+                                        {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->format('M j, H:i') }}
                                     </span>
                                 @endif
                                 @if (data_get($backup->latest_log, 'status') === 'success')
@@ -186,7 +194,7 @@
                                     • Success Rate: <span @class([
                                         'font-medium',
                                         'text-green-600' => $successRate >= 80,
-                                        'text-yellow-600' => $successRate >= 50 && $successRate < 80,
+                                        'text-warning-600' => $successRate >= 50 && $successRate < 80,
                                         'text-red-600' => $successRate < 50,
                                     ])>{{ $successRate }}%</span>
                                     ({{ $successCount }}/{{ $totalCount }})

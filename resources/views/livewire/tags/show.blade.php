@@ -73,7 +73,7 @@
                             <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
                                 'gap-2 cursor-pointer coolbox group border-l-2 border-dotted',
                                 'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                                'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                                'border-warning-500' => data_get($deployment, 'status') === 'in_progress',
                             ])>
                                 <div class="flex flex-col mx-6">
                                     <div class="font-bold dark:text-white">
