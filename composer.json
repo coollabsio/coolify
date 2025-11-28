@@ -36,7 +36,7 @@
         "poliander/cron": "^3.2.1",
         "purplepixie/phpdns": "^2.2",
         "pusher/pusher-php-server": "^7.2.7",
-        "resend/resend-laravel": "^0.19.0",
+        "resend/resend-laravel": "^0.20.0",
         "sentry/sentry-laravel": "^4.15.1",
         "socialiteproviders/authentik": "^5.2",
         "socialiteproviders/clerk": "^5.0",

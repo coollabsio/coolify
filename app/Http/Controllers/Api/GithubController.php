@@ -12,6 +12,88 @@ use OpenApi\Attributes as OA;
 
 class GithubController extends Controller
 {
+    private function removeSensitiveData($githubApp)
+    {
+        $githubApp->makeHidden([
+            'client_secret',
+            'webhook_secret',
+        ]);
+
+        return serializeApiResponse($githubApp);
+    }
+
+    #[OA\Get(
+        summary: 'List',
+        description: 'List all GitHub apps.',
+        path: '/github-apps',
+        operationId: 'list-github-apps',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['GitHub Apps'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of GitHub apps.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'id' => ['type' => 'integer'],
+                                    'uuid' => ['type' => 'string'],
+                                    'name' => ['type' => 'string'],
+                                    'organization' => ['type' => 'string', 'nullable' => true],
+                                    'api_url' => ['type' => 'string'],
+                                    'html_url' => ['type' => 'string'],
+                                    'custom_user' => ['type' => 'string'],
+                                    'custom_port' => ['type' => 'integer'],
+                                    'app_id' => ['type' => 'integer'],
+                                    'installation_id' => ['type' => 'integer'],
+                                    'client_id' => ['type' => 'string'],
+                                    'private_key_id' => ['type' => 'integer'],
+                                    'is_system_wide' => ['type' => 'boolean'],
+                                    'is_public' => ['type' => 'boolean'],
+                                    'team_id' => ['type' => 'integer'],
+                                    'type' => ['type' => 'string'],
+                                ]
+                            )
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function list_github_apps(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $githubApps = GithubApp::where(function ($query) use ($teamId) {
+            $query->where('team_id', $teamId)
+                ->orWhere('is_system_wide', true);
+        })->get();
+
+        $githubApps = $githubApps->map(function ($app) {
+            return $this->removeSensitiveData($app);
+        });
+
+        return response()->json($githubApps);
+    }
+
     #[OA\Post(
         summary: 'Create GitHub App',
         description: 'Create a new GitHub app.',

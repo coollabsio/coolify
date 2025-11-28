@@ -115,65 +115,170 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
             $resource->save();
         }
 
-        $serviceName = str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
-        $resource->service->environment_variables()->where('key', 'LIKE', "SERVICE_FQDN_{$serviceName}%")->delete();
-        $resource->service->environment_variables()->where('key', 'LIKE', "SERVICE_URL_{$serviceName}%")->delete();
+        // Extract SERVICE_URL and SERVICE_FQDN variable names from the compose template
+        // to ensure we use the exact names defined in the template (which may be abbreviated)
+        // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
+        // not variables that are merely referenced from other services
+        $serviceConfig = data_get($dockerCompose, "services.{$name}");
+        $environment = data_get($serviceConfig, 'environment', []);
+        $templateVariableNames = [];
+
+        foreach ($environment as $key => $value) {
+            if (is_int($key) && is_string($value)) {
+                // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
+                // Extract variable name (before '=' if present)
+                $envVarName = str($value)->before('=')->trim();
+                // Only include if it's a direct declaration (not a reference like ${VAR})
+                // Direct declarations look like: SERVICE_URL_APP or SERVICE_URL_APP_3000
+                // References look like: NEXT_PUBLIC_URL=${SERVICE_URL_APP}
+                if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                    $templateVariableNames[] = $envVarName->value();
+                }
+            } elseif (is_string($key)) {
+                // Map-style: "SERVICE_URL_APP_3000: value" or "SERVICE_FQDN_DB: localhost"
+                $envVarName = str($key);
+                if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                    $templateVariableNames[] = $envVarName->value();
+                }
+            }
+            // DO NOT extract variables that are only referenced with ${VAR_NAME} syntax
+            // Those belong to other services and will be updated when THOSE services are updated
+        }
+
+        // Remove duplicates
+        $templateVariableNames = array_unique($templateVariableNames);
+
+        // Extract unique service names to process (preserving the original case from template)
+        // This allows us to create both URL and FQDN pairs regardless of which one is in the template
+        $serviceNamesToProcess = [];
+        foreach ($templateVariableNames as $templateVarName) {
+            $parsed = parseServiceEnvironmentVariable($templateVarName);
+
+            // Extract the original service name with case preserved from the template
+            $strKey = str($templateVarName);
+            if ($parsed['has_port']) {
+                // For port-specific variables, get the name between SERVICE_URL_/SERVICE_FQDN_ and the last underscore
+                if ($strKey->startsWith('SERVICE_URL_')) {
+                    $serviceName = $strKey->after('SERVICE_URL_')->beforeLast('_')->value();
+                } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+                    $serviceName = $strKey->after('SERVICE_FQDN_')->beforeLast('_')->value();
+                } else {
+                    continue;
+                }
+            } else {
+                // For base variables, get everything after SERVICE_URL_/SERVICE_FQDN_
+                if ($strKey->startsWith('SERVICE_URL_')) {
+                    $serviceName = $strKey->after('SERVICE_URL_')->value();
+                } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+                    $serviceName = $strKey->after('SERVICE_FQDN_')->value();
+                } else {
+                    continue;
+                }
+            }
+
+            // Use lowercase key for array indexing (to group case variations together)
+            $serviceKey = str($serviceName)->lower()->value();
+
+            // Track both base service name and port-specific variant
+            if (! isset($serviceNamesToProcess[$serviceKey])) {
+                $serviceNamesToProcess[$serviceKey] = [
+                    'base' => $serviceName,  // Preserve original case
+                    'ports' => [],
+                ];
+            }
+
+            // If this variable has a port, track it
+            if ($parsed['has_port'] && $parsed['port']) {
+                $serviceNamesToProcess[$serviceKey]['ports'][] = $parsed['port'];
+            }
+        }
+
+        // Delete all existing SERVICE_URL and SERVICE_FQDN variables for these service names
+        // We need to delete both URL and FQDN variants, with and without ports
+        foreach ($serviceNamesToProcess as $serviceInfo) {
+            $serviceName = $serviceInfo['base'];
+
+            // Delete base variables
+            $resource->service->environment_variables()->where('key', "SERVICE_URL_{$serviceName}")->delete();
+            $resource->service->environment_variables()->where('key', "SERVICE_FQDN_{$serviceName}")->delete();
+
+            // Delete port-specific variables
+            foreach ($serviceInfo['ports'] as $port) {
+                $resource->service->environment_variables()->where('key', "SERVICE_URL_{$serviceName}_{$port}")->delete();
+                $resource->service->environment_variables()->where('key', "SERVICE_FQDN_{$serviceName}_{$port}")->delete();
+            }
+        }
 
         if ($resource->fqdn) {
             $resourceFqdns = str($resource->fqdn)->explode(',');
             $resourceFqdns = $resourceFqdns->first();
-            $variableName = 'SERVICE_URL_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
             $url = Url::fromString($resourceFqdns);
             $port = $url->getPort();
             $path = $url->getPath();
+
+            // Prepare URL value (with scheme and host)
             $urlValue = $url->getScheme().'://'.$url->getHost();
             $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
-            $resource->service->environment_variables()->updateOrCreate([
-                'resourceable_type' => Service::class,
-                'resourceable_id' => $resource->service_id,
-                'key' => $variableName,
-            ], [
-                'value' => $urlValue,
-                'is_preview' => false,
-            ]);
-            if ($port) {
-                $variableName = $variableName."_$port";
+
+            // Prepare FQDN value (host only, no scheme)
+            $fqdnHost = $url->getHost();
+            $fqdnValue = str($fqdnHost)->after('://');
+            if ($path !== '/') {
+                $fqdnValue = $fqdnValue.$path;
+            }
+
+            // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
+            foreach ($serviceNamesToProcess as $serviceInfo) {
+                $serviceName = $serviceInfo['base'];
+                $ports = array_unique($serviceInfo['ports']);
+
+                // ALWAYS create base pair (without port)
                 $resource->service->environment_variables()->updateOrCreate([
                     'resourceable_type' => Service::class,
                     'resourceable_id' => $resource->service_id,
-                    'key' => $variableName,
+                    'key' => "SERVICE_URL_{$serviceName}",
                 ], [
                     'value' => $urlValue,
                     'is_preview' => false,
                 ]);
-            }
-            $variableName = 'SERVICE_FQDN_'.str($resource->name)->upper()->replace('-', '_')->replace('.', '_');
-            $fqdn = Url::fromString($resourceFqdns);
-            $port = $fqdn->getPort();
-            $path = $fqdn->getPath();
-            $fqdn = $fqdn->getHost();
-            $fqdnValue = str($fqdn)->after('://');
-            if ($path !== '/') {
-                $fqdnValue = $fqdnValue.$path;
-            }
-            $resource->service->environment_variables()->updateOrCreate([
-                'resourceable_type' => Service::class,
-                'resourceable_id' => $resource->service_id,
-                'key' => $variableName,
-            ], [
-                'value' => $fqdnValue,
-                'is_preview' => false,
-            ]);
-            if ($port) {
-                $variableName = $variableName."_$port";
+
                 $resource->service->environment_variables()->updateOrCreate([
                     'resourceable_type' => Service::class,
                     'resourceable_id' => $resource->service_id,
-                    'key' => $variableName,
+                    'key' => "SERVICE_FQDN_{$serviceName}",
                 ], [
                     'value' => $fqdnValue,
                     'is_preview' => false,
                 ]);
+
+                // Create port-specific pairs for each port found in template or FQDN
+                $allPorts = $ports;
+                if ($port && ! in_array($port, $allPorts)) {
+                    $allPorts[] = $port;
+                }
+
+                foreach ($allPorts as $portNum) {
+                    $urlWithPort = $urlValue.':'.$portNum;
+                    $fqdnWithPort = $fqdnValue.':'.$portNum;
+
+                    $resource->service->environment_variables()->updateOrCreate([
+                        'resourceable_type' => Service::class,
+                        'resourceable_id' => $resource->service_id,
+                        'key' => "SERVICE_URL_{$serviceName}_{$portNum}",
+                    ], [
+                        'value' => $urlWithPort,
+                        'is_preview' => false,
+                    ]);
+
+                    $resource->service->environment_variables()->updateOrCreate([
+                        'resourceable_type' => Service::class,
+                        'resourceable_id' => $resource->service_id,
+                        'key' => "SERVICE_FQDN_{$serviceName}_{$portNum}",
+                    ], [
+                        'value' => $fqdnWithPort,
+                        'is_preview' => false,
+                    ]);
+                }
             }
         }
     } catch (\Throwable $e) {
@@ -183,4 +288,54 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
 function serviceKeys()
 {
     return get_service_templates()->keys();
+}
+
+/**
+ * Parse a SERVICE_URL_* or SERVICE_FQDN_* variable to extract the service name and port.
+ *
+ * This function detects if a service environment variable has a port suffix by checking
+ * if the last segment after the underscore is numeric.
+ *
+ * Examples:
+ *   - SERVICE_URL_APP_3000 → ['service_name' => 'app', 'port' => '3000', 'has_port' => true]
+ *   - SERVICE_URL_MY_API_8080 → ['service_name' => 'my_api', 'port' => '8080', 'has_port' => true]
+ *   - SERVICE_URL_MY_APP → ['service_name' => 'my_app', 'port' => null, 'has_port' => false]
+ *   - SERVICE_FQDN_REDIS_CACHE_6379 → ['service_name' => 'redis_cache', 'port' => '6379', 'has_port' => true]
+ *
+ * @param  string  $key  The environment variable key (e.g., SERVICE_URL_APP_3000)
+ * @return array{service_name: string, port: string|null, has_port: bool} Parsed service information
+ */
+function parseServiceEnvironmentVariable(string $key): array
+{
+    $strKey = str($key);
+    $lastSegment = $strKey->afterLast('_')->value();
+    $hasPort = is_numeric($lastSegment) && ctype_digit($lastSegment);
+
+    if ($hasPort) {
+        // Port-specific variable (e.g., SERVICE_URL_APP_3000)
+        if ($strKey->startsWith('SERVICE_URL_')) {
+            $serviceName = $strKey->after('SERVICE_URL_')->beforeLast('_')->lower()->value();
+        } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+            $serviceName = $strKey->after('SERVICE_FQDN_')->beforeLast('_')->lower()->value();
+        } else {
+            $serviceName = '';
+        }
+        $port = $lastSegment;
+    } else {
+        // Base variable without port (e.g., SERVICE_URL_APP)
+        if ($strKey->startsWith('SERVICE_URL_')) {
+            $serviceName = $strKey->after('SERVICE_URL_')->lower()->value();
+        } elseif ($strKey->startsWith('SERVICE_FQDN_')) {
+            $serviceName = $strKey->after('SERVICE_FQDN_')->lower()->value();
+        } else {
+            $serviceName = '';
+        }
+        $port = null;
+    }
+
+    return [
+        'service_name' => $serviceName,
+        'port' => $port,
+        'has_port' => $hasPort,
+    ];
 }

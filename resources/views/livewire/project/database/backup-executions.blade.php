@@ -68,22 +68,21 @@
                         </span>
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
-                        Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}
-                        @if (data_get($execution, 'status') !== 'running')
-                            <br>Ended:
-                            {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}
-                            <br>Duration:
-                            {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
-                            <br>Finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
+                        @if (data_get($execution, 'status') === 'running')
+                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}">
+                                Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
+                            </span>
+                        @else
+                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}">
+                                {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
+                                ({{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }})
+                                • {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->format('M j, H:i') }}
+                            </span>
                         @endif
-                    </div>
-                    <div class="text-gray-600 dark:text-gray-400 text-sm">
-                        Database: {{ data_get($execution, 'database_name', 'N/A') }}
-                    </div>
-                    <div class="text-gray-600 dark:text-gray-400 text-sm">
-                        Size: {{ data_get($execution, 'size') }} B /
-                        {{ round((int) data_get($execution, 'size') / 1024, 2) }} kB /
-                        {{ round((int) data_get($execution, 'size') / 1024 / 1024, 3) }} MB
+                        • Database: {{ data_get($execution, 'database_name', 'N/A') }}
+                        @if(data_get($execution, 'size'))
+                            • Size: {{ formatBytes(data_get($execution, 'size')) }}
+                        @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         Location: {{ data_get($execution, 'filename', 'N/A') }}

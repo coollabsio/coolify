@@ -4,6 +4,9 @@
     <x-forms.input placeholder="0 0 * * * or daily"
         helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." id="frequency"
         label="Frequency" />
+    <x-forms.input type="number" placeholder="300" id="timeout"
+        helper="Maximum execution time in seconds (60-3600). Default is 300 seconds (5 minutes)."
+        label="Timeout (seconds)" />
     @if ($type === 'application')
         @if ($containerNames->count() > 1)
             <x-forms.select id="container" label="Container name">

@@ -79,11 +79,11 @@ class ServerSetting extends Model
         });
         static::updated(function ($settings) {
             if (
-                $settings->isDirty('sentinel_token') ||
-                $settings->isDirty('sentinel_custom_url') ||
-                $settings->isDirty('sentinel_metrics_refresh_rate_seconds') ||
-                $settings->isDirty('sentinel_metrics_history_days') ||
-                $settings->isDirty('sentinel_push_interval_seconds')
+                $settings->wasChanged('sentinel_token') ||
+                $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
+                $settings->wasChanged('sentinel_metrics_history_days') ||
+                $settings->wasChanged('sentinel_push_interval_seconds')
             ) {
                 $settings->server->restartSentinel();
             }

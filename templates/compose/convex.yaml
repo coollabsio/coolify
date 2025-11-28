@@ -17,7 +17,7 @@ services:
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
       # URL of the Convex API as accessed by the client/frontend.
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_CONVEX}
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_DASHBOARD}
       # URL of Convex HTTP actions as accessed by the client/frontend.
       - CONVEX_SITE_ORIGIN=${SERVICE_URL_BACKEND}
       - DATABASE_URL=${DATABASE_URL:-}
@@ -49,7 +49,7 @@ services:
   dashboard:
     image: ghcr.io/get-convex/convex-dashboard:33cef775a8a6228cbacee4a09ac2c4073d62ed13
     environment:
-      - SERVICE_URL_CONVEX_6791
+      - SERVICE_URL_DASHBOARD_6791
       # URL of the Convex API as accessed by the dashboard (browser).
       - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
     depends_on:

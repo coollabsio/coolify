@@ -249,9 +249,13 @@ class StandaloneDragonfly extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $encodedPass = rawurlencode($this->dragonfly_password);
-                    $url = "{$scheme}://:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

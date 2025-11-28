@@ -47,10 +47,14 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
+    'timescaledb/timescaledb',
+    'pgvector/pgvector',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
     'minio/minio',
+    'ghcr.io/coollabsio/minio',
+    'coollabsio/minio',
     'svhd/logto',
 ];
 
@@ -63,4 +67,8 @@ const SUPPORTED_OS = [
     'alpine',
 ];
 
+const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
+    'pgadmin',
+    'postgresus',
+];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

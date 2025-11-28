@@ -88,7 +88,14 @@ class HetznerService
 
     public function getServerTypes(): array
     {
-        return $this->requestPaginated('get', '/server_types', 'server_types');
+        $types = $this->requestPaginated('get', '/server_types', 'server_types');
+
+        // Filter out entries where "deprecated" is explicitly true
+        $filtered = array_filter($types, function ($type) {
+            return ! (isset($type['deprecated']) && $type['deprecated'] === true);
+        });
+
+        return array_values($filtered);
     }
 
     public function getSshKeys(): array

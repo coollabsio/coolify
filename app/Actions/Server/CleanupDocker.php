@@ -20,7 +20,7 @@ class CleanupDocker
         $realtimeImageWithoutPrefix = 'coollabsio/coolify-realtime';
         $realtimeImageWithoutPrefixVersion = "coollabsio/coolify-realtime:$realtimeImageVersion";
 
-        $helperImageVersion = data_get($settings, 'helper_version');
+        $helperImageVersion = getHelperVersion();
         $helperImage = config('constants.coolify.helper_image');
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
         $helperImageWithoutPrefix = 'coollabsio/coolify-helper';

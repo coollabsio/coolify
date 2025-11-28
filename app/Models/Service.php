@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Services\ContainerStatusAggregator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -173,6 +174,21 @@ class Service extends BaseModel
         instant_remote_process(["docker network rm {$this->uuid}"], $server, false);
     }
 
+    /**
+     * Calculate the service's aggregate status from its applications and databases.
+     *
+     * This method aggregates status from Eloquent model relationships (not Docker containers).
+     * It differs from the CalculatesExcludedStatus trait which works with Docker container objects
+     * during container inspection. This accessor runs on-demand for UI display and works with
+     * already-stored status strings from the database.
+     *
+     * Status format: "{status}:{health}" or "{status}:{health}:excluded"
+     * - Status values: running, exited, degraded, starting, paused, restarting
+     * - Health values: healthy, unhealthy, unknown
+     * - :excluded suffix: Indicates all containers are excluded from health monitoring
+     *
+     * @return string The aggregate status in format "status:health" or "status:health:excluded"
+     */
     public function getStatusAttribute()
     {
         if ($this->isStarting()) {
@@ -182,69 +198,100 @@ class Service extends BaseModel
         $applications = $this->applications;
         $databases = $this->databases;
 
-        $complexStatus = null;
-        $complexHealth = null;
+        [$complexStatus, $complexHealth, $hasNonExcluded] = $this->aggregateResourceStatuses(
+            $applications,
+            $databases,
+            excludedOnly: false
+        );
 
-        foreach ($applications as $application) {
-            if ($application->exclude_from_status) {
-                continue;
+        // If all services are excluded from status checks, calculate status from excluded containers
+        // but mark it with :excluded to indicate monitoring is disabled
+        if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {
+            [$excludedStatus, $excludedHealth] = $this->aggregateResourceStatuses(
+                $applications,
+                $databases,
+                excludedOnly: true
+            );
+
+            // Return status with :excluded suffix to indicate monitoring is disabled
+            if ($excludedStatus && $excludedHealth) {
+                return "{$excludedStatus}:{$excludedHealth}:excluded";
             }
-            $status = str($application->status)->before('(')->trim();
-            $health = str($application->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
+
+            // If no status was calculated at all (no containers exist), return unknown
+            if ($excludedStatus === null && $excludedHealth === null) {
+                return 'unknown:unknown:excluded';
             }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+            return 'exited';
         }
-        foreach ($databases as $database) {
-            if ($database->exclude_from_status) {
-                continue;
-            }
-            $status = str($database->status)->before('(')->trim();
-            $health = str($database->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
-            }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+        // If health is null/empty, return just the status without trailing colon
+        if ($complexHealth === null || $complexHealth === '') {
+            return $complexStatus;
         }
 
         return "{$complexStatus}:{$complexHealth}";
+    }
+
+    /**
+     * Aggregate status and health from collections of applications and databases.
+     *
+     * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
+     * It processes container status strings stored in the database (not live Docker data).
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
+     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
+     * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
+     */
+    private function aggregateResourceStatuses($applications, $databases, bool $excludedOnly = false): array
+    {
+        $hasNonExcluded = false;
+        $statusStrings = collect();
+
+        // Process both applications and databases using the same logic
+        $resources = $applications->concat($databases);
+
+        foreach ($resources as $resource) {
+            $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
+
+            // Filter based on excludedOnly flag
+            if ($excludedOnly && ! $isExcluded) {
+                continue;
+            }
+            if (! $excludedOnly && $isExcluded) {
+                continue;
+            }
+
+            if (! $excludedOnly) {
+                $hasNonExcluded = true;
+            }
+
+            // Strip :excluded suffix before aggregation (it's in the 3rd part of "status:health:excluded")
+            $status = str($resource->status)->before(':excluded')->toString();
+            $statusStrings->push($status);
+        }
+
+        // If no status strings collected, return nulls
+        if ($statusStrings->isEmpty()) {
+            return $excludedOnly ? [null, null] : [null, null, $hasNonExcluded];
+        }
+
+        // Use ContainerStatusAggregator service for state machine logic
+        $aggregator = new ContainerStatusAggregator;
+        $aggregatedStatus = $aggregator->aggregateFromStrings($statusStrings);
+
+        // Parse the aggregated "status:health" string
+        $parts = explode(':', $aggregatedStatus);
+        $status = $parts[0] ?? null;
+        $health = $parts[1] ?? null;
+
+        if ($excludedOnly) {
+            return [$status, $health];
+        }
+
+        return [$status, $health, $hasNonExcluded];
     }
 
     public function extraFields()
@@ -1184,6 +1231,31 @@ class Service extends BaseModel
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
 
+    /**
+     * Get the required port for this service from the template definition.
+     */
+    public function getRequiredPort(): ?int
+    {
+        try {
+            $services = get_service_templates();
+            $serviceName = str($this->name)->beforeLast('-')->value();
+            $service = data_get($services, $serviceName, []);
+            $port = data_get($service, 'port');
+
+            return $port ? (int) $port : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if this service requires a port to function correctly.
+     */
+    public function requiresPort(): bool
+    {
+        return $this->getRequiredPort() !== null;
+    }
+
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
@@ -1262,6 +1334,11 @@ class Service extends BaseModel
 
     public function saveComposeConfigs()
     {
+        // Guard against null or empty docker_compose
+        if (! $this->docker_compose) {
+            return;
+        }
+
         $workdir = $this->workdir();
 
         instant_remote_process([

@@ -56,48 +56,53 @@
                                                 step2ButtonText="Update All
                                             Packages" />
                                         </div>
-                                        <table>
-                                            <thead>
-                                                <tr>
-                                                    <th>Package</th>
-                                                    @if ($packageManager !== 'dnf')
-                                                        <th>Current Version</th>
-                                                    @endif
-                                                    <th>New Version</th>
-                                                    <th>Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach ($updates as $update)
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full">
+                                                <thead>
                                                     <tr>
-                                                        <td class="inline-flex gap-2 justify-center items-center">
-                                                            @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
-                                                                <x-helper :helper="'This package will restart your currently running containers'">
-                                                                    <x-slot:icon>
-                                                                        <svg class="w-4 h-4 text-red-500 block"
-                                                                            viewBox="0 0 256 256"
-                                                                            xmlns="http://www.w3.org/2000/svg">
-                                                                            <path fill="currentColor"
-                                                                                d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16">
-                                                                            </path>
-                                                                        </svg>
-                                                                    </x-slot:icon>
-                                                                </x-helper>
-                                                            @endif
-                                                            {{ data_get($update, 'package') }}
-                                                        </td>
-                                                        @if ($packageManager !== 'dnf')
-                                                            <td>{{ data_get($update, 'current_version') }}</td>
-                                                        @endif
-                                                        <td>{{ data_get($update, 'new_version') }}</td>
-                                                        <td>
-                                                            <x-forms.button type="button"
-                                                                wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">Update</x-forms.button>
-                                                        </td>
+                                                        <th>Package</th>
+                                                        <th>Version</th>
+                                                        <th>Action</th>
                                                     </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($updates as $update)
+                                                        <tr>
+                                                            <td>
+                                                                <div class="flex gap-2 items-center">
+                                                                    @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
+                                                                        <x-helper :helper="'This package will restart your currently running containers'">
+                                                                            <x-slot:icon>
+                                                                                <svg class="w-4 h-4 text-red-500 block flex-shrink-0"
+                                                                                    viewBox="0 0 256 256"
+                                                                                    xmlns="http://www.w3.org/2000/svg">
+                                                                                    <path fill="currentColor"
+                                                                                        d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16">
+                                                                                    </path>
+                                                                                </svg>
+                                                                            </x-slot:icon>
+                                                                        </x-helper>
+                                                                    @endif
+                                                                    <span class="break-all">{{ data_get($update, 'package') }}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td class="whitespace-nowrap">
+                                                                <div class="flex gap-1 items-center">
+                                                                    <span>{{ data_get($update, 'new_version') }}</span>
+                                                                    @if ($packageManager !== 'dnf' && data_get($update, 'current_version'))
+                                                                        <x-helper helper="Current: {{ data_get($update, 'current_version') }}" />
+                                                                    @endif
+                                                                </div>
+                                                            </td>
+                                                            <td class="whitespace-nowrap">
+                                                                <x-forms.button type="button"
+                                                                    wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">Update</x-forms.button>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     @endif
                                 @endif
                             </div>

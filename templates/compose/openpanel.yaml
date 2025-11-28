@@ -76,6 +76,7 @@ services:
   openpanel-worker:
     image: lindesvard/openpanel-worker:latest
     environment:
+      - DISABLE_BULLBOARD=${DISABLE_BULLBOARD:-1}
       - NODE_ENV=production
       - NEXT_PUBLIC_SELF_HOSTED=true
       - SERVICE_URL_OPBULLBOARD

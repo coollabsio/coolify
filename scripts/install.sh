@@ -288,9 +288,9 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
-LATEST_REALTIME_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $8}' | tr -d ',')
+LATEST_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+LATEST_HELPER_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+LATEST_REALTIME_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $8}' | tr -d ',')
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -705,10 +705,10 @@ else
 fi
 
 echo -e "5. Download required files from CDN. "
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production
+curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 echo -e "6. Setting up environment variable file"
 

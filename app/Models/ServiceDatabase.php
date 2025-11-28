@@ -84,6 +84,10 @@ class ServiceDatabase extends BaseModel
         $image = str($this->image)->before(':');
         if ($image->contains('supabase/postgres')) {
             $finalImage = 'supabase/postgres';
+        } elseif ($image->contains('timescale')) {
+            $finalImage = 'postgresql';
+        } elseif ($image->contains('pgvector')) {
+            $finalImage = 'postgresql';
         } elseif ($image->contains('postgres') || $image->contains('postgis')) {
             $finalImage = 'postgresql';
         } else {

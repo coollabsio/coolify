@@ -25,20 +25,48 @@ class Show extends Component
 
     public ?string $startedAt = null;
 
+    // Explicit properties
+    public string $name;
+
+    public string $mountPath;
+
+    public ?string $hostPath = null;
+
     protected $rules = [
-        'storage.name' => 'required|string',
-        'storage.mount_path' => 'required|string',
-        'storage.host_path' => 'string|nullable',
+        'name' => 'required|string',
+        'mountPath' => 'required|string',
+        'hostPath' => 'string|nullable',
     ];
 
     protected $validationAttributes = [
         'name' => 'name',
-        'mount_path' => 'mount',
-        'host_path' => 'host',
+        'mountPath' => 'mount',
+        'hostPath' => 'host',
     ];
+
+    /**
+     * Sync data between component properties and model
+     *
+     * @param  bool  $toModel  If true, sync FROM properties TO model. If false, sync FROM model TO properties.
+     */
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            // Sync TO model (before save)
+            $this->storage->name = $this->name;
+            $this->storage->mount_path = $this->mountPath;
+            $this->storage->host_path = $this->hostPath;
+        } else {
+            // Sync FROM model (on load/refresh)
+            $this->name = $this->storage->name;
+            $this->mountPath = $this->storage->mount_path;
+            $this->hostPath = $this->storage->host_path;
+        }
+    }
 
     public function mount()
     {
+        $this->syncData(false);
         $this->isReadOnly = $this->storage->isReadOnlyVolume();
     }
 
@@ -47,6 +75,7 @@ class Show extends Component
         $this->authorize('update', $this->resource);
 
         $this->validate();
+        $this->syncData(true);
         $this->storage->save();
         $this->dispatch('success', 'Storage updated successfully');
     }

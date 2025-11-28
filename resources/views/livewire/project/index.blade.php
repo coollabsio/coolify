@@ -11,29 +11,38 @@
         @endcan
     </div>
     <div class="subtitle">All your projects are here.</div>
-    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 -mt-1" x-data="{ projects: @js($projects) }">
-        <template x-for="project in projects" :key="project.uuid">
-            <div class="box group cursor-pointer" @click="$wire.navigateToProject(project.uuid)">
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 -mt-1">
+        @foreach ($projects as $project)
+            <div class="relative gap-2 cursor-pointer box group">
+                <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
                 <div class="flex flex-1 mx-6">
                     <div class="flex flex-col justify-center flex-1">
-                        <div class="box-title" x-text="project.name"></div>
+                        <div class="box-title">{{ $project->name }}</div>
                         <div class="box-description">
-                            <div x-text="project.description"></div>
+                            {{ $project->description }}
                         </div>
                     </div>
-                    <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold"
-                        x-show="project.canUpdate || project.canCreateResource">
-                        <a class="hover:underline" wire:click.stop x-show="project.addResourceRoute"
-                            :href="project.addResourceRoute">
-                            + Add Resource
-                        </a>
-                        <a class="hover:underline" wire:click.stop x-show="project.canUpdate"
-                            :href="`/project/${project.uuid}/edit`">
-                            Settings
-                        </a>
+                    <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
+                        @if ($project->environments->first())
+                            @can('createAnyResource')
+                                <a class="hover:underline"
+                                    href="{{ route('project.resource.create', [
+                                        'project_uuid' => $project->uuid,
+                                        'environment_uuid' => $project->environments->first()->uuid,
+                                    ]) }}">
+                                    + Add Resource
+                                </a>
+                            @endcan
+                        @endif
+                        @can('update', $project)
+                            <a class="hover:underline"
+                                href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                Settings
+                            </a>
+                        @endcan
                     </div>
                 </div>
             </div>
-        </template>
+        @endforeach
     </div>
 </div>

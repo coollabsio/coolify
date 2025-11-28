@@ -239,10 +239,14 @@ class StandaloneMariadb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
                     $encodedUser = rawurlencode($this->mariadb_user);
                     $encodedPass = rawurlencode($this->mariadb_password);
 
-                    return "mysql://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mariadb_database}";
+                    return "mysql://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->mariadb_database}";
                 }
 
                 return null;
