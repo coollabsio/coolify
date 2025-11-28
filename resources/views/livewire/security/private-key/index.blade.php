@@ -16,7 +16,7 @@
         @forelse ($privateKeys as $key)
             @can('view', $key)
                 {{-- Admin/Owner: Clickable link --}}
-                <a class="box group"
+                <a class="coolbox group"
                     href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}">
                     <div class="flex flex-col justify-center mx-6">
                         <div class="box-title">
@@ -33,7 +33,7 @@
                 </a>
             @else
                 {{-- Member: Visible but not clickable --}}
-                <div class="box opacity-60 cursor-not-allowed hover:bg-transparent dark:hover:bg-transparent" title="You don't have permission to view this private key">
+                <div class="coolbox opacity-60 !cursor-not-allowed hover:bg-transparent dark:hover:bg-transparent" title="You don't have permission to view this private key">
                     <div class="flex flex-col justify-center mx-6">
                         <div class="box-title">
                             {{ data_get($key, 'name') }}

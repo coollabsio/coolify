@@ -229,6 +229,10 @@
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }
 
+@utility coolbox {
+    @apply flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded-lg border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-yellow-400 hover:ring-coollabs cursor-pointer min-h-[4rem];
+}
+
 @utility on-box {
     @apply rounded-sm hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }

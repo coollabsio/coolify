@@ -1,7 +1,6 @@
  <div @class([
-    'transition-all duration-150 box-without-bg dark:bg-coolgray-100 bg-white group p-2 rounded-lg border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-yellow-400 hover:ring-coollabs',
-    'cursor-pointer' => !$upgrade,
-    'hover:border-l-red-500 cursor-not-allowed' => $upgrade,
+    'coolbox group',
+    '!cursor-not-allowed hover:border-l-red-500' => $upgrade,
  ])>
     <div class="flex items-center">
         <div class="w-[4.5rem] h-[4.5rem] flex items-center justify-center text-black dark:text-white shrink-0 rounded-lg overflow-hidden">

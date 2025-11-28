@@ -170,13 +170,13 @@
                 <div class="subtitle">Select a proxy you would like to use on this server.</div>
                 @can('update', $server)
                     <div class="grid gap-4">
-                        <x-forms.button class="box" wire:click="selectProxy('NONE')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('NONE')">
                             Custom (None)
                         </x-forms.button>
-                        <x-forms.button class="box" wire:click="selectProxy('TRAEFIK')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('TRAEFIK')">
                             Traefik
                         </x-forms.button>
-                        <x-forms.button class="box" wire:click="selectProxy('CADDY')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('CADDY')">
                             Caddy
                         </x-forms.button>
                         {{-- <x-forms.button disabled class="box">

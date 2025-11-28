@@ -14,7 +14,7 @@
     <div class="flex flex-col flex-wrap gap-2 pt-4">
         @forelse($resource->scheduled_tasks as $task)
             @if ($resource->type() == 'application')
-                <a class="box"
+                <a class="coolbox"
                     href="{{ route('project.application.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
                         <span class="text-lg font-bold">{{ $task->name }}
@@ -29,7 +29,7 @@
                     </span>
                 </a>
             @elseif ($resource->type() == 'service')
-                <a class="box"
+                <a class="coolbox"
                     href="{{ route('project.service.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                     <span class="flex flex-col">
                         <span class="text-lg font-bold">{{ $task->name }}

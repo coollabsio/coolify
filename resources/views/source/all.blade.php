@@ -14,7 +14,7 @@
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
-                <a class="flex gap-2 text-center hover:no-underline box group"
+                <a class="flex gap-2 text-center hover:no-underline coolbox group"
                     href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                     {{-- <x-git-icon class="dark:text-white w-8 h-8 mt-1" git="{{ $source->getMorphClass() }}" /> --}}
                     <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
