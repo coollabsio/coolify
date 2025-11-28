@@ -21,7 +21,7 @@
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($project->environments->sortBy('created_at') as $environment)
-            <div class="gap-2 box group">
+            <div class="gap-2 coolbox group">
                 <div class="flex flex-1 mx-6">
                     <a class="flex flex-col justify-center flex-1"
                         href="{{ route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">

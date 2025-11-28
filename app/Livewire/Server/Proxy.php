@@ -90,9 +90,9 @@ class Proxy extends Component
         return is_array($traefikVersions) ? $traefikVersions : null;
     }
 
-    public function getConfigurationFilePathProperty()
+    public function getConfigurationFilePathProperty(): string
     {
-        return $this->server->proxyPath().'docker-compose.yml';
+        return rtrim($this->server->proxyPath(), '/') . '/docker-compose.yml';
     }
 
     public function changeProxy()

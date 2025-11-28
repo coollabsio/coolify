@@ -61,9 +61,14 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         if ($isFile === 'OK') {
-            $content = instant_remote_process(["cat $path"], $server, false);
+            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
             // Check if content contains binary data by looking for null bytes or non-printable characters
             if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
                 $content = '[binary file]';
@@ -91,14 +96,19 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
+        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
         if ($path && $path != '/' && $path != '.' && $path != '..') {
             if ($isFile === 'OK') {
-                $commands->push("rm -rf $path > /dev/null 2>&1 || true");
+                $commands->push("rm -rf {$escapedPath} > /dev/null 2>&1 || true");
             } elseif ($isDir === 'OK') {
-                $commands->push("rm -rf $path > /dev/null 2>&1 || true");
-                $commands->push("rmdir $path > /dev/null 2>&1 || true");
+                $commands->push("rm -rf {$escapedPath} > /dev/null 2>&1 || true");
+                $commands->push("rmdir {$escapedPath} > /dev/null 2>&1 || true");
             }
         }
         if ($commands->count() > 0) {
@@ -135,10 +145,15 @@ class LocalFileVolume extends BaseModel
             $path = $path->after('.');
             $path = $workdir.$path;
         }
-        $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($path, 'storage path');
+        $escapedPath = escapeshellarg($path);
+
+        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
+        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
         if ($isFile === 'OK' && $this->is_directory) {
-            $content = instant_remote_process(["cat $path"], $server, false);
+            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
             $this->is_directory = false;
             $this->content = $content;
             $this->save();
@@ -151,8 +166,8 @@ class LocalFileVolume extends BaseModel
                 throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
             }
             instant_remote_process([
-                "rm -fr $path",
-                "touch $path",
+                "rm -fr {$escapedPath}",
+                "touch {$escapedPath}",
             ], $server, false);
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
         }
@@ -161,19 +176,19 @@ class LocalFileVolume extends BaseModel
             $chown = data_get($this, 'chown');
             if ($content) {
                 $content = base64_encode($content);
-                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
+                $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
-                $commands->push("touch $path");
+                $commands->push("touch {$escapedPath}");
             }
-            $commands->push("chmod +x $path");
+            $commands->push("chmod +x {$escapedPath}");
             if ($chown) {
-                $commands->push("chown $chown $path");
+                $commands->push("chown $chown {$escapedPath}");
             }
             if ($chmod) {
-                $commands->push("chmod $chmod $path");
+                $commands->push("chmod $chmod {$escapedPath}");
             }
         } elseif ($isDir === 'NOK' && $this->is_directory) {
-            $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
         }
 
         return instant_remote_process($commands, $server);

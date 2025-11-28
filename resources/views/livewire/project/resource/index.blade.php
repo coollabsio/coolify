@@ -54,7 +54,7 @@
     @if ($environment->isEmpty())
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                class="items-center justify-center box">+ Add Resource</a>
+                class="items-center justify-center coolbox">+ Add Resource</a>
         @else
             <div
                 class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">
@@ -94,7 +94,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -143,7 +143,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -192,7 +192,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>

@@ -11,7 +11,7 @@
             <h2>Project: {{ data_get($project, 'name') }}</h2>
             <div class="pt-0 pb-3">{{ data_get($project, 'description') }}</div>
             @forelse ($project->environments as $environment)
-                <a class="box group"
+                <a class="coolbox group"
                     href="{{ route('shared-variables.environment.show', [
                         'project_uuid' => $project->uuid,
                         'environment_uuid' => $environment->uuid,

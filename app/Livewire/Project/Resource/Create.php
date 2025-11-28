@@ -81,7 +81,7 @@ class Create extends Component
                         'destination_id' => $destination->id,
                         'destination_type' => $destination->getMorphClass(),
                     ];
-                    if ($oneClickServiceName === 'cloudflared' || $oneClickServiceName === 'pgadmin') {
+                    if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
                     $service = Service::create($service_payload);
@@ -102,13 +102,33 @@ class Create extends Component
                             }
                         });
                     }
-                    $service->parse(isNew: true);
+                     $service->parse(isNew: true);
 
-                    return redirect()->route('project.service.configuration', [
-                        'service_uuid' => $service->uuid,
-                        'environment_uuid' => $environment->uuid,
-                        'project_uuid' => $project->uuid,
-                    ]);
+                     // For Beszel service disable gzip (fixes realtime not working issue)
+                     if ($oneClickServiceName === 'beszel') {
+                         $appService = $service->applications()->whereName('beszel')->first();
+                         if ($appService) {
+                             $appService->is_gzip_enabled = false;
+                             $appService->save();
+                         }
+                     }
+                     // For Appwrite services, disable strip prefix for services that handle domain requests
+                     if ($oneClickServiceName === 'appwrite') {
+                         $servicesToDisableStripPrefix = ['appwrite', 'appwrite-console', 'appwrite-realtime'];
+                         foreach ($servicesToDisableStripPrefix as $serviceName) {
+                             $appService = $service->applications()->whereName($serviceName)->first();
+                             if ($appService) {
+                                 $appService->is_stripprefix_enabled = false;
+                                 $appService->save();
+                             }
+                         }
+                     }
+
+                     return redirect()->route('project.service.configuration', [
+                         'service_uuid' => $service->uuid,
+                         'environment_uuid' => $environment->uuid,
+                         'project_uuid' => $project->uuid,
+                     ]);
                 }
             }
             $this->type = $type->value();
