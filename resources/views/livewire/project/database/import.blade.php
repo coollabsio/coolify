@@ -225,7 +225,9 @@
             <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
-                    <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Logs" fullHeight />
+                    <div wire:ignore>
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Logs" fullHeight />
+                    </div>
                 </x-slot:content>
             </x-slide-over>
         @else
