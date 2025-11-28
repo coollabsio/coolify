@@ -48,6 +48,7 @@ it('uses max of CDN and cache versions', function () {
         ->once()
         ->with(base_path('versions.json'), Mockery::on(function ($json) {
             $data = json_decode($json, true);
+
             // Should use cached version (4.0.10), not CDN version (4.0.0)
             return $data['coolify']['v4']['version'] === '4.0.10';
         }));
@@ -61,7 +62,7 @@ it('uses max of CDN and cache versions', function () {
         return $this->settings;
     });
 
-    $job = new CheckForUpdatesJob();
+    $job = new CheckForUpdatesJob;
     $job->handle();
 });
 
@@ -87,6 +88,7 @@ it('never downgrades from current running version', function () {
         ->once()
         ->with(base_path('versions.json'), Mockery::on(function ($json) {
             $data = json_decode($json, true);
+
             // Should use running version (4.0.10), not CDN (4.0.0) or cache (4.0.5)
             return $data['coolify']['v4']['version'] === '4.0.10';
         }));
@@ -104,7 +106,7 @@ it('never downgrades from current running version', function () {
         return $this->settings;
     });
 
-    $job = new CheckForUpdatesJob();
+    $job = new CheckForUpdatesJob;
     $job->handle();
 });
 
@@ -125,7 +127,7 @@ it('uses data_set for safe version mutation', function () {
         return $this->settings;
     });
 
-    $job = new CheckForUpdatesJob();
+    $job = new CheckForUpdatesJob;
 
     // Should not throw even if structure is unexpected
     // data_set() handles nested path creation
@@ -159,6 +161,7 @@ it('preserves other component versions when preventing Coolify downgrade', funct
             expect($data['traefik']['v3.6'])->toBe('3.6.2');
             // Sentinel should use CDN version
             expect($data['sentinel']['version'])->toBe('1.0.5');
+
             return true;
         }));
 
@@ -178,6 +181,6 @@ it('preserves other component versions when preventing Coolify downgrade', funct
         return $this->settings;
     });
 
-    $job = new CheckForUpdatesJob();
+    $job = new CheckForUpdatesJob;
     $job->handle();
 });

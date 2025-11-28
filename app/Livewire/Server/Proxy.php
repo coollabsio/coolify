@@ -91,7 +91,7 @@ class Proxy extends Component
 
     public function getConfigurationFilePathProperty(): string
     {
-        return rtrim($this->server->proxyPath(), '/') . '/docker-compose.yml';
+        return rtrim($this->server->proxyPath(), '/').'/docker-compose.yml';
     }
 
     public function changeProxy()

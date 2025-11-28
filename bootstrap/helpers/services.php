@@ -4,6 +4,7 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -349,14 +350,13 @@ function parseServiceEnvironmentVariable(string $key): array
  *
  * Must be called AFTER $service->parse() since it requires applications to exist.
  *
- * @param Service $service The service to apply prerequisites to
- * @return void
+ * @param  Service  $service  The service to apply prerequisites to
  */
 function applyServiceApplicationPrerequisites(Service $service): void
 {
     try {
         // Extract service name from service name (format: "servicename-uuid")
-        $serviceName = str($service->name)->before('-')->value();
+        $serviceName = str($service->name)->beforeLast('-')->value();
 
         // Apply gzip disabling if needed
         if (array_key_exists($serviceName, NEEDS_TO_DISABLE_GZIP)) {

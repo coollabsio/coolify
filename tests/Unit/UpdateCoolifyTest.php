@@ -4,7 +4,6 @@ use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -46,7 +45,7 @@ it('validates cache against running version before fallback', function () {
 
     config(['constants.coolify.version' => '4.0.10']);
 
-    $action = new UpdateCoolify();
+    $action = new UpdateCoolify;
 
     // Should throw exception - cache is older than running
     try {
@@ -115,7 +114,7 @@ it('prevents downgrade even with manual update', function () {
     // Current version is newer
     config(['constants.coolify.version' => '4.0.10']);
 
-    $action = new UpdateCoolify();
+    $action = new UpdateCoolify;
 
     \Illuminate\Support\Facades\Log::shouldReceive('error')
         ->once()

@@ -102,16 +102,16 @@ class Create extends Component
                             }
                         });
                     }
-                     $service->parse(isNew: true);
+                    $service->parse(isNew: true);
 
-                     // Apply service-specific application prerequisites
-                     applyServiceApplicationPrerequisites($service);
+                    // Apply service-specific application prerequisites
+                    applyServiceApplicationPrerequisites($service);
 
-                     return redirect()->route('project.service.configuration', [
-                         'service_uuid' => $service->uuid,
-                         'environment_uuid' => $environment->uuid,
-                         'project_uuid' => $project->uuid,
-                     ]);
+                    return redirect()->route('project.service.configuration', [
+                        'service_uuid' => $service->uuid,
+                        'environment_uuid' => $environment->uuid,
+                        'project_uuid' => $project->uuid,
+                    ]);
                 }
             }
             $this->type = $type->value();
