@@ -351,7 +351,7 @@ class ServicesController extends Controller
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
                 ];
-                if ($oneClickServiceName === 'cloudflared') {
+                if ($oneClickServiceName === 'pgadmin') {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
                 $service = Service::create($servicePayload);
