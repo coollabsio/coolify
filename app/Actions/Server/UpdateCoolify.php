@@ -42,12 +42,46 @@ class UpdateCoolify
                 $this->latestVersion = data_get($versions, 'coolify.v4.version');
             } else {
                 // Fallback to cache if CDN unavailable
-                Log::warning('Failed to fetch fresh version from CDN (unsuccessful response), using cache');
-                $this->latestVersion = get_latest_version_of_coolify();
+                $cacheVersion = get_latest_version_of_coolify();
+
+                // Validate cache version against current running version
+                if ($cacheVersion && version_compare($cacheVersion, config('constants.coolify.version'), '<')) {
+                    Log::error('Failed to fetch fresh version from CDN and cache is corrupted/outdated', [
+                        'cached_version' => $cacheVersion,
+                        'current_version' => config('constants.coolify.version'),
+                    ]);
+                    throw new \Exception(
+                        'Cannot determine latest version: CDN unavailable and cache version '.
+                        "({$cacheVersion}) is older than running version (".config('constants.coolify.version').')'
+                    );
+                }
+
+                $this->latestVersion = $cacheVersion;
+                Log::warning('Failed to fetch fresh version from CDN (unsuccessful response), using validated cache', [
+                    'version' => $cacheVersion,
+                ]);
             }
         } catch (\Throwable $e) {
-            Log::warning('Failed to fetch fresh version from CDN, using cache', ['error' => $e->getMessage()]);
-            $this->latestVersion = get_latest_version_of_coolify();
+            $cacheVersion = get_latest_version_of_coolify();
+
+            // Validate cache version against current running version
+            if ($cacheVersion && version_compare($cacheVersion, config('constants.coolify.version'), '<')) {
+                Log::error('Failed to fetch fresh version from CDN and cache is corrupted/outdated', [
+                    'error' => $e->getMessage(),
+                    'cached_version' => $cacheVersion,
+                    'current_version' => config('constants.coolify.version'),
+                ]);
+                throw new \Exception(
+                    'Cannot determine latest version: CDN unavailable and cache version '.
+                    "({$cacheVersion}) is older than running version (".config('constants.coolify.version').')'
+                );
+            }
+
+            $this->latestVersion = $cacheVersion;
+            Log::warning('Failed to fetch fresh version from CDN, using validated cache', [
+                'error' => $e->getMessage(),
+                'version' => $cacheVersion,
+            ]);
         }
 
         $this->currentVersion = config('constants.coolify.version');

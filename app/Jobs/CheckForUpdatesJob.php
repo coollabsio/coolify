@@ -38,18 +38,34 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                     $existingCoolifyVersion = data_get($existingVersions, 'coolify.v4.version');
                 }
 
-                // Detect CDN serving older Coolify version
-                if ($existingCoolifyVersion && version_compare($latest_version, $existingCoolifyVersion, '<')) {
-                    Log::warning('CDN served older Coolify version', [
+                // Determine the BEST version to use (CDN, cache, or current)
+                $bestVersion = $latest_version;
+
+                // Check if cache has newer version than CDN
+                if ($existingCoolifyVersion && version_compare($existingCoolifyVersion, $bestVersion, '>')) {
+                    Log::warning('CDN served older Coolify version than cache', [
                         'cdn_version' => $latest_version,
                         'cached_version' => $existingCoolifyVersion,
                         'current_version' => $current_version,
                     ]);
-
-                    // Keep the NEWER Coolify version from cache, but update other components
-                    $versions['coolify']['v4']['version'] = $existingCoolifyVersion;
-                    $latest_version = $existingCoolifyVersion;
+                    $bestVersion = $existingCoolifyVersion;
                 }
+
+                // CRITICAL: Never allow bestVersion to be older than currently running version
+                if (version_compare($bestVersion, $current_version, '<')) {
+                    Log::warning('Version downgrade prevented in CheckForUpdatesJob', [
+                        'cdn_version' => $latest_version,
+                        'cached_version' => $existingCoolifyVersion,
+                        'current_version' => $current_version,
+                        'attempted_best' => $bestVersion,
+                        'using' => $current_version,
+                    ]);
+                    $bestVersion = $current_version;
+                }
+
+                // Use data_set() for safe mutation (fixes #3)
+                data_set($versions, 'coolify.v4.version', $bestVersion);
+                $latest_version = $bestVersion;
 
                 // ALWAYS write versions.json (for Sentinel, Helper, Traefik updates)
                 File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
