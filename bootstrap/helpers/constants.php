@@ -67,4 +67,8 @@ const SUPPORTED_OS = [
     'alpine',
 ];
 
+const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
+    'pgadmin',
+    'postgresus',
+];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];
