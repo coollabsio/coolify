@@ -565,6 +565,11 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): string
     {
+        // Return empty string for HEAD or empty links to prevent misleading URLs
+        if (empty($link) || $link === 'HEAD') {
+            return '';
+        }
+
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
                 return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
