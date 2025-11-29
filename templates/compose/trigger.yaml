@@ -70,6 +70,7 @@ services:
     image: electricsql/electric
     environment:
       <<: *common-env
+      ELECTRIC_SECRET: $SERVICE_PASSWORD_64_ELECTRIC
     depends_on:
       postgresql:
         condition: service_healthy
