@@ -114,29 +114,30 @@
                                     <template x-if="item.status.startsWith('degraded')">
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredDatabases.length > 0">
+                                 </div>
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
+                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span x-text="item.destination?.server?.name || 'Unknown'"></span></div>
+                                 <template x-if="item.server_status == false">
+                                     <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
+                                     </div>
+                                 </template>
+                             </div>
+                         </a>
+                         <div
+                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
+                             <template x-for="tag in item.tags">
+                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                 </a>
+                             </template>
+                             <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                                 Add tag
+                             </a>
+                         </div>
+                     </span>
+                 </template>
+             </div>
+             <template x-if="filteredDatabases.length > 0">
                 <h2 class="pt-4">Databases</h2>
             </template>
             <div x-show="filteredDatabases.length > 0"
@@ -164,28 +165,29 @@
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredServices.length > 0">
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
+                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span x-text="item.destination?.server?.name || 'Unknown'"></span></div>
+                                 <template x-if="item.server_status == false">
+                                     <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
+                                     </div>
+                                 </template>
+                             </div>
+                         </a>
+                         <div
+                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
+                             <template x-for="tag in item.tags">
+                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                 </a>
+                             </template>
+                             <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                                 Add tag
+                             </a>
+                         </div>
+                     </span>
+                 </template>
+             </div>
+             <template x-if="filteredServices.length > 0">
                 <h2 class="pt-4">Services</h2>
             </template>
             <div x-show="filteredServices.length > 0"
@@ -213,29 +215,30 @@
                                         <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-        </div>
-    @endif
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
+                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
+                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span x-text="item.destination?.server?.name || 'Unknown'"></span></div>
+                                 <template x-if="item.server_status == false">
+                                     <div class="px-4 text-xs font-bold text-error">Server is unreachable or misconfigured
+                                     </div>
+                                 </template>
+                             </div>
+                         </a>
+                         <div
+                             class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
+                             <template x-for="tag in item.tags">
+                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
+                                 </a>
+                             </template>
+                             <a :href="`${item.hrefLink}/tags`" class="add-tag">
+                                 Add tag
+                             </a>
+                         </div>
+                     </span>
+                 </template>
+             </div>
+         </div>
+     @endif
 
 </div>
 
