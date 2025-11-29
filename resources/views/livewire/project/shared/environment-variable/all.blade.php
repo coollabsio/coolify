@@ -12,7 +12,7 @@
                     wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
             @endcan
         </div>
-        <div>Environment variables (secrets) for this resource. </div>
+        <div>Environment variables for this resource. <span class="text-xs dark:text-neutral-400">Lock a variable to treat it as a secret and redact it from deployment logs.</span></div>
         @if ($resourceClass === 'App\Models\Application')
             <div class="flex flex-col gap-2 pt-2">
                 @if (data_get($resource, 'build_pack') !== 'dockercompose')
@@ -58,7 +58,7 @@
     @if ($view === 'normal')
         <div>
             <h3>Production Environment Variables</h3>
-            <div>Environment (secrets) variables for Production.</div>
+            <div>Environment variables for Production.</div>
         </div>
         @forelse ($this->environmentVariables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
@@ -69,7 +69,7 @@
         @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
             <div>
                 <h3>Preview Deployments Environment Variables</h3>
-                <div>Environment (secrets) variables for Preview Deployments.</div>
+                <div>Environment variables for Preview Deployments.</div>
             </div>
             @foreach ($this->environmentVariablesPreview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
