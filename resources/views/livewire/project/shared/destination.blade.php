@@ -78,7 +78,7 @@
     </div>
     @if ($resource->getMorphClass() === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
         <div class="flex flex-col gap-2">
-            @if ($resource->fileStorages()->count() > 0)
+            @if ($resource->fileStorages()->get()->filter(fn($storage) => $storage->content)->count() > 0)
                 <h3>Add another server</h3>
                 <x-callout type="warning" title="Cannot add additional servers">
                     This application has file mounts configured. Applications with file mounts cannot be deployed to multiple servers as the storage would not be accessible across different servers.
