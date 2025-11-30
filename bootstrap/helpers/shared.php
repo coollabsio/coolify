@@ -230,10 +230,9 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get(config('constants.coolify.versions_url'));
-        $versions = $response->json();
+        $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.sentinel.version');
+        return data_get($versions, 'coolify.sentinel.version', '0.0.0');
     } catch (\Throwable) {
         return '0.0.0';
     }
