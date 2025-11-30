@@ -39,7 +39,7 @@ class GetLogs extends Component
 
     public ?bool $streamLogs = false;
 
-    public ?bool $showTimeStamps = true;
+    public ?bool $showTimeStamps = false;
 
     public ?int $numberOfLines = 100;
 

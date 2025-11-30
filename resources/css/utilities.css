@@ -49,7 +49,7 @@
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
 }
 
 /* Focus */
@@ -154,7 +154,7 @@
 }
 
 @utility badge-dashboard {
-    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+    @apply absolute top-1 right-1 w-2.5 h-2.5 rounded-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
 }
 
 @utility badge-success {
@@ -227,6 +227,10 @@
 
 @utility box-without-bg-without-border {
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
+}
+
+@utility coolbox {
+    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded-lg border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
 }
 
 @utility on-box {

@@ -79,12 +79,11 @@ class Proxy extends Component
 
         // Load from global cached helper (Redis + filesystem)
         $versionsData = get_versions_data();
-        $this->cachedVersionsFile = $versionsData;
-
         if (! $versionsData) {
             return null;
         }
 
+        $this->cachedVersionsFile = $versionsData;
         $traefikVersions = data_get($versionsData, 'traefik');
 
         return is_array($traefikVersions) ? $traefikVersions : null;
@@ -92,7 +91,7 @@ class Proxy extends Component
 
     public function getConfigurationFilePathProperty(): string
     {
-        return rtrim($this->server->proxyPath(), '/') . '/docker-compose.yml';
+        return rtrim($this->server->proxyPath(), '/').'/docker-compose.yml';
     }
 
     public function changeProxy()

@@ -376,6 +376,10 @@ class ServicesController extends Controller
                     });
                 }
                 $service->parse(isNew: true);
+
+                // Apply service-specific application prerequisites
+                applyServiceApplicationPrerequisites($service);
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }

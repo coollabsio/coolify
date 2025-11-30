@@ -102,33 +102,16 @@ class Create extends Component
                             }
                         });
                     }
-                     $service->parse(isNew: true);
+                    $service->parse(isNew: true);
 
-                     // For Beszel service disable gzip (fixes realtime not working issue)
-                     if ($oneClickServiceName === 'beszel') {
-                         $appService = $service->applications()->whereName('beszel')->first();
-                         if ($appService) {
-                             $appService->is_gzip_enabled = false;
-                             $appService->save();
-                         }
-                     }
-                     // For Appwrite services, disable strip prefix for services that handle domain requests
-                     if ($oneClickServiceName === 'appwrite') {
-                         $servicesToDisableStripPrefix = ['appwrite', 'appwrite-console', 'appwrite-realtime'];
-                         foreach ($servicesToDisableStripPrefix as $serviceName) {
-                             $appService = $service->applications()->whereName($serviceName)->first();
-                             if ($appService) {
-                                 $appService->is_stripprefix_enabled = false;
-                                 $appService->save();
-                             }
-                         }
-                     }
+                    // Apply service-specific application prerequisites
+                    applyServiceApplicationPrerequisites($service);
 
-                     return redirect()->route('project.service.configuration', [
-                         'service_uuid' => $service->uuid,
-                         'environment_uuid' => $environment->uuid,
-                         'project_uuid' => $project->uuid,
-                     ]);
+                    return redirect()->route('project.service.configuration', [
+                        'service_uuid' => $service->uuid,
+                        'environment_uuid' => $environment->uuid,
+                        'project_uuid' => $project->uuid,
+                    ]);
                 }
             }
             $this->type = $type->value();

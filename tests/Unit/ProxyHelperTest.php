@@ -153,3 +153,39 @@ it('compares branches for minor upgrades', function () {
 
     expect($result)->toBeTrue();
 });
+
+it('identifies default as predefined network', function () {
+    expect(isDockerPredefinedNetwork('default'))->toBeTrue();
+});
+
+it('identifies host as predefined network', function () {
+    expect(isDockerPredefinedNetwork('host'))->toBeTrue();
+});
+
+it('identifies coolify as not predefined network', function () {
+    expect(isDockerPredefinedNetwork('coolify'))->toBeFalse();
+});
+
+it('identifies coolify-overlay as not predefined network', function () {
+    expect(isDockerPredefinedNetwork('coolify-overlay'))->toBeFalse();
+});
+
+it('identifies custom networks as not predefined', function () {
+    $customNetworks = ['my-network', 'app-network', 'custom-123'];
+
+    foreach ($customNetworks as $network) {
+        expect(isDockerPredefinedNetwork($network))->toBeFalse();
+    }
+});
+
+it('identifies bridge as not predefined (per codebase pattern)', function () {
+    // 'bridge' is technically a Docker predefined network, but existing codebase
+    // only filters 'default' and 'host', so we maintain consistency
+    expect(isDockerPredefinedNetwork('bridge'))->toBeFalse();
+});
+
+it('identifies none as not predefined (per codebase pattern)', function () {
+    // 'none' is technically a Docker predefined network, but existing codebase
+    // only filters 'default' and 'host', so we maintain consistency
+    expect(isDockerPredefinedNetwork('none'))->toBeFalse();
+});

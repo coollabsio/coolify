@@ -328,7 +328,7 @@
                                         </div>
                                         @if ($loadingServers)
                                             <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
+                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
                                                     fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                                         stroke-width="4"></circle>
@@ -342,7 +342,7 @@
                                         @elseif (count($availableServers) > 0)
                                             @foreach ($availableServers as $index => $server)
                                                 <button type="button" wire:click="selectServer({{ $server['id'] }}, true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
                                                     <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
@@ -359,7 +359,7 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
+                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
                                                             viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                 d="M9 5l7 7-7 7" />
@@ -403,7 +403,7 @@
                                         </div>
                                         @if ($loadingDestinations)
                                             <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
+                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
                                                     fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                                         stroke-width="4"></circle>
@@ -417,7 +417,7 @@
                                         @elseif (count($availableDestinations) > 0)
                                             @foreach ($availableDestinations as $index => $destination)
                                                 <button type="button" wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
                                                     <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
@@ -428,7 +428,7 @@
                                                             </div>
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
+                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
                                                             viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                 d="M9 5l7 7-7 7" />
@@ -472,7 +472,7 @@
                                         </div>
                                         @if ($loadingProjects)
                                             <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
+                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
                                                     fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                                         stroke-width="4"></circle>
@@ -486,7 +486,7 @@
                                         @elseif (count($availableProjects) > 0)
                                             @foreach ($availableProjects as $index => $project)
                                                 <button type="button" wire:click="selectProject('{{ $project['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
                                                     <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
@@ -503,7 +503,7 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
+                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
                                                             viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                 d="M9 5l7 7-7 7" />
@@ -547,7 +547,7 @@
                                         </div>
                                         @if ($loadingEnvironments)
                                             <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg"
+                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
                                                     fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                                         stroke-width="4"></circle>
@@ -561,7 +561,7 @@
                                         @elseif (count($availableEnvironments) > 0)
                                             @foreach ($availableEnvironments as $index => $environment)
                                                 <button type="button" wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
                                                     <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
@@ -578,7 +578,7 @@
                                                             @endif
                                                         </div>
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400" fill="none"
+                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
                                                             viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                 d="M9 5l7 7-7 7" />
@@ -616,7 +616,7 @@
                                     @foreach ($searchResults as $result)
                                         @if (!isset($result['is_creatable_suggestion']))
                                             <a href="{{ $result['link'] ?? '#' }}"
-                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
+                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-warning-50 dark:focus:bg-warning-900/20 border-transparent hover:border-coollabs focus:border-warning-500 dark:focus:border-warning-400">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
@@ -680,13 +680,13 @@
                                     <!-- Category Items -->
                                     @foreach ($items as $item)
                                         <button type="button" wire:click="navigateToResource('{{ $item['type'] }}')"
-                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-transparent hover:border-yellow-500 focus:border-yellow-500">
+                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="flex items-center gap-3 flex-1 min-w-0">
                                                     <div
-                                                        class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+                                                        class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
                                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 text-yellow-600 dark:text-yellow-400" fill="none"
+                                                            class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none"
                                                             viewBox="0 0 24 24" stroke="currentColor">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                 d="M12 4v16m8-8H4" />
@@ -708,7 +708,7 @@
                                                     </div>
                                                 </div>
                                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                                    class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
+                                                    class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400 self-center"
                                                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M9 5l7 7-7 7" />
@@ -733,7 +733,7 @@
                                 </template>
                                 <template x-for="(result, index) in searchResults" :key="index">
                                     <a :href="result.link || '#'"
-                                        class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
+                                        class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-warning-50 dark:focus:bg-warning-900/20 border-transparent hover:border-coollabs focus:border-warning-500 dark:focus:border-warning-400">
                                         <div class="flex items-center justify-between gap-3">
                                             <div class="flex-1 min-w-0">
                                                 <div class="flex items-center gap-2 mb-1">
@@ -789,13 +789,13 @@
 
                                         <template x-for="item in items" :key="item.type">
                                             <button type="button" @click="$wire.navigateToResource(item.type)"
-                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-transparent hover:border-yellow-500 focus:border-yellow-500">
+                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex items-center gap-3 flex-1 min-w-0">
                                                         <div
-                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
                                                             <svg xmlns="http://www.w3.org/2000/svg"
-                                                                class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
+                                                                class="h-5 w-5 text-warning-600 dark:text-warning-400"
                                                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                                     stroke-width="2" d="M12 4v16m8-8H4" />
@@ -818,7 +818,7 @@
                                                         </div>
                                                     </div>
                                                     <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
+                                                        class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400 self-center"
                                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
                                                             stroke-width="2" d="M9 5l7 7-7 7" />
