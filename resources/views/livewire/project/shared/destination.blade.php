@@ -84,6 +84,7 @@
                     so when adding multiple servers, you are responsible to set up a synchronization
                     across different servers.
                 </x-callout>
+            @endif
             @if (count($networks) > 0)
                 <h3>Add another server</h3>
                 <div class="grid grid-cols-1 gap-4">
