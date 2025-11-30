@@ -24,7 +24,7 @@
                                 @if ($hetznerServerStatus)
                                     <span class="pl-1.5">
                                         @if (in_array($hetznerServerStatus, ['starting', 'initializing']))
-                                            <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-yellow-500"
+                                            <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
                                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10"
                                                     stroke="currentColor" stroke-width="4"></circle>
@@ -42,7 +42,7 @@
                                     </span>
                                 @else
                                     <span class="pl-1.5">
-                                        <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-yellow-500"
+                                        <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
                                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10"
                                                 stroke="currentColor" stroke-width="4"></circle>
@@ -80,7 +80,7 @@
                     @endif
                     @if ($isValidating)
                         <div
-                            class="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+                            class="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400">
                             <svg class="inline animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none"
                                 viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
