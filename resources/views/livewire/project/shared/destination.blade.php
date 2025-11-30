@@ -80,8 +80,8 @@
         <div class="flex flex-col gap-2">
             @if ($resource->persistentStorages()->count() > 0 || $resource->fileStorages()->count() > 0)
                 <x-callout type="warning" title="Cannot add additional servers">
-                    This application has persistent storage file mounts configured. Applications with persistent
-                    storage file mounts cannot be deployed to multiple servers as the storage would not be accessible
+                    This application has persistent storage configured. Coolify does not support storage synchronization,
+                    so when adding multiple servers, you are responsible to set up a synchronization
                     across different servers.
                 </x-callout>
             @elseif (count($networks) > 0)
