@@ -60,6 +60,7 @@
         "heredoc_indentation": {
             "indentation": "same_as_start"
         },
+        "indentation_type": false,
         "logical_operators": true,
         "long_to_shorthand_operator": true,
         "mb_str_functions": true,
@@ -67,8 +68,13 @@
             "modernize_stripos": true
         },
         "modernize_types_casting": true,
+        "modifier_keywords": true,
         "multiline_comment_opening_closing": true,
+        "multiline_promoted_properties": {
+            "minimum_number_of_parameters": 3
+        },
         "multiline_string_to_heredoc": true,
+        "new_expression_parentheses": true,
         "no_empty_comment": true,
         "no_extra_blank_lines": {
             "tokens": [
@@ -113,6 +119,7 @@
         },
         "no_useless_else": true,
         "no_useless_nullsafe_operator": true,
+        "no_useless_printf": true,
         "no_useless_sprintf": true,
         "no_whitespace_before_comma_in_array": {
             "after_heredoc": true
@@ -162,6 +169,7 @@
         "phpdoc_no_alias_tag": true,
         "phpdoc_no_empty_return": true,
         "phpdoc_return_self_reference": true,
+        "phpdoc_scalar": true,
         "phpdoc_tag_casing": true,
         "phpdoc_trim_consecutive_blank_line_separation": true,
         "phpdoc_types_order": {
@@ -175,6 +183,7 @@
         "self_accessor": true,
         "set_type_to_cast": true,
         "single_line_throw": true,
+        "single_space_around_construct": true,
         "single_trait_insert_per_statement": false,
         "strict_comparison": true,
         "strict_param": true,
@@ -191,13 +200,8 @@
             ]
         },
         "type_declaration_spaces": {
-            "elements": [
-                "constant",
-                "function",
-                "property"
-            ]
+            "elements": ["constant", "function", "property"]
         },
-        "visibility_required": true,
         "whitespace_after_comma_in_array": {
             "ensure_single_space": true
         }
