@@ -82,6 +82,21 @@ class ServiceApplicationView extends Component
         }
     }
 
+    public function instantSaveSettings()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            // Save checkbox states without port validation
+            $this->application->is_gzip_enabled = $this->isGzipEnabled;
+            $this->application->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            $this->application->exclude_from_status = $this->excludeFromStatus;
+            $this->application->save();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function instantSaveAdvanced()
     {
         try {
