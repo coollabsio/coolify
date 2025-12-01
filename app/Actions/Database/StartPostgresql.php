@@ -325,18 +325,36 @@ class StartPostgresql
         $filename = 'custom-postgres.conf';
         $config_file_path = "$this->configuration_dir/$filename";
 
-        if (blank($this->database->postgres_conf)) {
+        $content = $this->database->postgres_conf ?? '';
+
+        if (! str($content)->contains('listen_addresses')) {
+            $content .= "\nlisten_addresses = '*'";
+        }
+
+        if ($this->pgbackrest_enabled) {
+            $archiveConfig = (new GeneratePgbackrestConfig)->generatePostgresConfig($this->database);
+
+            foreach ($archiveConfig as $key => $value) {
+                $pattern = "/^{$key}\s*=.*$/m";
+                if (preg_match($pattern, $content)) {
+                    $content = preg_replace($pattern, "{$key} = '{$value}'", $content);
+                } else {
+                    $content .= "\n{$key} = '{$value}'";
+                }
+            }
+        }
+
+        $content = trim($content);
+
+        if (blank($content)) {
             $this->commands[] = "rm -f $config_file_path";
 
             return;
         }
 
-        $content = $this->database->postgres_conf;
-        if (! str($content)->contains('listen_addresses')) {
-            $content .= "\nlisten_addresses = '*'";
-            $this->database->postgres_conf = $content;
-            $this->database->save();
-        }
+        $this->database->postgres_conf = $content;
+        $this->database->save();
+
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
     }
@@ -345,6 +363,7 @@ class StartPostgresql
     {
         $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
         $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
+        $walArchiveDir = $this->configuration_dir.'/wal-archive';
         $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
 
         if (! $this->pgbackrest_enabled) {
@@ -355,11 +374,13 @@ class StartPostgresql
             return;
         }
 
-        $this->commands[] = "echo 'Setting up pgBackRest.'";
+        $this->commands[] = "echo 'Setting up pgBackRest for online backups.'";
         $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
         $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
         $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
         $this->commands[] = "mkdir -p {$pgbackrestRepoDir}";
+        $this->commands[] = "mkdir -p {$walArchiveDir}";
+        $this->commands[] = "chmod 777 {$walArchiveDir}";
 
         $config = GeneratePgbackrestConfig::run($this->database);
         $configBase64 = base64_encode($config);
@@ -372,12 +393,11 @@ class StartPostgresql
         $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
         $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
         $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
+        $walArchiveDir = $this->configuration_dir.'/wal-archive';
 
-        // In dev mode, Docker Compose runs on the host and needs host paths for bind mounts
-        // SSH commands run in coolify-testing-host where volume is at /data/coolify
-        // but Docker host sees it at /var/lib/docker/volumes/coolify_dev_coolify_data/_data
         $hostPgbackrestConfigDir = $this->getHostPath($pgbackrestConfigDir);
         $hostPgbackrestRepoDir = $this->getHostPath($pgbackrestRepoDir);
+        $hostWalArchiveDir = $this->getHostPath($walArchiveDir);
 
         $image = config('constants.pgbackrest.image');
         $version = config('constants.pgbackrest.version');
@@ -401,6 +421,11 @@ class StartPostgresql
             'labels' => $labels->toArray(),
             'environment' => [
                 'PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf',
+                "PGPASSWORD={$this->database->postgres_password}",
+                "PGHOST={$this->database->uuid}",
+                'PGPORT=5432',
+                "PGUSER={$this->database->postgres_user}",
+                "PGDATABASE={$this->database->postgres_db}",
             ],
             'volumes' => [
                 [
@@ -413,6 +438,11 @@ class StartPostgresql
                     'type' => 'bind',
                     'source' => $hostPgbackrestRepoDir,
                     'target' => '/var/lib/pgbackrest',
+                ],
+                [
+                    'type' => 'bind',
+                    'source' => $hostWalArchiveDir,
+                    'target' => '/var/lib/postgresql/wal_archive',
                 ],
             ],
             'depends_on' => [
@@ -447,6 +477,12 @@ class StartPostgresql
                 ];
             }
         }
+
+        $docker_compose['services'][$postgres_container]['volumes'][] = [
+            'type' => 'bind',
+            'source' => $hostWalArchiveDir,
+            'target' => '/var/lib/postgresql/wal_archive',
+        ];
 
         return $docker_compose;
     }

@@ -12,6 +12,7 @@ class GeneratePgbackrestConfig
     public function handle(StandalonePostgresql $database): string
     {
         $stanzaName = $database->getPgbackrestStanzaName();
+        $postgresContainer = $database->uuid;
 
         $retentionFull = $database->pgbackrest_retention_full ?? config('constants.pgbackrest.default_retention_full', 2);
         $retentionDiff = $database->pgbackrest_retention_diff ?? config('constants.pgbackrest.default_retention_diff', 7);
@@ -36,21 +37,23 @@ class GeneratePgbackrestConfig
 
         $config[] = '';
         $config[] = "[{$stanzaName}]";
-        // Access PostgreSQL data directly via mounted volume (no remote connection needed)
-        // The pgbackrest container mounts the postgres data volume at /var/lib/postgresql/data
         $config[] = 'pg1-path=/var/lib/postgresql/data';
+        $config[] = "pg1-host={$postgresContainer}";
+        $config[] = 'pg1-port=5432';
+        $config[] = "pg1-database={$database->postgres_db}";
+        $config[] = "pg1-user={$database->postgres_user}";
 
         return implode("\n", $config);
     }
 
     public function generatePostgresConfig(StandalonePostgresql $database): array
     {
-        $stanzaName = $database->getPgbackrestStanzaName();
-        $pgbackrestContainer = $database->getPgbackrestContainerName();
+        $walArchivePath = '/var/lib/postgresql/wal_archive';
 
         return [
+            'wal_level' => 'replica',
             'archive_mode' => 'on',
-            'archive_command' => "pgbackrest --stanza={$stanzaName} --pg1-host={$pgbackrestContainer} archive-push %p",
+            'archive_command' => "test ! -f {$walArchivePath}/%f && cp %p {$walArchivePath}/%f",
             'archive_timeout' => '60',
         ];
     }

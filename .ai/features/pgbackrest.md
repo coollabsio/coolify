@@ -11,36 +11,59 @@ pgBackRest is a reliable backup and restore solution for PostgreSQL that provide
 - Point-in-time recovery (PITR)
 - Backup integrity verification
 
-Coolify integrates pgBackRest using a **sidecar container approach** where pgBackRest runs in a separate container that mounts the PostgreSQL data volume.
+Coolify integrates pgBackRest using a **sidecar container approach** with **online/hot backups** - the database does NOT need to be stopped during backups.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Docker Network                        │
-│                                                              │
-│  ┌──────────────────┐         ┌──────────────────────────┐  │
-│  │   PostgreSQL     │         │   pgBackRest Sidecar     │  │
-│  │   Container      │         │   Container              │  │
-│  │   ({uuid})       │◄───────►│   ({uuid}-pgbackrest)    │  │
-│  │                  │         │                          │  │
-│  │  Port: 5432      │         │  - Runs backup jobs      │  │
-│  │                  │         │  - Manages stanza        │  │
-│  └────────┬─────────┘         │  - Stores backups        │  │
-│           │                   └────────────┬─────────────┘  │
-│           │                                │                 │
-│           ▼                                ▼                 │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Shared Docker Volume                     │   │
-│  │         (postgres-data-{uuid})                        │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │           pgBackRest Repository Volume                │   │
-│  │      ({workdir}/pgbackrest-repo)                      │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                        Docker Network                        |
+|                                                              |
+|  +------------------+         +--------------------------+   |
+|  |   PostgreSQL     |<------->|   pgBackRest Sidecar     |   |
+|  |   Container      |  libpq  |   Container              |   |
+|  |   ({uuid})       |         |   ({uuid}-pgbackrest)    |   |
+|  |                  |         |                          |   |
+|  |  Port: 5432      |         |  - Runs online backups   |   |
+|  |  WAL archiving   |         |  - Manages stanza        |   |
+|  |  enabled         |         |  - Stores backups        |   |
+|  +--------+---------+         +------------+-------------+   |
+|           |                                |                 |
+|           v                                v                 |
+|  +----------------------------------------------------------+|
+|  |              Shared Docker Volumes                        ||
+|  |  - postgres-data-{uuid} (data directory, read-only)       ||
+|  |  - wal-archive (WAL files for PITR)                       ||
+|  +----------------------------------------------------------+|
+|                                                              |
+|  +----------------------------------------------------------+|
+|  |           pgBackRest Repository Volume                    ||
+|  |      ({workdir}/pgbackrest-repo)                          ||
+|  +----------------------------------------------------------+|
++-------------------------------------------------------------+
 ```
+
+## Online Backup Implementation
+
+pgBackRest performs **online (hot) backups** without requiring database downtime:
+
+1. **PostgreSQL Configuration**: When pgBackRest is enabled, PostgreSQL is automatically configured with:
+   - `wal_level = replica` - Required for WAL archiving
+   - `archive_mode = on` - Enables WAL archiving
+   - `archive_command` - Copies WAL files to shared archive directory
+   - `archive_timeout = 60` - Forces WAL switch every 60 seconds
+
+2. **pgBackRest Sidecar Configuration**:
+   - Connects to PostgreSQL via libpq using `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE` environment variables
+   - Uses `pg1-host` pointing to the PostgreSQL container for backup start/stop commands
+   - Mounts PostgreSQL data directory read-only for file copying
+   - Mounts shared WAL archive directory for Point-in-Time Recovery (PITR)
+
+3. **Backup Process**:
+   - pgBackRest issues `pg_backup_start()` to PostgreSQL (no database stop required)
+   - Copies data files while database continues running
+   - Issues `pg_backup_stop()` to complete the backup
+   - WAL files ensure backup consistency
 
 ## Key Components
 
@@ -68,6 +91,7 @@ The `StandalonePostgresql` model has these pgBackRest-related methods:
 
 | Action | Purpose |
 |--------|---------|
+| `GeneratePgbackrestConfig` | Generates pgbackrest.conf and PostgreSQL archive settings |
 | `RestoreFromPgbackrest` | Validates and initiates restore operations |
 
 ### Helper Functions
@@ -96,10 +120,12 @@ Located in `bootstrap/helpers/databases.php`:
 ### Container Configuration
 
 The pgBackRest sidecar container is configured with:
-- Image: `woblerr/pgbackrest:2.54.2` (configurable in constants)
+- Image: `woblerr/pgbackrest:2.57.0` (configurable in constants)
 - Mounts PostgreSQL data volume read-only for backups
+- Mounts WAL archive directory for PITR
 - Mounts config and repository directories
 - Connects to same Docker network as PostgreSQL
+- Environment variables for PostgreSQL connection (PGPASSWORD, PGHOST, etc.)
 
 ## Backup Types
 
@@ -183,8 +209,9 @@ Run tests with:
 
 ### Core Implementation
 - `app/Models/StandalonePostgresql.php` - Model with pgBackRest methods
-- `app/Actions/Database/StartPostgresql.php` - Starts pgBackRest container
+- `app/Actions/Database/StartPostgresql.php` - Starts pgBackRest container with online backup config
 - `app/Actions/Database/StopPostgresql.php` - Stops pgBackRest container
+- `app/Actions/Database/Pgbackrest/GeneratePgbackrestConfig.php` - Generates configs
 - `bootstrap/helpers/databases.php` - Helper functions
 
 ### Jobs
