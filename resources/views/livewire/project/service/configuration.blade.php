@@ -37,6 +37,16 @@
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
+                    @if($applications->isEmpty() && $databases->isEmpty())
+                        <div class="p-4 text-sm text-neutral-500">
+                            No services defined in this Docker Compose file.
+                        </div>
+                    @elseif($applications->isEmpty())
+                        <div class="p-4 text-sm text-neutral-500">
+                            No applications with domains defined. Only database services are available.
+                        </div>
+                    @endif
+
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500' => str(

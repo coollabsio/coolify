@@ -770,10 +770,26 @@ function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
     }
     $imageName = $image->before(':');
 
-    // First check if it's a known database image
+    // Extract base image name (ignore registry prefix)
+    // Examples:
+    //   docker.io/library/postgres -> postgres
+    //   ghcr.io/postgrest/postgrest -> postgrest
+    //   postgres -> postgres
+    //   postgrest/postgrest -> postgrest
+    $baseImageName = $imageName;
+    if (str($imageName)->contains('/')) {
+        $baseImageName = str($imageName)->afterLast('/');
+    }
+
+    // Check if base image name exactly matches a known database image
     $isKnownDatabase = false;
     foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
-        if (str($imageName)->contains($database_docker_image)) {
+        // Extract base name from database pattern for comparison
+        $databaseBaseName = str($database_docker_image)->contains('/')
+            ? str($database_docker_image)->afterLast('/')
+            : $database_docker_image;
+
+        if ($baseImageName == $databaseBaseName) {
             $isKnownDatabase = true;
             break;
         }
