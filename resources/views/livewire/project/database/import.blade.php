@@ -303,18 +303,16 @@
                                         </div>
                                         <div class="pt-4">
                                             <x-modal-confirmation title="Restore Database from pgBackRest?" buttonTitle="Restore from pgBackRest"
-                                                submitAction="restoreFromPgbackrest" isErrorButton>
-                                                <x-slot:button-title>
-                                                    Restore from pgBackRest
-                                                </x-slot:button-title>
-                                                This will perform the following actions:
-                                                <ul class="list-disc list-inside pt-2">
-                                                    <li>Stop the PostgreSQL database</li>
-                                                    <li>Restore data from the selected pgBackRest backup</li>
-                                                    <li>Restart the database automatically</li>
-                                                </ul>
-                                                <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
-                                            </x-modal-confirmation>
+                                                submitAction="restoreFromPgbackrest" isErrorButton
+                                                :actions="[
+                                                    'This will stop the PostgreSQL database and restore it from the selected backup.',
+                                                    'All data written after this backup was taken will be permanently lost.',
+                                                    'The database will be temporarily unavailable during the restore process.',
+                                                    'After restore, the database will automatically restart.',
+                                                ]"
+                                                confirmationText="restore"
+                                                confirmationLabel="Type 'restore' to confirm"
+                                                shortConfirmationLabel="Confirmation" />
                                         </div>
                                     </div>
                                 @endif

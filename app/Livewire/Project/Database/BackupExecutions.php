@@ -146,8 +146,9 @@ class BackupExecutions extends Component
         return redirect()->route('download.backup', $exeuctionId);
     }
 
-    public function restoreFromPgbackrest(int $executionId): void
+    public function restoreFromPgbackrest(int|string $executionId): void
     {
+        $executionId = (int) trim((string) $executionId, "'\"");
         $execution = ScheduledDatabaseBackupExecution::find($executionId);
 
         if (! $execution) {

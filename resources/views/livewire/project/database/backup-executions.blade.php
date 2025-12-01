@@ -160,8 +160,20 @@
                     <div class="flex gap-2 mt-4">
                         @if (data_get($execution, 'status') === 'success')
                             @if ($isPgbackrestBackup)
-                                <x-forms.button class="dark:hover:bg-coolgray-400"
-                                    wire:click="restoreFromPgbackrest('{{ data_get($execution, 'id') }}')">Restore</x-forms.button>
+                                <x-modal-confirmation 
+                                    title="Restore Database from pgBackRest Backup?" 
+                                    buttonTitle="Restore"
+                                    isErrorButton
+                                    submitAction="restoreFromPgbackrest({{ data_get($execution, 'id') }})"
+                                    :actions="[
+                                        'This will stop the PostgreSQL database and restore it from the selected backup.',
+                                        'All data written after this backup was taken will be permanently lost.',
+                                        'The database will be temporarily unavailable during the restore process.',
+                                        'After restore, the database will automatically restart.',
+                                    ]"
+                                    confirmationText="restore"
+                                    confirmationLabel="Type 'restore' to confirm"
+                                    shortConfirmationLabel="Confirmation" />
                             @else
                                 <x-forms.button class="dark:hover:bg-coolgray-400"
                                     x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>

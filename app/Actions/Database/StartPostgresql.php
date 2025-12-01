@@ -394,22 +394,39 @@ class StartPostgresql
 
     private function generatePgbackrestInstallScript(string $stanzaName): string
     {
-        return <<<'BASH'
+        return <<<BASH
 #!/bin/bash
 set -e
 
 mkdir -p /tmp/pgbackrest
+mkdir -p /var/lib/pgbackrest/log
 
-if command -v pgbackrest &> /dev/null; then
-    exit 0
+NEED_INSTALL=0
+if ! command -v pgbackrest &> /dev/null; then
+    NEED_INSTALL=1
 fi
 
-if [ -f /etc/alpine-release ]; then
-    apk add --no-cache pgbackrest
-elif [ -f /etc/debian_version ]; then
-    apt-get update && apt-get install -y pgbackrest && rm -rf /var/lib/apt/lists/*
-else
-    exit 1
+if [ "\$NEED_INSTALL" = "1" ]; then
+    if [ -f /etc/alpine-release ]; then
+        apk add --no-cache pgbackrest
+    elif [ -f /etc/debian_version ]; then
+        apt-get update && apt-get install -y pgbackrest && rm -rf /var/lib/apt/lists/*
+    else
+        exit 1
+    fi
+fi
+
+# Fix permissions for postgres user
+chown -R postgres:postgres /tmp/pgbackrest /var/lib/pgbackrest /etc/pgbackrest 2>/dev/null || true
+chmod -R 770 /tmp/pgbackrest /var/lib/pgbackrest 2>/dev/null || true
+
+# Create stanza if it doesn't exist (before PostgreSQL starts archiving)
+if [ -d /var/lib/postgresql/data ] && [ -f /var/lib/postgresql/data/PG_VERSION ]; then
+    STANZA_CHECK=\$(su postgres -c "pgbackrest --stanza={$stanzaName} info" 2>&1 || true)
+    if echo "\$STANZA_CHECK" | grep -q 'missing stanza'; then
+        echo "Creating pgbackrest stanza..."
+        su postgres -c "pgbackrest --stanza={$stanzaName} stanza-create"
+    fi
 fi
 BASH;
     }
@@ -471,6 +488,6 @@ BASH;
 
         $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do sleep 2; done";
         $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} info' 2>&1 || true)";
-        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; fi";
+        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; elif echo \"\$STANZA_CHECK\" | grep -q 'stanza version'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-upgrade' 2>/dev/null || true; fi";
     }
 }

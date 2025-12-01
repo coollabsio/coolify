@@ -46,18 +46,13 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $this->database->update(['status' => 'restoring']);
 
         try {
-            $stopCommands = [
-                "docker stop {$postgresContainer} 2>/dev/null || true",
-            ];
-            instant_remote_process($stopCommands, $server, false);
-
             $restoreCommand = $this->buildRestoreCommand($stanzaName);
 
-            $commands = [
-                "docker start {$postgresContainer}",
+            $stopPostgresCommands = [
+                "docker exec {$postgresContainer} su postgres -c 'pg_ctl stop -D /var/lib/postgresql/data -m fast' 2>/dev/null || true",
                 "sleep 2",
             ];
-            instant_remote_process($commands, $server);
+            instant_remote_process($stopPostgresCommands, $server, false);
 
             fixPgbackrestPermissions($this->database);
 

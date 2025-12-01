@@ -324,6 +324,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'status' => 'running',
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_postgresql($database);
@@ -345,6 +346,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $databaseName,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'status' => 'running',
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mongodb($database);
@@ -359,6 +361,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'status' => 'running',
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mysql($database);
@@ -373,6 +376,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'status' => 'running',
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mariadb($database);
