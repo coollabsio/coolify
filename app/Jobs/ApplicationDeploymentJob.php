@@ -670,13 +670,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $build_command = "DOCKER_BUILDKIT=1 {$build_command}";
             }
 
-            // Append build arguments if not using build secrets (matching default behavior)
+            // Inject build arguments after build subcommand if not using build secrets
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
                 // Escape single quotes for bash -c context used by executeInDocker
                 $build_args_string = str_replace("'", "'\\''", $build_args_string);
-                $build_command .= " {$build_args_string}";
-                $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+
+                // Inject build args right after 'build' subcommand (not at the end)
+                $original_command = $build_command;
+                $build_command = injectDockerComposeBuildArgs($build_command, $build_args_string);
+
+                // Only log if build args were actually injected (command was modified)
+                if ($build_command !== $original_command) {
+                    $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+                }
             }
 
             $this->execute_remote_command(
