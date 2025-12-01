@@ -59,6 +59,16 @@ return [
         'minimum_required_version' => '24.0',
     ],
 
+    'pgbackrest' => [
+        'image' => env('PGBACKREST_IMAGE', 'woblerr/pgbackrest'),
+        'version' => env('PGBACKREST_VERSION', '2.57.0'),
+        'default_retention_full' => 2,
+        'default_retention_diff' => 7,
+        'default_log_level' => 'info',
+        'default_compress_type' => 'lz4',
+        'default_compress_level' => 6,
+    ],
+
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),

@@ -82,6 +82,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        if ($this->backup->isPgbackrestBackup() && $this->backup->isPostgresqlDatabase()) {
+            PgbackrestBackupJob::dispatch($this->backup);
+
+            return;
+        }
+
         try {
             $databasesToBackup = null;
 

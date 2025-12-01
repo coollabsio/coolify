@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -29,12 +30,24 @@ class CreateScheduledBackup extends Component
 
     public Collection $definedS3s;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $usePgbackrest = false;
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $pgbackrestBackupType = 'full';
+
+    public bool $pgbackrestAvailable = false;
+
     public function mount()
     {
         try {
             $this->definedS3s = currentTeam()->s3s;
             if ($this->definedS3s->count() > 0) {
                 $this->s3StorageId = $this->definedS3s->first()->id;
+            }
+
+            if ($this->database instanceof StandalonePostgresql && $this->database->isPgbackrestEnabled()) {
+                $this->pgbackrestAvailable = true;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -63,6 +76,8 @@ class CreateScheduledBackup extends Component
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
+                'use_pgbackrest' => $this->usePgbackrest && $this->pgbackrestAvailable,
+                'pgbackrest_backup_type' => $this->pgbackrestBackupType,
             ];
 
             if ($this->database->type() === 'standalone-postgresql') {

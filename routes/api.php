@@ -136,6 +136,13 @@ Route::group([
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:write']);
 
+    Route::get('/databases/{uuid}/pgbackrest', [DatabasesController::class, 'pgbackrest_status'])->middleware(['api.ability:read']);
+    Route::patch('/databases/{uuid}/pgbackrest', [DatabasesController::class, 'pgbackrest_update'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/pgbackrest/stanza', [DatabasesController::class, 'pgbackrest_stanza_create'])->middleware(['api.ability:write']);
+    Route::get('/databases/{uuid}/pgbackrest/backups', [DatabasesController::class, 'pgbackrest_backups'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/pgbackrest/backup', [DatabasesController::class, 'pgbackrest_backup'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/pgbackrest/restore', [DatabasesController::class, 'pgbackrest_restore'])->middleware(['api.ability:write']);
+
     Route::get('/services', [ServicesController::class, 'services'])->middleware(['api.ability:read']);
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 

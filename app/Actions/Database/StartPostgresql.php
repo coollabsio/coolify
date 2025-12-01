@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Database\Pgbackrest\GeneratePgbackrestConfig;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
@@ -21,6 +22,8 @@ class StartPostgresql
     public string $configuration_dir;
 
     private ?SslCertificate $ssl_certificate = null;
+
+    private bool $pgbackrest_enabled = false;
 
     public function handle(StandalonePostgresql $database)
     {
@@ -98,6 +101,8 @@ class StartPostgresql
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
         $this->add_custom_conf();
+        $this->pgbackrest_enabled = $this->database->isPgbackrestEnabled();
+        $this->setup_pgbackrest();
 
         $docker_compose = [
             'services' => [
@@ -208,7 +213,10 @@ class StartPostgresql
             ]);
         }
 
-        // Add custom docker run options
+        if ($this->pgbackrest_enabled) {
+            $docker_compose = $this->add_pgbackrest_service($docker_compose, $container_name);
+        }
+
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
@@ -329,5 +337,120 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+    }
+
+    private function setup_pgbackrest(): void
+    {
+        if (! $this->pgbackrest_enabled) {
+            $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
+            $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
+            $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
+            $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
+            $this->commands[] = "rm -rf {$pgbackrestConfigDir}";
+
+            return;
+        }
+
+        $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
+        $pgbackrestRepoDir = $this->database->getPgbackrestRepoDir();
+
+        $this->commands[] = "echo 'Setting up pgBackRest.'";
+        $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
+        $this->commands[] = "mkdir -p {$pgbackrestRepoDir}";
+
+        $config = GeneratePgbackrestConfig::run($this->database);
+        $configBase64 = base64_encode($config);
+        $this->commands[] = "echo '{$configBase64}' | base64 -d > {$pgbackrestConfigDir}/pgbackrest.conf";
+    }
+
+    private function add_pgbackrest_service(array $docker_compose, string $postgres_container): array
+    {
+        $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
+        $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
+        $pgbackrestRepoDir = $this->database->getPgbackrestRepoDir();
+
+        $image = config('constants.pgbackrest.image');
+        $version = config('constants.pgbackrest.version');
+        $fullImage = "{$image}:{$version}";
+
+        $postgresDataVolume = $this->get_postgres_data_volume_name();
+
+        $labels = collect([]);
+        $labels->push('coolify.managed=true');
+        $labels->push('coolify.type=database-backup');
+        $labels->push('coolify.databaseId='.$this->database->id);
+        $labels->push('coolify.databaseUuid='.$this->database->uuid);
+
+        $docker_compose['services'][$pgbackrestContainerName] = [
+            'image' => $fullImage,
+            'container_name' => $pgbackrestContainerName,
+            'restart' => RESTART_MODE,
+            'networks' => [
+                $this->database->destination->network,
+            ],
+            'labels' => $labels->toArray(),
+            'environment' => [
+                'PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf',
+            ],
+            'volumes' => [
+                [
+                    'type' => 'bind',
+                    'source' => "{$pgbackrestConfigDir}/pgbackrest.conf",
+                    'target' => '/etc/pgbackrest/pgbackrest.conf',
+                    'read_only' => true,
+                ],
+                [
+                    'type' => 'bind',
+                    'source' => $pgbackrestRepoDir,
+                    'target' => '/var/lib/pgbackrest',
+                ],
+            ],
+            'depends_on' => [
+                $postgres_container => [
+                    'condition' => 'service_healthy',
+                ],
+            ],
+            'healthcheck' => [
+                'test' => ['CMD-SHELL', 'pgbackrest version || exit 1'],
+                'interval' => '30s',
+                'timeout' => '10s',
+                'retries' => 3,
+                'start_period' => '10s',
+            ],
+            'command' => ['tail', '-f', '/dev/null'],
+        ];
+
+        if (str_starts_with($postgresDataVolume, '/')) {
+            $docker_compose['services'][$pgbackrestContainerName]['volumes'][] = [
+                'type' => 'bind',
+                'source' => $postgresDataVolume,
+                'target' => '/var/lib/postgresql/data',
+                'read_only' => true,
+            ];
+        } else {
+            $docker_compose['services'][$pgbackrestContainerName]['volumes'][] = "{$postgresDataVolume}:/var/lib/postgresql/data:ro";
+
+            if (! isset($docker_compose['volumes'][$postgresDataVolume])) {
+                $docker_compose['volumes'][$postgresDataVolume] = [
+                    'name' => $postgresDataVolume,
+                    'external' => false,
+                ];
+            }
+        }
+
+        return $docker_compose;
+    }
+
+    private function get_postgres_data_volume_name(): string
+    {
+        $persistentStorage = $this->database->persistentStorages()
+            ->where('mount_path', '/var/lib/postgresql/data')
+            ->first();
+
+        if ($persistentStorage && $persistentStorage->host_path) {
+            return $persistentStorage->host_path;
+        }
+
+        return $persistentStorage?->name ?? "postgres-data-{$this->database->uuid}";
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\Pgbackrest\RestoreFromPgbackrest;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
@@ -11,6 +12,9 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\PgbackrestBackupJob;
+use App\Jobs\PgbackrestRestoreJob;
+use App\Jobs\PgbackrestStanzaJob;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -2748,5 +2752,680 @@ class DatabasesController extends Controller
             ],
             200
         );
+    }
+
+    #[OA\Get(
+        summary: 'Get pgBackRest status',
+        description: 'Get pgBackRest configuration and status for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest',
+        operationId: 'get-database-pgbackrest',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'pgBackRest configuration and status',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean'),
+                        new OA\Property(property: 'retention_full', type: 'integer'),
+                        new OA\Property(property: 'retention_diff', type: 'integer'),
+                        new OA\Property(property: 'log_level', type: 'string'),
+                        new OA\Property(property: 'compress_type', type: 'string'),
+                        new OA\Property(property: 'compress_level', type: 'integer'),
+                        new OA\Property(property: 'container_running', type: 'boolean'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Database is not PostgreSQL',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function pgbackrest_status(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        $containerRunning = false;
+        if ($database->isPgbackrestEnabled()) {
+            try {
+                $server = $database->destination->server;
+                $containerName = $database->getPgbackrestContainerName();
+                $checkContainer = instant_remote_process(
+                    ["docker ps -q -f name=^/{$containerName}\$"],
+                    $server,
+                    false
+                );
+                $containerRunning = ! blank(trim($checkContainer));
+            } catch (\Exception $e) {
+                $containerRunning = false;
+            }
+        }
+
+        return response()->json([
+            'enabled' => $database->pgbackrest_enabled ?? false,
+            'retention_full' => $database->pgbackrest_retention_full ?? 2,
+            'retention_diff' => $database->pgbackrest_retention_diff ?? 7,
+            'log_level' => $database->pgbackrest_log_level ?? 'info',
+            'compress_type' => $database->pgbackrest_compress_type ?? 'lz4',
+            'compress_level' => $database->pgbackrest_compress_level ?? 6,
+            'container_running' => $containerRunning,
+        ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Update pgBackRest settings',
+        description: 'Update pgBackRest configuration for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest',
+        operationId: 'update-database-pgbackrest',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'pgBackRest settings',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'enabled' => ['type' => 'boolean', 'description' => 'Enable or disable pgBackRest'],
+                        'retention_full' => ['type' => 'integer', 'description' => 'Number of full backups to retain (1-100)'],
+                        'retention_diff' => ['type' => 'integer', 'description' => 'Number of differential backups to retain (1-100)'],
+                        'log_level' => ['type' => 'string', 'description' => 'Log level (off, error, warn, info, detail, debug, trace)'],
+                        'compress_type' => ['type' => 'string', 'description' => 'Compression type (none, bz2, gz, lz4, zst)'],
+                        'compress_level' => ['type' => 'integer', 'description' => 'Compression level (0-9)'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'pgBackRest settings updated',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'pgBackRest settings updated. Please restart the database to apply changes.'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Database is not PostgreSQL or validation failed',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function pgbackrest_update(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'enabled' => 'boolean',
+            'retention_full' => 'integer|min:1|max:100',
+            'retention_diff' => 'integer|min:1|max:100',
+            'log_level' => 'string|in:off,error,warn,info,detail,debug,trace',
+            'compress_type' => 'string|in:none,bz2,gz,lz4,zst',
+            'compress_level' => 'integer|min:0|max:9',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if ($request->has('enabled')) {
+            $database->pgbackrest_enabled = $request->boolean('enabled');
+        }
+        if ($request->has('retention_full')) {
+            $database->pgbackrest_retention_full = $request->input('retention_full');
+        }
+        if ($request->has('retention_diff')) {
+            $database->pgbackrest_retention_diff = $request->input('retention_diff');
+        }
+        if ($request->has('log_level')) {
+            $database->pgbackrest_log_level = $request->input('log_level');
+        }
+        if ($request->has('compress_type')) {
+            $database->pgbackrest_compress_type = $request->input('compress_type');
+        }
+        if ($request->has('compress_level')) {
+            $database->pgbackrest_compress_level = $request->input('compress_level');
+        }
+
+        $database->save();
+
+        return response()->json([
+            'message' => 'pgBackRest settings updated. Please restart the database to apply changes.',
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Initialize pgBackRest stanza',
+        description: 'Initialize the pgBackRest stanza for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest/stanza',
+        operationId: 'initialize-database-pgbackrest-stanza',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Stanza initialization queued',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Stanza initialization job queued.'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'pgBackRest not enabled or database not running',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function pgbackrest_stanza_create(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        if (! $database->isPgbackrestEnabled()) {
+            return response()->json(['message' => 'pgBackRest must be enabled first.'], 400);
+        }
+
+        $status = str($database->status);
+        if (! $status->startsWith('running')) {
+            return response()->json(['message' => 'Database must be running to initialize stanza.'], 400);
+        }
+
+        PgbackrestStanzaJob::dispatch($database, 'create');
+
+        return response()->json([
+            'message' => 'Stanza initialization job queued.',
+        ]);
+    }
+
+    #[OA\Get(
+        summary: 'List pgBackRest backups',
+        description: 'Get available pgBackRest backups for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest/backups',
+        operationId: 'list-database-pgbackrest-backups',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of pgBackRest backups',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'backups',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'label', type: 'string'),
+                                    new OA\Property(property: 'type', type: 'string'),
+                                    new OA\Property(property: 'size', type: 'integer'),
+                                    new OA\Property(property: 'size_formatted', type: 'string'),
+                                    new OA\Property(property: 'timestamp_start', type: 'integer'),
+                                    new OA\Property(property: 'timestamp_stop', type: 'integer'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'pgBackRest not enabled',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function pgbackrest_backups(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        if (! $database->isPgbackrestEnabled()) {
+            return response()->json(['message' => 'pgBackRest is not enabled for this database.'], 400);
+        }
+
+        $restoreAction = new RestoreFromPgbackrest;
+        $result = $restoreAction->getAvailableBackups($database);
+
+        if (! $result['success']) {
+            return response()->json([
+                'message' => $result['message'] ?? 'Failed to retrieve backups.',
+                'backups' => [],
+            ]);
+        }
+
+        return response()->json([
+            'backups' => $result['backups'],
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Trigger pgBackRest backup',
+        description: 'Trigger a manual pgBackRest backup for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest/backup',
+        operationId: 'trigger-database-pgbackrest-backup',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Backup options',
+            required: false,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'type' => ['type' => 'string', 'description' => 'Backup type: full, diff, or incr', 'default' => 'full'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Backup job queued',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'pgBackRest backup job queued.'),
+                        new OA\Property(property: 'backup_type', type: 'string', example: 'full'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'pgBackRest not enabled or database not running',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function pgbackrest_backup(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        if (! $database->isPgbackrestEnabled()) {
+            return response()->json(['message' => 'pgBackRest is not enabled for this database.'], 400);
+        }
+
+        $status = str($database->status);
+        if (! $status->startsWith('running')) {
+            return response()->json(['message' => 'Database must be running to perform a backup.'], 400);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'type' => 'string|in:full,diff,incr',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $backupType = $request->input('type', 'full');
+
+        $backup = ScheduledDatabaseBackup::create([
+            'enabled' => false,
+            'frequency' => '0 0 * * *',
+            'save_s3' => false,
+            'database_id' => $database->id,
+            'database_type' => $database->getMorphClass(),
+            'team_id' => $teamId,
+            'use_pgbackrest' => true,
+            'pgbackrest_backup_type' => $backupType,
+            'databases_to_backup' => $database->postgres_db,
+        ]);
+
+        PgbackrestBackupJob::dispatch($backup);
+
+        return response()->json([
+            'message' => 'pgBackRest backup job queued.',
+            'backup_type' => $backupType,
+        ]);
+    }
+
+    #[OA\Post(
+        summary: 'Restore from pgBackRest',
+        description: 'Trigger a restore from a pgBackRest backup. The database will be stopped, restored, and restarted.',
+        path: '/databases/{uuid}/pgbackrest/restore',
+        operationId: 'restore-database-pgbackrest',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Restore options',
+            required: false,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'backup_label' => ['type' => 'string', 'description' => 'Specific backup label to restore from (optional, defaults to latest)'],
+                        'restart_after' => ['type' => 'boolean', 'description' => 'Whether to restart the database after restore', 'default' => true],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restore job queued',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'pgBackRest restore job queued. The database will be stopped during restore and restarted automatically.'),
+                        new OA\Property(property: 'backup_label', type: 'string', example: 'latest'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'pgBackRest not enabled, database not stopped, or restore validation failed',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function pgbackrest_restore(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'pgBackRest is only available for PostgreSQL databases.'], 400);
+        }
+
+        if (! $database->isPgbackrestEnabled()) {
+            return response()->json(['message' => 'pgBackRest is not enabled for this database.'], 400);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'backup_label' => 'string|nullable',
+            'restart_after' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $backupLabel = $request->input('backup_label');
+        $restartAfter = $request->boolean('restart_after', true);
+
+        $restoreAction = new RestoreFromPgbackrest;
+        $validation = $restoreAction->validateRestore($database, $backupLabel);
+
+        if (! $validation['valid']) {
+            return response()->json(['message' => $validation['message']], 400);
+        }
+
+        PgbackrestRestoreJob::dispatch($database, $backupLabel, null, $restartAfter);
+
+        return response()->json([
+            'message' => 'pgBackRest restore job queued. The database will be stopped during restore and restarted automatically.',
+            'backup_label' => $backupLabel ?? 'latest',
+        ]);
     }
 }

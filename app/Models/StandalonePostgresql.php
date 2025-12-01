@@ -19,6 +19,7 @@ class StandalonePostgresql extends BaseModel
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
+        'pgbackrest_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -319,6 +320,31 @@ class StandalonePostgresql extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return true;
+    }
+
+    public function isPgbackrestEnabled(): bool
+    {
+        return (bool) $this->pgbackrest_enabled;
+    }
+
+    public function getPgbackrestStanzaName(): string
+    {
+        return 'db-'.$this->uuid;
+    }
+
+    public function getPgbackrestContainerName(): string
+    {
+        return $this->uuid.'-pgbackrest';
+    }
+
+    public function getPgbackrestConfigDir(): string
+    {
+        return $this->workdir().'/pgbackrest';
+    }
+
+    public function getPgbackrestRepoDir(): string
+    {
+        return $this->workdir().'/pgbackrest-repo';
     }
 
     public function getCpuMetrics(int $mins = 5)

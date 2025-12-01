@@ -10,6 +10,10 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'use_pgbackrest' => 'boolean',
+    ];
+
     public static function ownedByCurrentTeam()
     {
         return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');
@@ -79,5 +83,15 @@ class ScheduledDatabaseBackup extends BaseModel
         }
 
         return null;
+    }
+
+    public function isPgbackrestBackup(): bool
+    {
+        return (bool) $this->use_pgbackrest;
+    }
+
+    public function isPostgresqlDatabase(): bool
+    {
+        return $this->database_type === StandalonePostgresql::class;
     }
 }

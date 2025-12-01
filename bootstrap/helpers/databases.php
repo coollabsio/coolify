@@ -454,3 +454,162 @@ function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null):
 
     return false;
 }
+
+function isPgbackrestContainerRunning(StandalonePostgresql $database): bool
+{
+    $server = $database->destination->server ?? null;
+    if (! $server) {
+        return false;
+    }
+
+    $containerName = $database->getPgbackrestContainerName();
+    $nameFilter = '^/'.$containerName.'$';
+
+    $result = instant_remote_process(
+        ['docker ps -q -f name='.escapeshellarg($nameFilter)],
+        $server,
+        throwError: false,
+    );
+
+    return ! blank(trim($result));
+}
+
+function getPgbackrestInfo(StandalonePostgresql $database): ?array
+{
+    if (! $database->isPgbackrestEnabled()) {
+        return null;
+    }
+
+    $server = $database->destination->server ?? null;
+    if (! $server) {
+        return null;
+    }
+
+    $containerName = $database->getPgbackrestContainerName();
+    $stanzaName = $database->getPgbackrestStanzaName();
+
+    try {
+        $output = instant_remote_process(
+            ["docker exec {$containerName} pgbackrest --stanza={$stanzaName} info --output=json"],
+            $server,
+            throwError: false,
+        );
+
+        if (blank($output)) {
+            return null;
+        }
+
+        $info = json_decode($output, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($info)) {
+            return null;
+        }
+
+        return $info;
+    } catch (\Throwable) {
+        return null;
+    }
+}
+
+function getPgbackrestBackupList(StandalonePostgresql $database): Collection
+{
+    $info = getPgbackrestInfo($database);
+
+    if (empty($info) || ! isset($info[0]['backup']) || ! is_array($info[0]['backup'])) {
+        return collect();
+    }
+
+    return collect($info[0]['backup'])->map(function ($backup) {
+        $dbList = [];
+        if (isset($backup['database']) && is_array($backup['database'])) {
+            $dbList = array_values(array_filter(array_column($backup['database'], 'name')));
+        }
+
+        $size = (int) ($backup['info']['size'] ?? 0);
+        $repoSize = (int) ($backup['info']['repository']['size'] ?? 0);
+
+        return [
+            'label' => $backup['label'] ?? null,
+            'type' => $backup['type'] ?? null,
+            'size' => $size,
+            'size_formatted' => formatBytes($size),
+            'repository_size' => $repoSize,
+            'repository_size_formatted' => formatBytes($repoSize),
+            'timestamp_start' => $backup['timestamp']['start'] ?? null,
+            'timestamp_stop' => $backup['timestamp']['stop'] ?? null,
+            'started_at' => isset($backup['timestamp']['start']) ? \Carbon\Carbon::createFromTimestamp($backup['timestamp']['start']) : null,
+            'finished_at' => isset($backup['timestamp']['stop']) ? \Carbon\Carbon::createFromTimestamp($backup['timestamp']['stop']) : null,
+            'database_list' => $dbList,
+            'prior' => $backup['prior'] ?? null,
+        ];
+    })->reverse()->values();
+}
+
+function getPgbackrestLatestBackup(StandalonePostgresql $database): ?array
+{
+    $backups = getPgbackrestBackupList($database);
+
+    return $backups->first();
+}
+
+function getPgbackrestBackupByLabel(StandalonePostgresql $database, string $label): ?array
+{
+    $backups = getPgbackrestBackupList($database);
+
+    return $backups->firstWhere('label', $label);
+}
+
+function getPgbackrestStanzaStatus(StandalonePostgresql $database): array
+{
+    if (! $database->isPgbackrestEnabled()) {
+        return ['status' => 'disabled', 'message' => 'pgBackRest is not enabled'];
+    }
+
+    if (! isPgbackrestContainerRunning($database)) {
+        return ['status' => 'container_stopped', 'message' => 'pgBackRest container is not running'];
+    }
+
+    $info = getPgbackrestInfo($database);
+
+    if ($info === null) {
+        return ['status' => 'error', 'message' => 'Failed to get pgBackRest info'];
+    }
+
+    if (empty($info) || ! isset($info[0]) || ! is_array($info[0])) {
+        return ['status' => 'no_stanza', 'message' => 'No stanza configured'];
+    }
+
+    $stanzaInfo = $info[0];
+    $status = $stanzaInfo['status'] ?? [];
+
+    if (isset($status['code']) && $status['code'] !== 0) {
+        return [
+            'status' => 'error',
+            'message' => $status['message'] ?? 'Unknown error',
+            'code' => $status['code'],
+        ];
+    }
+
+    $backupCount = count($stanzaInfo['backup'] ?? []);
+
+    return [
+        'status' => 'ok',
+        'message' => "Stanza is healthy with {$backupCount} backup(s)",
+        'backup_count' => $backupCount,
+        'cipher' => $stanzaInfo['cipher'] ?? 'none',
+    ];
+}
+
+function calculatePgbackrestTotalSize(StandalonePostgresql $database): int
+{
+    return getPgbackrestBackupList($database)->sum('repository_size');
+}
+
+function formatPgbackrestBackupType(string $type): string
+{
+    return match ($type) {
+        'full' => 'Full',
+        'diff' => 'Differential',
+        'incr' => 'Incremental',
+        default => ucfirst($type),
+    };
+}

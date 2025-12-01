@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\StandalonePostgresql;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -82,12 +83,25 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $usePgbackrest = false;
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $pgbackrestBackupType = 'full';
+
+    public bool $pgbackrestAvailable = false;
+
     public function mount()
     {
         try {
             $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
+
+            $database = $this->backup->database;
+            if ($database instanceof StandalonePostgresql && $database->isPgbackrestEnabled()) {
+                $this->pgbackrestAvailable = true;
+            }
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -129,6 +143,8 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->use_pgbackrest = $this->usePgbackrest && $this->pgbackrestAvailable;
+            $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -147,6 +163,8 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->usePgbackrest = $this->backup->use_pgbackrest ?? false;
+            $this->pgbackrestBackupType = $this->backup->pgbackrest_backup_type ?? 'full';
         }
     }
 

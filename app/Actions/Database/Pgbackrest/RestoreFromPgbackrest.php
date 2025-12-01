@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Actions\Database\Pgbackrest;
+
+use App\Models\StandalonePostgresql;
+use Lorisleiva\Actions\Concerns\AsAction;
+
+class RestoreFromPgbackrest
+{
+    use AsAction;
+
+    public function handle(
+        StandalonePostgresql $database,
+        ?string $backupLabel = null,
+        ?string $targetTime = null,
+        ?string $targetDatabase = null
+    ): array {
+        if (! $database->isPgbackrestEnabled()) {
+            return ['success' => false, 'message' => 'pgBackRest is not enabled'];
+        }
+
+        if (! isPgbackrestContainerRunning($database)) {
+            return ['success' => false, 'message' => 'pgBackRest container is not running'];
+        }
+
+        $containerName = $database->getPgbackrestContainerName();
+        $stanzaName = $database->getPgbackrestStanzaName();
+
+        $restoreCommand = $this->buildRestoreCommand($stanzaName, $backupLabel, $targetTime, $targetDatabase);
+
+        return [
+            'success' => true,
+            'command' => $restoreCommand,
+            'container' => $containerName,
+            'stanza' => $stanzaName,
+        ];
+    }
+
+    private function buildRestoreCommand(
+        string $stanzaName,
+        ?string $backupLabel = null,
+        ?string $targetTime = null,
+        ?string $targetDatabase = null
+    ): string {
+        $command = 'pgbackrest --stanza='.escapeshellarg($stanzaName);
+
+        if ($backupLabel) {
+            $command .= ' --set='.escapeshellarg($backupLabel);
+        }
+
+        if ($targetTime) {
+            $command .= ' --type=time --target='.escapeshellarg($targetTime);
+        }
+
+        if ($targetDatabase) {
+            $command .= ' --db-include='.escapeshellarg($targetDatabase);
+        }
+
+        $command .= ' --delta restore';
+
+        return $command;
+    }
+
+    public function getAvailableBackups(StandalonePostgresql $database): array
+    {
+        if (! $database->isPgbackrestEnabled()) {
+            return ['success' => false, 'message' => 'pgBackRest is not enabled', 'backups' => []];
+        }
+
+        if (! isPgbackrestContainerRunning($database)) {
+            return ['success' => false, 'message' => 'pgBackRest container is not running', 'backups' => []];
+        }
+
+        $backups = getPgbackrestBackupList($database)->toArray();
+
+        return ['success' => true, 'backups' => $backups];
+    }
+
+    public function validateRestore(StandalonePostgresql $database, ?string $backupLabel = null): array
+    {
+        if (! $database->isPgbackrestEnabled()) {
+            return ['valid' => false, 'message' => 'pgBackRest is not enabled'];
+        }
+
+        $status = str($database->status);
+        if ($status->startsWith('running')) {
+            return [
+                'valid' => false,
+                'message' => 'Database must be stopped before restore. Please stop the database first.',
+            ];
+        }
+
+        if ($backupLabel) {
+            $backup = getPgbackrestBackupByLabel($database, $backupLabel);
+
+            if (! $backup) {
+                return ['valid' => false, 'message' => "Backup with label '{$backupLabel}' not found"];
+            }
+        }
+
+        return ['valid' => true, 'message' => 'Restore can proceed'];
+    }
+}
