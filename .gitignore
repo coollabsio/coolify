@@ -2,7 +2,7 @@
 .env.*
 !.env.testing
 !.env.example
-!.env.development.example
+!.env.local.example
 !.env.production.example
 
 .bash_history
@@ -13,17 +13,24 @@
 node_modules
 /vendor
 
+*.log
+
+.ai
+CLAUDE.md
 /.cursor
 /.fleet
 /.idea
+/.junie
 /.nova
 /.vscode
+/.windsurfrules
 /.zed
-
-*.log
 
 .DS_Store
 Thumbs.db
+
+*.swo
+*.swp
 
 *.sqlite*
 
@@ -35,9 +42,10 @@ Thumbs.db
 Homestead.json
 Homestead.yaml
 
-/public/build/
-/public/hot/
-/public/storage/
+/public/build
+/public/hot
+/public/storage
+/public/vendor
 
 /storage/**
 !/storage/app
