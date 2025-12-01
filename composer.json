@@ -26,7 +26,6 @@
         "laravel/pint": "^1.26.0",
         "mockery/mockery": "^1.6.12",
         "nunomaduro/collision": "^8.8.3",
-        "peckphp/peck": "^0.2.0",
         "pestphp/pest": "^4.1.6",
         "pestphp/pest-plugin-laravel": "^4.0.0",
         "pestphp/pest-plugin-type-coverage": "^4.0.3",
