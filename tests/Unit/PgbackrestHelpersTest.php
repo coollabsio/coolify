@@ -5,7 +5,6 @@ use App\Models\StandalonePostgresql;
 beforeEach(function () {
     $this->database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $this->database->shouldReceive('isPgbackrestEnabled')->andReturn(true);
-    $this->database->shouldReceive('getPgbackrestContainerName')->andReturn('test-uuid-pgbackrest');
     $this->database->shouldReceive('getPgbackrestStanzaName')->andReturn('db-test-uuid');
 });
 
@@ -41,13 +40,13 @@ it('getPgbackrestInfo returns null when server is null', function () {
     expect(getPgbackrestInfo($this->database))->toBeNull();
 });
 
-it('isPgbackrestContainerRunning returns false when server is null', function () {
+it('isPostgresContainerRunning returns false when server is null', function () {
     $destination = new stdClass;
     $destination->server = null;
 
     $this->database->destination = $destination;
 
-    expect(isPgbackrestContainerRunning($this->database))->toBeFalse();
+    expect(isPostgresContainerRunning($this->database))->toBeFalse();
 });
 
 it('getPgbackrestBackupList returns empty collection when info is null', function () {

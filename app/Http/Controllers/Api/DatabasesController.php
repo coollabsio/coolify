@@ -2830,14 +2830,7 @@ class DatabasesController extends Controller
         $containerRunning = false;
         if ($database->isPgbackrestEnabled()) {
             try {
-                $server = $database->destination->server;
-                $containerName = $database->getPgbackrestContainerName();
-                $checkContainer = instant_remote_process(
-                    ["docker ps -q -f name=^/{$containerName}\$"],
-                    $server,
-                    false
-                );
-                $containerRunning = ! blank(trim($checkContainer));
+                $containerRunning = isPostgresContainerRunning($database);
             } catch (\Exception $e) {
                 $containerRunning = false;
             }

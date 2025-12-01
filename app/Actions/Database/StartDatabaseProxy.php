@@ -52,8 +52,9 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = database_proxy_dir($database->uuid);
+        $host_configuration_dir = $configuration_dir;
         if (isDev()) {
-            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+            $host_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
         $nginxconf = <<<EOF
     user  nginx;
@@ -86,7 +87,7 @@ class StartDatabaseProxy
                     'volumes' => [
                         [
                             'type' => 'bind',
-                            'source' => "$configuration_dir/nginx.conf",
+                            'source' => "$host_configuration_dir/nginx.conf",
                             'target' => '/etc/nginx/nginx.conf',
                         ],
                     ],

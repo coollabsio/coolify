@@ -34,7 +34,6 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         $server = $this->database->destination->server;
-        $containerName = $this->database->getPgbackrestContainerName();
         $postgresContainer = $this->database->uuid;
         $stanzaName = $this->database->getPgbackrestStanzaName();
 
@@ -52,22 +51,12 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             ];
             instant_remote_process($stopCommands, $server, false);
 
-            $pgDataVolume = $this->getPostgresDataVolumeName();
-            $restoreContainerName = "pgbackrest-restore-{$this->database->uuid}";
-
             $restoreCommand = $this->buildRestoreCommand($stanzaName);
 
             $commands = [
-                "docker stop {$restoreContainerName} 2>/dev/null || true",
-                "docker rm -f {$restoreContainerName} 2>/dev/null || true",
-                "docker run --rm --name {$restoreContainerName} ".
-                    "--network {$this->database->destination->network} ".
-                    "-v {$this->database->getPgbackrestConfigDir()}/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro ".
-                    "-v {$this->database->getPgbackrestRepoDir()}:/var/lib/pgbackrest ".
-                    "-v {$pgDataVolume}:/var/lib/postgresql/data ".
-                    '-e PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf '.
-                    config('constants.pgbackrest.image').':'.config('constants.pgbackrest.version').' '.
-                    $restoreCommand,
+                "docker start {$postgresContainer}",
+                "sleep 2",
+                "docker exec {$postgresContainer} {$restoreCommand}",
             ];
 
             $output = instant_remote_process($commands, $server);
@@ -84,7 +73,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
                 $this->database->update(['status' => 'exited']);
             }
 
-            $team = $this->database->team();
+            $team = $this->database->team;
             $team?->notify(new PgbackrestRestoreSuccess($this->database, $this->backupLabel));
 
         } catch (\Throwable $e) {
@@ -95,7 +84,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->database->update(['status' => 'error']);
 
-            $team = $this->database->team();
+            $team = $this->database->team;
             $team?->notify(new PgbackrestRestoreFailed($this->database, $e->getMessage(), $this->backupLabel));
 
             throw $e;
@@ -112,24 +101,13 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($this->targetTime) {
             $command .= ' --type=time --target='.escapeshellarg($this->targetTime);
+        } else {
+            $command .= ' --type=immediate';
         }
 
-        $command .= ' --delta --link-all restore';
+        $command .= ' --target-action=promote --delta --link-all restore';
 
         return $command;
-    }
-
-    private function getPostgresDataVolumeName(): string
-    {
-        $persistentStorage = $this->database->persistentStorages()
-            ->where('mount_path', '/var/lib/postgresql/data')
-            ->first();
-
-        if ($persistentStorage && $persistentStorage->host_path) {
-            return $persistentStorage->host_path;
-        }
-
-        return $persistentStorage?->name ?? "postgres-data-{$this->database->uuid}";
     }
 
     public function failed(\Throwable $exception): void

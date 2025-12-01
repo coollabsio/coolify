@@ -8,7 +8,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 beforeEach(function () {
     $this->database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $this->database->shouldReceive('isPgbackrestEnabled')->andReturn(true);
-    $this->database->shouldReceive('getPgbackrestContainerName')->andReturn('test-uuid-pgbackrest');
     $this->database->shouldReceive('getPgbackrestStanzaName')->andReturn('db-test-uuid');
 });
 

@@ -22,13 +22,6 @@ it('getPgbackrestStanzaName returns correct format', function () {
     expect($database->getPgbackrestStanzaName())->toBe('db-abc123xyz');
 });
 
-it('getPgbackrestContainerName returns correct format', function () {
-    $database = new StandalonePostgresql;
-    $database->setRawAttributes(['uuid' => 'abc123xyz']);
-
-    expect($database->getPgbackrestContainerName())->toBe('abc123xyz-pgbackrest');
-});
-
 it('getPgbackrestConfigDir returns path based on workdir', function () {
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('workdir')->andReturn('/data/coolify/databases/abc123xyz');

@@ -12,7 +12,6 @@ class GeneratePgbackrestConfig
     public function handle(StandalonePostgresql $database): string
     {
         $stanzaName = $database->getPgbackrestStanzaName();
-        $postgresContainer = $database->uuid;
 
         $retentionFull = $database->pgbackrest_retention_full ?? config('constants.pgbackrest.default_retention_full', 2);
         $retentionDiff = $database->pgbackrest_retention_diff ?? config('constants.pgbackrest.default_retention_diff', 7);
@@ -38,22 +37,22 @@ class GeneratePgbackrestConfig
         $config[] = '';
         $config[] = "[{$stanzaName}]";
         $config[] = 'pg1-path=/var/lib/postgresql/data';
-        $config[] = "pg1-host={$postgresContainer}";
+        $config[] = 'pg1-socket-path=/var/run/postgresql';
         $config[] = 'pg1-port=5432';
-        $config[] = "pg1-database={$database->postgres_db}";
         $config[] = "pg1-user={$database->postgres_user}";
+        $config[] = "pg1-database={$database->postgres_db}";
 
         return implode("\n", $config);
     }
 
     public function generatePostgresConfig(StandalonePostgresql $database): array
     {
-        $walArchivePath = '/var/lib/postgresql/wal_archive';
+        $stanzaName = $database->getPgbackrestStanzaName();
 
         return [
             'wal_level' => 'replica',
             'archive_mode' => 'on',
-            'archive_command' => "test ! -f {$walArchivePath}/%f && cp %p {$walArchivePath}/%f",
+            'archive_command' => "pgbackrest --stanza={$stanzaName} archive-push %p",
             'archive_timeout' => '60',
         ];
     }

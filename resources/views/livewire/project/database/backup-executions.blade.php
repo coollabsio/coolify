@@ -154,25 +154,46 @@
                             <pre class="whitespace-pre-wrap text-sm">{{ data_get($execution, 'message') }}</pre>
                         </div>
                     @endif
+                    @php
+                        $isPgbackrestBackup = str_starts_with(data_get($execution, 'filename', ''), 'pgbackrest:');
+                    @endphp
                     <div class="flex gap-2 mt-4">
                         @if (data_get($execution, 'status') === 'success')
-                            <x-forms.button class="dark:hover:bg-coolgray-400"
-                                x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
+                            @if ($isPgbackrestBackup)
+                                <x-forms.button class="dark:hover:bg-coolgray-400"
+                                    wire:click="restoreFromPgbackrest('{{ data_get($execution, 'id') }}')">Restore</x-forms.button>
+                            @else
+                                <x-forms.button class="dark:hover:bg-coolgray-400"
+                                    x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
+                            @endif
                         @endif
                         @php
                             $executionCheckboxes = [];
                             $deleteActions = [];
+                            $pgbackrestDeletable = null;
 
-                            if (!data_get($execution, 'local_storage_deleted', false)) {
-                                $deleteActions[] = 'This backup will be permanently deleted from local storage.';
-                            }
+                            if ($isPgbackrestBackup) {
+                                $pgbackrestDeletable = $this->isPgbackrestBackupDeletableFromRepo(data_get($execution, 'id'));
+                                
+                                if ($pgbackrestDeletable['deletable']) {
+                                    $deleteActions[] = 'This will remove the backup entry from this list.';
+                                    $executionCheckboxes[] = ['id' => 'delete_pgbackrest_repo', 'label' => 'Also delete the backup data from pgBackRest repository (this is the most recent backup and can be safely deleted)'];
+                                } else {
+                                    $deleteActions[] = 'This will only remove the backup entry from this list.';
+                                    $deleteActions[] = 'The actual backup data in pgBackRest cannot be deleted because other backups depend on it.';
+                                }
+                            } else {
+                                if (!data_get($execution, 'local_storage_deleted', false)) {
+                                    $deleteActions[] = 'This backup will be permanently deleted from local storage.';
+                                }
 
-                            if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
-                                $executionCheckboxes[] = ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'];
-                            }
+                                if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
+                                    $executionCheckboxes[] = ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'];
+                                }
 
-                            if (empty($deleteActions)) {
-                                $deleteActions[] = 'This backup execution record will be deleted.';
+                                if (empty($deleteActions)) {
+                                    $deleteActions[] = 'This backup execution record will be deleted.';
+                                }
                             }
                         @endphp
                         <x-modal-confirmation title="Confirm Backup Deletion?" buttonTitle="Delete" isErrorButton

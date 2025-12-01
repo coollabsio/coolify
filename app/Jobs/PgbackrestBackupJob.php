@@ -37,6 +37,10 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $backup_log_uuid = null;
 
+    private string $stanzaName;
+
+    private string $containerName;
+
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
@@ -67,6 +71,9 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
             if (! $this->database->isPgbackrestEnabled()) {
                 throw new \Exception('pgBackRest is not enabled for this database');
             }
+
+            $this->stanzaName = $this->database->getPgbackrestStanzaName();
+            $this->containerName = $this->database->uuid;
 
             BackupCreated::dispatch($this->team->id);
 
@@ -107,25 +114,24 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
         } while ($exists);
 
         $backupType = $this->backup->pgbackrest_backup_type ?? 'full';
-        $stanzaName = $this->database->getPgbackrestStanzaName();
-        $containerName = $this->database->getPgbackrestContainerName();
 
         $this->backup_log = ScheduledDatabaseBackupExecution::create([
             'uuid' => $this->backup_log_uuid,
             'database_name' => $this->database->postgres_db,
-            'filename' => "pgbackrest:{$stanzaName}:{$backupType}",
+            'filename' => "pgbackrest:{$this->stanzaName}:{$backupType}",
             'scheduled_database_backup_id' => $this->backup->id,
+            'status' => 'running',
             'local_storage_deleted' => false,
         ]);
 
         try {
-            if (! isPgbackrestContainerRunning($this->database)) {
-                throw new \Exception('pgBackRest container is not running');
+            if (! $this->database->isPgbackrestEnabled()) {
+                throw new \Exception('pgBackRest is not enabled for this database');
             }
 
-            $backupCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --type={$backupType} backup";
+            $this->assertPostgresReadyForPgbackrest();
 
-            $output = instant_remote_process([$backupCommand], $this->server);
+            $output = $this->runPgbackrestBackupWithRetries($backupType);
 
             $lastBackup = getPgbackrestLatestBackup($this->database) ?? [];
 
@@ -133,6 +139,7 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'status' => 'success',
                 'message' => $output,
                 'size' => $lastBackup['size'] ?? 0,
+                'pgbackrest_label' => $lastBackup['label'] ?? null,
                 'finished_at' => Carbon::now()->toImmutable(),
             ]);
 
@@ -146,5 +153,147 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             throw $e;
         }
+    }
+
+    private function assertPostgresReadyForPgbackrest(): void
+    {
+        $user = $this->database->postgres_user;
+        $db = $this->database->postgres_db;
+
+        $checkCommand = "docker exec {$this->containerName} psql -U {$user} -d {$db} -A -t -F '|' -c \"SELECT name, setting, pending_restart FROM pg_settings WHERE name IN ('archive_mode','wal_level');\"";
+
+        $output = instant_remote_process([$checkCommand], $this->server, throwError: false);
+        $output = trim($output ?? '');
+
+        if ($output === '' || str_contains($output, 'psql:')) {
+            throw new \Exception(
+                "Unable to verify PostgreSQL configuration for pgBackRest. ".
+                "Check that the container is running and 'psql' is available."
+            );
+        }
+
+        $settings = [
+            'archive_mode' => null,
+            'wal_level' => null,
+        ];
+        $pendingRestart = [
+            'archive_mode' => false,
+            'wal_level' => false,
+        ];
+
+        foreach (preg_split('/\r\n|\r|\n/', $output) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            [$name, $setting, $pending] = array_pad(explode('|', $line), 3, null);
+            if (array_key_exists($name, $settings)) {
+                $settings[$name] = $setting;
+                $pendingRestart[$name] = ($pending === 't');
+            }
+        }
+        $archiveOk = ($settings['archive_mode'] === 'on');
+        $walLevelOk = in_array($settings['wal_level'], ['replica', 'logical'], true);
+
+        if ($archiveOk && $walLevelOk) {
+            return;
+        }
+
+        $msg = "PostgreSQL is not correctly configured for pgBackRest:\n";
+        $msg .= "- archive_mode: got '{$settings['archive_mode']}', expected 'on'";
+        if ($pendingRestart['archive_mode']) {
+            $msg .= ' (change pending restart)';
+        }
+        $msg .= "\n- wal_level: got '{$settings['wal_level']}', expected 'replica' or 'logical'";
+        if ($pendingRestart['wal_level']) {
+            $msg .= ' (change pending restart)';
+        }
+
+        if ($pendingRestart['archive_mode'] || $pendingRestart['wal_level']) {
+            $msg .= "\n\nPostgreSQL reports that configuration changes are pending restart. ";
+            $msg .= 'This usually happens when pgBackRest was enabled on a running database. ';
+            $msg .= "Please restart the database from the Coolify UI so that 'archive_mode=on' and 'wal_level=replica' take effect, then retry the backup.";
+        } else {
+            $msg .= "\n\nNo pending restart is reported. Please ensure that pgBackRest is enabled ";
+            $msg .= "for this database and that the generated 'custom-postgres.conf' is being used. ";
+            $msg .= 'After adjusting configuration, restart the database and retry the backup.';
+        }
+
+        throw new \Exception($msg);
+    }
+
+    private function runPgbackrestBackupWithRetries(string $backupType): string
+    {
+        $maxAttempts = 3;
+        $baseDelaySeconds = 30;
+
+        $lastOutput = '';
+        $lastExitCode = 0;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $backupCommand = "set +e; docker exec {$this->containerName} pgbackrest --stanza={$this->stanzaName} --type={$backupType} backup 2>&1; EXIT_CODE=\$?; set -e; echo \"EXIT_CODE:\${EXIT_CODE}\"";
+
+            $output = instant_remote_process([$backupCommand], $this->server, throwError: false);
+
+            $exitCode = 0;
+            if (preg_match('/EXIT_CODE:(\d+)$/', $output, $matches)) {
+                $exitCode = (int) $matches[1];
+                $output = preg_replace('/EXIT_CODE:\d+$/', '', $output);
+            }
+
+            $lastOutput = trim($output);
+            $lastExitCode = $exitCode;
+
+            if ($exitCode === 0) {
+                return $lastOutput;
+            }
+
+            if ($this->isConfigurationError($exitCode, $lastOutput)) {
+                $this->throwConfigurationError($exitCode, $lastOutput);
+            }
+
+            if ($attempt < $maxAttempts) {
+                sleep($baseDelaySeconds * $attempt);
+
+                continue;
+            }
+        }
+
+        $this->throwBackupFailure($lastExitCode, $lastOutput);
+    }
+
+    private function isConfigurationError(int $exitCode, string $output): bool
+    {
+        if ($exitCode === 87) {
+            return true;
+        }
+
+        return str_contains($output, 'archive_mode must be enabled')
+            || str_contains($output, 'wal_level must be at least replica');
+    }
+
+    private function throwConfigurationError(int $exitCode, string $output): void
+    {
+        $message = "pgBackRest backup failed with exit code {$exitCode} due to PostgreSQL configuration.\n\n";
+        $message .= "pgBackRest reported that 'archive_mode' and/or 'wal_level' are not correctly set.\n";
+        $message .= "This usually means the database was running before pgBackRest was enabled and has not been restarted.\n";
+        $message .= "Please restart the database from the Coolify UI (so that 'archive_mode=on' and 'wal_level=replica' take effect) ";
+        $message .= "and then retry the backup.\n\n";
+        $message .= "--- Command Output ---\n{$output}\n";
+
+        throw new \Exception($message);
+    }
+
+    private function throwBackupFailure(int $exitCode, string $output): void
+    {
+        $logCommand = "docker exec {$this->containerName} cat /var/log/pgbackrest/{$this->stanzaName}-backup.log 2>/dev/null | tail -100";
+        $logOutput = instant_remote_process([$logCommand], $this->server, throwError: false);
+
+        $errorMessage = "pgBackRest backup failed with exit code {$exitCode} after multiple attempts.\n\n";
+        $errorMessage .= "--- Command Output ---\n{$output}\n\n";
+        if (! empty($logOutput)) {
+            $errorMessage .= "--- pgBackRest Log ---\n{$logOutput}";
+        }
+
+        throw new \Exception($errorMessage);
     }
 }

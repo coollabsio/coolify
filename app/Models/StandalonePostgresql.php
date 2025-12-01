@@ -332,11 +332,6 @@ class StandalonePostgresql extends BaseModel
         return 'db-'.$this->uuid;
     }
 
-    public function getPgbackrestContainerName(): string
-    {
-        return $this->uuid.'-pgbackrest';
-    }
-
     public function getPgbackrestConfigDir(): string
     {
         $baseDir = $this->workdir();

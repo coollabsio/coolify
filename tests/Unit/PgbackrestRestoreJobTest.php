@@ -7,7 +7,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 beforeEach(function () {
     $this->database = Mockery::mock(StandalonePostgresql::class)->makePartial();
-    $this->database->shouldReceive('getPgbackrestContainerName')->andReturn('test-uuid-pgbackrest');
     $this->database->shouldReceive('getPgbackrestStanzaName')->andReturn('db-test-uuid');
 });
 
@@ -58,4 +57,45 @@ it('can disable restart after restore', function () {
     $job = new PgbackrestRestoreJob($this->database, null, null, false);
 
     expect($job->restartAfter)->toBeFalse();
+});
+
+it('buildRestoreCommand includes type=immediate when no target time', function () {
+    $job = new PgbackrestRestoreJob($this->database, 'backup-label');
+
+    $reflection = new ReflectionClass($job);
+    $method = $reflection->getMethod('buildRestoreCommand');
+    $method->setAccessible(true);
+
+    $command = $method->invoke($job, 'db-test-uuid');
+
+    expect($command)->toContain('--type=immediate');
+    expect($command)->toContain('--target-action=promote');
+    expect($command)->toContain('--delta');
+    expect($command)->toContain('--link-all');
+});
+
+it('buildRestoreCommand includes type=time when target time is provided', function () {
+    $job = new PgbackrestRestoreJob($this->database, 'backup-label', '2024-12-01 12:00:00');
+
+    $reflection = new ReflectionClass($job);
+    $method = $reflection->getMethod('buildRestoreCommand');
+    $method->setAccessible(true);
+
+    $command = $method->invoke($job, 'db-test-uuid');
+
+    expect($command)->toContain('--type=time');
+    expect($command)->toContain("--target='2024-12-01 12:00:00'");
+    expect($command)->not->toContain('--type=immediate');
+});
+
+it('buildRestoreCommand includes backup label when provided', function () {
+    $job = new PgbackrestRestoreJob($this->database, 'my-backup-20241201');
+
+    $reflection = new ReflectionClass($job);
+    $method = $reflection->getMethod('buildRestoreCommand');
+    $method->setAccessible(true);
+
+    $command = $method->invoke($job, 'db-test-uuid');
+
+    expect($command)->toContain("--set='my-backup-20241201'");
 });

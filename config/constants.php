@@ -60,8 +60,6 @@ return [
     ],
 
     'pgbackrest' => [
-        'image' => env('PGBACKREST_IMAGE', 'woblerr/pgbackrest'),
-        'version' => env('PGBACKREST_VERSION', '2.57.0'),
         'default_retention_full' => 2,
         'default_retention_diff' => 7,
         'default_log_level' => 'info',

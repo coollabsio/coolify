@@ -19,11 +19,7 @@ class RestoreFromPgbackrest
             return ['success' => false, 'message' => 'pgBackRest is not enabled'];
         }
 
-        if (! isPgbackrestContainerRunning($database)) {
-            return ['success' => false, 'message' => 'pgBackRest container is not running'];
-        }
-
-        $containerName = $database->getPgbackrestContainerName();
+        $containerName = $database->uuid;
         $stanzaName = $database->getPgbackrestStanzaName();
 
         $restoreCommand = $this->buildRestoreCommand($stanzaName, $backupLabel, $targetTime, $targetDatabase);
@@ -50,13 +46,15 @@ class RestoreFromPgbackrest
 
         if ($targetTime) {
             $command .= ' --type=time --target='.escapeshellarg($targetTime);
+        } else {
+            $command .= ' --type=immediate';
         }
 
         if ($targetDatabase) {
             $command .= ' --db-include='.escapeshellarg($targetDatabase);
         }
 
-        $command .= ' --delta restore';
+        $command .= ' --target-action=promote --delta restore';
 
         return $command;
     }
@@ -67,8 +65,8 @@ class RestoreFromPgbackrest
             return ['success' => false, 'message' => 'pgBackRest is not enabled', 'backups' => []];
         }
 
-        if (! isPgbackrestContainerRunning($database)) {
-            return ['success' => false, 'message' => 'pgBackRest container is not running', 'backups' => []];
+        if (! isPostgresContainerRunning($database)) {
+            return ['success' => false, 'message' => 'PostgreSQL container is not running', 'backups' => []];
         }
 
         $backups = getPgbackrestBackupList($database)->toArray();
@@ -88,14 +86,6 @@ class RestoreFromPgbackrest
                 'valid' => false,
                 'message' => 'Database must be stopped before restore. Please stop the database first.',
             ];
-        }
-
-        if ($backupLabel) {
-            $backup = getPgbackrestBackupByLabel($database, $backupLabel);
-
-            if (! $backup) {
-                return ['valid' => false, 'message' => "Backup with label '{$backupLabel}' not found"];
-            }
         }
 
         return ['valid' => true, 'message' => 'Restore can proceed'];

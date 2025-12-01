@@ -2,8 +2,13 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Actions\Database\Pgbackrest\RestoreFromPgbackrest;
+use App\Jobs\PgbackrestRestoreJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\StandalonePostgresql;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +16,8 @@ use Livewire\Component;
 
 class BackupExecutions extends Component
 {
+    use AuthorizesRequests;
+
     public ?ScheduledDatabaseBackup $backup = null;
 
     public $database;
@@ -34,6 +41,8 @@ class BackupExecutions extends Component
     public $delete_backup_s3 = false;
 
     public $delete_backup_sftp = false;
+
+    public $delete_pgbackrest_repo = false;
 
     public function getListeners()
     {
@@ -89,16 +98,43 @@ class BackupExecutions extends Component
             : $execution->scheduledDatabaseBackup->database->destination->server;
 
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $server);
+            $filename = $execution->filename ?? null;
+            $isPgbackrest = is_string($filename) && str_starts_with($filename, 'pgbackrest:');
+
+            if ($filename && ! $isPgbackrest) {
+                deleteBackupsLocally($filename, $server);
 
                 if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+                    deleteBackupsS3($filename, $execution->scheduledDatabaseBackup->s3);
+                }
+            }
+
+            if ($isPgbackrest && $this->delete_pgbackrest_repo) {
+                $database = $this->database;
+                if ($database instanceof StandalonePostgresql) {
+                    $backupLabel = $this->findBackupLabelForExecution($database, $execution);
+                    if ($backupLabel) {
+                        $deleteResult = deletePgbackrestBackup($database, $backupLabel);
+                        if (! $deleteResult['success']) {
+                            $this->dispatch('error', $deleteResult['message']);
+
+                            return;
+                        }
+                    }
                 }
             }
 
             $execution->delete();
-            $this->dispatch('success', 'Backup deleted.');
+
+            if ($isPgbackrest) {
+                if ($this->delete_pgbackrest_repo) {
+                    $this->dispatch('success', 'Backup deleted from pgBackRest repository and entry removed.');
+                } else {
+                    $this->dispatch('success', 'Backup entry removed. Note: The actual backup data is managed by pgBackRest retention policies.');
+                }
+            } else {
+                $this->dispatch('success', 'Backup deleted.');
+            }
             $this->refreshBackupExecutions();
         } catch (\Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
@@ -108,6 +144,101 @@ class BackupExecutions extends Component
     public function download_file($exeuctionId)
     {
         return redirect()->route('download.backup', $exeuctionId);
+    }
+
+    public function restoreFromPgbackrest(int $executionId): void
+    {
+        $execution = ScheduledDatabaseBackupExecution::find($executionId);
+
+        if (! $execution) {
+            $this->dispatch('error', 'Backup execution not found.');
+
+            return;
+        }
+
+        $database = $this->database;
+
+        if (! $database instanceof StandalonePostgresql) {
+            $this->dispatch('error', 'pgBackRest restore is only available for PostgreSQL databases.');
+
+            return;
+        }
+
+        $this->authorize('update', $database);
+
+        if (! $database->isPgbackrestEnabled()) {
+            $this->dispatch('error', 'pgBackRest is not enabled for this database.');
+
+            return;
+        }
+
+        $filename = $execution->filename;
+        if (! str_starts_with($filename, 'pgbackrest:')) {
+            $this->dispatch('error', 'This is not a pgBackRest backup.');
+
+            return;
+        }
+
+        $backupLabel = $execution->pgbackrest_label;
+
+        if (empty($backupLabel)) {
+            $this->dispatch('error', 'This backup does not have a pgBackRest label stored. It may be from an older version.');
+
+            return;
+        }
+
+        $restoreAction = new RestoreFromPgbackrest;
+        $validation = $restoreAction->validateRestore($database, $backupLabel);
+
+        if (! $validation['valid']) {
+            $this->dispatch('error', $validation['message']);
+
+            return;
+        }
+
+        try {
+            PgbackrestRestoreJob::dispatch($database, $backupLabel, null, true);
+            $this->dispatch('success', 'Restore job has been queued. The database will restart automatically after restore.');
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to queue restore job: '.$e->getMessage());
+        }
+    }
+
+    private function findBackupLabelForExecution(StandalonePostgresql $database, ScheduledDatabaseBackupExecution $execution): ?string
+    {
+        if (empty($execution->pgbackrest_label)) {
+            return null;
+        }
+
+        $backups = getPgbackrestBackupList($database);
+        $exists = $backups->contains('label', $execution->pgbackrest_label);
+
+        return $exists ? $execution->pgbackrest_label : null;
+    }
+
+    public function isPgbackrestBackupDeletableFromRepo(int $executionId): array
+    {
+        $execution = ScheduledDatabaseBackupExecution::find($executionId);
+        if (! $execution) {
+            return ['deletable' => false, 'reason' => 'Execution not found'];
+        }
+
+        $filename = $execution->filename ?? '';
+        if (! str_starts_with($filename, 'pgbackrest:')) {
+            return ['deletable' => false, 'reason' => 'Not a pgBackRest backup'];
+        }
+
+        $database = $this->database;
+        if (! $database instanceof StandalonePostgresql) {
+            return ['deletable' => false, 'reason' => 'Not a PostgreSQL database'];
+        }
+
+        $backupLabel = $this->findBackupLabelForExecution($database, $execution);
+        if (! $backupLabel) {
+            return ['deletable' => false, 'reason' => 'Backup not found in repository'];
+        }
+
+        return isPgbackrestBackupDeletable($database, $backupLabel);
     }
 
     public function refreshBackupExecutions(): void

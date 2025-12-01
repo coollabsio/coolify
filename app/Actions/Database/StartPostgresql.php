@@ -4,7 +4,6 @@ namespace App\Actions\Database;
 
 use App\Actions\Database\Pgbackrest\GeneratePgbackrestConfig;
 use App\Helpers\SslHelper;
-use App\Jobs\PgbackrestStanzaJob;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -98,8 +97,8 @@ class StartPostgresql
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
-        $this->add_custom_conf();
         $this->pgbackrest_enabled = $this->database->isPgbackrestEnabled();
+        $this->add_custom_conf();
         $this->setup_pgbackrest();
 
         $docker_compose = [
@@ -190,7 +189,7 @@ class StartPostgresql
 
         $command = ['postgres'];
 
-        if (filled($this->database->postgres_conf)) {
+        if (filled($this->database->postgres_conf) || $this->pgbackrest_enabled) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
                 [[
@@ -212,7 +211,7 @@ class StartPostgresql
         }
 
         if ($this->pgbackrest_enabled) {
-            $docker_compose = $this->add_pgbackrest_service($docker_compose, $container_name);
+            $docker_compose = $this->add_pgbackrest_to_postgres($docker_compose, $container_name);
         }
 
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
@@ -231,15 +230,16 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d --force-recreate";
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
-        $this->commands[] = "echo 'Database started.'";
 
         if ($this->pgbackrest_enabled) {
-            PgbackrestStanzaJob::dispatch($this->database, 'create')->delay(now()->addSeconds(30));
+            $this->add_stanza_creation_commands($container_name);
         }
+
+        $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
@@ -331,9 +331,9 @@ class StartPostgresql
             $content .= "\nlisten_addresses = '*'";
         }
 
-        if ($this->pgbackrest_enabled) {
-            $archiveConfig = (new GeneratePgbackrestConfig)->generatePostgresConfig($this->database);
+        $archiveConfig = (new GeneratePgbackrestConfig)->generatePostgresConfig($this->database);
 
+        if ($this->pgbackrest_enabled) {
             foreach ($archiveConfig as $key => $value) {
                 $pattern = "/^{$key}\s*=.*$/m";
                 if (preg_match($pattern, $content)) {
@@ -342,6 +342,12 @@ class StartPostgresql
                     $content .= "\n{$key} = '{$value}'";
                 }
             }
+        } else {
+            foreach (array_keys($archiveConfig) as $key) {
+                $pattern = "/^{$key}\s*=.*$/m";
+                $content = preg_replace($pattern, '', $content);
+            }
+            $content = preg_replace("/\n{2,}/", "\n", $content);
         }
 
         $content = trim($content);
@@ -363,141 +369,85 @@ class StartPostgresql
     {
         $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
         $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
-        $walArchiveDir = $this->configuration_dir.'/wal-archive';
-        $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
 
         if (! $this->pgbackrest_enabled) {
-            $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
-            $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
             $this->commands[] = "rm -rf {$pgbackrestConfigDir}";
 
             return;
         }
 
         $this->commands[] = "echo 'Setting up pgBackRest for online backups.'";
-        $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
-        $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
         $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
         $this->commands[] = "mkdir -p {$pgbackrestRepoDir}";
-        $this->commands[] = "mkdir -p {$walArchiveDir}";
-        $this->commands[] = "chmod 777 {$walArchiveDir}";
+        $this->commands[] = "chmod 777 {$pgbackrestRepoDir}";
 
         $config = GeneratePgbackrestConfig::run($this->database);
         $configBase64 = base64_encode($config);
-        $this->commands[] = "rm -rf {$pgbackrestConfigDir}/pgbackrest.conf";
         $this->commands[] = "echo '{$configBase64}' | base64 -d | tee {$pgbackrestConfigDir}/pgbackrest.conf > /dev/null";
+
+        $stanzaName = $this->database->getPgbackrestStanzaName();
+        $installScript = $this->generatePgbackrestInstallScript($stanzaName);
+        $installScriptBase64 = base64_encode($installScript);
+        $this->commands[] = "echo '{$installScriptBase64}' | base64 -d | tee {$pgbackrestConfigDir}/install-pgbackrest.sh > /dev/null";
+        $this->commands[] = "chmod +x {$pgbackrestConfigDir}/install-pgbackrest.sh";
     }
 
-    private function add_pgbackrest_service(array $docker_compose, string $postgres_container): array
+    private function generatePgbackrestInstallScript(string $stanzaName): string
     {
-        $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
+        return <<<'BASH'
+#!/bin/bash
+set -e
+
+if command -v pgbackrest &> /dev/null; then
+    echo "pgBackRest is already installed"
+    exit 0
+fi
+
+echo "Installing pgBackRest..."
+
+if [ -f /etc/alpine-release ]; then
+    echo "Detected Alpine Linux"
+    apk add --no-cache pgbackrest
+elif [ -f /etc/debian_version ]; then
+    echo "Detected Debian/Ubuntu"
+    apt-get update && apt-get install -y pgbackrest && rm -rf /var/lib/apt/lists/*
+else
+    echo "Unsupported OS for pgBackRest installation"
+    exit 1
+fi
+
+echo "pgBackRest installed successfully"
+BASH;
+    }
+
+    private function add_pgbackrest_to_postgres(array $docker_compose, string $postgres_container): array
+    {
         $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
         $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
-        $walArchiveDir = $this->configuration_dir.'/wal-archive';
 
         $hostPgbackrestConfigDir = $this->getHostPath($pgbackrestConfigDir);
         $hostPgbackrestRepoDir = $this->getHostPath($pgbackrestRepoDir);
-        $hostWalArchiveDir = $this->getHostPath($walArchiveDir);
-
-        $image = config('constants.pgbackrest.image');
-        $version = config('constants.pgbackrest.version');
-        $fullImage = "{$image}:{$version}";
-
-        $postgresDataVolume = $this->get_postgres_data_volume_name();
-
-        $labels = collect([]);
-        $labels->push('coolify.managed=true');
-        $labels->push('coolify.type=database-backup');
-        $labels->push('coolify.databaseId='.$this->database->id);
-        $labels->push('coolify.databaseUuid='.$this->database->uuid);
-
-        $docker_compose['services'][$pgbackrestContainerName] = [
-            'image' => $fullImage,
-            'container_name' => $pgbackrestContainerName,
-            'restart' => RESTART_MODE,
-            'networks' => [
-                $this->database->destination->network,
-            ],
-            'labels' => $labels->toArray(),
-            'environment' => [
-                'PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf',
-                "PGPASSWORD={$this->database->postgres_password}",
-                "PGHOST={$this->database->uuid}",
-                'PGPORT=5432',
-                "PGUSER={$this->database->postgres_user}",
-                "PGDATABASE={$this->database->postgres_db}",
-            ],
-            'volumes' => [
-                [
-                    'type' => 'bind',
-                    'source' => "{$hostPgbackrestConfigDir}/pgbackrest.conf",
-                    'target' => '/etc/pgbackrest/pgbackrest.conf',
-                    'read_only' => true,
-                ],
-                [
-                    'type' => 'bind',
-                    'source' => $hostPgbackrestRepoDir,
-                    'target' => '/var/lib/pgbackrest',
-                ],
-                [
-                    'type' => 'bind',
-                    'source' => $hostWalArchiveDir,
-                    'target' => '/var/lib/postgresql/wal_archive',
-                ],
-            ],
-            'depends_on' => [
-                $postgres_container => [
-                    'condition' => 'service_healthy',
-                ],
-            ],
-            'healthcheck' => [
-                'test' => ['CMD-SHELL', 'pgbackrest version || exit 1'],
-                'interval' => '30s',
-                'timeout' => '10s',
-                'retries' => 3,
-                'start_period' => '10s',
-            ],
-            'command' => ['tail', '-f', '/dev/null'],
-        ];
-
-        if (str_starts_with($postgresDataVolume, '/')) {
-            $docker_compose['services'][$pgbackrestContainerName]['volumes'][] = [
-                'type' => 'bind',
-                'source' => $postgresDataVolume,
-                'target' => '/var/lib/postgresql/data',
-                'read_only' => true,
-            ];
-        } else {
-            $docker_compose['services'][$pgbackrestContainerName]['volumes'][] = "{$postgresDataVolume}:/var/lib/postgresql/data:ro";
-
-            if (! isset($docker_compose['volumes'][$postgresDataVolume])) {
-                $docker_compose['volumes'][$postgresDataVolume] = [
-                    'name' => $postgresDataVolume,
-                    'external' => false,
-                ];
-            }
-        }
 
         $docker_compose['services'][$postgres_container]['volumes'][] = [
             'type' => 'bind',
-            'source' => $hostWalArchiveDir,
-            'target' => '/var/lib/postgresql/wal_archive',
+            'source' => $hostPgbackrestConfigDir,
+            'target' => '/etc/pgbackrest',
+        ];
+
+        $docker_compose['services'][$postgres_container]['volumes'][] = [
+            'type' => 'bind',
+            'source' => $hostPgbackrestRepoDir,
+            'target' => '/var/lib/pgbackrest',
+        ];
+
+        $docker_compose['services'][$postgres_container]['entrypoint'] = [
+            '/bin/sh',
+            '-c',
+            '/etc/pgbackrest/install-pgbackrest.sh && exec docker-entrypoint.sh "$@"',
+            '--',
         ];
 
         return $docker_compose;
-    }
-
-    private function get_postgres_data_volume_name(): string
-    {
-        $persistentStorage = $this->database->persistentStorages()
-            ->where('mount_path', '/var/lib/postgresql/data')
-            ->first();
-
-        if ($persistentStorage && $persistentStorage->host_path) {
-            return $persistentStorage->host_path;
-        }
-
-        return $persistentStorage?->name ?? "postgres-data-{$this->database->uuid}";
     }
 
     /**
@@ -514,5 +464,22 @@ class StartPostgresql
         }
 
         return $path;
+    }
+
+    private function add_stanza_creation_commands(string $container_name): void
+    {
+        $stanzaName = $this->database->getPgbackrestStanzaName();
+
+        $this->commands[] = "echo 'Waiting for PostgreSQL to be ready for pgBackRest stanza creation...'";
+        $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do echo 'Waiting for PostgreSQL...'; sleep 2; done";
+        $this->commands[] = "echo 'PostgreSQL is ready.'";
+
+        $this->commands[] = "echo 'Fixing pgBackRest repository permissions...'";
+        $this->commands[] = "docker exec {$container_name} chown -R postgres:postgres /var/lib/pgbackrest";
+        $this->commands[] = "docker exec {$container_name} chmod -R 750 /var/lib/pgbackrest";
+
+        $this->commands[] = "echo 'Checking pgBackRest stanza status...'";
+        $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} pgbackrest --stanza={$stanzaName} info 2>&1 || true)";
+        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then echo 'Creating pgBackRest stanza...'; docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; docker exec {$container_name} chown -R postgres:postgres /var/lib/pgbackrest; echo 'pgBackRest stanza created successfully.'; else echo 'pgBackRest stanza already exists.'; fi";
     }
 }

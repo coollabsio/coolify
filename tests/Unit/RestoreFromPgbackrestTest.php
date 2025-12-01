@@ -5,7 +5,6 @@ use App\Models\StandalonePostgresql;
 
 beforeEach(function () {
     $this->database = Mockery::mock(StandalonePostgresql::class)->makePartial();
-    $this->database->shouldReceive('getPgbackrestContainerName')->andReturn('test-uuid-pgbackrest');
     $this->database->shouldReceive('getPgbackrestStanzaName')->andReturn('db-test-uuid');
 });
 
@@ -80,6 +79,8 @@ it('buildRestoreCommand is called with correct stanza name', function () {
     $command = $method->invoke($action, 'db-test-uuid');
 
     expect($command)->toContain('--stanza=\'db-test-uuid\'');
+    expect($command)->toContain('--type=immediate');
+    expect($command)->toContain('--target-action=promote');
     expect($command)->toContain('--delta restore');
 });
 
@@ -134,5 +135,19 @@ it('buildRestoreCommand combines all options correctly', function () {
     expect($command)->toContain('--type=time');
     expect($command)->toContain('--target=\'2024-12-01 12:00:00\'');
     expect($command)->toContain('--db-include=\'mydb\'');
+    expect($command)->toContain('--target-action=promote');
     expect($command)->toContain('--delta restore');
+});
+
+it('buildRestoreCommand uses type=immediate when no target time provided', function () {
+    $action = new RestoreFromPgbackrest;
+
+    $reflection = new ReflectionClass($action);
+    $method = $reflection->getMethod('buildRestoreCommand');
+    $method->setAccessible(true);
+
+    $command = $method->invoke($action, 'db-test-uuid', 'backup-label', null, null);
+
+    expect($command)->toContain('--type=immediate');
+    expect($command)->not->toContain('--type=time');
 });

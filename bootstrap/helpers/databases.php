@@ -455,14 +455,14 @@ function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null):
     return false;
 }
 
-function isPgbackrestContainerRunning(StandalonePostgresql $database): bool
+function isPostgresContainerRunning(StandalonePostgresql $database): bool
 {
     $server = $database->destination->server ?? null;
     if (! $server) {
         return false;
     }
 
-    $containerName = $database->getPgbackrestContainerName();
+    $containerName = $database->uuid;
     $nameFilter = '^/'.$containerName.'$';
 
     $result = instant_remote_process(
@@ -485,7 +485,7 @@ function getPgbackrestInfo(StandalonePostgresql $database): ?array
         return null;
     }
 
-    $containerName = $database->getPgbackrestContainerName();
+    $containerName = $database->uuid;
     $stanzaName = $database->getPgbackrestStanzaName();
 
     try {
@@ -564,8 +564,8 @@ function getPgbackrestStanzaStatus(StandalonePostgresql $database): array
         return ['status' => 'disabled', 'message' => 'pgBackRest is not enabled'];
     }
 
-    if (! isPgbackrestContainerRunning($database)) {
-        return ['status' => 'container_stopped', 'message' => 'pgBackRest container is not running'];
+    if (! isPostgresContainerRunning($database)) {
+        return ['status' => 'container_stopped', 'message' => 'PostgreSQL container is not running'];
     }
 
     $info = getPgbackrestInfo($database);
@@ -612,4 +612,62 @@ function formatPgbackrestBackupType(string $type): string
         'incr' => 'Incremental',
         default => ucfirst($type),
     };
+}
+
+function isPgbackrestBackupDeletable(StandalonePostgresql $database, string $label): array
+{
+    $backups = getPgbackrestBackupList($database);
+
+    $backup = $backups->firstWhere('label', $label);
+    if (! $backup) {
+        return ['deletable' => false, 'reason' => 'Backup not found in repository'];
+    }
+
+    $dependents = $backups->filter(function ($b) use ($label) {
+        return ($b['prior'] ?? null) === $label;
+    });
+
+    if ($dependents->isNotEmpty()) {
+        $dependentLabels = $dependents->pluck('label')->join(', ');
+
+        return [
+            'deletable' => false,
+            'reason' => "This backup has dependent backups that would become unrestorable: {$dependentLabels}",
+            'dependents' => $dependents->pluck('label')->toArray(),
+        ];
+    }
+
+    return ['deletable' => true, 'reason' => null];
+}
+
+function deletePgbackrestBackup(StandalonePostgresql $database, string $label): array
+{
+    $deletableCheck = isPgbackrestBackupDeletable($database, $label);
+    if (! $deletableCheck['deletable']) {
+        return ['success' => false, 'message' => $deletableCheck['reason']];
+    }
+
+    if (! isPostgresContainerRunning($database)) {
+        return ['success' => false, 'message' => 'PostgreSQL container is not running'];
+    }
+
+    $containerName = $database->uuid;
+    $stanzaName = $database->getPgbackrestStanzaName();
+    $server = $database->destination->server;
+
+    $expireCommand = "set +e; docker exec {$containerName} pgbackrest --stanza=".escapeshellarg($stanzaName).' --set='.escapeshellarg($label).' expire 2>&1; EXIT_CODE=$?; set -e; echo "EXIT_CODE:${EXIT_CODE}"';
+
+    $output = instant_remote_process([$expireCommand], $server, throwError: false);
+
+    $exitCode = 0;
+    if (preg_match('/EXIT_CODE:(\d+)$/', $output, $matches)) {
+        $exitCode = (int) $matches[1];
+        $output = preg_replace('/EXIT_CODE:\d+$/', '', $output);
+    }
+
+    if ($exitCode !== 0) {
+        return ['success' => false, 'message' => "Failed to expire backup: {$output}"];
+    }
+
+    return ['success' => true, 'message' => 'Backup deleted from pgBackRest repository'];
 }

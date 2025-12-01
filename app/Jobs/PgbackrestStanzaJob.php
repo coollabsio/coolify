@@ -39,7 +39,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $server = $this->database->destination->server;
-        $containerName = $this->database->getPgbackrestContainerName();
+        $containerName = $this->database->uuid;
         $stanzaName = $this->database->getPgbackrestStanzaName();
 
         $checkContainer = instant_remote_process(
@@ -49,7 +49,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
         );
 
         if (blank(trim($checkContainer))) {
-            Log::warning('pgBackRest container is not running, will retry', [
+            Log::warning('PostgreSQL container is not running, will retry', [
                 'database_id' => $this->database->id,
                 'container' => $containerName,
             ]);
@@ -85,7 +85,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
                 'stanza' => $stanzaName,
             ]);
 
-            $team = $this->database->team();
+            $team = $this->database->team;
             $team?->notify(new PgbackrestStanzaCreated($this->database));
         } else {
             Log::info('pgBackRest stanza already exists', [
@@ -135,7 +135,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
             'error' => $exception->getMessage(),
         ]);
 
-        $team = $this->database->team();
+        $team = $this->database->team;
         $team?->notify(new PgbackrestStanzaFailed($this->database, $exception->getMessage()));
     }
 }
