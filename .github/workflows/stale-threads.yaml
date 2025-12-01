@@ -8,12 +8,16 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: stale-threads
+  cancel-in-progress: true
+
 jobs:
   stale-threads:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
       - name: Manage stale threads (Issues & PRs)
-        uses: actions/stale@v10
+        uses: actions/stale@5f858e3efba33a5ca4407a664cc011ad407f2008 # https://github.com/actions/stale/releases/tag/v10.1.0
         with:
           stale-issue-message: |
             This issue has been marked as stale due to inactivity. It will be automatically closed in 7 days if no update is received.
