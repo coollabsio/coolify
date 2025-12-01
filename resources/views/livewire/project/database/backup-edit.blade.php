@@ -48,14 +48,30 @@
         <h3>Settings</h3>
         <div class="flex gap-2 flex-col ">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                <div class="flex flex-col gap-2 w-full md:w-2/3">
+                    <x-forms.select id="postgresBackupTool" label="Backup Engine">
+                        <option value="pgbackrest">pgBackRest (incremental)</option>
+                        <option value="pg_dump">pg_dump (legacy)</option>
+                    </x-forms.select>
+                    @if ($postgresBackupTool === 'pgbackrest')
+                        <x-forms.select id="pgbackrestBackupType" label="pgBackRest Backup Type">
+                            <option value="full">Full</option>
+                            <option value="diff">Differential</option>
+                            <option value="incr">Incremental</option>
+                        </x-forms.select>
+                        <div class="text-xs text-neutral-500">pgBackRest backups capture the full Postgres data directory and
+                            support incremental runs. Database selection is ignored while using pgBackRest.</div>
+                    @else
+                        <div class="w-48">
+                            <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
+                        </div>
+                        @if (!$backup->dump_all)
+                            <x-forms.input label="Databases To Backup"
+                                helper="Comma separated list of databases to backup. Empty will include the default one."
+                                id="databasesToBackup" />
+                        @endif
+                    @endif
                 </div>
-                @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
-                        id="databasesToBackup" />
-                @endif
             @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
                 <x-forms.input label="Databases To Include"
                     helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."

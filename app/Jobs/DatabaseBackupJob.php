@@ -283,11 +283,22 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
+            $usePgBackRest = false;
+
             if ($this->database->name === 'coolify-db') {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
+            }
+
+            if (str($databaseType)->contains('postgres')) {
+                $usePgBackRest = data_get($this->backup, 'postgres_backup_tool', 'pgbackrest') === 'pgbackrest';
+
+                if ($usePgBackRest) {
+                    $primaryDatabase = $databasesToBackup[0] ?? $this->database->postgres_user ?? 'postgres';
+                    $databasesToBackup = [$primaryDatabase];
+                }
             }
             foreach ($databasesToBackup as $database) {
                 // Generate unique UUID for each database backup execution
@@ -309,7 +320,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 try {
                     if (str($databaseType)->contains('postgres')) {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
-                        if ($this->backup->dump_all) {
+                        if ($usePgBackRest) {
+                            $this->backup_file = "/pgbackrest-$database-".Carbon::now()->timestamp.'.tar.gz';
+                        } elseif ($this->backup->dump_all) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
@@ -320,7 +333,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
-                        $this->backup_standalone_postgresql($database);
+                        if ($usePgBackRest) {
+                            $this->backup_standalone_postgresql_pgbackrest($database);
+                        } else {
+                            $this->backup_standalone_postgresql($database);
+                        }
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -508,6 +525,73 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backup_standalone_postgresql_pgbackrest(string $database): void
+    {
+        try {
+            $repoPath = $this->backup_dir.'/pgbackrest';
+            $network = data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class
+                ? data_get($this->database->service, 'destination.network')
+                : data_get($this->database->destination, 'network');
+            $network ??= 'bridge';
+            $stanza = str($this->directory_name.'-'.$database)->slug('_')->value();
+            $helperImage = $this->getFullImageName();
+            $backupType = data_get($this->backup, 'pgbackrest_backup_type', 'incr') ?? 'incr';
+            if (! in_array($backupType, ['full', 'diff', 'incr'], true)) {
+                $backupType = 'incr';
+            }
+            $postgresPort = data_get($this->database, 'public_port', 5432) ?? 5432;
+            $commands = [];
+
+            $configCommand = <<<'BASH'
+cat <<'EOF' > %s/pgbackrest.conf
+[global]
+repo1-path=/backups/repo1
+log-path=/backups/log
+spool-path=/backups/spool
+start-fast=y
+compress-type=zst
+compress-level=6
+
+[%s]
+pg1-path=/var/lib/postgresql/data
+pg1-host=%s
+pg1-port=%s
+pg1-user=%s
+EOF
+BASH;
+            $configCommand = sprintf(
+                $configCommand,
+                $repoPath,
+                $stanza,
+                $this->container_name,
+                $postgresPort,
+                $this->database->postgres_user,
+            );
+
+            $containerOptions = "--rm --name pgbackrest-{$this->backup_log_uuid} --network {$network} --volumes-from {$this->container_name} -v {$repoPath}:/backups";
+            if ($this->postgres_password) {
+                $escapedPassword = escapeshellarg($this->postgres_password);
+                $containerOptions = "-e PGPASSWORD={$escapedPassword} {$containerOptions}";
+            }
+            $runBase = "docker run {$containerOptions} {$helperImage}";
+
+            $commands[] = 'mkdir -p '.$repoPath.'/repo1 '.$repoPath.'/log '.$repoPath.'/spool';
+            $commands[] = $configCommand;
+            $commands[] = "$runBase pgbackrest --config=/backups/pgbackrest.conf --stanza={$stanza} stanza-create --log-level-console=info || true";
+            $commands[] = "$runBase pgbackrest --config=/backups/pgbackrest.conf --stanza={$stanza} backup --type={$backupType} --log-level-console=info";
+            $commands[] = "latest_label=$(ls -1t {$repoPath}/repo1/backup/{$stanza} 2>/dev/null | head -n1) && [ -n \"$latest_label\" ] && tar -czf {$this->backup_location} -C {$repoPath} repo1 log spool pgbackrest.conf";
+
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {

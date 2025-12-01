@@ -100,6 +100,8 @@ class SettingsBackup extends Component
                 'frequency' => '0 0 * * *',
                 'database_id' => $this->database->id,
                 'database_type' => \App\Models\StandalonePostgresql::class,
+                'postgres_backup_tool' => 'pgbackrest',
+                'pgbackrest_backup_type' => 'incr',
                 'team_id' => currentTeam()->id,
             ]);
             $this->database->refresh();

@@ -82,6 +82,12 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'string'])]
+    public string $postgresBackupTool = 'pgbackrest';
+
+    #[Validate(['required', 'string'])]
+    public string $pgbackrestBackupType = 'incr';
+
     public function mount()
     {
         try {
@@ -107,6 +113,9 @@ class BackupEdit extends Component
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->disable_local_backup = $this->disableLocalBackup;
             $this->backup->s3_storage_id = $this->s3StorageId;
+            $this->sanitizePostgresBackupFields();
+            $this->backup->postgres_backup_tool = $this->postgresBackupTool;
+            $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
 
             // Validate databases_to_backup to prevent command injection
             if (filled($this->databasesToBackup)) {
@@ -147,6 +156,9 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->postgresBackupTool = $this->backup->postgres_backup_tool ?? 'pgbackrest';
+            $this->pgbackrestBackupType = $this->backup->pgbackrest_backup_type ?? 'incr';
+            $this->sanitizePostgresBackupFields();
         }
     }
 
@@ -208,6 +220,20 @@ class BackupEdit extends Component
         }
     }
 
+    private function sanitizePostgresBackupFields(): void
+    {
+        $allowedTools = ['pgbackrest', 'pg_dump'];
+        $allowedTypes = ['full', 'diff', 'incr'];
+
+        if (! in_array($this->postgresBackupTool, $allowedTools, true)) {
+            $this->postgresBackupTool = 'pgbackrest';
+        }
+
+        if (! in_array($this->pgbackrestBackupType, $allowedTypes, true)) {
+            $this->pgbackrestBackupType = 'incr';
+        }
+    }
+
     public function instantSave()
     {
         try {
@@ -229,6 +255,14 @@ class BackupEdit extends Component
         // Validate that disable_local_backup can only be true when S3 backup is enabled
         if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
             $this->backup->disable_local_backup = $this->disableLocalBackup = false;
+        }
+
+        if (! in_array($this->postgresBackupTool, ['pgbackrest', 'pg_dump'], true)) {
+            throw new \Exception('Invalid Postgres backup tool selected.');
+        }
+
+        if (! in_array($this->pgbackrestBackupType, ['full', 'diff', 'incr'], true)) {
+            throw new \Exception('Invalid pgBackRest backup type selected.');
         }
 
         $isValid = validate_cron_expression($this->backup->frequency);

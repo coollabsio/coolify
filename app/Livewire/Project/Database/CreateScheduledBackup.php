@@ -67,6 +67,8 @@ class CreateScheduledBackup extends Component
 
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
+                $payload['postgres_backup_tool'] = 'pgbackrest';
+                $payload['pgbackrest_backup_type'] = 'incr';
             } elseif ($this->database->type() === 'standalone-mysql') {
                 $payload['databases_to_backup'] = $this->database->mysql_database;
             } elseif ($this->database->type() === 'standalone-mariadb') {
