@@ -55,7 +55,7 @@ class GeneratePgbackrestConfig
             'wal_level' => 'replica',
             'archive_mode' => 'on',
             'archive_command' => "pgbackrest --stanza={$stanzaName} archive-push %p",
-            'archive_timeout' => '60',
+            'archive_timeout' => '7200',
         ];
     }
 }
