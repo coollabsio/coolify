@@ -21,7 +21,7 @@ test('buildRestoreCommand handles PostgreSQL with dumpAll', function () {
     $component = new Import;
     $component->dumpAll = true;
     // This is the full dump-all command prefix that would be set in the updatedDumpAll method
-    $component->postgresqlRestoreCommand = 'psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && psql -U $POSTGRES_USER -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U $POSTGRES_USER --if-exists {} && createdb -U $POSTGRES_USER postgres';
+    $component->postgresqlRestoreCommand = 'psql -U $POSTGRES_USER -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && psql -U $POSTGRES_USER -d postgres -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U $POSTGRES_USER --if-exists {} && createdb -U $POSTGRES_USER postgres';
 
     $database = Mockery::mock('App\Models\StandalonePostgresql');
     $database->shouldReceive('getMorphClass')->andReturn('App\Models\StandalonePostgresql');
