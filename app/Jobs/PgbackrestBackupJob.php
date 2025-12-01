@@ -41,8 +41,6 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $containerName;
 
-    private array $logBuffer = [];
-
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
@@ -135,38 +133,17 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception('pgBackRest is not enabled for this database');
             }
 
-            $this->addLog("Starting {$backupType} backup for stanza: {$this->stanzaName}");
-
-            $this->addLog('Fixing pgBackRest permissions...');
             fixPgbackrestPermissions($this->database);
-
-            $this->addLog('Verifying PostgreSQL configuration...');
             $this->assertPostgresReadyForPgbackrest();
-
-            $this->addLog('Ensuring stanza exists...');
             $this->ensureStanzaExists();
-
-            $this->addLog('PostgreSQL configuration verified successfully');
-            $this->addLog('Executing pgBackRest backup command...');
 
             $output = $this->runPgbackrestBackupWithRetries($backupType);
 
-            $this->addLog('Backup command completed successfully');
-            $this->addLog('Retrieving backup information...');
-
             $lastBackup = getPgbackrestLatestBackup($this->database) ?? [];
-
-            $this->addLog('Backup completed!');
-            if (! empty($lastBackup['label'])) {
-                $this->addLog("Backup label: {$lastBackup['label']}");
-            }
-            if (! empty($lastBackup['size'])) {
-                $this->addLog('Backup size: '.formatBytes($lastBackup['size']));
-            }
 
             $this->backup_log->update([
                 'status' => 'success',
-                'message' => implode("\n", $this->logBuffer)."\n\n--- pgBackRest Output ---\n".$output,
+                'message' => $output,
                 'size' => $lastBackup['size'] ?? 0,
                 'pgbackrest_label' => $lastBackup['label'] ?? null,
                 'finished_at' => Carbon::now()->toImmutable(),
@@ -175,51 +152,25 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->team->notify(new BackupSuccess($this->backup, $this->database, $this->database->postgres_db));
 
         } catch (\Throwable $e) {
-            $this->addLog('Backup failed: '.$e->getMessage());
-
-            $failureMessage = implode("\n", $this->logBuffer);
-            if (! str_contains($e->getMessage(), '---')) {
-                $failureMessage .= "\n\n--- Error Details ---\n".$e->getMessage();
-            } else {
-                $failureMessage .= "\n\n".$e->getMessage();
-            }
-
             $this->backup_log->update([
                 'status' => 'failed',
-                'message' => $failureMessage,
+                'message' => $e->getMessage(),
                 'finished_at' => Carbon::now()->toImmutable(),
             ]);
             throw $e;
         }
     }
 
-    private function addLog(string $message): void
-    {
-        $timestamp = now()->format('Y-m-d H:i:s');
-        $this->logBuffer[] = "[{$timestamp}] {$message}";
-
-        if ($this->backup_log) {
-            $this->backup_log->update([
-                'message' => implode("\n", $this->logBuffer),
-            ]);
-        }
-    }
-
     private function ensureStanzaExists(): void
     {
-        $checkCmd = "--stanza={$this->stanzaName} info";
-        $output = execPgbackrest($this->database, $checkCmd);
+        $output = execPgbackrest($this->database, "--stanza={$this->stanzaName} info");
 
         if (str_contains($output, 'missing stanza')) {
-            $this->addLog('pgBackRest stanza missing, creating...');
-            $createCmd = "--stanza={$this->stanzaName} stanza-create";
-            $createOut = execPgbackrest($this->database, $createCmd);
+            $createOut = execPgbackrest($this->database, "--stanza={$this->stanzaName} stanza-create");
 
             if (str_contains($createOut, 'ERROR') && ! str_contains($createOut, 'already exists')) {
                 throw new \Exception("Failed to create pgBackRest stanza:\n{$createOut}");
             }
-
-            $this->addLog('pgBackRest stanza created successfully');
         }
     }
 
@@ -298,10 +249,6 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
         $lastExitCode = 0;
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            if ($attempt > 1) {
-                $this->addLog("Attempt {$attempt}/{$maxAttempts}...");
-            }
-
             $backupCommand = "set +e; docker exec {$this->containerName} su postgres -c 'pgbackrest --stanza={$this->stanzaName} --type={$backupType} backup' 2>&1; EXIT_CODE=\$?; set -e; echo \"EXIT_CODE:\${EXIT_CODE}\"";
 
             $output = instant_remote_process([$backupCommand], $this->server, throwError: false);
@@ -319,18 +266,13 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
                 return $lastOutput;
             }
 
-            $this->addLog("Backup attempt failed with exit code {$exitCode}");
-
             if ($this->isConfigurationError($exitCode, $lastOutput)) {
                 $this->throwConfigurationError($exitCode, $lastOutput);
             }
 
             if ($attempt < $maxAttempts) {
                 $delay = $baseDelaySeconds * $attempt;
-                $this->addLog("Waiting {$delay} seconds before retry...");
                 sleep($delay);
-
-                continue;
             }
         }
 

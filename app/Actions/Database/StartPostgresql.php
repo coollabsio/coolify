@@ -377,10 +377,9 @@ class StartPostgresql
             return;
         }
 
-        $this->commands[] = "echo 'Setting up pgBackRest for online backups.'";
         $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
         $this->commands[] = "mkdir -p {$pgbackrestRepoDir}";
-        $this->commands[] = "chmod 777 {$pgbackrestRepoDir}";
+        $this->commands[] = "mkdir -p {$pgbackrestRepoDir}/log";
 
         $config = GeneratePgbackrestConfig::run($this->database);
         $configBase64 = base64_encode($config);
@@ -399,38 +398,19 @@ class StartPostgresql
 #!/bin/bash
 set -e
 
-# Fix permissions on pgbackrest directories - must be done on every startup
-# because these are bind-mounted volumes that may have wrong ownership
-echo "Fixing pgBackRest directory permissions..."
-chown -R postgres:postgres /var/lib/pgbackrest 2>/dev/null || true
-chmod -R 750 /var/lib/pgbackrest 2>/dev/null || true
-chown -R postgres:postgres /etc/pgbackrest 2>/dev/null || true
-chmod -R 750 /etc/pgbackrest 2>/dev/null || true
-
-# Create and fix permissions on lock directory
 mkdir -p /tmp/pgbackrest
-chown -R postgres:postgres /tmp/pgbackrest
-chmod -R 750 /tmp/pgbackrest
 
 if command -v pgbackrest &> /dev/null; then
-    echo "pgBackRest is already installed"
     exit 0
 fi
 
-echo "Installing pgBackRest..."
-
 if [ -f /etc/alpine-release ]; then
-    echo "Detected Alpine Linux"
     apk add --no-cache pgbackrest
 elif [ -f /etc/debian_version ]; then
-    echo "Detected Debian/Ubuntu"
     apt-get update && apt-get install -y pgbackrest && rm -rf /var/lib/apt/lists/*
 else
-    echo "Unsupported OS for pgBackRest installation"
     exit 1
 fi
-
-echo "pgBackRest installed successfully"
 BASH;
     }
 
@@ -482,7 +462,6 @@ BASH;
 
     private function add_pgbackrest_permission_fix_commands(string $container_name): void
     {
-        $this->commands[] = "echo 'Fixing pgBackRest permissions inside container...'";
         $this->commands[] = "docker exec -u 0:0 {$container_name} sh -c 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true; chmod -R 770 /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true'";
     }
 
@@ -490,12 +469,8 @@ BASH;
     {
         $stanzaName = $this->database->getPgbackrestStanzaName();
 
-        $this->commands[] = "echo 'Waiting for PostgreSQL to be ready for pgBackRest stanza creation...'";
-        $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do echo 'Waiting for PostgreSQL...'; sleep 2; done";
-        $this->commands[] = "echo 'PostgreSQL is ready.'";
-
-        $this->commands[] = "echo 'Checking pgBackRest stanza status...'";
+        $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do sleep 2; done";
         $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} info' 2>&1 || true)";
-        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then echo 'Creating pgBackRest stanza...'; docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; echo 'pgBackRest stanza created successfully.'; else echo 'pgBackRest stanza already exists.'; fi";
+        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; fi";
     }
 }
