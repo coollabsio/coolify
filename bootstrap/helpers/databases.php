@@ -490,7 +490,7 @@ function getPgbackrestInfo(StandalonePostgresql $database): ?array
 
     try {
         $output = instant_remote_process(
-            ["docker exec {$containerName} pgbackrest --stanza={$stanzaName} info --output=json"],
+            ["docker exec {$containerName} su postgres -c 'pgbackrest --stanza={$stanzaName} info --output=json'"],
             $server,
             throwError: false,
         );
@@ -655,7 +655,9 @@ function deletePgbackrestBackup(StandalonePostgresql $database, string $label): 
     $stanzaName = $database->getPgbackrestStanzaName();
     $server = $database->destination->server;
 
-    $expireCommand = "set +e; docker exec {$containerName} pgbackrest --stanza=".escapeshellarg($stanzaName).' --set='.escapeshellarg($label).' expire 2>&1; EXIT_CODE=$?; set -e; echo "EXIT_CODE:${EXIT_CODE}"';
+    $escapedStanza = escapeshellarg($stanzaName);
+    $escapedLabel = escapeshellarg($label);
+    $expireCommand = "set +e; docker exec {$containerName} su postgres -c 'pgbackrest --stanza={$escapedStanza} --set={$escapedLabel} expire' 2>&1; EXIT_CODE=\$?; set -e; echo \"EXIT_CODE:\${EXIT_CODE}\"";
 
     $output = instant_remote_process([$expireCommand], $server, throwError: false);
 
@@ -670,4 +672,34 @@ function deletePgbackrestBackup(StandalonePostgresql $database, string $label): 
     }
 
     return ['success' => true, 'message' => 'Backup deleted from pgBackRest repository'];
+}
+
+/**
+ * Execute a pgBackRest command inside a PostgreSQL container as the postgres user.
+ *
+ * @param  StandalonePostgresql  $database  The database to run the command on
+ * @param  string  $args  The pgBackRest arguments (e.g., '--stanza=db-xxx backup')
+ * @param  bool  $throwError  Whether to throw on error
+ * @return string The command output
+ */
+function execPgbackrest(StandalonePostgresql $database, string $args, bool $throwError = false): string
+{
+    $server = $database->destination->server;
+    $container = $database->uuid;
+    $cmd = "docker exec {$container} su postgres -c 'pgbackrest {$args}' 2>&1";
+
+    return instant_remote_process([$cmd], $server, throwError: $throwError);
+}
+
+/**
+ * Fix pgBackRest permissions inside the container by running chown as root.
+ * This is needed because bind-mounted directories are created as root on the host.
+ */
+function fixPgbackrestPermissions(StandalonePostgresql $database): void
+{
+    $server = $database->destination->server;
+    $container = $database->uuid;
+    $cmd = "docker exec -u 0:0 {$container} sh -c 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true; chmod -R 770 /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true'";
+
+    instant_remote_process([$cmd], $server, throwError: false);
 }

@@ -29,6 +29,8 @@ class GeneratePgbackrestConfig
         $config[] = "compress-level={$compressLevel}";
         $config[] = "log-level-console={$logLevel}";
         $config[] = 'log-level-file=detail';
+        $config[] = 'log-path=/var/lib/pgbackrest/log';
+        $config[] = 'lock-path=/tmp/pgbackrest';
         $config[] = 'start-fast=y';
         $config[] = 'stop-auto=y';
         $config[] = 'delta=y';

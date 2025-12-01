@@ -228,9 +228,10 @@ class StartPostgresql
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml down --remove-orphans 2>/dev/null || true";
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d --force-recreate";
+        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
@@ -398,6 +399,19 @@ class StartPostgresql
 #!/bin/bash
 set -e
 
+# Fix permissions on pgbackrest directories - must be done on every startup
+# because these are bind-mounted volumes that may have wrong ownership
+echo "Fixing pgBackRest directory permissions..."
+chown -R postgres:postgres /var/lib/pgbackrest 2>/dev/null || true
+chmod -R 750 /var/lib/pgbackrest 2>/dev/null || true
+chown -R postgres:postgres /etc/pgbackrest 2>/dev/null || true
+chmod -R 750 /etc/pgbackrest 2>/dev/null || true
+
+# Create and fix permissions on lock directory
+mkdir -p /tmp/pgbackrest
+chown -R postgres:postgres /tmp/pgbackrest
+chmod -R 750 /tmp/pgbackrest
+
 if command -v pgbackrest &> /dev/null; then
     echo "pgBackRest is already installed"
     exit 0
@@ -466,6 +480,12 @@ BASH;
         return $path;
     }
 
+    private function add_pgbackrest_permission_fix_commands(string $container_name): void
+    {
+        $this->commands[] = "echo 'Fixing pgBackRest permissions inside container...'";
+        $this->commands[] = "docker exec -u 0:0 {$container_name} sh -c 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true; chmod -R 770 /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true'";
+    }
+
     private function add_stanza_creation_commands(string $container_name): void
     {
         $stanzaName = $this->database->getPgbackrestStanzaName();
@@ -474,12 +494,8 @@ BASH;
         $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do echo 'Waiting for PostgreSQL...'; sleep 2; done";
         $this->commands[] = "echo 'PostgreSQL is ready.'";
 
-        $this->commands[] = "echo 'Fixing pgBackRest repository permissions...'";
-        $this->commands[] = "docker exec {$container_name} chown -R postgres:postgres /var/lib/pgbackrest";
-        $this->commands[] = "docker exec {$container_name} chmod -R 750 /var/lib/pgbackrest";
-
         $this->commands[] = "echo 'Checking pgBackRest stanza status...'";
-        $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} pgbackrest --stanza={$stanzaName} info 2>&1 || true)";
-        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then echo 'Creating pgBackRest stanza...'; docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; docker exec {$container_name} chown -R postgres:postgres /var/lib/pgbackrest; echo 'pgBackRest stanza created successfully.'; else echo 'pgBackRest stanza already exists.'; fi";
+        $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} info' 2>&1 || true)";
+        $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then echo 'Creating pgBackRest stanza...'; docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; echo 'pgBackRest stanza created successfully.'; else echo 'pgBackRest stanza already exists.'; fi";
     }
 }

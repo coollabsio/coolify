@@ -99,6 +99,7 @@ class BackupEdit extends Component
             $this->syncData();
 
             $database = $this->backup->database;
+            $this->status = $database->status ?? null;
             if ($database instanceof StandalonePostgresql && $database->isPgbackrestEnabled()) {
                 $this->pgbackrestAvailable = true;
             }

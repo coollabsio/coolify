@@ -80,12 +80,11 @@ class RestoreFromPgbackrest
             return ['valid' => false, 'message' => 'pgBackRest is not enabled'];
         }
 
-        $status = str($database->status);
-        if ($status->startsWith('running')) {
-            return [
-                'valid' => false,
-                'message' => 'Database must be stopped before restore. Please stop the database first.',
-            ];
+        if ($backupLabel) {
+            $backup = getPgbackrestBackupByLabel($database, $backupLabel);
+            if (! $backup) {
+                return ['valid' => false, 'message' => 'Backup not found in pgBackRest repository'];
+            }
         }
 
         return ['valid' => true, 'message' => 'Restore can proceed'];

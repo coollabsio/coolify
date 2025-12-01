@@ -94,4 +94,9 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         return $this->database_type === StandalonePostgresql::class;
     }
+
+    public function hasRunningExecution(): bool
+    {
+        return $this->executions()->where('status', 'running')->exists();
+    }
 }

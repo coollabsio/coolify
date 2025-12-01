@@ -56,10 +56,12 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             $commands = [
                 "docker start {$postgresContainer}",
                 "sleep 2",
-                "docker exec {$postgresContainer} {$restoreCommand}",
             ];
+            instant_remote_process($commands, $server);
 
-            $output = instant_remote_process($commands, $server);
+            fixPgbackrestPermissions($this->database);
+
+            $output = execPgbackrest($this->database, $restoreCommand, throwError: true);
 
             Log::info('pgBackRest restore completed', [
                 'database_id' => $this->database->id,
@@ -93,7 +95,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
     private function buildRestoreCommand(string $stanzaName): string
     {
-        $command = 'pgbackrest --stanza='.escapeshellarg($stanzaName);
+        $command = '--stanza='.escapeshellarg($stanzaName);
 
         if ($this->backupLabel) {
             $command .= ' --set='.escapeshellarg($this->backupLabel);

@@ -58,18 +58,19 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        fixPgbackrestPermissions($this->database);
+
         match ($this->action) {
-            'create' => $this->createStanza($server, $containerName, $stanzaName),
-            'upgrade' => $this->upgradeStanza($server, $containerName, $stanzaName),
-            'check' => $this->checkStanza($server, $containerName, $stanzaName),
+            'create' => $this->createStanza($stanzaName),
+            'upgrade' => $this->upgradeStanza($stanzaName),
+            'check' => $this->checkStanza($stanzaName),
             default => throw new \InvalidArgumentException("Invalid stanza action: {$this->action}"),
         };
     }
 
-    private function createStanza($server, string $containerName, string $stanzaName): void
+    private function createStanza(string $stanzaName): void
     {
-        $checkCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} info 2>&1";
-        $checkResult = instant_remote_process([$checkCommand], $server, false);
+        $checkResult = execPgbackrest($this->database, "--stanza={$stanzaName} info");
 
         if (str_contains($checkResult, 'missing stanza')) {
             Log::info('Creating pgBackRest stanza', [
@@ -77,8 +78,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
                 'stanza' => $stanzaName,
             ]);
 
-            $createCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} stanza-create";
-            instant_remote_process([$createCommand], $server);
+            execPgbackrest($this->database, "--stanza={$stanzaName} stanza-create", throwError: true);
 
             Log::info('pgBackRest stanza created successfully', [
                 'database_id' => $this->database->id,
@@ -95,15 +95,14 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function upgradeStanza($server, string $containerName, string $stanzaName): void
+    private function upgradeStanza(string $stanzaName): void
     {
         Log::info('Upgrading pgBackRest stanza', [
             'database_id' => $this->database->id,
             'stanza' => $stanzaName,
         ]);
 
-        $upgradeCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} stanza-upgrade";
-        instant_remote_process([$upgradeCommand], $server);
+        execPgbackrest($this->database, "--stanza={$stanzaName} stanza-upgrade", throwError: true);
 
         Log::info('pgBackRest stanza upgraded successfully', [
             'database_id' => $this->database->id,
@@ -111,15 +110,14 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
         ]);
     }
 
-    private function checkStanza($server, string $containerName, string $stanzaName): void
+    private function checkStanza(string $stanzaName): void
     {
         Log::info('Checking pgBackRest stanza', [
             'database_id' => $this->database->id,
             'stanza' => $stanzaName,
         ]);
 
-        $checkCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} check";
-        instant_remote_process([$checkCommand], $server);
+        execPgbackrest($this->database, "--stanza={$stanzaName} check", throwError: true);
 
         Log::info('pgBackRest stanza check passed', [
             'database_id' => $this->database->id,
