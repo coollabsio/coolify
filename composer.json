@@ -2,16 +2,9 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "coollabsio/coolify",
     "type": "project",
-    "description": "Coolify a free, open-source & self-hostable PaaS alternative to Heroku, Netlify, Vercel and Railway.",
+    "description": "An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 280+ one-click services on your own servers.",
+    "keywords": ["coolify", "php", "laravel", "inertiajs", "svelte", "svelte5", "self-hosted", "self-hosting", "docker", "docker-compose", "server", "deployment", "databases", "static-site", "nodejs", "nextjs", "mysql", "mariadb", "postgres", "redis"],
     "homepage": "https://coolify.io",
-    "keywords": [
-        "coolify",
-        "deployment",
-        "self-hosted",
-        "open-source",
-        "docker",
-        "podman"
-    ],
     "license": "AGPL-3.0",
     "require": {
         "php": "^8.5",
@@ -47,6 +40,19 @@
         }
     },
     "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.local.example', '.env');\"",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan key:generate --ansi",
+            "@php artisan migrate --force --ansi",
+            "bun install",
+            "bun run build"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite --kill-others"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
@@ -54,32 +60,22 @@
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
-        "post-root-package-install": [
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        "post-install-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
-        "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
-        ],
-        "dev": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --force --ansi",
-            "Composer\\Config::disableProcessTimeout",
-            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite"
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ],
         "refactor": "rector",
-        "format": "pint",
-        "lint": "phpstan --memory-limit=1G",
+        "format": "pint --parallel",
+        "lint": "phpstan --memory-limit=2G",
         "test": [
             "@php artisan config:clear --ansi",
             "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
         ],
         "test:refactor": "rector --dry-run",
-        "test:format": "pint --test",
-        "test:typos": "peck",
-        "test:type-coverage": "pest --parallel --type-coverage --memory-limit=1G --min=100",
+        "test:format": "pint --parallel --test",
+        "test:type-coverage": "pest --parallel --type-coverage --memory-limit=2G --min=100",
         "test:all": [
             "@test:refactor",
             "@test:format",
