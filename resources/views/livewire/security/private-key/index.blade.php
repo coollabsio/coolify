@@ -26,7 +26,7 @@
                             {{ $key->description }}
                             @if (!$key->isInUse())
                                 <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-yellow-400 text-black">Unused</span>
+                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-warning-400 text-black">Unused</span>
                             @endif
                         </div>
                     </div>
@@ -43,7 +43,7 @@
                             {{ $key->description }}
                             @if (!$key->isInUse())
                                 <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-yellow-400 text-black">Unused</span>
+                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-warning-400 text-black">Unused</span>
                             @endif
                         </div>
                     </div>

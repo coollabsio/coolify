@@ -8,8 +8,6 @@ use Livewire\Component;
 
 class Upgrade extends Component
 {
-    public bool $showProgress = false;
-
     public bool $updateInProgress = false;
 
     public bool $isUpgradeAvailable = false;

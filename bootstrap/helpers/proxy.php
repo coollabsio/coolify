@@ -6,6 +6,20 @@ use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Check if a network name is a Docker predefined system network.
+ * These networks cannot be created, modified, or managed by docker network commands.
+ *
+ * @param  string  $network  Network name to check
+ * @return bool True if it's a predefined network that should be skipped
+ */
+function isDockerPredefinedNetwork(string $network): bool
+{
+    // Only filter 'default' and 'host' to match existing codebase patterns
+    // See: bootstrap/helpers/parsers.php:891, bootstrap/helpers/shared.php:689,748
+    return in_array($network, ['default', 'host'], true);
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -66,8 +80,12 @@ function collectDockerNetworksByServer(Server $server)
         $networks->push($network);
         $allNetworks->push($network);
     }
-    $networks = collect($networks)->flatten()->unique();
-    $allNetworks = $allNetworks->flatten()->unique();
+    $networks = collect($networks)->flatten()->unique()->filter(function ($network) {
+        return ! isDockerPredefinedNetwork($network);
+    });
+    $allNetworks = $allNetworks->flatten()->unique()->filter(function ($network) {
+        return ! isDockerPredefinedNetwork($network);
+    });
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
@@ -219,8 +237,8 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     $array_of_networks = collect([]);
     $filtered_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
-        if ($network === 'host') {
-            return; // network-scoped alias is supported only for containers in user defined networks
+        if (isDockerPredefinedNetwork($network)) {
+            return; // Predefined networks cannot be used in network configuration
         }
 
         $array_of_networks[$network] = [

@@ -74,6 +74,9 @@ class DockerCompose extends Component
             }
             $service->parse(isNew: true);
 
+            // Apply service-specific application prerequisites
+            applyServiceApplicationPrerequisites($service);
+
             return redirect()->route('project.service.configuration', [
                 'service_uuid' => $service->uuid,
                 'environment_uuid' => $environment->uuid,
