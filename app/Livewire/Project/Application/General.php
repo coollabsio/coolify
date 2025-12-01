@@ -1018,11 +1018,27 @@ class General extends Component
         // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
         // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
         // Build-time env path references ApplicationDeploymentJob::BUILD_TIME_ENV_PATH as source of truth
-        return injectDockerComposeFlags(
+        $command = injectDockerComposeFlags(
             $this->dockerComposeCustomBuildCommand,
             ".{$normalizedBase}{$this->dockerComposeLocation}",
             \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
         );
+
+        // Inject build args if not using build secrets
+        if (! $this->application->settings->use_build_secrets) {
+            $buildTimeEnvs = $this->application->environment_variables()
+                ->where('is_buildtime', true)
+                ->get();
+
+            if ($buildTimeEnvs->isNotEmpty()) {
+                $buildArgs = generateDockerBuildArgs($buildTimeEnvs);
+                $buildArgsString = $buildArgs->implode(' ');
+
+                $command = injectDockerComposeBuildArgs($command, $buildArgsString);
+            }
+        }
+
+        return $command;
     }
 
     public function getDockerComposeStartCommandPreviewProperty(): string
