@@ -601,24 +601,27 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     if ($resource->build_pack === 'dockercompose') {
                         // Check if a service with this name actually exists
                         $serviceExists = false;
+                        $actualServiceName = null;
                         foreach ($services as $serviceNameKey => $service) {
                             $transformedServiceName = str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value();
                             if ($transformedServiceName === $serviceName) {
                                 $serviceExists = true;
+                                $actualServiceName = $serviceNameKey; // Store the ORIGINAL service name
                                 break;
                             }
                         }
 
                         // Only add domain if the service exists
-                        if ($serviceExists) {
+                        if ($serviceExists && $actualServiceName) {
                             $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                            $domainExists = data_get($domains->get($serviceName), 'domain');
+                            // Use the ORIGINAL service name as the key to avoid collisions
+                            $domainExists = data_get($domains->get($actualServiceName), 'domain');
 
                             // Update domain using URL with port if applicable
                             $domainValue = $port ? $urlWithPort : $url;
 
                             if (is_null($domainExists)) {
-                                $domains->put($serviceName, [
+                                $domains->put($actualServiceName, [
                                     'domain' => $domainValue,
                                 ]);
                                 $resource->docker_compose_domains = $domains->toJson();
@@ -1077,8 +1080,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack !== 'dockercompose') {
             $domains = collect([]);
         }
-        $changedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
-        $fqdns = data_get($domains, "$changedServiceName.domain");
+        // Use the original service name for lookup (no transformation needed)
+        $fqdns = data_get($domains, "$serviceName.domain");
         // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {

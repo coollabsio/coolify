@@ -11,6 +11,16 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * Generate a stable 4-character hash from a service name for uniqueness
+ * This is used to differentiate services like "api.test" and "api-test"
+ * which would otherwise collide when normalized.
+ */
+function serviceNameHash(string $serviceName): string
+{
+    return substr(md5($serviceName), 0, 4);
+}
+
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
@@ -467,8 +477,13 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
             if ($service_name) {
-                $http_label = "http-{$loop}-{$uuid}-{$service_name}";
-                $https_label = "https-{$loop}-{$uuid}-{$service_name}";
+                // Normalize service name for Traefik labels by replacing dots with hyphens
+                // This prevents label parsing issues with service names like "api.test"
+                // Add a 4-char hash to ensure uniqueness for services like "api.test" vs "api-test"
+                $normalized_service_name = str($service_name)->replace('.', '-')->value();
+                $hash = serviceNameHash($service_name);
+                $http_label = "http-{$loop}-{$uuid}-{$normalized_service_name}-{$hash}";
+                $https_label = "https-{$loop}-{$uuid}-{$normalized_service_name}-{$hash}";
             }
             if (str($image)->contains('ghost')) {
                 $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
