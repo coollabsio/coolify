@@ -183,7 +183,7 @@
                 :canResource="$database" />
         </div>
 
-        <div class="pb-16">
+        <div class="pb-8">
             <div class="flex items-center gap-2 pb-2">
 
                 <h3>Initialization scripts</h3>

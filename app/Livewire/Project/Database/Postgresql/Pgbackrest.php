@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Database\Postgresql;
 
 use App\Actions\Database\Pgbackrest\RestoreFromPgbackrest;
-use App\Jobs\PgbackrestStanzaJob;
 use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -124,32 +123,6 @@ class Pgbackrest extends Component
             );
 
             $this->dispatch('configurationChanged');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function initializeStanza()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            if (! $this->database->isPgbackrestEnabled()) {
-                $this->dispatch('error', 'pgBackRest must be enabled first.');
-
-                return;
-            }
-
-            $status = str($this->database->status);
-            if (! $status->startsWith('running')) {
-                $this->dispatch('error', 'Database must be running to initialize stanza.');
-
-                return;
-            }
-
-            PgbackrestStanzaJob::dispatch($this->database, 'create');
-
-            $this->dispatch('success', 'Stanza initialization job queued. This may take a few moments.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

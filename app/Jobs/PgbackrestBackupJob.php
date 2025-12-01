@@ -123,7 +123,7 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception('pgBackRest container is not running');
             }
 
-            $backupCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --type={$backupType} backup";
+            $backupCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --type={$backupType} --no-online --force backup";
 
             $output = instant_remote_process([$backupCommand], $this->server);
 

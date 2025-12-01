@@ -339,12 +339,22 @@ class StandalonePostgresql extends BaseModel
 
     public function getPgbackrestConfigDir(): string
     {
-        return $this->workdir().'/pgbackrest';
+        $baseDir = $this->workdir();
+        if (isDev()) {
+            $baseDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$this->uuid;
+        }
+
+        return $baseDir.'/pgbackrest';
     }
 
     public function getPgbackrestRepoDir(): string
     {
-        return $this->workdir().'/pgbackrest-repo';
+        $baseDir = $this->workdir();
+        if (isDev()) {
+            $baseDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$this->uuid;
+        }
+
+        return $baseDir.'/pgbackrest-repo';
     }
 
     public function getCpuMetrics(int $mins = 5)

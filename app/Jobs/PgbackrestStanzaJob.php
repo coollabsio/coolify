@@ -77,7 +77,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
                 'stanza' => $stanzaName,
             ]);
 
-            $createCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} stanza-create";
+            $createCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --no-online stanza-create";
             instant_remote_process([$createCommand], $server);
 
             Log::info('pgBackRest stanza created successfully', [
@@ -102,7 +102,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
             'stanza' => $stanzaName,
         ]);
 
-        $upgradeCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} stanza-upgrade";
+        $upgradeCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --no-online stanza-upgrade";
         instant_remote_process([$upgradeCommand], $server);
 
         Log::info('pgBackRest stanza upgraded successfully', [
@@ -118,7 +118,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
             'stanza' => $stanzaName,
         ]);
 
-        $checkCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} check";
+        $checkCommand = "docker exec {$containerName} pgbackrest --stanza={$stanzaName} --no-online check";
         instant_remote_process([$checkCommand], $server);
 
         Log::info('pgBackRest stanza check passed', [

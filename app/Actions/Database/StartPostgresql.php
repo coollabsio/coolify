@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Actions\Database\Pgbackrest\GeneratePgbackrestConfig;
 use App\Helpers\SslHelper;
+use App\Jobs\PgbackrestStanzaJob;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -30,9 +31,6 @@ class StartPostgresql
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
-        if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
-        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -182,7 +180,7 @@ class StartPostgresql
                     $docker_compose['services'][$container_name]['volumes'],
                     [[
                         'type' => 'bind',
-                        'source' => $init_script,
+                        'source' => $this->getHostPath($init_script),
                         'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
                         'read_only' => true,
                     ]]
@@ -197,7 +195,7 @@ class StartPostgresql
                 $docker_compose['services'][$container_name]['volumes'],
                 [[
                     'type' => 'bind',
-                    'source' => $this->configuration_dir.'/custom-postgres.conf',
+                    'source' => $this->getHostPath($this->configuration_dir).'/custom-postgres.conf',
                     'target' => '/etc/postgresql/postgresql.conf',
                     'read_only' => true,
                 ]]
@@ -238,6 +236,10 @@ class StartPostgresql
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
         $this->commands[] = "echo 'Database started.'";
+
+        if ($this->pgbackrest_enabled) {
+            PgbackrestStanzaJob::dispatch($this->database, 'create')->delay(now()->addSeconds(30));
+        }
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
@@ -341,9 +343,11 @@ class StartPostgresql
 
     private function setup_pgbackrest(): void
     {
+        $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
+        $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
+        $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
+
         if (! $this->pgbackrest_enabled) {
-            $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
-            $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
             $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
             $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
             $this->commands[] = "rm -rf {$pgbackrestConfigDir}";
@@ -351,23 +355,29 @@ class StartPostgresql
             return;
         }
 
-        $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
-        $pgbackrestRepoDir = $this->database->getPgbackrestRepoDir();
-
         $this->commands[] = "echo 'Setting up pgBackRest.'";
+        $this->commands[] = "docker stop {$pgbackrestContainerName} 2>/dev/null || true";
+        $this->commands[] = "docker rm -f {$pgbackrestContainerName} 2>/dev/null || true";
         $this->commands[] = "mkdir -p {$pgbackrestConfigDir}";
         $this->commands[] = "mkdir -p {$pgbackrestRepoDir}";
 
         $config = GeneratePgbackrestConfig::run($this->database);
         $configBase64 = base64_encode($config);
-        $this->commands[] = "echo '{$configBase64}' | base64 -d > {$pgbackrestConfigDir}/pgbackrest.conf";
+        $this->commands[] = "rm -rf {$pgbackrestConfigDir}/pgbackrest.conf";
+        $this->commands[] = "echo '{$configBase64}' | base64 -d | tee {$pgbackrestConfigDir}/pgbackrest.conf > /dev/null";
     }
 
     private function add_pgbackrest_service(array $docker_compose, string $postgres_container): array
     {
         $pgbackrestContainerName = $this->database->getPgbackrestContainerName();
-        $pgbackrestConfigDir = $this->database->getPgbackrestConfigDir();
-        $pgbackrestRepoDir = $this->database->getPgbackrestRepoDir();
+        $pgbackrestConfigDir = $this->configuration_dir.'/pgbackrest';
+        $pgbackrestRepoDir = $this->configuration_dir.'/pgbackrest-repo';
+
+        // In dev mode, Docker Compose runs on the host and needs host paths for bind mounts
+        // SSH commands run in coolify-testing-host where volume is at /data/coolify
+        // but Docker host sees it at /var/lib/docker/volumes/coolify_dev_coolify_data/_data
+        $hostPgbackrestConfigDir = $this->getHostPath($pgbackrestConfigDir);
+        $hostPgbackrestRepoDir = $this->getHostPath($pgbackrestRepoDir);
 
         $image = config('constants.pgbackrest.image');
         $version = config('constants.pgbackrest.version');
@@ -395,13 +405,13 @@ class StartPostgresql
             'volumes' => [
                 [
                     'type' => 'bind',
-                    'source' => "{$pgbackrestConfigDir}/pgbackrest.conf",
+                    'source' => "{$hostPgbackrestConfigDir}/pgbackrest.conf",
                     'target' => '/etc/pgbackrest/pgbackrest.conf',
                     'read_only' => true,
                 ],
                 [
                     'type' => 'bind',
-                    'source' => $pgbackrestRepoDir,
+                    'source' => $hostPgbackrestRepoDir,
                     'target' => '/var/lib/pgbackrest',
                 ],
             ],
@@ -452,5 +462,21 @@ class StartPostgresql
         }
 
         return $persistentStorage?->name ?? "postgres-data-{$this->database->uuid}";
+    }
+
+    /**
+     * Convert a path from the SSH target perspective to the Docker host perspective.
+     *
+     * In dev mode, SSH commands run in coolify-testing-host where the volume is mounted
+     * at /data/coolify, but Docker Compose runs on the host where the same volume is at
+     * /var/lib/docker/volumes/coolify_dev_coolify_data/_data.
+     */
+    private function getHostPath(string $path): string
+    {
+        if (isDev()) {
+            return str_replace('/data/coolify', '/var/lib/docker/volumes/coolify_dev_coolify_data/_data', $path);
+        }
+
+        return $path;
     }
 }

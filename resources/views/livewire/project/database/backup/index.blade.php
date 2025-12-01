@@ -5,6 +5,13 @@
     <h1>Backups</h1>
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
+
+    @if ($database->type() === 'standalone-postgresql')
+        <div class="pb-8">
+            <livewire:project.database.postgresql.pgbackrest :database="$database" />
+        </div>
+    @endif
+
     <div>
         <div class="flex gap-2">
             <h2 class="pb-4">Scheduled Backups</h2>

@@ -34,6 +34,11 @@ Code patterns and best practices by domain:
 - **[Form Components](patterns/form-components.md)** - Enhanced form components with authorization
 - **[API & Routing](patterns/api-and-routing.md)** - API design, routing conventions, REST patterns
 
+### 🔧 Features
+Feature-specific documentation:
+
+- **[pgBackRest](features/pgbackrest.md)** - PostgreSQL backup/restore with pgBackRest integration
+
 ### 📖 Meta
 Documentation about documentation:
 

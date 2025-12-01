@@ -21,6 +21,7 @@ services:
     volumes:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
+      - dev_coolify_data:/var/lib/docker/volumes/coolify_dev_coolify_data/_data
   postgres:
     pull_policy: always
     ports:
