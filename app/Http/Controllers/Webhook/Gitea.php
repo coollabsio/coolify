@@ -7,7 +7,6 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -18,30 +17,6 @@ class Gitea extends Controller
         try {
             $return_payloads = collect([]);
             $x_gitea_delivery = request()->header('X-Gitea-Delivery');
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $files = Storage::disk('webhooks-during-maintenance')->files();
-                $gitea_delivery_found = collect($files)->filter(function ($file) use ($x_gitea_delivery) {
-                    return Str::contains($file, $x_gitea_delivery);
-                })->first();
-                if ($gitea_delivery_found) {
-                    return;
-                }
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitea::manual_{$x_gitea_delivery}", $json);
-
-                return;
-            }
             $x_gitea_event = Str::lower($request->header('X-Gitea-Event'));
             $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');

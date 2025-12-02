@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Jobs\StripeProcessJob;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class Stripe extends Controller
 {
@@ -20,23 +19,6 @@ class Stripe extends Controller
                 $signature,
                 $webhookSecret
             );
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Stripe::events_stripe", $json);
-
-                return response('Webhook received. Cool cool cool cool cool.', 200);
-            }
             StripeProcessJob::dispatch($event);
 
             return response('Webhook received. Cool cool cool cool cool.', 200);

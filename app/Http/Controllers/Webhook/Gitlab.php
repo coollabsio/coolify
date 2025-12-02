@@ -7,7 +7,6 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -16,24 +15,6 @@ class Gitlab extends Controller
     public function manual(Request $request)
     {
         try {
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitlab::manual_gitlab", $json);
-
-                return;
-            }
-
             $return_payloads = collect([]);
             $payload = $request->collect();
             $headers = $request->headers->all();
