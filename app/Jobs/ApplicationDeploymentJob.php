@@ -670,13 +670,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $build_command = "DOCKER_BUILDKIT=1 {$build_command}";
             }
 
-            // Append build arguments if not using build secrets (matching default behavior)
+            // Inject build arguments after build subcommand if not using build secrets
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
                 // Escape single quotes for bash -c context used by executeInDocker
                 $build_args_string = str_replace("'", "'\\''", $build_args_string);
-                $build_command .= " {$build_args_string}";
-                $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+
+                // Inject build args right after 'build' subcommand (not at the end)
+                $original_command = $build_command;
+                $build_command = injectDockerComposeBuildArgs($build_command, $build_args_string);
+
+                // Only log if build args were actually injected (command was modified)
+                if ($build_command !== $original_command) {
+                    $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+                }
             }
 
             $this->execute_remote_command(
@@ -1363,7 +1370,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $envs_base64 = base64_encode($environment_variables->implode("\n"));
 
         // Write .env file to workdir (for container runtime)
-        $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for build phase.', hidden: true);
+        $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for container.', hidden: true);
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
@@ -1401,15 +1408,44 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
         }
 
-        $envs = collect([]);
-        $coolify_envs = $this->generate_coolify_env_variables();
+        // Use associative array for automatic deduplication
+        $envs_dict = [];
 
-        // Add COOLIFY variables
-        $coolify_envs->each(function ($item, $key) use ($envs) {
-            $envs->push($key.'='.escapeBashEnvValue($item));
-        });
+        // 1. Add nixpacks plan variables FIRST (lowest priority - can be overridden)
+        if ($this->build_pack === 'nixpacks' &&
+            isset($this->nixpacks_plan_json) &&
+            $this->nixpacks_plan_json->isNotEmpty()) {
 
-        // Add SERVICE_NAME variables for Docker Compose builds
+            $planVariables = data_get($this->nixpacks_plan_json, 'variables', []);
+
+            if (! empty($planVariables)) {
+                if (isDev()) {
+                    $this->application_deployment_queue->addLogEntry('[DEBUG] Adding '.count($planVariables).' nixpacks plan variables to buildtime.env');
+                }
+
+                foreach ($planVariables as $key => $value) {
+                    // Skip COOLIFY_* and SERVICE_* - they'll be added later with higher priority
+                    if (str_starts_with($key, 'COOLIFY_') || str_starts_with($key, 'SERVICE_')) {
+                        continue;
+                    }
+
+                    $escapedValue = escapeBashEnvValue($value);
+                    $envs_dict[$key] = $escapedValue;
+
+                    if (isDev()) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Nixpacks var: {$key}={$escapedValue}");
+                    }
+                }
+            }
+        }
+
+        // 2. Add COOLIFY variables (can override nixpacks, but shouldn't happen in practice)
+        $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
+        foreach ($coolify_envs as $key => $item) {
+            $envs_dict[$key] = escapeBashEnvValue($item);
+        }
+
+        // 3. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
         if ($this->build_pack === 'dockercompose') {
             if ($this->pull_request_id === 0) {
                 // Generate SERVICE_NAME for dockercompose services from processed compose
@@ -1420,7 +1456,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.escapeBashEnvValue($serviceName));
+                    $envs_dict['SERVICE_NAME_'.str($serviceName)->upper()] = escapeBashEnvValue($serviceName);
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
@@ -1433,8 +1469,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             } else {
@@ -1442,7 +1478,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id)));
+                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -1455,17 +1491,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyUrl->__toString()));
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.escapeBashEnvValue($coolifyFqdn));
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             }
         }
 
-        // Add build-time user variables only
+        // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
         if ($this->pull_request_id === 0) {
             $sorted_environment_variables = $this->application->environment_variables()
-                ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
@@ -1483,7 +1518,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     // Strip outer quotes from real_value and apply proper bash escaping
                     $value = trim($env->real_value, "'");
                     $escapedValue = escapeBashEnvValue($value);
-                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev() && isset($envs_dict[$env->key])) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                    }
+
+                    $envs_dict[$env->key] = $escapedValue;
 
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
@@ -1495,7 +1535,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     // For normal vars, use double quotes to allow $VAR expansion
                     $escapedValue = escapeBashDoubleQuoted($env->real_value);
-                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev() && isset($envs_dict[$env->key])) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                    }
+
+                    $envs_dict[$env->key] = $escapedValue;
 
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
@@ -1507,7 +1552,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $sorted_environment_variables = $this->application->environment_variables_preview()
-                ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
@@ -1525,7 +1569,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     // Strip outer quotes from real_value and apply proper bash escaping
                     $value = trim($env->real_value, "'");
                     $escapedValue = escapeBashEnvValue($value);
-                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev() && isset($envs_dict[$env->key])) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                    }
+
+                    $envs_dict[$env->key] = $escapedValue;
 
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
@@ -1537,7 +1586,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     // For normal vars, use double quotes to allow $VAR expansion
                     $escapedValue = escapeBashDoubleQuoted($env->real_value);
-                    $envs->push($env->key.'='.$escapedValue);
+
+                    if (isDev() && isset($envs_dict[$env->key])) {
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                    }
+
+                    $envs_dict[$env->key] = $escapedValue;
 
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
@@ -1547,6 +1601,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+        }
+
+        // Convert dictionary back to collection in KEY=VALUE format
+        $envs = collect([]);
+        foreach ($envs_dict as $key => $value) {
+            $envs->push($key.'='.$value);
         }
 
         // Return the generated environment variables
@@ -1957,7 +2017,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function set_coolify_variables()
     {
-        $this->coolify_variables = "SOURCE_COMMIT={$this->commit} ";
+        $this->coolify_variables = '';
+
+        // Only include SOURCE_COMMIT in build context if enabled in settings
+        if ($this->application->settings->include_source_commit_in_build) {
+            $this->coolify_variables .= "SOURCE_COMMIT={$this->commit} ";
+        }
         if ($this->pull_request_id === 0) {
             $fqdn = $this->application->fqdn;
         } else {
@@ -1979,7 +2044,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->coolify_variables .= "COOLIFY_BRANCH={$this->application->git_branch} ";
         }
         $this->coolify_variables .= "COOLIFY_RESOURCE_UUID={$this->application->uuid} ";
-        $this->coolify_variables .= "COOLIFY_CONTAINER_NAME={$this->container_name} ";
     }
 
     private function check_git_if_build_needed()
@@ -2230,7 +2294,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Add COOLIFY_* environment variables to Nixpacks build context
-        $coolify_envs = $this->generate_coolify_env_variables();
+        $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         $coolify_envs->each(function ($value, $key) {
             $this->env_nixpacks_args->push("--env {$key}={$value}");
         });
@@ -2238,17 +2302,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
     }
 
-    private function generate_coolify_env_variables(): Collection
+    private function generate_coolify_env_variables(bool $forBuildTime = false): Collection
     {
         $coolify_envs = collect([]);
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
-            // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
-                    $coolify_envs->put('SOURCE_COMMIT', $this->commit);
-                } else {
-                    $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+            // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
+            // SOURCE_COMMIT changes with each commit and breaks Docker cache if included in build
+            if (! $forBuildTime || $this->application->settings->include_source_commit_in_build) {
+                if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                    if (! is_null($this->commit)) {
+                        $coolify_envs->put('SOURCE_COMMIT', $this->commit);
+                    } else {
+                        $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+                    }
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
@@ -2273,20 +2340,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
                     $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
                 }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                // Only add COOLIFY_CONTAINER_NAME for runtime (not build-time) - it changes every deployment and breaks Docker cache
+                if (! $forBuildTime) {
+                    if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                        $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                    }
                 }
             }
 
             add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
 
         } else {
-            // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
-                    $coolify_envs->put('SOURCE_COMMIT', $this->commit);
-                } else {
-                    $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+            // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
+            // SOURCE_COMMIT changes with each commit and breaks Docker cache if included in build
+            if (! $forBuildTime || $this->application->settings->include_source_commit_in_build) {
+                if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                    if (! is_null($this->commit)) {
+                        $coolify_envs->put('SOURCE_COMMIT', $this->commit);
+                    } else {
+                        $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+                    }
                 }
             }
             if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
@@ -2311,8 +2384,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
                     $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
                 }
-                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                // Only add COOLIFY_CONTAINER_NAME for runtime (not build-time) - it changes every deployment and breaks Docker cache
+                if (! $forBuildTime) {
+                    if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                        $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                    }
                 }
             }
 
@@ -2326,9 +2402,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function generate_env_variables()
     {
         $this->env_args = collect([]);
-        $this->env_args->put('SOURCE_COMMIT', $this->commit);
 
-        $coolify_envs = $this->generate_coolify_env_variables();
+        // Only include SOURCE_COMMIT in build args if enabled in settings
+        if ($this->application->settings->include_source_commit_in_build) {
+            $this->env_args->put('SOURCE_COMMIT', $this->commit);
+        }
+
+        $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         $coolify_envs->each(function ($value, $key) {
             $this->env_args->put($key, $value);
         });
@@ -2748,7 +2828,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             // Traditional build args approach - generate COOLIFY_ variables locally
             // Generate COOLIFY_ variables locally for build args
-            $coolify_envs = $this->generate_coolify_env_variables();
+            $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
             $coolify_envs->each(function ($value, $key) {
                 $this->build_args->push("--build-arg '{$key}'");
             });
@@ -3070,7 +3150,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         try {
             $timeout = isDev() ? 1 : 30;
             $this->execute_remote_command(
-                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
                 ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
             );
         } catch (Exception $error) {
@@ -3294,7 +3374,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function generate_secrets_hash($variables)
     {
         if (! $this->secrets_hash_key) {
-            $this->secrets_hash_key = bin2hex(random_bytes(32));
+            // Use APP_KEY as deterministic hash key to preserve Docker build cache
+            // Random keys would change every deployment, breaking cache even when secrets haven't changed
+            $this->secrets_hash_key = config('app.key');
         }
 
         if ($variables instanceof Collection) {
@@ -3337,100 +3419,121 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         if ($this->dockerBuildkitSupported) {
             // We dont need to add build secrets to dockerfile for buildkit, as we already added them with --secret flag in function generate_docker_env_flags_for_secrets
+            return;
+        }
+
+        // Skip ARG injection if disabled by user - preserves Docker build cache
+        if ($this->application->settings->inject_build_args_to_dockerfile === false) {
+            $this->application_deployment_queue->addLogEntry('Skipping Dockerfile ARG injection (disabled in settings).', hidden: true);
+
+            return;
+        }
+
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
+            'hidden' => true,
+            'save' => 'dockerfile',
+            'ignore_errors' => true,
+        ]);
+        $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+
+        // Find all FROM instruction positions
+        $fromLines = $this->findFromInstructionLines($dockerfile);
+
+        // If no FROM instructions found, skip ARG insertion
+        if (empty($fromLines)) {
+            return;
+        }
+
+        // Collect all ARG statements to insert
+        $argsToInsert = collect();
+
+        if ($this->pull_request_id === 0) {
+            // Only add environment variables that are available during build
+            $envs = $this->application->environment_variables()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)
+                ->get();
+            foreach ($envs as $env) {
+                if (data_get($env, 'is_multiline') === true) {
+                    $argsToInsert->push("ARG {$env->key}");
+                } else {
+                    $argsToInsert->push("ARG {$env->key}={$env->real_value}");
+                }
+            }
+            // Add Coolify variables as ARGs
+            if ($this->coolify_variables) {
+                $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
+                    ->filter()
+                    ->map(function ($var) {
+                        return "ARG {$var}";
+                    });
+                $argsToInsert = $argsToInsert->merge($coolify_vars);
+            }
         } else {
-            $this->execute_remote_command([
+            // Only add preview environment variables that are available during build
+            $envs = $this->application->environment_variables_preview()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)
+                ->get();
+            foreach ($envs as $env) {
+                if (data_get($env, 'is_multiline') === true) {
+                    $argsToInsert->push("ARG {$env->key}");
+                } else {
+                    $argsToInsert->push("ARG {$env->key}={$env->real_value}");
+                }
+            }
+            // Add Coolify variables as ARGs
+            if ($this->coolify_variables) {
+                $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
+                    ->filter()
+                    ->map(function ($var) {
+                        return "ARG {$var}";
+                    });
+                $argsToInsert = $argsToInsert->merge($coolify_vars);
+            }
+        }
+
+        // Development logging to show what ARGs are being injected
+        if (isDev()) {
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] Dockerfile ARG Injection');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+            $this->application_deployment_queue->addLogEntry('[DEBUG] ARGs to inject: '.$argsToInsert->count());
+            foreach ($argsToInsert as $arg) {
+                // Only show ARG key, not the value (for security)
+                $argKey = str($arg)->after('ARG ')->before('=')->toString();
+                $this->application_deployment_queue->addLogEntry("[DEBUG]   - {$argKey}");
+            }
+        }
+
+        // Insert ARGs after each FROM instruction (in reverse order to maintain correct line numbers)
+        if ($argsToInsert->isNotEmpty()) {
+            foreach (array_reverse($fromLines) as $fromLineIndex) {
+                // Insert all ARGs after this FROM instruction
+                foreach ($argsToInsert->reverse() as $arg) {
+                    $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
+                }
+            }
+            $envs_mapped = $envs->mapWithKeys(function ($env) {
+                return [$env->key => $env->real_value];
+            });
+            $secrets_hash = $this->generate_secrets_hash($envs_mapped);
+            $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
+        }
+
+        $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
+        $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info', hidden: true);
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
+                'hidden' => true,
+            ],
+            [
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
                 'hidden' => true,
-                'save' => 'dockerfile',
                 'ignore_errors' => true,
             ]);
-            $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
-
-            // Find all FROM instruction positions
-            $fromLines = $this->findFromInstructionLines($dockerfile);
-
-            // If no FROM instructions found, skip ARG insertion
-            if (empty($fromLines)) {
-                return;
-            }
-
-            // Collect all ARG statements to insert
-            $argsToInsert = collect();
-
-            if ($this->pull_request_id === 0) {
-                // Only add environment variables that are available during build
-                $envs = $this->application->environment_variables()
-                    ->where('key', 'not like', 'NIXPACKS_%')
-                    ->where('is_buildtime', true)
-                    ->get();
-                foreach ($envs as $env) {
-                    if (data_get($env, 'is_multiline') === true) {
-                        $argsToInsert->push("ARG {$env->key}");
-                    } else {
-                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
-                    }
-                }
-                // Add Coolify variables as ARGs
-                if ($this->coolify_variables) {
-                    $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
-                        ->filter()
-                        ->map(function ($var) {
-                            return "ARG {$var}";
-                        });
-                    $argsToInsert = $argsToInsert->merge($coolify_vars);
-                }
-            } else {
-                // Only add preview environment variables that are available during build
-                $envs = $this->application->environment_variables_preview()
-                    ->where('key', 'not like', 'NIXPACKS_%')
-                    ->where('is_buildtime', true)
-                    ->get();
-                foreach ($envs as $env) {
-                    if (data_get($env, 'is_multiline') === true) {
-                        $argsToInsert->push("ARG {$env->key}");
-                    } else {
-                        $argsToInsert->push("ARG {$env->key}={$env->real_value}");
-                    }
-                }
-                // Add Coolify variables as ARGs
-                if ($this->coolify_variables) {
-                    $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
-                        ->filter()
-                        ->map(function ($var) {
-                            return "ARG {$var}";
-                        });
-                    $argsToInsert = $argsToInsert->merge($coolify_vars);
-                }
-            }
-
-            // Insert ARGs after each FROM instruction (in reverse order to maintain correct line numbers)
-            if ($argsToInsert->isNotEmpty()) {
-                foreach (array_reverse($fromLines) as $fromLineIndex) {
-                    // Insert all ARGs after this FROM instruction
-                    foreach ($argsToInsert->reverse() as $arg) {
-                        $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
-                    }
-                }
-                $envs_mapped = $envs->mapWithKeys(function ($env) {
-                    return [$env->key => $env->real_value];
-                });
-                $secrets_hash = $this->generate_secrets_hash($envs_mapped);
-                $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
-            }
-
-            $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info', hidden: true);
-            $this->execute_remote_command(
-                [
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
-                    'hidden' => true,
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]);
-        }
     }
 
     private function modify_dockerfile_for_secrets($dockerfile_path)
@@ -3500,6 +3603,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function modify_dockerfiles_for_compose($composeFile)
     {
         if ($this->application->build_pack !== 'dockercompose') {
+            return;
+        }
+
+        // Skip ARG injection if disabled by user - preserves Docker build cache
+        if ($this->application->settings->inject_build_args_to_dockerfile === false) {
+            $this->application_deployment_queue->addLogEntry('Skipping Docker Compose Dockerfile ARG injection (disabled in settings).', hidden: true);
+
             return;
         }
 
@@ -3591,6 +3701,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->application_deployment_queue->addLogEntry("Service {$serviceName}: No build-time variables to add.");
 
                 continue;
+            }
+
+            // Development logging to show what ARGs are being injected for Docker Compose
+            if (isDev()) {
+                $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+                $this->application_deployment_queue->addLogEntry("[DEBUG] Docker Compose ARG Injection - Service: {$serviceName}");
+                $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');
+                $this->application_deployment_queue->addLogEntry('[DEBUG] ARGs to inject: '.$argsToAdd->count());
+                foreach ($argsToAdd as $arg) {
+                    $argKey = str($arg)->after('ARG ')->toString();
+                    $this->application_deployment_queue->addLogEntry("[DEBUG]   - {$argKey}");
+                }
             }
 
             $totalAdded = 0;

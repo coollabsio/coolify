@@ -10,7 +10,7 @@ class ActivityMonitor extends Component
 {
     public ?string $header = null;
 
-    public $activityId;
+    public $activityId = null;
 
     public $eventToDispatch = 'activityFinished';
 
@@ -49,7 +49,22 @@ class ActivityMonitor extends Component
 
     public function hydrateActivity()
     {
+        if ($this->activityId === null) {
+            $this->activity = null;
+
+            return;
+        }
+
         $this->activity = Activity::find($this->activityId);
+    }
+
+    public function updatedActivityId($value)
+    {
+        if ($value) {
+            $this->hydrateActivity();
+            $this->isPollingActive = true;
+            self::$eventDispatched = false;
+        }
     }
 
     public function polling()

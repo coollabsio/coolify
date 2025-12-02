@@ -35,7 +35,7 @@
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="relative gap-2 cursor-pointer box group">
+                    <div class="relative gap-2 cursor-pointer coolbox group">
                         <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
@@ -103,7 +103,7 @@
                 @foreach ($servers as $server)
                     <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                         @class([
-                            'gap-2 border cursor-pointer box group',
+                            'gap-2 border cursor-pointer coolbox group',
                             'border-red-500' =>
                                 !$server->settings->is_reachable || $server->settings->force_disabled,
                         ])>

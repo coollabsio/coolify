@@ -21,7 +21,7 @@
                 <div class="flex flex-col justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
                         <div class="flex">
-                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
+                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 coolbox"
                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
                                 wire:key="{{ $ghapp->id }}">
                                 <div class="flex mr-4">

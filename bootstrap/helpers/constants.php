@@ -67,4 +67,14 @@ const SUPPORTED_OS = [
     'alpine',
 ];
 
+const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
+    'pgadmin',
+    'postgresus',
+];
+const NEEDS_TO_DISABLE_GZIP = [
+    'beszel' => ['beszel'],
+];
+const NEEDS_TO_DISABLE_STRIPPREFIX = [
+    'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
+];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

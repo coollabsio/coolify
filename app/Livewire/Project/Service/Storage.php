@@ -179,6 +179,10 @@ class Storage extends Component
             $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
             $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
 
+            // Validate paths to prevent command injection
+            validateShellSafePath($this->file_storage_directory_source, 'storage source path');
+            validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
+
             \App\Models\LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
                 'mount_path' => $this->file_storage_directory_destination,

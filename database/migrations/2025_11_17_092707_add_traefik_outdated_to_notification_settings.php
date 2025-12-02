@@ -19,9 +19,13 @@ return new class extends Migration
             $table->boolean('traefik_outdated_slack_notifications')->default(true);
         });
 
-        Schema::table('webhook_notification_settings', function (Blueprint $table) {
-            $table->boolean('traefik_outdated_webhook_notifications')->default(true);
-        });
+        // Only add if table exists and column doesn't exist
+        if (Schema::hasTable('webhook_notification_settings') &&
+            ! Schema::hasColumn('webhook_notification_settings', 'traefik_outdated_webhook_notifications')) {
+            Schema::table('webhook_notification_settings', function (Blueprint $table) {
+                $table->boolean('traefik_outdated_webhook_notifications')->default(true);
+            });
+        }
 
         Schema::table('telegram_notification_settings', function (Blueprint $table) {
             $table->boolean('traefik_outdated_telegram_notifications')->default(true);
@@ -45,9 +49,13 @@ return new class extends Migration
             $table->dropColumn('traefik_outdated_slack_notifications');
         });
 
-        Schema::table('webhook_notification_settings', function (Blueprint $table) {
-            $table->dropColumn('traefik_outdated_webhook_notifications');
-        });
+        // Only drop if table and column exist
+        if (Schema::hasTable('webhook_notification_settings') &&
+            Schema::hasColumn('webhook_notification_settings', 'traefik_outdated_webhook_notifications')) {
+            Schema::table('webhook_notification_settings', function (Blueprint $table) {
+                $table->dropColumn('traefik_outdated_webhook_notifications');
+            });
+        }
 
         Schema::table('telegram_notification_settings', function (Blueprint $table) {
             $table->dropColumn('traefik_outdated_telegram_notifications');

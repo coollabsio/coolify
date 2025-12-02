@@ -962,6 +962,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
+        '--entrypoint' => 'entrypoint',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -981,6 +982,38 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
             }
+        }
+        if ($option === '--entrypoint') {
+            $value = null;
+            // Match --entrypoint=value or --entrypoint value
+            // Handle quoted strings with escaped quotes: --entrypoint "python -c \"print('hi')\""
+            // Pattern matches: double-quoted (with escapes), single-quoted (with escapes), or unquoted values
+            if (preg_match(
+                '/--entrypoint(?:=|\s+)(?<raw>"(?:\\\\.|[^"])*"|\'(?:\\\\.|[^\'])*\'|[^\s]+)/',
+                $custom_docker_run_options,
+                $entrypoint_matches
+            )) {
+                $rawValue = $entrypoint_matches['raw'];
+                // Handle double-quoted strings: strip quotes and unescape special characters
+                if (str_starts_with($rawValue, '"') && str_ends_with($rawValue, '"')) {
+                    $inner = substr($rawValue, 1, -1);
+                    // Unescape backslash sequences: \" \$ \` \\
+                    $value = preg_replace('/\\\\(["$`\\\\])/', '$1', $inner);
+                } elseif (str_starts_with($rawValue, "'") && str_ends_with($rawValue, "'")) {
+                    // Handle single-quoted strings: just strip quotes (no unescaping per shell rules)
+                    $value = substr($rawValue, 1, -1);
+                } else {
+                    // Handle unquoted values
+                    $value = $rawValue;
+                }
+            }
+
+            if ($value && trim($value) !== '') {
+                $options[$option][] = $value;
+                $options[$option] = array_values(array_unique($options[$option]));
+            }
+
+            continue;
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
@@ -1020,6 +1053,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--entrypoint') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                // Docker compose accepts entrypoint as either a string or an array
+                // Keep it as a string for simplicity - docker compose will handle it
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -1336,4 +1375,63 @@ function injectDockerComposeFlags(string $command, string $composeFilePath, stri
 
     // Replace only first occurrence to avoid modifying comments/strings/chained commands
     return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
+}
+
+/**
+ * Inject build arguments right after build-related subcommands in docker/docker compose commands.
+ * This ensures build args are only applied to build operations, not to push, pull, up, etc.
+ *
+ * Supports:
+ * - docker compose build
+ * - docker buildx build
+ * - docker builder build
+ * - docker build (legacy)
+ *
+ * Examples:
+ * - Input:  "docker compose -f file.yml build"
+ *   Output: "docker compose -f file.yml build --build-arg X --build-arg Y"
+ *
+ * - Input:  "docker buildx build --platform linux/amd64"
+ *   Output: "docker buildx build --build-arg X --build-arg Y --platform linux/amd64"
+ *
+ * - Input:  "docker builder build --tag myimage:latest"
+ *   Output: "docker builder build --build-arg X --build-arg Y --tag myimage:latest"
+ *
+ * - Input:  "docker compose build && docker compose push"
+ *   Output: "docker compose build --build-arg X --build-arg Y && docker compose push"
+ *
+ * - Input:  "docker compose push"
+ *   Output: "docker compose push" (unchanged - no build command found)
+ *
+ * @param  string  $command  The docker command
+ * @param  string  $buildArgsString  The build arguments to inject (e.g., "--build-arg X --build-arg Y")
+ * @return string The modified command with build args injected after build subcommand
+ */
+function injectDockerComposeBuildArgs(string $command, string $buildArgsString): string
+{
+    // Early return if no build args to inject
+    if (empty(trim($buildArgsString))) {
+        return $command;
+    }
+
+    // Match build-related commands:
+    // - ' builder build' (docker builder build)
+    // - ' buildx build' (docker buildx build)
+    // - ' build' (docker compose build, docker build)
+    // Followed by either:
+    // - whitespace (allowing service names, flags, or any valid arguments)
+    // - end of string ($)
+    // This regex ensures we match build subcommands, not "build" in other contexts
+    // IMPORTANT: Order matters - check longer patterns first (builder build, buildx build) before ' build'
+    $pattern = '/( builder build| buildx build| build)(?=\s|$)/';
+
+    // Replace the first occurrence of build command with build command + build-args
+    $modifiedCommand = preg_replace(
+        $pattern,
+        '$1 '.$buildArgsString,
+        $command,
+        1  // Only replace first occurrence
+    );
+
+    return $modifiedCommand ?? $command;
 }

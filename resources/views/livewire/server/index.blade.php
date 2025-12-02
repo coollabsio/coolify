@@ -15,7 +15,7 @@
         @forelse ($servers as $server)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                 @class([
-                    'gap-2 border cursor-pointer box group',
+                    'gap-2 border cursor-pointer coolbox group',
                     'border-red-500' =>
                         !$server->settings->is_reachable || $server->settings->force_disabled,
                 ])>

@@ -1644,9 +1644,16 @@ function serviceParser(Service $resource): Collection
                 if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
-                        $fqdn = "$fqdn$path";
-                        $url = "$url$path";
-                        $fqdnValueForEnv = "$fqdnValueForEnv$path";
+                        // Only add path if it's not already present (prevents duplication on subsequent parse() calls)
+                        if (! str($fqdn)->endsWith($path)) {
+                            $fqdn = "$fqdn$path";
+                        }
+                        if (! str($url)->endsWith($path)) {
+                            $url = "$url$path";
+                        }
+                        if (! str($fqdnValueForEnv)->endsWith($path)) {
+                            $fqdnValueForEnv = "$fqdnValueForEnv$path";
+                        }
                     }
                 }
 
