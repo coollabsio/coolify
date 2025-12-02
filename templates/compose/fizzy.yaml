@@ -36,7 +36,7 @@ services:
       - MARIADB_DATABASE=fizzy
       - MARIADB_USER=$SERVICE_USER_MARIADB
       - MARIADB_PASSWORD=$SERVICE_PASSWORD_MARIADB
-      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADB_ROOT
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
     volumes:
       - mariadb-data:/var/lib/mysql
     healthcheck:
