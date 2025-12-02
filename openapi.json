@@ -8923,7 +8923,8 @@
                                         "example": true
                                     }
                                 },
-                                "type": "object"
+                                "type": "object",
+                                "additionalProperties": false
                             }
                         }
                     }

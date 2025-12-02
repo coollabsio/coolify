@@ -1559,6 +1559,7 @@ class ServicesController extends Controller
                                 'example' => true,
                             ],
                         ],
+                        additionalProperties: false,
                     ),
                 ),
             ],

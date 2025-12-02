@@ -5657,6 +5657,7 @@ paths:
                   description: 'Enable path prefix stripping in proxy.'
                   example: true
               type: object
+              additionalProperties: false
       responses:
         '200':
           description: 'Application updated successfully.'
