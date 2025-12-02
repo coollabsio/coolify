@@ -15,13 +15,11 @@ services:
       - RAILS_ENV=production
       - RAILS_LOG_TO_STDOUT=true
       - RAILS_SERVE_STATIC_FILES=true
-      - DATABASE_URL=mysql2://$SERVICE_USER_MARIADB:$SERVICE_PASSWORD_MARIADB@mariadb:3306/fizzy
+      - DATABASE_ADAPTER=sqlite3
       - VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
       - VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
-    depends_on:
-      mariadb:
-        condition: service_healthy
     volumes:
+      - fizzy-data:/rails/db
       - fizzy-storage:/rails/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/up"]
@@ -29,18 +27,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  mariadb:
-    image: mariadb:11
-    environment:
-      - MARIADB_DATABASE=fizzy
-      - MARIADB_USER=$SERVICE_USER_MARIADB
-      - MARIADB_PASSWORD=$SERVICE_PASSWORD_MARIADB
-      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
-    volumes:
-      - mariadb-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
