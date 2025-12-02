@@ -123,8 +123,28 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         if (empty($pgbackrestConfig) || empty($pgbackrestRepo)) {
             $configDir = database_configuration_dir()."/{$containerName}";
-            $pgbackrestConfig = $pgbackrestConfig ?: "{$configDir}/pgbackrest";
-            $pgbackrestRepo = $pgbackrestRepo ?: "{$configDir}/pgbackrest-repo";
+            $defaultConfig = "{$configDir}/pgbackrest";
+            $defaultRepo = "{$configDir}/pgbackrest-repo";
+
+            $checkPathsCmd = "test -d {$defaultRepo} && echo 'EXISTS' || echo 'MISSING'";
+            $pathCheck = instant_remote_process([$checkPathsCmd], $server, throwError: false);
+
+            if (trim($pathCheck) === 'EXISTS') {
+                $pgbackrestConfig = $pgbackrestConfig ?: $defaultConfig;
+                $pgbackrestRepo = $pgbackrestRepo ?: $defaultRepo;
+            } else {
+                $devConfigDir = "/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/{$containerName}";
+                $devCheckCmd = "test -d {$devConfigDir}/pgbackrest-repo && echo 'EXISTS' || echo 'MISSING'";
+                $devCheck = instant_remote_process([$devCheckCmd], $server, throwError: false);
+
+                if (trim($devCheck) === 'EXISTS') {
+                    $pgbackrestConfig = $pgbackrestConfig ?: "{$devConfigDir}/pgbackrest";
+                    $pgbackrestRepo = $pgbackrestRepo ?: "{$devConfigDir}/pgbackrest-repo";
+                } else {
+                    $pgbackrestConfig = $pgbackrestConfig ?: $defaultConfig;
+                    $pgbackrestRepo = $pgbackrestRepo ?: $defaultRepo;
+                }
+            }
         }
 
         return [
