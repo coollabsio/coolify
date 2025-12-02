@@ -1,37 +1,9 @@
 <div class="p-4 my-4 border dark:border-coolgray-200 border-neutral-200">
     <div x-init="$wire.getLogs" id="screen" x-data="{
         fullscreen: false,
-        alwaysScroll: false,
-        intervalId: null,
         useSimpleView: localStorage.getItem('logView') === 'simple',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
-            if (this.fullscreen === false) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-            }
-        },
-        toggleScroll() {
-            this.alwaysScroll = !this.alwaysScroll;
-
-            if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const screen = document.getElementById('screen');
-                    const logs = document.getElementById('logs');
-                    if (screen.scrollTop !== logs.scrollHeight) {
-                        screen.scrollTop = logs.scrollHeight;
-                    }
-                }, 100);
-            } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-            }
-        },
-        goTop() {
-            this.alwaysScroll = false;
-            clearInterval(this.intervalId);
-            const screen = document.getElementById('screen');
-            screen.scrollTop = 0;
         },
         toggleLogView() {
             localStorage.setItem('logView', this.useSimpleView ? 'simple' : 'enhanced');
