@@ -4,64 +4,18 @@ declare(strict_types=1);
 
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\Config\RectorConfig;
+use Rector\Php80\Rector\NotIdentical\MbStrContainsRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
-use RectorLaravel\Rector\ArrayDimFetch\EnvVariableToEnvHelperRector;
-use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
-use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
-use RectorLaravel\Rector\ArrayDimFetch\SessionVariableToSessionFacadeRector;
-use RectorLaravel\Rector\BooleanNot\AvoidNegatedCollectionContainsOrDoesntContainRector;
-use RectorLaravel\Rector\Cast\DatabaseExpressionCastsToMethodCallRector;
-use RectorLaravel\Rector\Class_\AddExtendsAnnotationToModelFactoriesRector;
-use RectorLaravel\Rector\Class_\AddMockConsoleOutputFalseToConsoleTestsRector;
-use RectorLaravel\Rector\Class_\AnonymousMigrationsRector;
-use RectorLaravel\Rector\Class_\PropertyDeferToDeferrableProviderToRector;
+use Rector\Php85\Rector\Expression\NestedFuncCallsToPipeOperatorRector;
+use Rector\Php85\Rector\StmtsAwareInterface\SequentialAssignmentsToPipeOperatorRector;
 use RectorLaravel\Rector\Class_\RemoveModelPropertyFromFactoriesRector;
-use RectorLaravel\Rector\Class_\ReplaceExpectsMethodsInTestsRector;
-use RectorLaravel\Rector\Class_\UnifyModelDatesWithCastsRector;
-use RectorLaravel\Rector\ClassMethod\AddGenericReturnTypeToRelationsRector;
-use RectorLaravel\Rector\ClassMethod\MigrateToSimplifiedAttributeRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
-use RectorLaravel\Rector\Expr\AppEnvironmentComparisonToParameterRector;
-use RectorLaravel\Rector\Expr\SubStrToStartsWithOrEndsWithStaticMethodCallRector\SubStrToStartsWithOrEndsWithStaticMethodCallRector;
-use RectorLaravel\Rector\FuncCall\DispatchNonShouldQueueToDispatchSyncRector;
-use RectorLaravel\Rector\FuncCall\FactoryFuncCallToStaticCallRector;
-use RectorLaravel\Rector\FuncCall\HelperFuncCallToFacadeClassRector;
-use RectorLaravel\Rector\FuncCall\NotFilledBlankFuncCallToBlankFilledFuncCallRector;
-use RectorLaravel\Rector\FuncCall\NowFuncWithStartOfDayMethodCallToTodayFuncRector;
+use RectorLaravel\Rector\FuncCall\ConfigToTypedConfigMethodCallRector;
 use RectorLaravel\Rector\FuncCall\RemoveDumpDataDeadCodeRector;
-use RectorLaravel\Rector\FuncCall\RemoveRedundantValueCallsRector;
-use RectorLaravel\Rector\FuncCall\RemoveRedundantWithCallsRector;
-use RectorLaravel\Rector\FuncCall\SleepFuncToSleepStaticCallRector;
-use RectorLaravel\Rector\FuncCall\TypeHintTappableCallRector;
-use RectorLaravel\Rector\If_\AbortIfRector;
-use RectorLaravel\Rector\If_\ReportIfRector;
-use RectorLaravel\Rector\If_\ThrowIfRector;
-use RectorLaravel\Rector\MethodCall\AssertSeeToAssertSeeHtmlRector;
-use RectorLaravel\Rector\MethodCall\AssertStatusToAssertMethodRector;
-use RectorLaravel\Rector\MethodCall\AvoidNegatedCollectionFilterOrRejectRector;
-use RectorLaravel\Rector\MethodCall\DatabaseExpressionToStringToMethodCallRector;
-use RectorLaravel\Rector\MethodCall\FactoryApplyingStatesRector;
-use RectorLaravel\Rector\MethodCall\JsonCallToExplicitJsonCallRector;
-use RectorLaravel\Rector\MethodCall\LumenRoutesStringActionToUsesArrayRector;
-use RectorLaravel\Rector\MethodCall\LumenRoutesStringMiddlewareToArrayRector;
-use RectorLaravel\Rector\MethodCall\RedirectBackToBackHelperRector;
-use RectorLaravel\Rector\MethodCall\RedirectRouteToToRouteHelperRector;
-use RectorLaravel\Rector\MethodCall\RefactorBlueprintGeometryColumnsRector;
-use RectorLaravel\Rector\MethodCall\ReplaceWithoutJobsEventsAndNotificationsWithFacadeFakeRector;
-use RectorLaravel\Rector\MethodCall\ResponseHelperCallToJsonResponseRector;
-use RectorLaravel\Rector\MethodCall\ReverseConditionableMethodCallRector;
-use RectorLaravel\Rector\MethodCall\UnaliasCollectionMethodsRector;
-use RectorLaravel\Rector\MethodCall\UseComponentPropertyWithinCommandsRector;
-use RectorLaravel\Rector\MethodCall\ValidationRuleArrayStringValueToArrayRector;
 use RectorLaravel\Rector\MethodCall\WhereToWhereLikeRector;
-use RectorLaravel\Rector\Namespace_\FactoryDefinitionRector;
-use RectorLaravel\Rector\PropertyFetch\OptionalToNullsafeOperatorRector;
-use RectorLaravel\Rector\PropertyFetch\ReplaceFakerInstanceWithHelperRector;
-use RectorLaravel\Rector\StaticCall\CarbonSetTestNowToTravelToRector;
-use RectorLaravel\Rector\StaticCall\DispatchToHelperFunctionsRector;
-use RectorLaravel\Rector\StaticCall\Redirect301ToPermanentRedirectRector;
-use RectorLaravel\Rector\StaticCall\ReplaceAssertTimesSendWithAssertSentTimesRector;
 use RectorLaravel\Rector\StaticCall\RequestStaticValidateToInjectRector;
+use RectorLaravel\Set\LaravelSetList;
+use RectorLaravel\Set\LaravelSetProvider;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -80,77 +34,45 @@ return RectorConfig::configure()
     ])
     ->withCache(__DIR__.'/storage/rector', FileCacheStorage::class)
     ->withPhpSets()
+    ->withAttributesSets()
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,
         codingStyle: true,
         typeDeclarations: true,
+        typeDeclarationDocblocks: true,
         privatization: true,
-        naming: true,
         instanceOf: true,
         earlyReturn: true,
         carbon: true,
         rectorPreset: true,
-        phpunitCodeQuality: true,
     )
-    ->withAttributesSets()
+    ->withSetProviders(LaravelSetProvider::class)
+    ->withComposerBased(laravel: true)
+    ->withSets([
+        LaravelSetList::LARAVEL_ARRAYACCESS_TO_METHOD_CALL,
+        LaravelSetList::LARAVEL_ARRAY_STR_FUNCTION_TO_STATIC_CALL,
+        LaravelSetList::LARAVEL_CODE_QUALITY,
+        LaravelSetList::LARAVEL_COLLECTION,
+        LaravelSetList::LARAVEL_CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME,
+        LaravelSetList::LARAVEL_FACADE_ALIASES_TO_FULL_NAMES,
+        LaravelSetList::LARAVEL_FACTORIES,
+        LaravelSetList::LARAVEL_IF_HELPERS,
+        LaravelSetList::LARAVEL_LEGACY_FACTORIES_TO_CLASSES,
+        LaravelSetList::LARAVEL_TESTING,
+        LaravelSetList::LARAVEL_TYPE_DECLARATIONS,
+    ])
     ->withRules([
-        AbortIfRector::class,
-        AddExtendsAnnotationToModelFactoriesRector::class,
-        AddGenericReturnTypeToRelationsRector::class,
-        AddMockConsoleOutputFalseToConsoleTestsRector::class,
-        AnonymousMigrationsRector::class,
-        AppEnvironmentComparisonToParameterRector::class,
-        AssertSeeToAssertSeeHtmlRector::class,
-        AssertStatusToAssertMethodRector::class,
-        AvoidNegatedCollectionContainsOrDoesntContainRector::class,
-        AvoidNegatedCollectionFilterOrRejectRector::class,
-        CarbonSetTestNowToTravelToRector::class,
-        DatabaseExpressionCastsToMethodCallRector::class,
-        DatabaseExpressionToStringToMethodCallRector::class,
-        DispatchNonShouldQueueToDispatchSyncRector::class,
-        DispatchToHelperFunctionsRector::class,
+        // Core Rector Rules
+        SequentialAssignmentsToPipeOperatorRector::class,
+        NestedFuncCallsToPipeOperatorRector::class,
+        MbStrContainsRector::class,
+
+        // Laravel Rector Rules
         EmptyToBlankAndFilledFuncRector::class,
-        EnvVariableToEnvHelperRector::class,
-        FactoryApplyingStatesRector::class,
-        FactoryDefinitionRector::class,
-        FactoryFuncCallToStaticCallRector::class,
-        HelperFuncCallToFacadeClassRector::class,
-        JsonCallToExplicitJsonCallRector::class,
-        LumenRoutesStringActionToUsesArrayRector::class,
-        LumenRoutesStringMiddlewareToArrayRector::class,
-        MigrateToSimplifiedAttributeRector::class,
-        NotFilledBlankFuncCallToBlankFilledFuncCallRector::class,
-        NowFuncWithStartOfDayMethodCallToTodayFuncRector::class,
-        OptionalToNullsafeOperatorRector::class,
-        PropertyDeferToDeferrableProviderToRector::class,
-        Redirect301ToPermanentRedirectRector::class,
-        RedirectBackToBackHelperRector::class,
-        RedirectRouteToToRouteHelperRector::class,
-        RefactorBlueprintGeometryColumnsRector::class,
-        RemoveDumpDataDeadCodeRector::class,
+        ConfigToTypedConfigMethodCallRector::class,
         RemoveModelPropertyFromFactoriesRector::class,
-        RemoveRedundantValueCallsRector::class,
-        RemoveRedundantWithCallsRector::class,
-        ReplaceAssertTimesSendWithAssertSentTimesRector::class,
-        ReplaceExpectsMethodsInTestsRector::class,
-        ReplaceFakerInstanceWithHelperRector::class,
-        ReplaceWithoutJobsEventsAndNotificationsWithFacadeFakeRector::class,
-        ReportIfRector::class,
         RequestStaticValidateToInjectRector::class,
-        RequestVariablesToRequestFacadeRector::class,
-        ResponseHelperCallToJsonResponseRector::class,
-        ReverseConditionableMethodCallRector::class,
-        ServerVariableToRequestFacadeRector::class,
-        SessionVariableToSessionFacadeRector::class,
-        SleepFuncToSleepStaticCallRector::class,
-        SubStrToStartsWithOrEndsWithStaticMethodCallRector::class,
-        ThrowIfRector::class,
-        TypeHintTappableCallRector::class,
-        UnaliasCollectionMethodsRector::class,
-        UnifyModelDatesWithCastsRector::class,
-        UseComponentPropertyWithinCommandsRector::class,
-        ValidationRuleArrayStringValueToArrayRector::class,
     ])
     ->withConfiguredRule(RemoveDumpDataDeadCodeRector::class, [
         'dd',
