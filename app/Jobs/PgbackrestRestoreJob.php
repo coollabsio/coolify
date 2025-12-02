@@ -128,7 +128,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
     private function clearDataDirectory(Server $server, string $container): void
     {
         $dataDir = '/var/lib/postgresql/data';
-        $clearCmd = "docker exec {$container} find {$dataDir} -mindepth 1 -delete 2>&1 || true";
+        $clearCmd = "docker exec -u 0:0 {$container} sh -c 'rm -rf {$dataDir}/* {$dataDir}/.[!.]* 2>/dev/null; chown postgres:postgres {$dataDir}'";
         instant_remote_process([$clearCmd], $server, false);
     }
 
