@@ -2,11 +2,8 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Actions\Database\Pgbackrest\RestoreFromPgbackrest;
-use App\Jobs\PgbackrestRestoreJob;
 use App\Models\S3Storage;
 use App\Models\Server;
-use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -155,14 +152,6 @@ class Import extends Component
 
     public ?int $s3FileSize = null;
 
-    public bool $pgbackrestEnabled = false;
-
-    public array $pgbackrestBackups = [];
-
-    public ?string $selectedPgbackrestBackup = null;
-
-    public bool $pgbackrestRestoreInProgress = false;
-
     public function getListeners()
     {
         $userId = Auth::id();
@@ -183,7 +172,6 @@ class Import extends Component
         $this->parameters = get_route_parameters();
         $this->getContainers();
         $this->loadAvailableS3Storages();
-        $this->loadPgbackrestBackups();
     }
 
     public function updatedDumpAll($value)
@@ -623,89 +611,5 @@ EOD;
         }
 
         return $restoreCommand;
-    }
-
-    public function loadPgbackrestBackups(): void
-    {
-        $this->pgbackrestEnabled = false;
-        $this->pgbackrestBackups = [];
-
-        if (! $this->resource instanceof StandalonePostgresql) {
-            return;
-        }
-
-        if (! $this->resource->isPgbackrestEnabled()) {
-            return;
-        }
-
-        $this->pgbackrestEnabled = true;
-
-        try {
-            $restoreAction = new RestoreFromPgbackrest;
-            $result = $restoreAction->getAvailableBackups($this->resource);
-            if ($result['success']) {
-                $this->pgbackrestBackups = $result['backups'];
-            }
-        } catch (\Throwable $e) {
-            $this->pgbackrestBackups = [];
-        }
-    }
-
-    public function refreshPgbackrestBackups(): void
-    {
-        $this->loadPgbackrestBackups();
-        $this->dispatch('success', 'Backup list refreshed.');
-    }
-
-    public function restoreFromPgbackrest(): void
-    {
-        $this->authorize('update', $this->resource);
-
-        if (! $this->resource instanceof StandalonePostgresql) {
-            $this->dispatch('error', 'pgBackRest restore is only available for PostgreSQL databases.');
-
-            return;
-        }
-
-        if (! $this->resource->isPgbackrestEnabled()) {
-            $this->dispatch('error', 'pgBackRest is not enabled for this database.');
-
-            return;
-        }
-
-        if (blank($this->selectedPgbackrestBackup)) {
-            $this->dispatch('error', 'Please select a backup to restore.');
-
-            return;
-        }
-
-        $restoreAction = new RestoreFromPgbackrest;
-        $validation = $restoreAction->validateRestore(
-            $this->resource,
-            $this->selectedPgbackrestBackup
-        );
-
-        if (! $validation['valid']) {
-            $this->dispatch('error', $validation['message']);
-
-            return;
-        }
-
-        try {
-            $this->pgbackrestRestoreInProgress = true;
-
-            PgbackrestRestoreJob::dispatch(
-                $this->resource,
-                $this->selectedPgbackrestBackup,
-                null,
-                true
-            );
-
-            $this->dispatch('success', 'Restore job has been queued. The database will restart automatically after restore completes.');
-        } catch (\Throwable $e) {
-            $this->pgbackrestRestoreInProgress = false;
-
-            return handleError($e, $this);
-        }
     }
 }

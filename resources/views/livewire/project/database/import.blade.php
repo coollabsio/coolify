@@ -126,19 +126,6 @@
                     </div>
                 @endif
 
-                @if ($pgbackrestEnabled)
-                    <div @click="restoreType = 'pgbackrest'"
-                         class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
-                         :class="restoreType === 'pgbackrest' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
-                        <div class="flex flex-col gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                            </svg>
-                            <h4 class="text-lg font-bold">Restore from pgBackRest</h4>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">Point-in-time recovery using pgBackRest backups</p>
-                        </div>
-                    </div>
-                @endif
             </div>
 
             {{-- File Restore Section --}}
@@ -228,97 +215,6 @@
                                             <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
                                         </x-modal-confirmation>
                                     </div>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                @endcan
-            @endif
-
-            {{-- pgBackRest Restore Section --}}
-            @if ($pgbackrestEnabled)
-                @can('update', $resource)
-                    <div x-show="restoreType === 'pgbackrest'" class="pt-6">
-                        <h3>Restore from pgBackRest</h3>
-                        <p class="text-sm text-neutral-500 pt-2">
-                            pgBackRest provides efficient point-in-time recovery. The database will be stopped during restore and restarted automatically after completion.
-                        </p>
-
-                        <div class="flex flex-col gap-4 pt-4">
-                            <div class="flex gap-2 items-center">
-                                <x-forms.button wire:click="refreshPgbackrestBackups" type="button">
-                                    Refresh Backup List
-                                </x-forms.button>
-                            </div>
-
-                            @if (count($pgbackrestBackups) > 0)
-                                <div class="overflow-x-auto">
-                                    <table class="table-auto w-full text-sm">
-                                        <thead>
-                                            <tr class="border-b border-neutral-700">
-                                                <th class="px-4 py-2 text-left w-12">Select</th>
-                                                <th class="px-4 py-2 text-left">Label</th>
-                                                <th class="px-4 py-2 text-left">Type</th>
-                                                <th class="px-4 py-2 text-left">Size</th>
-                                                <th class="px-4 py-2 text-left">Completed</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach ($pgbackrestBackups as $backup)
-                                                <tr class="border-b border-neutral-800 cursor-pointer hover:bg-neutral-800/50"
-                                                    wire:click="$set('selectedPgbackrestBackup', '{{ $backup['label'] }}')">
-                                                    <td class="px-4 py-2">
-                                                        <input type="radio" name="pgbackrest_backup"
-                                                            value="{{ $backup['label'] }}"
-                                                            wire:model="selectedPgbackrestBackup"
-                                                            class="radio radio-warning" />
-                                                    </td>
-                                                    <td class="px-4 py-2 font-mono text-xs">{{ $backup['label'] }}</td>
-                                                    <td class="px-4 py-2">
-                                                        <span class="px-2 py-1 rounded text-xs
-                                                            @if ($backup['type'] === 'full') bg-green-600
-                                                            @elseif ($backup['type'] === 'diff') bg-blue-600
-                                                            @else bg-yellow-600 @endif">
-                                                            {{ $backup['type'] }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-4 py-2">{{ $backup['size_formatted'] ?? formatBytes($backup['size'] ?? 0) }}</td>
-                                                    <td class="px-4 py-2">
-                                                        @if ($backup['timestamp_stop'])
-                                                            {{ \Carbon\Carbon::createFromTimestamp($backup['timestamp_stop'])->format('Y-m-d H:i:s') }}
-                                                        @else
-                                                            -
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                @if ($selectedPgbackrestBackup)
-                                    <div class="pt-4">
-                                        <div class="p-4 rounded bg-neutral-800">
-                                            <p class="text-sm">Selected backup: <span class="font-mono font-bold">{{ $selectedPgbackrestBackup }}</span></p>
-                                        </div>
-                                        <div class="pt-4">
-                                            <x-modal-confirmation title="Restore Database from pgBackRest?" buttonTitle="Restore from pgBackRest"
-                                                submitAction="restoreFromPgbackrest" isErrorButton
-                                                :actions="[
-                                                    'This will stop the PostgreSQL database and restore it from the selected backup.',
-                                                    'All data written after this backup was taken will be permanently lost.',
-                                                    'The database will be temporarily unavailable during the restore process.',
-                                                    'After restore, the database will automatically restart.',
-                                                ]"
-                                                confirmationText="restore"
-                                                confirmationLabel="Type 'restore' to confirm"
-                                                shortConfirmationLabel="Confirmation" />
-                                        </div>
-                                    </div>
-                                @endif
-                            @else
-                                <div class="text-neutral-500">
-                                    No pgBackRest backups found. Run a backup first using the scheduled backup feature with pgBackRest enabled.
                                 </div>
                             @endif
                         </div>
