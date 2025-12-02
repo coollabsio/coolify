@@ -61,7 +61,8 @@
                 <x-forms.button type="submit">Refresh</x-forms.button>
                 <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
                 <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
-                <x-forms.checkbox-alpine label="Simple View" x-model="useSimpleView" @click="$nextTick(() => toggleLogView())" />
+                <x-forms.checkbox-alpine label="Simple View" x-model="useSimpleView"
+                    @click="$nextTick(() => toggleLogView())" />
             </div>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
@@ -70,21 +71,6 @@
                 <div :class="fullscreen ? 'fixed top-4 right-4' : 'absolute top-6 right-0'">
                     <div class="flex justify-end gap-4" :class="fullscreen ? 'fixed' : ''"
                         style="transform: translateX(-100%)">
-                        {{-- <button title="Go Top" x-show="fullscreen" x-on:click="goTop">
-                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
-                            </svg>
-                        </button>
-                        <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'dark:text-warning' : ''"
-                            x-on:click="toggleScroll">
-                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
-                            </svg>
-                        </button> --}}
                         <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen">
                             <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
