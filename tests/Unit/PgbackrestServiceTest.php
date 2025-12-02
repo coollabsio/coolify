@@ -140,6 +140,24 @@ it('buildRestoreCommand uses immediate type when no target time', function () {
     expect($command)->toContain('--type=immediate');
 });
 
+it('buildRestoreCommand includes paths when includePaths is true', function () {
+    $service = PgbackrestService::for($this->database);
+
+    $command = $service->buildRestoreCommand(null, null, includePaths: true);
+
+    expect($command)->toContain('--pg1-path=/var/lib/postgresql/data');
+    expect($command)->toContain('--repo1-path=/var/lib/pgbackrest');
+});
+
+it('buildRestoreCommand excludes paths by default', function () {
+    $service = PgbackrestService::for($this->database);
+
+    $command = $service->buildRestoreCommand();
+
+    expect($command)->not->toContain('--pg1-path');
+    expect($command)->not->toContain('--repo1-path');
+});
+
 it('formatBackupType returns correct labels', function () {
     expect(PgbackrestService::formatBackupType('full'))->toBe('Full');
     expect(PgbackrestService::formatBackupType('diff'))->toBe('Differential');

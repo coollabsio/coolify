@@ -405,11 +405,18 @@ class PgbackrestService
 
     /**
      * Build the pgBackRest restore command.
+     *
+     * @param  bool  $includePaths  Include explicit paths (needed for temp container)
      */
-    public function buildRestoreCommand(?string $backupLabel = null, ?string $targetTime = null): string
+    public function buildRestoreCommand(?string $backupLabel = null, ?string $targetTime = null, bool $includePaths = false): string
     {
         $stanza = escapeshellarg($this->getStanzaName());
         $command = "--stanza={$stanza}";
+
+        if ($includePaths) {
+            $command .= ' --pg1-path=/var/lib/postgresql/data';
+            $command .= ' --repo1-path=/var/lib/pgbackrest';
+        }
 
         if ($backupLabel) {
             $command .= ' --set='.escapeshellarg($backupLabel);
@@ -433,7 +440,7 @@ class PgbackrestService
      */
     public function restore(?string $backupLabel = null, ?string $targetTime = null): string
     {
-        $command = $this->buildRestoreCommand($backupLabel, $targetTime);
+        $command = $this->buildRestoreCommand($backupLabel, $targetTime, includePaths: true);
 
         return $this->execute($command, needsDataDir: true, throwError: true);
     }
