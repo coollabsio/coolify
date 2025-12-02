@@ -376,7 +376,8 @@
                                 "schema": {
                                     "properties": {
                                         "uuid": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "format": "uuid"
                                         }
                                     },
                                     "type": "object"
