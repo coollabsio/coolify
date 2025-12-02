@@ -120,7 +120,7 @@ class ServerManagerJob implements ShouldQueue
         // Check if we should run sentinel-based checks
         $lastSentinelUpdate = $server->sentinel_updated_at;
         $waitTime = $server->waitBeforeDoingSshCheck();
-        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->subSeconds($waitTime));
+        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
         if ($sentinelOutOfSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
