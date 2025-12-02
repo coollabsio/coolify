@@ -1,0 +1,45 @@
+# documentation: https://github.com/basecamp/fizzy
+# slogan: Kanban tracking tool for issues and ideas by 37signals
+# category: productivity
+# tags: kanban, project management, issues, rails, ruby, basecamp, 37signals
+# logo: svgs/fizzy.svg
+# port: 80
+
+services:
+  fizzy:
+    image: ghcr.io/basecamp/fizzy:main
+    environment:
+      - SERVICE_FQDN_FIZZY_80
+      - SECRET_KEY_BASE=$SERVICE_PASSWORD_FIZZY
+      - RAILS_MASTER_KEY=$SERVICE_PASSWORD_64_MASTERKEY
+      - RAILS_ENV=production
+      - RAILS_LOG_TO_STDOUT=true
+      - RAILS_SERVE_STATIC_FILES=true
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/fizzy
+      - VAPID_PRIVATE_KEY=$SERVICE_PASSWORD_64_VAPIDPRIVATE
+      - VAPID_PUBLIC_KEY=$SERVICE_PASSWORD_64_VAPIDPUBLIC
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - fizzy-storage:/rails/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=fizzy
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

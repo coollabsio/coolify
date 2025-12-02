@@ -1110,6 +1110,24 @@
         "minversion": "0.0.0",
         "port": "5800"
     },
+    "fizzy": {
+        "documentation": "https://github.com/basecamp/fizzy?utm_source=coolify.io",
+        "slogan": "Kanban tracking tool for issues and ideas by 37signals",
+        "compose": "c2VydmljZXM6CiAgZml6enk6CiAgICBpbWFnZTogJ2doY3IuaW8vYmFzZWNhbXAvZml6enk6bWFpbicKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSVpaWV84MAogICAgICAtIFNFQ1JFVF9LRVlfQkFTRT0kU0VSVklDRV9QQVNTV09SRF9GSVpaWQogICAgICAtIFJBSUxTX01BU1RFUl9LRVk9JFNFUlZJQ0VfUEFTU1dPUkRfNjRfTUFTVEVSS0VZCiAgICAgIC0gUkFJTFNfRU5WPXByb2R1Y3Rpb24KICAgICAgLSBSQUlMU19MT0dfVE9fU1RET1VUPXRydWUKICAgICAgLSBSQUlMU19TRVJWRV9TVEFUSUNfRklMRVM9dHJ1ZQogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXNxbDovLyRTRVJWSUNFX1VTRVJfUE9TVEdSRVM6JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVNAcG9zdGdyZXM6NTQzMi9maXp6eScKICAgICAgLSBWQVBJRF9QUklWQVRFX0tFWT0kU0VSVklDRV9QQVNTV09SRF82NF9WQVBJRFBSSVZBVEUKICAgICAgLSBWQVBJRF9QVUJMSUNfS0VZPSRTRVJWSUNFX1BBU1NXT1JEXzY0X1ZBUElEUFVCTElDCiAgICBkZXBlbmRzX29uOgogICAgICBwb3N0Z3JlczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgdm9sdW1lczoKICAgICAgLSAnZml6enktc3RvcmFnZTovcmFpbHMvc3RvcmFnZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MC91cCcKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMzBzCiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX0RCPWZpenp5CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3Bvc3RncmVzLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "kanban",
+            "project management",
+            "issues",
+            "rails",
+            "ruby",
+            "basecamp",
+            "37signals"
+        ],
+        "category": "productivity",
+        "logo": "svgs/fizzy.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "flipt": {
         "documentation": "https://docs.flipt.io/cloud/overview?utm_source=coolify.io",
         "slogan": "Flipt is a fully managed feature flag solution that enables you to keep your feature flags and remote config next to your code in Git.",

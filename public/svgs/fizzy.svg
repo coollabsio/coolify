@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#0EA5E9" stroke="#0284C7" stroke-width="2"/>
+
+  <!-- Kanban board representation -->
+  <g transform="translate(20, 25)">
+    <!-- First column -->
+    <rect x="0" y="0" width="16" height="50" rx="2" fill="white" opacity="0.9"/>
+    <rect x="2" y="4" width="12" height="8" rx="1" fill="#0EA5E9"/>
+    <rect x="2" y="14" width="12" height="8" rx="1" fill="#0EA5E9"/>
+    <rect x="2" y="24" width="12" height="8" rx="1" fill="#0EA5E9"/>
+
+    <!-- Second column -->
+    <rect x="22" y="0" width="16" height="50" rx="2" fill="white" opacity="0.9"/>
+    <rect x="24" y="4" width="12" height="8" rx="1" fill="#0EA5E9"/>
+    <rect x="24" y="14" width="12" height="8" rx="1" fill="#0EA5E9"/>
+
+    <!-- Third column -->
+    <rect x="44" y="0" width="16" height="50" rx="2" fill="white" opacity="0.9"/>
+    <rect x="46" y="4" width="12" height="8" rx="1" fill="#0EA5E9"/>
+  </g>
+
+  <!-- Sparkle/Fizzy effect -->
+  <circle cx="75" cy="30" r="3" fill="#FCD34D" opacity="0.9"/>
+  <circle cx="70" cy="20" r="2" fill="#FCD34D" opacity="0.7"/>
+  <circle cx="80" cy="25" r="2.5" fill="#FCD34D" opacity="0.8"/>
+</svg>
