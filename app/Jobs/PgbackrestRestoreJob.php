@@ -48,15 +48,17 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $this->updateRestoreStatus('running', 'Preparing for restore...');
 
         try {
+            $mounts = $this->getVolumeMounts($server);
+
             $this->updateRestoreStatus('running', 'Stopping PostgreSQL container...');
             $this->stopContainer($server, $containerName);
 
             $this->updateRestoreStatus('running', 'Clearing data directory...');
-            $this->clearDataDirectory($server);
+            $this->clearDataDirectory($server, $mounts);
 
             $this->updateRestoreStatus('running', "Restoring from backup: {$this->backupLabel}...");
             $restoreCommand = $this->buildRestoreCommand($stanzaName);
-            $output = $this->executeRestoreWithTempContainer($server, $restoreCommand);
+            $output = $this->executeRestoreWithTempContainer($server, $mounts, $restoreCommand);
 
             Log::info('pgBackRest restore completed', [
                 'database_id' => $this->database->id,
@@ -101,31 +103,47 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         sleep(2);
     }
 
-    private function getVolumeMounts(): array
+    private function getVolumeMounts(Server $server): array
     {
         $containerName = $this->database->uuid;
-        $configDir = database_configuration_dir()."/{$containerName}";
         $dataVolume = "postgres-data-{$containerName}";
+
+        $inspectCmd = "docker inspect {$containerName} --format '{{range .Mounts}}{{if eq .Destination \"/etc/pgbackrest\"}}PGBACKREST_CONFIG={{.Source}}{{end}}{{if eq .Destination \"/var/lib/pgbackrest\"}}PGBACKREST_REPO={{.Source}}{{end}}{{end}}' 2>/dev/null || true";
+        $output = instant_remote_process([$inspectCmd], $server, false);
+
+        $pgbackrestConfig = '';
+        $pgbackrestRepo = '';
+
+        if (preg_match('/PGBACKREST_CONFIG=([^\s]+)/', $output ?? '', $matches)) {
+            $pgbackrestConfig = $matches[1];
+        }
+        if (preg_match('/PGBACKREST_REPO=([^\s]+)/', $output ?? '', $matches)) {
+            $pgbackrestRepo = $matches[1];
+        }
+
+        if (empty($pgbackrestConfig) || empty($pgbackrestRepo)) {
+            $configDir = database_configuration_dir()."/{$containerName}";
+            $pgbackrestConfig = $pgbackrestConfig ?: "{$configDir}/pgbackrest";
+            $pgbackrestRepo = $pgbackrestRepo ?: "{$configDir}/pgbackrest-repo";
+        }
 
         return [
             'data_volume' => $dataVolume,
-            'pgbackrest_config' => "{$configDir}/pgbackrest",
-            'pgbackrest_repo' => "{$configDir}/pgbackrest-repo",
+            'pgbackrest_config' => $pgbackrestConfig,
+            'pgbackrest_repo' => $pgbackrestRepo,
         ];
     }
 
-    private function clearDataDirectory(Server $server): void
+    private function clearDataDirectory(Server $server, array $mounts): void
     {
-        $mounts = $this->getVolumeMounts();
         $dataVolume = $mounts['data_volume'];
 
         $clearCmd = "docker run --rm -v {$dataVolume}:/var/lib/postgresql/data alpine sh -c 'rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]*'";
         instant_remote_process([$clearCmd], $server, false);
     }
 
-    private function executeRestoreWithTempContainer(Server $server, string $restoreCommand): string
+    private function executeRestoreWithTempContainer(Server $server, array $mounts, string $restoreCommand): string
     {
-        $mounts = $this->getVolumeMounts();
         $image = $this->database->image;
 
         $cmd = 'docker run --rm '.
