@@ -124,7 +124,7 @@ class ServerManagerJob implements ShouldQueue
 
         if ($sentinelOutOfSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
-            if ($this->shouldRunNow($this->checkFrequency)) {
+            if ($this->shouldRunNow($this->checkFrequency, $serverTimezone)) {
                 ServerCheckJob::dispatch($server);
             }
         }

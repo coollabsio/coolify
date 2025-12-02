@@ -95,3 +95,27 @@ it('demonstrates compounding bug without copy() across multiple calls', function
     // The executionTime is now 1680 seconds (28 minutes) earlier than it should be!
     expect($executionTime->diffInSeconds(Carbon::parse('2024-12-02 12:00:00')))->toEqual(1680);
 });
+
+it('respects server timezone when evaluating cron schedules', function () {
+    // This test verifies that timezone parameter affects cron evaluation
+    // Set a fixed test time at 23:00 UTC
+    Carbon::setTestNow('2024-12-02 23:00:00', 'UTC');
+
+    $executionTime = Carbon::now();
+    $cronExpression = new \Cron\CronExpression('0 23 * * *'); // Every day at 11 PM
+
+    // Test 1: UTC timezone at 23:00 - should match
+    $timeInUTC = $executionTime->copy()->setTimezone('UTC');
+    expect($cronExpression->isDue($timeInUTC))->toBeTrue();
+
+    // Test 2: America/New_York timezone - 23:00 UTC is 18:00 EST, should not match 23:00 cron
+    $timeInEST = $executionTime->copy()->setTimezone('America/New_York');
+    expect($cronExpression->isDue($timeInEST))->toBeFalse();
+
+    // Test 3: Asia/Tokyo timezone - 23:00 UTC is 08:00 JST next day, should not match 23:00 cron
+    $timeInJST = $executionTime->copy()->setTimezone('Asia/Tokyo');
+    expect($cronExpression->isDue($timeInJST))->toBeFalse();
+
+    // Test 4: Verify copy() preserves the original time
+    expect($executionTime->toDateTimeString())->toBe('2024-12-02 23:00:00');
+});
