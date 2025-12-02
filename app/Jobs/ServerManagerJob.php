@@ -111,32 +111,33 @@ class ServerManagerJob implements ShouldQueue
 
     private function processServerTasks(Server $server): void
     {
+        // Get server timezone (used for all scheduled tasks)
+        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+        if (validate_timezone($serverTimezone) === false) {
+            $serverTimezone = config('app.timezone');
+        }
+
         // Check if we should run sentinel-based checks
         $lastSentinelUpdate = $server->sentinel_updated_at;
         $waitTime = $server->waitBeforeDoingSshCheck();
         $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->subSeconds($waitTime));
 
         if ($sentinelOutOfSync) {
-            // Dispatch jobs if Sentinel is out of sync
+            // Dispatch ServerCheckJob if Sentinel is out of sync
             if ($this->shouldRunNow($this->checkFrequency)) {
                 ServerCheckJob::dispatch($server);
             }
-
-            // Dispatch ServerStorageCheckJob if due
-            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 * * * *');
-            if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
-                $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
-            }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency);
-
-            if ($shouldRunStorageCheck) {
-                ServerStorageCheckJob::dispatch($server);
-            }
         }
 
-        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
-        if (validate_timezone($serverTimezone) === false) {
-            $serverTimezone = config('app.timezone');
+        // Dispatch ServerStorageCheckJob if due (independent of Sentinel status)
+        $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
+        if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
+            $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
+        }
+        $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
+
+        if ($shouldRunStorageCheck) {
+            ServerStorageCheckJob::dispatch($server);
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
