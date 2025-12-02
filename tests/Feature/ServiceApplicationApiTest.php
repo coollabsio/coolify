@@ -43,14 +43,16 @@ beforeEach(function () {
         'project_id' => $this->project->id,
     ]);
 
-    // Create a service for testing
+    // Create a service for testing (using the real environment from above)
     $this->service = Service::create([
         'name' => 'test-service',
         'environment_id' => $this->environment->id,
-        'server_id' => 1, // Mock server ID
         'destination_id' => 1,
         'destination_type' => 'App\Models\StandaloneDocker',
-        'docker_compose_raw' => 'version: "3.8"',
+        'docker_compose_raw' => 'version: "3.8"
+services:
+  app:
+    image: nginx:latest',
     ]);
 });
 
