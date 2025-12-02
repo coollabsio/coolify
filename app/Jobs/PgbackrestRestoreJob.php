@@ -54,10 +54,11 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->stopPostgresql($server, $postgresContainer);
 
-            $this->updateRestoreStatus('running', 'Fixing permissions...');
-            fixPgbackrestPermissions($this->database);
+            $this->updateRestoreStatus('running', 'Clearing data directory...');
 
-            $this->updateRestoreStatus('running', "Executing pgBackRest restore from backup: {$this->backupLabel}...");
+            $this->clearDataDirectory($server, $postgresContainer);
+
+            $this->updateRestoreStatus('running', "Restoring from backup: {$this->backupLabel}...");
 
             $output = $this->executeRestore($server, $postgresContainer, $restoreCommand);
 
@@ -122,6 +123,13 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
                 sleep(1);
             }
         }
+    }
+
+    private function clearDataDirectory(Server $server, string $container): void
+    {
+        $dataDir = '/var/lib/postgresql/data';
+        $clearCmd = "docker exec {$container} find {$dataDir} -mindepth 1 -delete 2>&1 || true";
+        instant_remote_process([$clearCmd], $server, false);
     }
 
     private function executeRestore(Server $server, string $container, string $restoreCommand): string
