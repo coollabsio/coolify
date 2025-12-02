@@ -1594,24 +1594,16 @@ class ServicesController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
             new OA\Response(
                 response: 409,
-                description: 'Domain conflict detected.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Domain conflict detected.'],
-                                'conflicts' => ['type' => 'array', 'items' => ['type' => 'object']],
-                            ]
-                        )
-                    ),
-                ]
+                ref: '#/components/responses/409',
             ),
             new OA\Response(
                 response: 422,
