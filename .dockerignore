@@ -47,6 +47,7 @@ Homestead.yaml
 
 /storage/**
 !/storage/**/
+/storage/rector/**
 
 .git
 .gitattributes

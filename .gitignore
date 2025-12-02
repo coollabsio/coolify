@@ -51,3 +51,4 @@ Homestead.yaml
 !/storage/app
 !/storage/framework
 !/storage/logs
+!/storage/rector
