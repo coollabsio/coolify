@@ -3,6 +3,7 @@
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
+        useSimpleView: localStorage.getItem('logView') === 'simple',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
@@ -12,7 +13,7 @@
         },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
-    
+
             if (this.alwaysScroll) {
                 this.intervalId = setInterval(() => {
                     const screen = document.getElementById('screen');
@@ -31,6 +32,9 @@
             clearInterval(this.intervalId);
             const screen = document.getElementById('screen');
             screen.scrollTop = 0;
+        },
+        toggleLogView() {
+            localStorage.setItem('logView', this.useSimpleView ? 'simple' : 'enhanced');
         }
     }">
         <div class="flex gap-2 items-center">
@@ -57,6 +61,7 @@
                 <x-forms.button type="submit">Refresh</x-forms.button>
                 <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
                 <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
+                <x-forms.checkbox-alpine label="Simple View" x-model="useSimpleView" @click="$nextTick(() => toggleLogView())" />
             </div>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
@@ -68,16 +73,16 @@
                         {{-- <button title="Go Top" x-show="fullscreen" x-on:click="goTop">
                             <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
+                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
                             </svg>
                         </button>
                         <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'dark:text-warning' : ''"
                             x-on:click="toggleScroll">
                             <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
+                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                             </svg>
                         </button> --}}
                         <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen">
@@ -92,69 +97,76 @@
                             </svg>
                         </button>
                         <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen">
-                            <svg class="w-5 h-5 opacity-30 hover:opacity-100"
-                                viewBox="0 0 24 24"xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                             </svg>
                         </button>
                     </div>
                 </div>
                 @if ($outputs)
                     <div id="logs" class="font-mono text-sm">
-                        @foreach (explode("\n", trim($outputs)) as $line)
-                            @if (!empty(trim($line)))
-                                @php
-                                    $lowerLine = strtolower($line);
-                                    $isError =
-                                        str_contains($lowerLine, 'error') ||
-                                        str_contains($lowerLine, 'err') ||
-                                        str_contains($lowerLine, 'failed') ||
-                                        str_contains($lowerLine, 'exception');
-                                    $isWarning =
-                                        str_contains($lowerLine, 'warn') ||
-                                        str_contains($lowerLine, 'warning') ||
-                                        str_contains($lowerLine, 'wrn');
-                                    $isDebug =
-                                        str_contains($lowerLine, 'debug') ||
-                                        str_contains($lowerLine, 'dbg') ||
-                                        str_contains($lowerLine, 'trace');
-                                    $barColor = $isError
-                                        ? 'bg-red-500 dark:bg-red-400'
-                                        : ($isWarning
-                                            ? 'bg-warning-500 dark:bg-warning-400'
-                                            : ($isDebug
-                                                ? 'bg-purple-500 dark:bg-purple-400'
-                                                : 'bg-blue-500 dark:bg-blue-400'));
-                                    $bgColor = $isError
-                                        ? 'bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100/50 dark:hover:bg-red-800/30'
-                                        : ($isWarning
-                                            ? 'bg-warning-50/50 dark:bg-warning-900/20 hover:bg-warning-100/50 dark:hover:bg-warning-800/30'
-                                            : ($isDebug
-                                                ? 'bg-purple-50/50 dark:bg-purple-900/20 hover:bg-purple-100/50 dark:hover:bg-purple-800/30'
-                                                : 'bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100/50 dark:hover:bg-blue-800/30'));
+                        <!-- Simple View (Original) -->
+                        <div x-show="useSimpleView">
+                            <pre class="whitespace-pre-wrap break-all">{{ $outputs }}</pre>
+                        </div>
 
-                                    // Check for timestamp at the beginning (ISO 8601 format)
-                                    $timestampPattern = '/^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)\s+/';
-                                    $hasTimestamp = preg_match($timestampPattern, $line, $matches);
-                                    $timestamp = $hasTimestamp ? $matches[1] : null;
-                                    $logContent = $hasTimestamp ? preg_replace($timestampPattern, '', $line) : $line;
-                                @endphp
-                                <div class="flex items-start gap-2 py-1 px-2 rounded-sm">
-                                    <div class="w-1 {{ $barColor }} rounded-full flex-shrink-0 self-stretch"></div>
-                                    <div class="flex-1 {{ $bgColor }} py-1 px-2 -mx-2 rounded-sm">
-                                        @if ($hasTimestamp)
-                                            <span
-                                                class="text-xs text-gray-500 dark:text-gray-400 font-mono mr-2">{{ $timestamp }}</span>
-                                            <span class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
-                                        @else
-                                            <span class="whitespace-pre-wrap break-all">{{ $line }}</span>
-                                        @endif
+                        <!-- Enhanced View (Current with color coding) -->
+                        <div x-show="!useSimpleView">
+                            @foreach (explode("\n", trim($outputs)) as $line)
+                                @if (!empty(trim($line)))
+                                    @php
+                                        $lowerLine = strtolower($line);
+                                        $isError =
+                                            str_contains($lowerLine, 'error') ||
+                                            str_contains($lowerLine, 'err') ||
+                                            str_contains($lowerLine, 'failed') ||
+                                            str_contains($lowerLine, 'exception');
+                                        $isWarning =
+                                            str_contains($lowerLine, 'warn') ||
+                                            str_contains($lowerLine, 'warning') ||
+                                            str_contains($lowerLine, 'wrn');
+                                        $isDebug =
+                                            str_contains($lowerLine, 'debug') ||
+                                            str_contains($lowerLine, 'dbg') ||
+                                            str_contains($lowerLine, 'trace');
+                                        $barColor = $isError
+                                            ? 'bg-red-500 dark:bg-red-400'
+                                            : ($isWarning
+                                                ? 'bg-warning-500 dark:bg-warning-400'
+                                                : ($isDebug
+                                                    ? 'bg-purple-500 dark:bg-purple-400'
+                                                    : 'bg-blue-500 dark:bg-blue-400'));
+                                        $bgColor = $isError
+                                            ? 'bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100/50 dark:hover:bg-red-800/30'
+                                            : ($isWarning
+                                                ? 'bg-warning-50/50 dark:bg-warning-900/20 hover:bg-warning-100/50 dark:hover:bg-warning-800/30'
+                                                : ($isDebug
+                                                    ? 'bg-purple-50/50 dark:bg-purple-900/20 hover:bg-purple-100/50 dark:hover:bg-purple-800/30'
+                                                    : 'bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100/50 dark:hover:bg-blue-800/30'));
+
+                                        // Check for timestamp at the beginning (ISO 8601 format)
+                                        $timestampPattern = '/^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)\s+/';
+                                        $hasTimestamp = preg_match($timestampPattern, $line, $matches);
+                                        $timestamp = $hasTimestamp ? $matches[1] : null;
+                                        $logContent = $hasTimestamp ? preg_replace($timestampPattern, '', $line) : $line;
+                                    @endphp
+                                    <div class="flex items-start gap-2 py-1 px-2 rounded-sm">
+                                        <div class="w-1 {{ $barColor }} rounded-full flex-shrink-0 self-stretch"></div>
+                                        <div class="flex-1 {{ $bgColor }} py-1 px-2 -mx-2 rounded-sm">
+                                            @if ($hasTimestamp)
+                                                <span
+                                                    class="text-xs text-gray-500 dark:text-gray-400 font-mono mr-2">{{ $timestamp }}</span>
+                                                <span class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
+                                            @else
+                                                <span class="whitespace-pre-wrap break-all">{{ $line }}</span>
+                                            @endif
+                                        </div>
                                     </div>
-                                </div>
-                            @endif
-                        @endforeach
+                                @endif
+                            @endforeach
+                        </div>
                     </div>
                 @else
                     <div id="logs" class="font-mono text-sm py-4 px-2 text-gray-500 dark:text-gray-400">
