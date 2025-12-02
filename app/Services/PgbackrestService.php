@@ -126,11 +126,11 @@ class PgbackrestService
         $pgbackrestConfig = '';
         $pgbackrestRepo = '';
 
-        if (preg_match('/PGBACKREST_CONFIG=([^\s]+)/', $output ?? '', $matches)) {
-            $pgbackrestConfig = $matches[1];
+        if (preg_match('/PGBACKREST_CONFIG=(.+?)(?=PGBACKREST_|$)/', $output ?? '', $matches)) {
+            $pgbackrestConfig = trim($matches[1]);
         }
-        if (preg_match('/PGBACKREST_REPO=([^\s]+)/', $output ?? '', $matches)) {
-            $pgbackrestRepo = $matches[1];
+        if (preg_match('/PGBACKREST_REPO=(.+?)(?=PGBACKREST_|$)/', $output ?? '', $matches)) {
+            $pgbackrestRepo = trim($matches[1]);
         }
 
         if (empty($pgbackrestConfig) || empty($pgbackrestRepo)) {
@@ -666,7 +666,7 @@ class PgbackrestService
         $dataVolume = $mounts['data_volume'];
 
         $clearCmd = "docker run --rm -v {$dataVolume}:/data alpine sh -c '".
-            'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; '.
+            'find /data -mindepth 1 -delete 2>/dev/null; '.
             'echo CLEARED'.
             "' 2>&1";
 
