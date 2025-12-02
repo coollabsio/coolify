@@ -15,11 +15,11 @@ services:
       - RAILS_ENV=production
       - RAILS_LOG_TO_STDOUT=true
       - RAILS_SERVE_STATIC_FILES=true
-      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/fizzy
-      - VAPID_PRIVATE_KEY=$SERVICE_PASSWORD_64_VAPIDPRIVATE
-      - VAPID_PUBLIC_KEY=$SERVICE_PASSWORD_64_VAPIDPUBLIC
+      - DATABASE_URL=mysql2://$SERVICE_USER_MARIADB:$SERVICE_PASSWORD_MARIADB@mariadb:3306/fizzy
+      - VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
+      - VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
     volumes:
       - fizzy-storage:/rails/storage
@@ -30,16 +30,17 @@ services:
       retries: 5
       start_period: 30s
 
-  postgres:
-    image: postgres:16-alpine
+  mariadb:
+    image: mariadb:11
     environment:
-      - POSTGRES_DB=fizzy
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - MARIADB_DATABASE=fizzy
+      - MARIADB_USER=$SERVICE_USER_MARIADB
+      - MARIADB_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADB_ROOT
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - mariadb-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
       retries: 10
