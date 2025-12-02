@@ -2,6 +2,7 @@
 
 use App\Jobs\PgbackrestRestoreJob;
 use App\Models\StandalonePostgresql;
+use App\Services\PgbackrestService;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -59,14 +60,10 @@ it('can disable restart after restore', function () {
     expect($job->restartAfter)->toBeFalse();
 });
 
-it('buildRestoreCommand includes type=immediate when no target time', function () {
-    $job = new PgbackrestRestoreJob($this->database, 'backup-label');
+it('service buildRestoreCommand includes type=immediate when no target time', function () {
+    $service = PgbackrestService::for($this->database);
 
-    $reflection = new ReflectionClass($job);
-    $method = $reflection->getMethod('buildRestoreCommand');
-    $method->setAccessible(true);
-
-    $command = $method->invoke($job, 'db-test-uuid');
+    $command = $service->buildRestoreCommand('backup-label');
 
     expect($command)->toContain('--type=immediate');
     expect($command)->toContain('--target-action=promote');
@@ -74,28 +71,20 @@ it('buildRestoreCommand includes type=immediate when no target time', function (
     expect($command)->toContain('--link-all');
 });
 
-it('buildRestoreCommand includes type=time when target time is provided', function () {
-    $job = new PgbackrestRestoreJob($this->database, 'backup-label', '2024-12-01 12:00:00');
+it('service buildRestoreCommand includes type=time when target time is provided', function () {
+    $service = PgbackrestService::for($this->database);
 
-    $reflection = new ReflectionClass($job);
-    $method = $reflection->getMethod('buildRestoreCommand');
-    $method->setAccessible(true);
-
-    $command = $method->invoke($job, 'db-test-uuid');
+    $command = $service->buildRestoreCommand('backup-label', '2024-12-01 12:00:00');
 
     expect($command)->toContain('--type=time');
     expect($command)->toContain("--target='2024-12-01 12:00:00'");
     expect($command)->not->toContain('--type=immediate');
 });
 
-it('buildRestoreCommand includes backup label when provided', function () {
-    $job = new PgbackrestRestoreJob($this->database, 'my-backup-20241201');
+it('service buildRestoreCommand includes backup label when provided', function () {
+    $service = PgbackrestService::for($this->database);
 
-    $reflection = new ReflectionClass($job);
-    $method = $reflection->getMethod('buildRestoreCommand');
-    $method->setAccessible(true);
-
-    $command = $method->invoke($job, 'db-test-uuid');
+    $command = $service->buildRestoreCommand('my-backup-20241201');
 
     expect($command)->toContain("--set='my-backup-20241201'");
 });

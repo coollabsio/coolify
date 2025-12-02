@@ -457,225 +457,56 @@ function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null):
 
 function isPostgresContainerRunning(StandalonePostgresql $database): bool
 {
-    $server = $database->destination->server ?? null;
-    if (! $server) {
-        return false;
-    }
-
-    $containerName = $database->uuid;
-    $nameFilter = '^/'.$containerName.'$';
-
-    $result = instant_remote_process(
-        ['docker ps -q -f name='.escapeshellarg($nameFilter)],
-        $server,
-        throwError: false,
-    );
-
-    return ! blank(trim($result));
+    return \App\Services\PgbackrestService::for($database)->isContainerRunning();
 }
 
 function getPgbackrestInfo(StandalonePostgresql $database): ?array
 {
-    if (! $database->isPgbackrestEnabled()) {
-        return null;
-    }
-
-    $server = $database->destination->server ?? null;
-    if (! $server) {
-        return null;
-    }
-
-    $containerName = $database->uuid;
-    $stanzaName = $database->getPgbackrestStanzaName();
-
-    try {
-        $output = instant_remote_process(
-            ["docker exec {$containerName} su postgres -c 'pgbackrest --stanza={$stanzaName} info --output=json'"],
-            $server,
-            throwError: false,
-        );
-
-        if (blank($output)) {
-            return null;
-        }
-
-        $info = json_decode($output, true);
-        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($info)) {
-            return null;
-        }
-
-        return $info;
-    } catch (\Throwable) {
-        return null;
-    }
+    return \App\Services\PgbackrestService::for($database)->getInfo();
 }
 
 function getPgbackrestBackupList(StandalonePostgresql $database): Collection
 {
-    $info = getPgbackrestInfo($database);
-
-    if (empty($info) || ! isset($info[0]['backup']) || ! is_array($info[0]['backup'])) {
-        return collect();
-    }
-
-    return collect($info[0]['backup'])->map(function ($backup) {
-        $dbList = [];
-        if (isset($backup['database']) && is_array($backup['database'])) {
-            $dbList = array_values(array_filter(array_column($backup['database'], 'name')));
-        }
-
-        $size = (int) ($backup['info']['size'] ?? 0);
-        $repoSize = (int) ($backup['info']['repository']['size'] ?? 0);
-
-        return [
-            'label' => $backup['label'] ?? null,
-            'type' => $backup['type'] ?? null,
-            'size' => $size,
-            'size_formatted' => formatBytes($size),
-            'repository_size' => $repoSize,
-            'repository_size_formatted' => formatBytes($repoSize),
-            'timestamp_start' => $backup['timestamp']['start'] ?? null,
-            'timestamp_stop' => $backup['timestamp']['stop'] ?? null,
-            'started_at' => isset($backup['timestamp']['start']) ? \Carbon\Carbon::createFromTimestamp($backup['timestamp']['start']) : null,
-            'finished_at' => isset($backup['timestamp']['stop']) ? \Carbon\Carbon::createFromTimestamp($backup['timestamp']['stop']) : null,
-            'database_list' => $dbList,
-            'prior' => $backup['prior'] ?? null,
-        ];
-    })->reverse()->values();
+    return \App\Services\PgbackrestService::for($database)->getBackupList();
 }
 
 function getPgbackrestLatestBackup(StandalonePostgresql $database): ?array
 {
-    $backups = getPgbackrestBackupList($database);
-
-    return $backups->first();
+    return \App\Services\PgbackrestService::for($database)->getLatestBackup();
 }
 
 function getPgbackrestBackupByLabel(StandalonePostgresql $database, string $label): ?array
 {
-    $backups = getPgbackrestBackupList($database);
-
-    return $backups->firstWhere('label', $label);
+    return \App\Services\PgbackrestService::for($database)->getBackupByLabel($label);
 }
 
 function getPgbackrestStanzaStatus(StandalonePostgresql $database): array
 {
-    if (! $database->isPgbackrestEnabled()) {
-        return ['status' => 'disabled', 'message' => 'pgBackRest is not enabled'];
-    }
-
-    if (! isPostgresContainerRunning($database)) {
-        return ['status' => 'container_stopped', 'message' => 'PostgreSQL container is not running'];
-    }
-
-    $info = getPgbackrestInfo($database);
-
-    if ($info === null) {
-        return ['status' => 'error', 'message' => 'Failed to get pgBackRest info'];
-    }
-
-    if (empty($info) || ! isset($info[0]) || ! is_array($info[0])) {
-        return ['status' => 'no_stanza', 'message' => 'No stanza configured'];
-    }
-
-    $stanzaInfo = $info[0];
-    $status = $stanzaInfo['status'] ?? [];
-
-    if (isset($status['code']) && $status['code'] !== 0) {
-        return [
-            'status' => 'error',
-            'message' => $status['message'] ?? 'Unknown error',
-            'code' => $status['code'],
-        ];
-    }
-
-    $backupCount = count($stanzaInfo['backup'] ?? []);
-
-    return [
-        'status' => 'ok',
-        'message' => "Stanza is healthy with {$backupCount} backup(s)",
-        'backup_count' => $backupCount,
-        'cipher' => $stanzaInfo['cipher'] ?? 'none',
-    ];
+    return \App\Services\PgbackrestService::for($database)->getStanzaStatus();
 }
 
 function calculatePgbackrestTotalSize(StandalonePostgresql $database): int
 {
-    return getPgbackrestBackupList($database)->sum('repository_size');
+    return \App\Services\PgbackrestService::for($database)->getTotalSize();
 }
 
 function formatPgbackrestBackupType(string $type): string
 {
-    return match ($type) {
-        'full' => 'Full',
-        'diff' => 'Differential',
-        'incr' => 'Incremental',
-        default => ucfirst($type),
-    };
+    return \App\Services\PgbackrestService::formatBackupType($type);
 }
 
 function isPgbackrestBackupDeletable(StandalonePostgresql $database, string $label): array
 {
-    $backups = getPgbackrestBackupList($database);
-
-    $backup = $backups->firstWhere('label', $label);
-    if (! $backup) {
-        return ['deletable' => false, 'reason' => 'Backup not found in repository'];
-    }
-
-    $dependents = $backups->filter(function ($b) use ($label) {
-        return ($b['prior'] ?? null) === $label;
-    });
-
-    if ($dependents->isNotEmpty()) {
-        $dependentLabels = $dependents->pluck('label')->join(', ');
-
-        return [
-            'deletable' => false,
-            'reason' => "This backup has dependent backups that would become unrestorable: {$dependentLabels}",
-            'dependents' => $dependents->pluck('label')->toArray(),
-        ];
-    }
-
-    return ['deletable' => true, 'reason' => null];
+    return \App\Services\PgbackrestService::for($database)->isBackupDeletable($label);
 }
 
 function deletePgbackrestBackup(StandalonePostgresql $database, string $label): array
 {
-    $deletableCheck = isPgbackrestBackupDeletable($database, $label);
-    if (! $deletableCheck['deletable']) {
-        return ['success' => false, 'message' => $deletableCheck['reason']];
-    }
-
-    if (! isPostgresContainerRunning($database)) {
-        return ['success' => false, 'message' => 'PostgreSQL container is not running'];
-    }
-
-    $containerName = $database->uuid;
-    $stanzaName = $database->getPgbackrestStanzaName();
-    $server = $database->destination->server;
-
-    $escapedStanza = escapeshellarg($stanzaName);
-    $escapedLabel = escapeshellarg($label);
-    $expireCommand = "set +e; docker exec {$containerName} su postgres -c 'pgbackrest --stanza={$escapedStanza} --set={$escapedLabel} expire' 2>&1; EXIT_CODE=\$?; set -e; echo \"EXIT_CODE:\${EXIT_CODE}\"";
-
-    $output = instant_remote_process([$expireCommand], $server, throwError: false);
-
-    $exitCode = 0;
-    if (preg_match('/EXIT_CODE:(\d+)$/', $output, $matches)) {
-        $exitCode = (int) $matches[1];
-        $output = preg_replace('/EXIT_CODE:\d+$/', '', $output);
-    }
-
-    if ($exitCode !== 0) {
-        return ['success' => false, 'message' => "Failed to expire backup: {$output}"];
-    }
-
-    return ['success' => true, 'message' => 'Backup deleted from pgBackRest repository'];
+    return \App\Services\PgbackrestService::for($database)->deleteBackup($label);
 }
 
 /**
- * Execute a pgBackRest command inside a PostgreSQL container as the postgres user.
+ * Execute a pgBackRest command (uses service which auto-selects main or temp container).
  *
  * @param  StandalonePostgresql  $database  The database to run the command on
  * @param  string  $args  The pgBackRest arguments (e.g., '--stanza=db-xxx backup')
@@ -684,11 +515,7 @@ function deletePgbackrestBackup(StandalonePostgresql $database, string $label): 
  */
 function execPgbackrest(StandalonePostgresql $database, string $args, bool $throwError = false): string
 {
-    $server = $database->destination->server;
-    $container = $database->uuid;
-    $cmd = "docker exec {$container} su postgres -c 'pgbackrest {$args}' 2>&1";
-
-    return instant_remote_process([$cmd], $server, throwError: $throwError);
+    return \App\Services\PgbackrestService::for($database)->execute($args, needsDataDir: false, throwError: $throwError);
 }
 
 /**
@@ -697,7 +524,11 @@ function execPgbackrest(StandalonePostgresql $database, string $args, bool $thro
  */
 function fixPgbackrestPermissions(StandalonePostgresql $database): void
 {
-    $server = $database->destination->server;
+    $server = $database->destination->server ?? null;
+    if (! $server) {
+        return;
+    }
+
     $container = $database->uuid;
     $cmd = "docker exec -u 0:0 {$container} sh -c 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true; chmod -R 770 /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true'";
 
