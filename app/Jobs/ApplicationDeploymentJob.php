@@ -3170,6 +3170,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->graceful_shutdown_container($this->container_name);
             }
         } catch (Exception $e) {
+            // If new version is healthy, this is just cleanup - don't fail the deployment
+            if ($this->newVersionIsHealthy || $force) {
+                $this->application_deployment_queue->addLogEntry(
+                    "Warning: Could not remove old container: {$e->getMessage()}",
+                    'stderr',
+                    hidden: true
+                );
+                \Log::warning("Failed to stop running container {$this->container_name}: {$e->getMessage()}");
+
+                return; // Don't re-throw - cleanup failures shouldn't fail successful deployments
+            }
+
+            // Only re-throw if deployment hasn't succeeded yet
             throw new DeploymentException("Failed to stop running container: {$e->getMessage()}", $e->getCode(), $e);
         }
     }
