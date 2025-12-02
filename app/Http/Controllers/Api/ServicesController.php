@@ -1440,6 +1440,10 @@ class ServicesController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),

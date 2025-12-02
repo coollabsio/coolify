@@ -8834,6 +8834,9 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     }
