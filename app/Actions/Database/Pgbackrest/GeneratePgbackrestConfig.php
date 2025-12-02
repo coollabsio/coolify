@@ -15,6 +15,9 @@ class GeneratePgbackrestConfig
 
         $retentionFull = $database->pgbackrest_retention_full ?? config('constants.pgbackrest.default_retention_full', 2);
         $retentionDiff = $database->pgbackrest_retention_diff ?? config('constants.pgbackrest.default_retention_diff', 7);
+        $retentionFullType = $database->pgbackrest_retention_full_type ?? 'count';
+        $retentionArchive = $database->pgbackrest_retention_archive ?? null;
+        $retentionArchiveType = $database->pgbackrest_retention_archive_type ?? 'full';
         $compressType = $database->pgbackrest_compress_type ?? config('constants.pgbackrest.default_compress_type', 'lz4');
         $compressLevel = $database->pgbackrest_compress_level ?? config('constants.pgbackrest.default_compress_level', 6);
         $logLevel = $database->pgbackrest_log_level ?? config('constants.pgbackrest.default_log_level', 'info');
@@ -23,8 +26,13 @@ class GeneratePgbackrestConfig
 
         $config[] = '[global]';
         $config[] = 'repo1-path=/var/lib/pgbackrest';
+        $config[] = "repo1-retention-full-type={$retentionFullType}";
         $config[] = "repo1-retention-full={$retentionFull}";
         $config[] = "repo1-retention-diff={$retentionDiff}";
+        $config[] = "repo1-retention-archive-type={$retentionArchiveType}";
+        if ($retentionArchive !== null) {
+            $config[] = "repo1-retention-archive={$retentionArchive}";
+        }
         $config[] = "compress-type={$compressType}";
         $config[] = "compress-level={$compressLevel}";
         $config[] = "log-level-console={$logLevel}";

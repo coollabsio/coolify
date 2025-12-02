@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Database\Postgresql;
 
-use App\Actions\Database\Pgbackrest\RestoreFromPgbackrest;
 use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -20,24 +19,27 @@ class Pgbackrest extends Component
 
     public int $retentionDiff = 7;
 
+    public string $retentionFullType = 'count';
+
+    public string $retentionArchiveType = 'full';
+
+    public ?int $retentionArchive = null;
+
     public string $logLevel = 'info';
 
     public string $compressType = 'lz4';
 
     public int $compressLevel = 6;
 
-    public array $backups = [];
-
-    public bool $isLoading = false;
-
-    public ?string $stanzaStatus = null;
-
     protected function rules(): array
     {
         return [
             'pgbackrestEnabled' => 'boolean',
-            'retentionFull' => 'required|integer|min:1|max:100',
-            'retentionDiff' => 'required|integer|min:1|max:100',
+            'retentionFull' => 'required|integer|min:1|max:9999999',
+            'retentionDiff' => 'required|integer|min:1|max:9999999',
+            'retentionFullType' => 'required|string|in:count,time',
+            'retentionArchiveType' => 'required|string|in:full,diff,incr',
+            'retentionArchive' => 'nullable|integer|min:1|max:9999999',
             'logLevel' => 'required|string|in:off,error,warn,info,detail,debug,trace',
             'compressType' => 'required|string|in:none,bz2,gz,lz4,zst',
             'compressLevel' => 'required|integer|min:0|max:9',
@@ -57,7 +59,6 @@ class Pgbackrest extends Component
     {
         $this->authorize('view', $this->database);
         $this->syncData();
-        $this->loadBackups();
     }
 
     public function syncData(bool $toModel = false)
@@ -67,6 +68,9 @@ class Pgbackrest extends Component
             $this->database->pgbackrest_enabled = $this->pgbackrestEnabled;
             $this->database->pgbackrest_retention_full = $this->retentionFull;
             $this->database->pgbackrest_retention_diff = $this->retentionDiff;
+            $this->database->pgbackrest_retention_full_type = $this->retentionFullType;
+            $this->database->pgbackrest_retention_archive_type = $this->retentionArchiveType;
+            $this->database->pgbackrest_retention_archive = $this->retentionArchive;
             $this->database->pgbackrest_log_level = $this->logLevel;
             $this->database->pgbackrest_compress_type = $this->compressType;
             $this->database->pgbackrest_compress_level = $this->compressLevel;
@@ -75,37 +79,13 @@ class Pgbackrest extends Component
             $this->pgbackrestEnabled = $this->database->pgbackrest_enabled ?? false;
             $this->retentionFull = $this->database->pgbackrest_retention_full ?? 2;
             $this->retentionDiff = $this->database->pgbackrest_retention_diff ?? 7;
+            $this->retentionFullType = $this->database->pgbackrest_retention_full_type ?? 'count';
+            $this->retentionArchiveType = $this->database->pgbackrest_retention_archive_type ?? 'full';
+            $this->retentionArchive = $this->database->pgbackrest_retention_archive;
             $this->logLevel = $this->database->pgbackrest_log_level ?? 'info';
             $this->compressType = $this->database->pgbackrest_compress_type ?? 'lz4';
             $this->compressLevel = $this->database->pgbackrest_compress_level ?? 6;
         }
-    }
-
-    public function loadBackups()
-    {
-        if (! $this->database->isPgbackrestEnabled()) {
-            $this->backups = [];
-
-            return;
-        }
-
-        try {
-            $restoreAction = new RestoreFromPgbackrest;
-            $result = $restoreAction->getAvailableBackups($this->database);
-            if ($result['success']) {
-                $this->backups = $result['backups'];
-            } else {
-                $this->backups = [];
-            }
-        } catch (\Throwable $e) {
-            $this->backups = [];
-        }
-    }
-
-    public function refreshBackups()
-    {
-        $this->loadBackups();
-        $this->dispatch('success', 'Backup list refreshed.');
     }
 
     public function togglePgbackrest()

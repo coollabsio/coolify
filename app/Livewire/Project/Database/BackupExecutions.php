@@ -44,13 +44,62 @@ class BackupExecutions extends Component
 
     public $delete_pgbackrest_repo = false;
 
+    // Restore progress tracking
+    public bool $showRestoreProgress = false;
+
+    public ?string $restoreStatus = null;
+
+    public ?string $restoreMessage = null;
+
+    public ?string $restoreBackupLabel = null;
+
     public function getListeners()
     {
         $userId = Auth::id();
 
         return [
             "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => 'checkRestoreStatus',
         ];
+    }
+
+    public function checkRestoreStatus(): void
+    {
+        if ($this->database instanceof StandalonePostgresql) {
+            $this->database->refresh();
+            $this->restoreStatus = $this->database->pgbackrest_restore_status;
+            $this->restoreMessage = $this->database->pgbackrest_restore_message;
+
+            // Show progress modal if restore is running
+            if ($this->restoreStatus === 'running' || $this->database->status === 'restoring') {
+                $this->showRestoreProgress = true;
+            }
+        }
+    }
+
+    public function dismissRestoreProgress(): void
+    {
+        if ($this->database instanceof StandalonePostgresql) {
+            $this->database->update([
+                'pgbackrest_restore_status' => null,
+                'pgbackrest_restore_message' => null,
+                'pgbackrest_restore_started_at' => null,
+            ]);
+        }
+
+        $this->showRestoreProgress = false;
+        $this->restoreStatus = null;
+        $this->restoreMessage = null;
+        $this->restoreBackupLabel = null;
+    }
+
+    public function pollRestoreStatus(): void
+    {
+        if ($this->showRestoreProgress && $this->database instanceof StandalonePostgresql) {
+            $this->database->refresh();
+            $this->restoreStatus = $this->database->pgbackrest_restore_status;
+            $this->restoreMessage = $this->database->pgbackrest_restore_message;
+        }
     }
 
     public function cleanupFailed()
@@ -197,12 +246,13 @@ class BackupExecutions extends Component
             return;
         }
 
-        try {
-            PgbackrestRestoreJob::dispatch($database, $backupLabel, null, true);
-            $this->dispatch('success', 'Restore job has been queued. The database will restart automatically after restore.');
-        } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to queue restore job: '.$e->getMessage());
-        }
+        $this->restoreBackupLabel = $backupLabel;
+        $this->restoreStatus = 'running';
+        $this->restoreMessage = "Starting restore from backup: {$backupLabel}";
+        $this->showRestoreProgress = true;
+
+        PgbackrestRestoreJob::dispatch($database, $backupLabel, null, true);
+        $this->dispatch('success', 'Restore job started. Please wait...');
     }
 
     private function findBackupLabelForExecution(StandalonePostgresql $database, ScheduledDatabaseBackupExecution $execution): ?string
@@ -312,6 +362,14 @@ class BackupExecutions extends Component
         $this->database = $backup->database;
         $this->updateCurrentPage();
         $this->loadExecutions();
+
+        if ($this->database instanceof StandalonePostgresql) {
+            $this->restoreStatus = $this->database->pgbackrest_restore_status;
+            $this->restoreMessage = $this->database->pgbackrest_restore_message;
+            if ($this->restoreStatus === 'running' || $this->database->status === 'restoring') {
+                $this->showRestoreProgress = true;
+            }
+        }
     }
 
     public function server()
