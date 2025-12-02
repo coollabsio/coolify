@@ -36,7 +36,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         $server = $this->database->destination->server;
-        $postgresContainer = $this->database->uuid;
+        $containerName = $this->database->uuid;
         $stanzaName = $this->database->getPgbackrestStanzaName();
 
         Log::info('Starting pgBackRest restore', [
@@ -45,22 +45,18 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             'target_time' => $this->targetTime,
         ]);
 
-        $this->updateRestoreStatus('running', 'Stopping PostgreSQL for restore...');
+        $this->updateRestoreStatus('running', 'Preparing for restore...');
 
         try {
-            $restoreCommand = $this->buildRestoreCommand($stanzaName);
-
-            $this->updateRestoreStatus('running', 'Stopping PostgreSQL...');
-
-            $this->stopPostgresql($server, $postgresContainer);
+            $this->updateRestoreStatus('running', 'Stopping PostgreSQL container...');
+            $this->stopContainer($server, $containerName);
 
             $this->updateRestoreStatus('running', 'Clearing data directory...');
-
-            $this->clearDataDirectory($server, $postgresContainer);
+            $this->clearDataDirectory($server);
 
             $this->updateRestoreStatus('running', "Restoring from backup: {$this->backupLabel}...");
-
-            $output = $this->executeRestore($server, $postgresContainer, $restoreCommand);
+            $restoreCommand = $this->buildRestoreCommand($stanzaName);
+            $output = $this->executeRestoreWithTempContainer($server, $restoreCommand);
 
             Log::info('pgBackRest restore completed', [
                 'database_id' => $this->database->id,
@@ -68,8 +64,8 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             if ($this->restartAfter) {
-                $this->updateRestoreStatus('running', 'Restore complete. Restarting PostgreSQL...');
-                Log::info('Restarting PostgreSQL after restore', ['database_id' => $this->database->id]);
+                $this->updateRestoreStatus('running', 'Restore complete. Starting PostgreSQL...');
+                Log::info('Starting PostgreSQL after restore', ['database_id' => $this->database->id]);
                 StartPostgresql::run($this->database);
             } else {
                 $this->database->update(['status' => 'exited']);
@@ -98,43 +94,49 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function stopPostgresql(Server $server, string $container): void
+    private function stopContainer(Server $server, string $containerName): void
     {
-        $dataDir = '/var/lib/postgresql/data';
-        $pidFile = "{$dataDir}/postmaster.pid";
-
-        $stopCmd = "docker exec {$container} su postgres -c 'pg_ctl stop -D {$dataDir} -m fast -w -t 30' 2>&1 || true";
+        $stopCmd = "docker stop -t 30 {$containerName} 2>/dev/null || true";
         instant_remote_process([$stopCmd], $server, false);
-
         sleep(2);
-
-        $checkPidCmd = "docker exec {$container} test -f {$pidFile} && echo 'running' || echo 'stopped'";
-        $result = instant_remote_process([$checkPidCmd], $server, false);
-
-        if (str_contains($result ?? '', 'running')) {
-            $stopImmediate = "docker exec {$container} su postgres -c 'pg_ctl stop -D {$dataDir} -m immediate -w -t 10' 2>&1 || true";
-            instant_remote_process([$stopImmediate], $server, false);
-            sleep(2);
-
-            $result = instant_remote_process([$checkPidCmd], $server, false);
-            if (str_contains($result ?? '', 'running')) {
-                $killCmd = "docker exec {$container} sh -c 'pkill -9 postgres 2>/dev/null || true; rm -f {$pidFile}'";
-                instant_remote_process([$killCmd], $server, false);
-                sleep(1);
-            }
-        }
     }
 
-    private function clearDataDirectory(Server $server, string $container): void
+    private function getVolumeMounts(): array
     {
-        $dataDir = '/var/lib/postgresql/data';
-        $clearCmd = "docker exec -u 0:0 {$container} sh -c 'rm -rf {$dataDir}/* {$dataDir}/.[!.]* 2>/dev/null; chown postgres:postgres {$dataDir}'";
+        $containerName = $this->database->uuid;
+        $configDir = database_configuration_dir()."/{$containerName}";
+        $dataVolume = "postgres-data-{$containerName}";
+
+        return [
+            'data_volume' => $dataVolume,
+            'pgbackrest_config' => "{$configDir}/pgbackrest",
+            'pgbackrest_repo' => "{$configDir}/pgbackrest-repo",
+        ];
+    }
+
+    private function clearDataDirectory(Server $server): void
+    {
+        $mounts = $this->getVolumeMounts();
+        $dataVolume = $mounts['data_volume'];
+
+        $clearCmd = "docker run --rm -v {$dataVolume}:/var/lib/postgresql/data alpine sh -c 'rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]*'";
         instant_remote_process([$clearCmd], $server, false);
     }
 
-    private function executeRestore(Server $server, string $container, string $restoreCommand): string
+    private function executeRestoreWithTempContainer(Server $server, string $restoreCommand): string
     {
-        $cmd = "docker exec {$container} su postgres -c 'pgbackrest {$restoreCommand}' 2>&1";
+        $mounts = $this->getVolumeMounts();
+        $image = $this->database->image;
+
+        $cmd = 'docker run --rm '.
+            "-v {$mounts['data_volume']}:/var/lib/postgresql/data ".
+            "-v {$mounts['pgbackrest_config']}:/etc/pgbackrest ".
+            "-v {$mounts['pgbackrest_repo']}:/var/lib/pgbackrest ".
+            "{$image} sh -c '".
+            'apk add --no-cache pgbackrest 2>/dev/null || (apt-get update && apt-get install -y pgbackrest) 2>/dev/null; '.
+            'chown -R postgres:postgres /var/lib/postgresql/data /var/lib/pgbackrest /etc/pgbackrest 2>/dev/null; '.
+            "su postgres -c \"pgbackrest {$restoreCommand}\"".
+            "' 2>&1";
 
         $fullCmd = "set +e; {$cmd}; EXIT_CODE=\$?; echo \"PGBACKREST_EXIT_CODE:\${EXIT_CODE}\"; exit \$EXIT_CODE";
 
