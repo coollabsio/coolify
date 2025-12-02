@@ -6672,6 +6672,24 @@ components:
                 type: string
                 example: 'Resource not found.'
             type: object
+    '409':
+      description: 'Domain conflicts detected.'
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: 'Domain conflicts detected. Use force_domain_override=true to proceed.'
+              warning:
+                type: string
+                example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'
+              conflicts:
+                type: array
+                items:
+                  properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_type: { type: string, example: application } }
+                  type: object
+            type: object
     '422':
       description: 'Validation error.'
       content:

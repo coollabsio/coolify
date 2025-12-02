@@ -41,6 +41,28 @@ use OpenApi\Attributes as OA;
                 ]
             )),
         new OA\Response(
+            response: 409,
+            description: 'Domain conflicts detected.',
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Domain conflicts detected. Use force_domain_override=true to proceed.'),
+                    new OA\Property(property: 'warning', type: 'string', example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'),
+                    new OA\Property(
+                        property: 'conflicts',
+                        type: 'array',
+                        items: new OA\Items(
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'domain', type: 'string', example: 'example.com'),
+                                new OA\Property(property: 'resource_name', type: 'string', example: 'My Application'),
+                                new OA\Property(property: 'resource_type', type: 'string', example: 'application'),
+                            ]
+                        )
+                    ),
+                ]
+            )),
+        new OA\Response(
             response: 422,
             description: 'Validation error.',
             content: new OA\JsonContent(
