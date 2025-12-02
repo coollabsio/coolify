@@ -241,12 +241,32 @@
                             @else
                                     <div class="flex flex-col gap-2">
                                 @endcan
-                                    <div class="flex gap-2">
-                                        <x-forms.input x-bind:disabled="shouldDisable()" placeholder="/" id="baseDirectory"
-                                            label="Base Directory" helper="Directory to use as root. Useful for monorepos." />
+                                    <div x-data="{
+                                        baseDir: '{{ $application->base_directory }}',
+                                        composeLocation: '{{ $application->docker_compose_location }}',
+                                        normalizePath(path) {
+                                            if (!path || path.trim() === '') return '/';
+                                            path = path.trim();
+                                            path = path.replace(/\/+$/, '');
+                                            if (!path.startsWith('/')) {
+                                                path = '/' + path;
+                                            }
+                                            return path;
+                                        },
+                                        normalizeBaseDir() {
+                                            this.baseDir = this.normalizePath(this.baseDir);
+                                        },
+                                        normalizeComposeLocation() {
+                                            this.composeLocation = this.normalizePath(this.composeLocation);
+                                        }
+                                    }" class="flex gap-2">
+                                        <x-forms.input x-bind:disabled="shouldDisable()" placeholder="/" wire:model.defer="baseDirectory"
+                                            label="Base Directory" helper="Directory to use as root. Useful for monorepos."
+                                            x-model="baseDir" @blur="normalizeBaseDir()" />
                                         <x-forms.input x-bind:disabled="shouldDisable()" placeholder="/docker-compose.yaml"
-                                            id="dockerComposeLocation" label="Docker Compose Location"
-                                            helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
+                                            wire:model.defer="dockerComposeLocation" label="Docker Compose Location"
+                                            helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>"
+                                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
                                     </div>
                                     <div class="w-96">
                                         <x-forms.checkbox instantSave id="isPreserveRepositoryEnabled"
@@ -293,13 +313,32 @@
                                     @endif
                                 </div>
                         @else
-                                <div class="flex flex-col gap-2 xl:flex-row">
-                                    <x-forms.input placeholder="/" id="baseDirectory" label="Base Directory"
-                                        helper="Directory to use as root. Useful for monorepos." x-bind:disabled="!canUpdate" />
+                                <div x-data="{
+                                    baseDir: '{{ $application->base_directory }}',
+                                    dockerfileLocation: '{{ $application->dockerfile_location }}',
+                                    normalizePath(path) {
+                                        if (!path || path.trim() === '') return '/';
+                                        path = path.trim();
+                                        path = path.replace(/\/+$/, '');
+                                        if (!path.startsWith('/')) {
+                                            path = '/' + path;
+                                        }
+                                        return path;
+                                    },
+                                    normalizeBaseDir() {
+                                        this.baseDir = this.normalizePath(this.baseDir);
+                                    },
+                                    normalizeDockerfileLocation() {
+                                        this.dockerfileLocation = this.normalizePath(this.dockerfileLocation);
+                                    }
+                                }" class="flex flex-col gap-2 xl:flex-row">
+                                    <x-forms.input placeholder="/" wire:model.defer="baseDirectory" label="Base Directory"
+                                        helper="Directory to use as root. Useful for monorepos." x-bind:disabled="!canUpdate"
+                                        x-model="baseDir" @blur="normalizeBaseDir()" />
                                     @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
-                                        <x-forms.input placeholder="/Dockerfile" id="dockerfileLocation" label="Dockerfile Location"
+                                        <x-forms.input placeholder="/Dockerfile" wire:model.defer="dockerfileLocation" label="Dockerfile Location"
                                             helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>"
-                                            x-bind:disabled="!canUpdate" />
+                                            x-bind:disabled="!canUpdate" x-model="dockerfileLocation" @blur="normalizeDockerfileLocation()" />
                                     @endif
 
                                     @if ($application->build_pack === 'dockerfile')

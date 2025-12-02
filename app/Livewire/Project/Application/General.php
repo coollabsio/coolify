@@ -606,13 +606,6 @@ class General extends Component
         }
     }
 
-    public function updatedBaseDirectory()
-    {
-        if ($this->buildPack === 'dockercompose') {
-            $this->loadComposeFile();
-        }
-    }
-
     public function updatedIsStatic($value)
     {
         if ($value) {
@@ -791,6 +784,7 @@ class General extends Component
             $oldPortsExposes = $this->application->ports_exposes;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
+            $oldBaseDirectory = $this->application->base_directory;
 
             // Process FQDN with intermediate variable to avoid Collection/string confusion
             $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
@@ -821,6 +815,16 @@ class General extends Component
                 return; // Stop if there are conflicts and user hasn't confirmed
             }
 
+            // Normalize paths BEFORE validation
+            if ($this->baseDirectory && $this->baseDirectory !== '/') {
+                $this->baseDirectory = rtrim($this->baseDirectory, '/');
+                $this->application->base_directory = $this->baseDirectory;
+            }
+            if ($this->publishDirectory && $this->publishDirectory !== '/') {
+                $this->publishDirectory = rtrim($this->publishDirectory, '/');
+                $this->application->publish_directory = $this->publishDirectory;
+            }
+
             $this->application->save();
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
@@ -828,7 +832,10 @@ class General extends Component
                 $this->application->save();
             }
 
-            if ($this->buildPack === 'dockercompose' && $oldDockerComposeLocation !== $this->dockerComposeLocation) {
+            // Validate docker compose file path when base directory OR compose location changes
+            if ($this->buildPack === 'dockercompose' &&
+                ($oldDockerComposeLocation !== $this->dockerComposeLocation ||
+                 $oldBaseDirectory !== $this->baseDirectory)) {
                 $compose_return = $this->loadComposeFile(showToast: false);
                 if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
                     return;
@@ -854,14 +861,6 @@ class General extends Component
                     $this->portsExposes = $port;
                     $this->application->ports_exposes = $port;
                 }
-            }
-            if ($this->baseDirectory && $this->baseDirectory !== '/') {
-                $this->baseDirectory = rtrim($this->baseDirectory, '/');
-                $this->application->base_directory = $this->baseDirectory;
-            }
-            if ($this->publishDirectory && $this->publishDirectory !== '/') {
-                $this->publishDirectory = rtrim($this->publishDirectory, '/');
-                $this->application->publish_directory = $this->publishDirectory;
             }
             if ($this->buildPack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
