@@ -12,6 +12,7 @@ class GeneratePgbackrestConfig
     public function handle(StandalonePostgresql $database): string
     {
         $stanzaName = $database->getPgbackrestStanzaName();
+        $repoType = $database->pgbackrest_repo_type ?? 'posix';
 
         $retentionFull = $database->pgbackrest_retention_full ?? config('constants.pgbackrest.default_retention_full', 2);
         $retentionDiff = $database->pgbackrest_retention_diff ?? config('constants.pgbackrest.default_retention_diff', 7);
@@ -25,7 +26,19 @@ class GeneratePgbackrestConfig
         $config = [];
 
         $config[] = '[global]';
-        $config[] = 'repo1-path=/var/lib/pgbackrest';
+
+        if ($repoType === 's3') {
+            $config[] = 'repo1-type=s3';
+            $config[] = "repo1-path=/coolify/{$database->uuid}";
+            $config[] = "repo1-s3-bucket={$database->pgbackrest_s3_bucket}";
+            $config[] = "repo1-s3-endpoint={$database->pgbackrest_s3_endpoint}";
+            $config[] = "repo1-s3-region={$database->pgbackrest_s3_region}";
+            $config[] = 'repo1-s3-uri-style='.($database->pgbackrest_s3_uri_style ?? 'path');
+            $config[] = 'repo1-s3-verify-tls='.($database->pgbackrest_s3_verify_tls ? 'y' : 'n');
+        } else {
+            $config[] = 'repo1-path=/var/lib/pgbackrest';
+        }
+
         $config[] = "repo1-retention-full-type={$retentionFullType}";
         $config[] = "repo1-retention-full={$retentionFull}";
         $config[] = "repo1-retention-diff={$retentionDiff}";
@@ -64,6 +77,37 @@ class GeneratePgbackrestConfig
             'archive_mode' => 'on',
             'archive_command' => "pgbackrest --stanza={$stanzaName} archive-push %p",
             'archive_timeout' => '7200',
+        ];
+    }
+
+    /**
+     * Check if S3 configuration is complete.
+     */
+    public static function isS3ConfigComplete(StandalonePostgresql $database): bool
+    {
+        if (($database->pgbackrest_repo_type ?? 'posix') !== 's3') {
+            return true;
+        }
+
+        return ! empty($database->pgbackrest_s3_bucket)
+            && ! empty($database->pgbackrest_s3_endpoint)
+            && ! empty($database->pgbackrest_s3_region)
+            && ! empty($database->pgbackrest_s3_key)
+            && ! empty($database->pgbackrest_s3_secret);
+    }
+
+    /**
+     * Get S3 credential environment variables for container use.
+     */
+    public static function getS3EnvVars(StandalonePostgresql $database): array
+    {
+        if (($database->pgbackrest_repo_type ?? 'posix') !== 's3') {
+            return [];
+        }
+
+        return [
+            'PGBACKREST_REPO1_S3_KEY' => $database->pgbackrest_s3_key,
+            'PGBACKREST_REPO1_S3_KEY_SECRET' => $database->pgbackrest_s3_secret,
         ];
     }
 }

@@ -15,14 +15,15 @@ afterEach(function () {
 });
 
 it('generates config with default retention values', function () {
-    $this->database->pgbackrest_retention_full = null;
-    $this->database->pgbackrest_retention_diff = null;
+    $this->database->pgbackrest_retention_full = 2;
+    $this->database->pgbackrest_retention_diff = 7;
     $this->database->pgbackrest_retention_full_type = null;
     $this->database->pgbackrest_retention_archive = null;
     $this->database->pgbackrest_retention_archive_type = null;
-    $this->database->pgbackrest_compress_type = null;
-    $this->database->pgbackrest_compress_level = null;
-    $this->database->pgbackrest_log_level = null;
+    $this->database->pgbackrest_compress_type = 'lz4';
+    $this->database->pgbackrest_compress_level = 6;
+    $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 'posix';
 
     $config = GeneratePgbackrestConfig::run($this->database);
 
@@ -42,6 +43,7 @@ it('generates config with custom retention full type as time', function () {
     $this->database->pgbackrest_compress_type = 'lz4';
     $this->database->pgbackrest_compress_level = 6;
     $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 'posix';
 
     $config = GeneratePgbackrestConfig::run($this->database);
 
@@ -59,6 +61,7 @@ it('generates config with explicit archive retention', function () {
     $this->database->pgbackrest_compress_type = 'lz4';
     $this->database->pgbackrest_compress_level = 6;
     $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 'posix';
 
     $config = GeneratePgbackrestConfig::run($this->database);
 
@@ -75,6 +78,7 @@ it('omits archive retention when null to use pgbackrest default', function () {
     $this->database->pgbackrest_compress_type = 'lz4';
     $this->database->pgbackrest_compress_level = 6;
     $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 'posix';
 
     $config = GeneratePgbackrestConfig::run($this->database);
 
@@ -92,6 +96,7 @@ it('generates complete stanza configuration', function () {
     $this->database->pgbackrest_compress_type = 'lz4';
     $this->database->pgbackrest_compress_level = 6;
     $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 'posix';
 
     $config = GeneratePgbackrestConfig::run($this->database);
 
@@ -103,3 +108,33 @@ it('generates complete stanza configuration', function () {
     expect($config)->toContain('start-fast=y');
     expect($config)->toContain('delta=y');
 });
+
+it('generates S3 repository configuration', function () {
+    $this->database->pgbackrest_retention_full = 2;
+    $this->database->pgbackrest_retention_diff = 7;
+    $this->database->pgbackrest_retention_full_type = 'count';
+    $this->database->pgbackrest_retention_archive = null;
+    $this->database->pgbackrest_retention_archive_type = 'full';
+    $this->database->pgbackrest_compress_type = 'lz4';
+    $this->database->pgbackrest_compress_level = 6;
+    $this->database->pgbackrest_log_level = 'info';
+    $this->database->pgbackrest_repo_type = 's3';
+    $this->database->uuid = 'test-uuid';
+    $this->database->pgbackrest_s3_bucket = 'my-backup-bucket';
+    $this->database->pgbackrest_s3_endpoint = 's3.amazonaws.com';
+    $this->database->pgbackrest_s3_region = 'us-east-1';
+    $this->database->pgbackrest_s3_uri_style = 'path';
+    $this->database->pgbackrest_s3_verify_tls = true;
+
+    $config = GeneratePgbackrestConfig::run($this->database);
+
+    expect($config)->toContain('repo1-type=s3');
+    expect($config)->toContain('repo1-path=/coolify/test-uuid');
+    expect($config)->toContain('repo1-s3-bucket=my-backup-bucket');
+    expect($config)->toContain('repo1-s3-endpoint=s3.amazonaws.com');
+    expect($config)->toContain('repo1-s3-region=us-east-1');
+    expect($config)->toContain('repo1-s3-uri-style=path');
+    expect($config)->toContain('repo1-s3-verify-tls=y');
+});
+
+

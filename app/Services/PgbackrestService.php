@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Actions\Database\Pgbackrest\GeneratePgbackrestConfig;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Illuminate\Support\Collection;
@@ -12,6 +13,8 @@ use Illuminate\Support\Collection;
  * Handles backup listing, validation, restore, and delete operations.
  * Works whether the PostgreSQL container is running or stopped by
  * automatically switching between main container exec and temp container.
+ *
+ * Supports both local (posix) and S3 repositories.
  */
 class PgbackrestService
 {
@@ -47,6 +50,22 @@ class PgbackrestService
     public function isEnabled(): bool
     {
         return $this->database->isPgbackrestEnabled();
+    }
+
+    /**
+     * Get the repository type (posix or s3).
+     */
+    public function getRepoType(): string
+    {
+        return $this->database->pgbackrest_repo_type ?? 'posix';
+    }
+
+    /**
+     * Check if using S3 repository.
+     */
+    public function isS3Repo(): bool
+    {
+        return $this->getRepoType() === 's3';
     }
 
     /**
@@ -196,6 +215,35 @@ class PgbackrestService
     }
 
     /**
+     * Get pgBackRest info using temp container context (ensures same context as restore).
+     */
+    public function getInfoFromTempContainer(): ?array
+    {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
+        $stanza = escapeshellarg($this->getStanzaName());
+
+        try {
+            $output = $this->executeInTempContainer("--stanza={$stanza} info --output=json", false, false);
+
+            if (blank($output)) {
+                return null;
+            }
+
+            $info = json_decode($output, true);
+            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($info)) {
+                return null;
+            }
+
+            return $info;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Get list of available backups.
      */
     public function getBackupList(): Collection
@@ -228,6 +276,27 @@ class PgbackrestService
                 'finished_at' => isset($backup['timestamp']['stop']) ? \Carbon\Carbon::createFromTimestamp($backup['timestamp']['stop']) : null,
                 'database_list' => $dbList,
                 'prior' => $backup['prior'] ?? null,
+            ];
+        })->reverse()->values();
+    }
+
+    /**
+     * Get backup list using temp container context (same as restore will use).
+     */
+    public function getBackupListFromTempContainer(): Collection
+    {
+        $info = $this->getInfoFromTempContainer();
+
+        if (empty($info) || ! isset($info[0]['backup']) || ! is_array($info[0]['backup'])) {
+            return collect();
+        }
+
+        return collect($info[0]['backup'])->map(function ($backup) {
+            return [
+                'label' => $backup['label'] ?? null,
+                'type' => $backup['type'] ?? null,
+                'timestamp_start' => $backup['timestamp']['start'] ?? null,
+                'timestamp_stop' => $backup['timestamp']['stop'] ?? null,
             ];
         })->reverse()->values();
     }
@@ -354,7 +423,7 @@ class PgbackrestService
     }
 
     /**
-     * Validate that a restore operation can proceed.
+     * Validate that a restore operation can proceed (basic validation).
      */
     public function validateRestore(?string $backupLabel = null): array
     {
@@ -367,6 +436,199 @@ class PgbackrestService
         }
 
         return ['valid' => true, 'message' => 'Restore can proceed'];
+    }
+
+    /**
+     * Deep validation of restore operation before any destructive actions.
+     *
+     * This runs in the SAME context (temp container) as the actual restore,
+     * ensuring that if validation passes, the restore will have access to
+     * the backup.
+     *
+     * @param  string|null  $backupLabel  Specific backup to restore, or null for latest
+     * @param  string|null  $targetTime  Point-in-time target, or null for immediate
+     * @return array{valid: bool, message: string, diagnostics?: array}
+     */
+    public function validateRestoreDeep(?string $backupLabel = null, ?string $targetTime = null): array
+    {
+        $diagnostics = [
+            'stanza' => $this->getStanzaName(),
+            'repo_type' => $this->getRepoType(),
+            'backup_label' => $backupLabel ?? 'latest',
+            'target_time' => $targetTime,
+        ];
+
+        if (! $this->isEnabled()) {
+            return [
+                'valid' => false,
+                'message' => 'pgBackRest is not enabled for this database.',
+                'diagnostics' => $diagnostics,
+            ];
+        }
+
+        if ($this->isS3Repo() && ! GeneratePgbackrestConfig::isS3ConfigComplete($this->database)) {
+            return [
+                'valid' => false,
+                'message' => 'S3 configuration is incomplete. Please provide bucket, endpoint, region, and credentials.',
+                'diagnostics' => $diagnostics,
+            ];
+        }
+
+        $mounts = $this->getMounts();
+        $diagnostics['mounts'] = $mounts;
+
+        if (empty($mounts['pgbackrest_config'])) {
+            return [
+                'valid' => false,
+                'message' => 'pgBackRest configuration path could not be resolved. Ensure the database container has been started at least once with pgBackRest enabled.',
+                'diagnostics' => $diagnostics,
+            ];
+        }
+
+        if (! $this->isS3Repo() && empty($mounts['pgbackrest_repo'])) {
+            return [
+                'valid' => false,
+                'message' => 'pgBackRest repository path could not be resolved for local repository.',
+                'diagnostics' => $diagnostics,
+            ];
+        }
+
+        if (empty($mounts['data_volume'])) {
+            return [
+                'valid' => false,
+                'message' => 'Data volume could not be resolved.',
+                'diagnostics' => $diagnostics,
+            ];
+        }
+
+        try {
+            $stanza = escapeshellarg($this->getStanzaName());
+            $output = $this->executeInTempContainer("--stanza={$stanza} info --output=json", false, true);
+            $info = json_decode($output, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($info)) {
+                return [
+                    'valid' => false,
+                    'message' => 'Failed to parse pgBackRest info output. The repository may be corrupted or inaccessible.',
+                    'diagnostics' => array_merge($diagnostics, ['raw_output' => substr($output, 0, 500)]),
+                ];
+            }
+
+            if (empty($info) || ! isset($info[0])) {
+                return [
+                    'valid' => false,
+                    'message' => "Stanza '{$this->getStanzaName()}' not found in repository. Ensure stanza-create has been run.",
+                    'diagnostics' => $diagnostics,
+                ];
+            }
+
+            $stanzaInfo = $info[0];
+            $status = $stanzaInfo['status'] ?? [];
+
+            if (isset($status['code']) && $status['code'] !== 0) {
+                $statusMessage = $status['message'] ?? 'Unknown stanza error';
+
+                return [
+                    'valid' => false,
+                    'message' => "Stanza error: {$statusMessage}",
+                    'diagnostics' => array_merge($diagnostics, ['stanza_status' => $status]),
+                ];
+            }
+
+            $backups = $stanzaInfo['backup'] ?? [];
+            $diagnostics['backup_count'] = count($backups);
+
+            if (empty($backups)) {
+                return [
+                    'valid' => false,
+                    'message' => 'No backups found in the repository. Create a backup before attempting restore.',
+                    'diagnostics' => $diagnostics,
+                ];
+            }
+
+            if ($backupLabel) {
+                $foundBackup = collect($backups)->firstWhere('label', $backupLabel);
+                if (! $foundBackup) {
+                    $availableLabels = collect($backups)->pluck('label')->take(5)->join(', ');
+
+                    return [
+                        'valid' => false,
+                        'message' => "Backup '{$backupLabel}' not found in repository. It may have been expired by retention policy. Available backups: {$availableLabels}",
+                        'diagnostics' => array_merge($diagnostics, ['available_labels' => collect($backups)->pluck('label')->toArray()]),
+                    ];
+                }
+                $diagnostics['validated_backup'] = $foundBackup['label'];
+            }
+
+            if ($targetTime) {
+                $earliestStart = collect($backups)->min('timestamp.start');
+                $latestStop = collect($backups)->max('timestamp.stop');
+
+                $diagnostics['earliest_backup'] = $earliestStart ? date('Y-m-d H:i:s', $earliestStart) : null;
+                $diagnostics['latest_backup'] = $latestStop ? date('Y-m-d H:i:s', $latestStop) : null;
+            }
+
+        } catch (\RuntimeException $e) {
+            $errorMessage = $e->getMessage();
+
+            if (str_contains($errorMessage, 'S3') || str_contains($errorMessage, 's3')) {
+                return [
+                    'valid' => false,
+                    'message' => 'Unable to connect to S3 repository. Verify S3 endpoint, bucket, region, and credentials.',
+                    'diagnostics' => array_merge($diagnostics, ['error' => $errorMessage]),
+                ];
+            }
+
+            if (str_contains($errorMessage, 'stanza') || str_contains($errorMessage, 'could not find')) {
+                return [
+                    'valid' => false,
+                    'message' => "Stanza '{$this->getStanzaName()}' not found. The repository may not be initialized for this database.",
+                    'diagnostics' => array_merge($diagnostics, ['error' => $errorMessage]),
+                ];
+            }
+
+            return [
+                'valid' => false,
+                'message' => "Pre-flight check failed: {$this->formatErrorMessage($e)}",
+                'diagnostics' => array_merge($diagnostics, ['error' => $errorMessage]),
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'All pre-flight checks passed. Restore can proceed safely.',
+            'diagnostics' => $diagnostics,
+        ];
+    }
+
+    /**
+     * Verify repository structure exists (for local repos).
+     */
+    public function verifyRepositoryStructure(): array
+    {
+        if ($this->isS3Repo()) {
+            return ['valid' => true, 'message' => 'S3 repository structure is managed remotely.'];
+        }
+
+        $mounts = $this->getMounts();
+        if (empty($mounts['pgbackrest_repo'])) {
+            return ['valid' => false, 'message' => 'Repository path not resolved.'];
+        }
+
+        $stanza = $this->getStanzaName();
+        $repoPath = $mounts['pgbackrest_repo'];
+
+        $checkCmd = "test -d {$repoPath}/backup/{$stanza} && echo 'EXISTS' || echo 'MISSING'";
+        $result = instant_remote_process([$checkCmd], $this->server, throwError: false);
+
+        if (trim($result) !== 'EXISTS') {
+            return [
+                'valid' => false,
+                'message' => "Repository structure not found at {$repoPath}/backup/{$stanza}. Stanza may not be initialized.",
+            ];
+        }
+
+        return ['valid' => true, 'message' => 'Repository structure verified.'];
     }
 
     /**
@@ -386,6 +648,9 @@ class PgbackrestService
 
     /**
      * Clear the PostgreSQL data directory using a temporary container.
+     *
+     * This ensures PGDATA is completely empty before restore.
+     * Uses a thorough rm pattern to handle hidden files.
      */
     public function clearDataDirectory(): void
     {
@@ -399,8 +664,17 @@ class PgbackrestService
         }
 
         $dataVolume = $mounts['data_volume'];
-        $clearCmd = "docker run --rm -v {$dataVolume}:/var/lib/postgresql/data alpine sh -c 'rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.*' 2>/dev/null || true";
-        instant_remote_process([$clearCmd], $this->server, throwError: false);
+
+        $clearCmd = "docker run --rm -v {$dataVolume}:/data alpine sh -c '".
+            'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; '.
+            'echo CLEARED'.
+            "' 2>&1";
+
+        $result = instant_remote_process([$clearCmd], $this->server, throwError: false);
+
+        if (! str_contains($result ?? '', 'CLEARED')) {
+            throw new \RuntimeException('Failed to clear data directory: '.$result);
+        }
     }
 
     /**
@@ -415,7 +689,9 @@ class PgbackrestService
 
         if ($includePaths) {
             $command .= ' --pg1-path=/var/lib/postgresql/data';
-            $command .= ' --repo1-path=/var/lib/pgbackrest';
+            if (! $this->isS3Repo()) {
+                $command .= ' --repo1-path=/var/lib/pgbackrest';
+            }
         }
 
         if ($backupLabel) {
@@ -463,25 +739,48 @@ class PgbackrestService
     {
         $mounts = $this->getMounts();
 
-        if (empty($mounts['pgbackrest_config']) || empty($mounts['pgbackrest_repo'])) {
+        if (empty($mounts['pgbackrest_config'])) {
             if ($throwError) {
-                throw new \RuntimeException('pgBackRest config/repository paths could not be resolved.');
+                throw new \RuntimeException('pgBackRest config path could not be resolved.');
+            }
+
+            return '';
+        }
+
+        if (! $this->isS3Repo() && empty($mounts['pgbackrest_repo'])) {
+            if ($throwError) {
+                throw new \RuntimeException('pgBackRest repository path could not be resolved for local repository.');
             }
 
             return '';
         }
 
         $image = $this->database->image;
-        $volumeArgs = "-v {$mounts['pgbackrest_config']}:/etc/pgbackrest ".
-                      "-v {$mounts['pgbackrest_repo']}:/var/lib/pgbackrest ";
+        $volumeArgs = "-v {$mounts['pgbackrest_config']}:/etc/pgbackrest ";
+
+        if (! $this->isS3Repo()) {
+            $volumeArgs .= "-v {$mounts['pgbackrest_repo']}:/var/lib/pgbackrest ";
+        }
 
         if ($withDataDir && ! empty($mounts['data_volume'])) {
             $volumeArgs = "-v {$mounts['data_volume']}:/var/lib/postgresql/data ".$volumeArgs;
         }
 
-        $cmd = 'docker run --rm '.$volumeArgs.
+        $envArgs = '';
+        if ($this->isS3Repo()) {
+            $s3Vars = GeneratePgbackrestConfig::getS3EnvVars($this->database);
+            foreach ($s3Vars as $key => $value) {
+                if (! empty($value)) {
+                    $envArgs .= ' -e '.escapeshellarg("{$key}={$value}");
+                }
+            }
+            $volumeArgs .= '-v pgbackrest-s3-logs-'.escapeshellarg($this->database->uuid).':/var/lib/pgbackrest ';
+        }
+
+        $cmd = 'docker run --rm '.$envArgs.' '.$volumeArgs.
             "{$image} sh -c '".
             'apk add --no-cache pgbackrest 2>/dev/null || (apt-get update && apt-get install -y pgbackrest) 2>/dev/null; '.
+            'mkdir -p /var/lib/pgbackrest/log /tmp/pgbackrest 2>/dev/null || true; '.
             'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest 2>/dev/null || true; '.
             ($withDataDir ? 'chown -R postgres:postgres /var/lib/postgresql/data 2>/dev/null || true; ' : '').
             "su postgres -c \"pgbackrest {$args}\"".
@@ -553,20 +852,40 @@ class PgbackrestService
             }
         }
 
+        if (str_contains($message, 'database identifier') || str_contains($message, 'db-id')) {
+            return 'Database identifier mismatch. Ensure you are restoring to an empty data directory matching the original cluster.';
+        }
+
+        if ((str_contains($message, 'S3') || str_contains($message, 's3')) && str_contains($message, 'ERROR')) {
+            return 'Error accessing S3 repository. Check S3 endpoint, bucket, region, and credentials.';
+        }
+
+        if (str_contains($message, 'unable to load') && str_contains($message, 'configuration')) {
+            return 'Unable to load S3 configuration. Verify network connectivity and S3 credentials.';
+        }
+
         if (str_contains($message, 'archive_mode')) {
             return 'PostgreSQL is not configured for archiving. Please ensure pgBackRest is properly enabled and the database has been restarted.';
         }
 
-        if (str_contains($message, 'stanza')) {
+        if (str_contains($message, 'stanza') || str_contains($message, 'could not find stanza')) {
             return 'pgBackRest stanza not found. The backup repository may not be initialized. Try creating a backup first.';
         }
 
-        if (str_contains($message, 'backup set')) {
+        if (str_contains($message, 'backup set') || str_contains($message, 'backup not found')) {
             return 'Backup not found in the repository. It may have been expired by retention policy.';
         }
 
-        if (str_contains($message, 'permission')) {
+        if (str_contains($message, 'permission') || str_contains($message, 'Permission denied')) {
             return 'Permission error during restore. The pgBackRest container may not have proper access to the data directory.';
+        }
+
+        if (str_contains($message, 'connection refused') || str_contains($message, 'Connection refused')) {
+            return 'Connection refused. Check network connectivity and ensure the target service is running.';
+        }
+
+        if (str_contains($message, 'timeout') || str_contains($message, 'Timeout')) {
+            return 'Operation timed out. This may indicate network issues or a slow S3 connection.';
         }
 
         return strlen($message) > 500 ? substr($message, 0, 500).'...' : $message;
@@ -583,5 +902,26 @@ class PgbackrestService
             'incr' => 'Incremental',
             default => ucfirst($type),
         };
+    }
+
+    /**
+     * Get diagnostic information for debugging.
+     */
+    public function getDiagnostics(): array
+    {
+        $mounts = $this->getMounts();
+
+        return [
+            'database_uuid' => $this->database->uuid,
+            'stanza' => $this->getStanzaName(),
+            'repo_type' => $this->getRepoType(),
+            'is_s3' => $this->isS3Repo(),
+            's3_bucket' => $this->isS3Repo() ? $this->database->pgbackrest_s3_bucket : null,
+            's3_endpoint' => $this->isS3Repo() ? $this->database->pgbackrest_s3_endpoint : null,
+            's3_region' => $this->isS3Repo() ? $this->database->pgbackrest_s3_region : null,
+            'mounts' => $mounts,
+            'container_running' => $this->isContainerRunning(),
+            'enabled' => $this->isEnabled(),
+        ];
     }
 }

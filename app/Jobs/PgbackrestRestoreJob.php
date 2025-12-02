@@ -16,6 +16,20 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * PgBackRest Restore Job
+ *
+ * Executes a complete restore flow:
+ * 1. Pre-flight validation (before any destructive actions)
+ * 2. Stop PostgreSQL container
+ * 3. Clear PGDATA (automatic, no user confirmation)
+ * 4. Restore from pgBackRest backup
+ * 5. Start PostgreSQL container
+ *
+ * Safety: If pre-flight validation fails, no destructive actions are taken.
+ * The restore uses the same execution context (temp container) for both
+ * validation and restore to ensure consistency.
+ */
 class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -41,13 +55,42 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         Log::info('Starting pgBackRest restore', [
             'database_id' => $this->database->id,
+            'database_uuid' => $this->database->uuid,
             'backup_label' => $this->backupLabel,
             'target_time' => $this->targetTime,
+            'repo_type' => $this->service->getRepoType(),
         ]);
 
-        $this->updateRestoreStatus('running', 'Preparing for restore...');
+        $this->updateRestoreStatus('running', 'Running pre-flight checks...');
 
         try {
+            $validation = $this->service->validateRestoreDeep($this->backupLabel, $this->targetTime);
+
+            if (! $validation['valid']) {
+                Log::warning('pgBackRest restore pre-flight validation failed', [
+                    'database_id' => $this->database->id,
+                    'message' => $validation['message'],
+                    'diagnostics' => $validation['diagnostics'] ?? [],
+                ]);
+
+                $this->database->update(['status' => 'error']);
+                $this->updateRestoreStatus('failed', $validation['message']);
+
+                $team = $this->database->team();
+                $team?->notify(new PgbackrestRestoreFailed(
+                    $this->database,
+                    "Pre-flight check failed: {$validation['message']}",
+                    $this->backupLabel
+                ));
+
+                return;
+            }
+
+            Log::info('pgBackRest pre-flight validation passed', [
+                'database_id' => $this->database->id,
+                'diagnostics' => $validation['diagnostics'] ?? [],
+            ]);
+
             $this->updateRestoreStatus('running', 'Stopping PostgreSQL container...');
             $this->service->stopContainer();
 
@@ -61,7 +104,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
             Log::info('pgBackRest restore completed', [
                 'database_id' => $this->database->id,
-                'output' => $output,
+                'output_length' => strlen($output),
             ]);
 
             if ($this->restartAfter) {
@@ -83,6 +126,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             Log::error('pgBackRest restore failed', [
                 'database_id' => $this->database->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->database->update(['status' => 'error']);
@@ -97,10 +141,17 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
     private function updateRestoreStatus(string $status, string $message): void
     {
+        $dbStatus = match ($status) {
+            'running' => 'restoring',
+            'failed' => 'error',
+            'success' => $this->restartAfter ? 'running' : 'exited',
+            default => $this->database->status,
+        };
+
         $this->database->update([
             'pgbackrest_restore_status' => $status,
             'pgbackrest_restore_message' => $message,
-            'status' => $status === 'running' ? 'restoring' : ($status === 'failed' ? 'error' : $this->database->status),
+            'status' => $dbStatus,
         ]);
 
         $this->broadcastStatusChange();

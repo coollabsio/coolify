@@ -20,6 +20,9 @@ class StandalonePostgresql extends BaseModel
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
         'pgbackrest_enabled' => 'boolean',
+        'pgbackrest_s3_key' => 'encrypted',
+        'pgbackrest_s3_secret' => 'encrypted',
+        'pgbackrest_s3_verify_tls' => 'boolean',
     ];
 
     protected static function booted()
