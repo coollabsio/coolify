@@ -2,7 +2,7 @@
 # slogan: Kanban tracking tool for issues and ideas by 37signals
 # category: productivity
 # tags: kanban, project management, issues, rails, ruby, basecamp, 37signals
-# logo: svgs/fizzy.svg
+# logo: svgs/fizzy.png
 # port: 80
 
 services:
