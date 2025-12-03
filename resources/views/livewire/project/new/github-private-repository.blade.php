@@ -143,6 +143,10 @@
                                             helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                                     </div>
                                 @endif
+                                <div class="w-64">
+                                    <x-forms.checkbox id="checkCoolifyConfig" label="Import coolify.json"
+                                        helper="If a coolify.json file exists in the repository, import build settings and environment variables from it." />
+                                </div>
                             </div>
                             <x-forms.button type="submit">
                                 Continue

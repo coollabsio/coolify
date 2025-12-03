@@ -118,6 +118,21 @@
                         </div>
                     </div>
                 </div>
+                {{-- Coolify JSON Import - Full Width --}}
+                <div x-show="coolifyJsonImport && (search === '' || 'import coolify json configuration'.includes(search.toLowerCase()))"
+                    class="mt-4">
+                    <div x-on:click="setType(coolifyJsonImport.id)"
+                        :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
+                        <x-resource-view>
+                            <x-slot:title><span x-text="coolifyJsonImport.name"></span></x-slot>
+                            <x-slot:description><span x-text="coolifyJsonImport.description"></span></x-slot>
+                            <x-slot:logo>
+                                <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
+                                    :src="coolifyJsonImport.logo">
+                            </x-slot>
+                        </x-resource-view>
+                    </div>
+                </div>
                 <div x-show="filteredDatabases.length > 0" class="mt-8">
                     <h2 class="mb-4">Databases</h2>
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
@@ -211,6 +226,7 @@
                         services: [],
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
+                        coolifyJsonImport: null,
                         databases: [],
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }
                         docCheckInProgress: {}, // Track ongoing checks: { serviceName: boolean }
@@ -226,12 +242,14 @@
                                 categories,
                                 gitBasedApplications,
                                 dockerBasedApplications,
+                                coolifyJsonImport,
                                 databases
                             } = await this.$wire.loadServices();
                             this.services = services;
                             this.categories = categories || [];
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
+                            this.coolifyJsonImport = coolifyJsonImport;
                             this.databases = databases;
                             this.loading = false;
                             this.$nextTick(() => {

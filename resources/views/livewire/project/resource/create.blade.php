@@ -14,6 +14,8 @@
         <livewire:project.new.docker-compose :type="$type" />
     @elseif ($type === 'docker-image')
         <livewire:project.new.docker-image :type="$type" />
+    @elseif ($type === 'coolify-json')
+        <livewire:project.new.coolify-json-import :type="$type" />
     @else
         <livewire:project.new.select />
     @endif

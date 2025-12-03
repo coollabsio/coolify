@@ -936,6 +936,21 @@ class General extends Component
         ]);
     }
 
+    public function downloadRepositoryConfig()
+    {
+        $this->authorize('view', $this->application);
+
+        $config = $this->application->generateRepositoryConfig();
+        $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return response()->streamDownload(function () use ($json) {
+            echo $json;
+        }, 'coolify.json', [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => 'attachment; filename=coolify.json',
+        ]);
+    }
+
     private function updateServiceEnvironmentVariables()
     {
         $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);

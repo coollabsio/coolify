@@ -190,6 +190,9 @@ class GlobalSearch extends Component
             'new compose' => 'docker-compose-empty',
             'new docker image' => 'docker-image',
             'new image' => 'docker-image',
+            'new coolify json' => 'coolify-json',
+            'new json' => 'coolify-json',
+            'new import' => 'coolify-json',
 
             // Databases
             'new postgresql' => 'postgresql',
@@ -234,7 +237,7 @@ class GlobalSearch extends Component
             'project', 'source',
             // Applications
             'public', 'private-gh-app', 'private-deploy-key',
-            'dockerfile', 'docker-compose-empty', 'docker-image',
+            'dockerfile', 'docker-compose-empty', 'docker-image', 'coolify-json',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
             'dragonfly', 'mongodb', 'clickhouse',
@@ -1025,6 +1028,15 @@ class GlobalSearch extends Component
                 'description' => 'Deploy an existing Docker image from any registry',
                 'quickcommand' => '(type: new image)',
                 'type' => 'docker-image',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Import from coolify.json',
+                'description' => 'Paste a coolify.json configuration to quickly create an application',
+                'quickcommand' => '(type: new json)',
+                'type' => 'coolify-json',
                 'category' => 'Applications',
                 'resourceType' => 'application',
             ]);

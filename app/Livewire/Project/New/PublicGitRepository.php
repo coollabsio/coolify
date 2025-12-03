@@ -363,10 +363,24 @@ class PublicGitRepository extends Component
             $application->fqdn = $fqdn;
             $application->save();
             if ($this->checkCoolifyConfig) {
-                // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
-                // if ($config) {
-                //     $application->setConfig($config);
-                // }
+                try {
+                    // Construct clean git URL from host and repository
+                    $gitUrl = "https://{$this->git_host}/{$this->git_repository}.git";
+                    $config = loadConfigFromGit(
+                        $gitUrl,
+                        $this->git_branch,
+                        $this->base_directory,
+                        $destination->server->id,
+                        auth()->user()->currentTeam()->id
+                    );
+                    if ($config) {
+                        $application->setConfig($config, fromRepository: true);
+                        session()->flash('success', 'coolify.json configuration detected and applied.');
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('coolify.json: Failed to apply config - '.$e->getMessage());
+                    session()->flash('warning', 'coolify.json found but failed to apply: '.$e->getMessage());
+                }
             }
 
             return redirect()->route('project.application.configuration', [

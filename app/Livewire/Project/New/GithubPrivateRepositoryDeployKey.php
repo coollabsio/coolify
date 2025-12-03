@@ -49,6 +49,8 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public bool $show_is_static = true;
 
+    public bool $checkCoolifyConfig = true;
+
     private object $repository_url_parsed;
 
     private GithubApp|GitlabApp|string $git_source = 'other';
@@ -198,6 +200,24 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->fqdn = $fqdn;
             $application->name = generate_random_name($application->uuid);
             $application->save();
+
+            // Check for coolify.json configuration
+            try {
+                $config = loadConfigFromGit(
+                    $this->repository_url,
+                    $this->branch,
+                    $this->base_directory ?? '/',
+                    $destination->server->id,
+                    auth()->user()->currentTeam()->id
+                );
+                if ($config) {
+                    $application->setConfig($config, fromRepository: true);
+                    session()->flash('success', 'coolify.json configuration detected and applied.');
+                }
+            } catch (\Exception $e) {
+                \Log::warning('coolify.json: Failed to apply config - '.$e->getMessage());
+                session()->flash('warning', 'coolify.json found but failed to apply: '.$e->getMessage());
+            }
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

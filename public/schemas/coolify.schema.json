@@ -1,0 +1,664 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://coolify.io/schemas/coolify.schema.json",
+  "title": "Coolify Application Configuration",
+  "description": "Schema for coolify.json configuration files used to configure Coolify applications",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this JSON schema for IDE support"
+    },
+    "version": {
+      "type": "string",
+      "description": "Schema version for future compatibility",
+      "enum": ["1.0"],
+      "default": "1.0"
+    },
+    "name": {
+      "type": "string",
+      "description": "Application name displayed in Coolify"
+    },
+    "description": {
+      "type": "string",
+      "description": "Application description"
+    },
+    "source": {
+      "type": "object",
+      "description": "Git source configuration (only used when importing via copy-paste, ignored when coolify.json is in repository)",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Git repository URL (e.g., https://github.com/user/repo)",
+          "examples": ["https://github.com/coollabsio/coolify-examples"]
+        },
+        "branch": {
+          "type": "string",
+          "description": "Git branch to deploy",
+          "default": "main"
+        },
+        "commit_sha": {
+          "type": "string",
+          "description": "Specific commit SHA to deploy",
+          "default": "HEAD"
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "description": "Build configuration settings",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Build pack type",
+          "enum": ["nixpacks", "dockerfile", "dockercompose", "dockerimage", "static"],
+          "default": "nixpacks"
+        },
+        "base_directory": {
+          "type": "string",
+          "description": "Base directory for the build (relative to repository root)",
+          "default": "/",
+          "examples": ["/", "/app", "/frontend"]
+        },
+        "publish_directory": {
+          "type": "string",
+          "description": "Directory containing built files to publish (for static builds)",
+          "examples": ["/dist", "/build", "/public"]
+        },
+        "dockerfile_location": {
+          "type": "string",
+          "description": "Path to Dockerfile (relative to base_directory)",
+          "default": "/Dockerfile",
+          "examples": ["/Dockerfile", "/docker/Dockerfile.prod"]
+        },
+        "docker_compose_location": {
+          "type": "string",
+          "description": "Path to docker-compose file (relative to base_directory)",
+          "default": "/docker-compose.yml",
+          "examples": ["/docker-compose.yml", "/docker-compose.prod.yml"]
+        },
+        "install_command": {
+          "type": "string",
+          "description": "Custom install command (overrides auto-detected)",
+          "examples": ["npm ci", "yarn install --frozen-lockfile", "pnpm install"]
+        },
+        "build_command": {
+          "type": "string",
+          "description": "Custom build command (overrides auto-detected)",
+          "examples": ["npm run build", "yarn build", "cargo build --release"]
+        },
+        "start_command": {
+          "type": "string",
+          "description": "Custom start command (overrides auto-detected)",
+          "examples": ["npm start", "node server.js", "./target/release/app"]
+        },
+        "watch_paths": {
+          "type": "string",
+          "description": "Comma-separated paths to watch for changes (triggers rebuild)",
+          "examples": ["src,package.json", "**/*.rs,Cargo.toml"]
+        },
+        "static_image": {
+          "type": "string",
+          "description": "Docker image to use for static file serving",
+          "default": "nginx:alpine"
+        },
+        "dockerfile_target_build": {
+          "type": "string",
+          "description": "Docker build target stage (for multi-stage builds)",
+          "examples": ["production", "builder"]
+        },
+        "custom_docker_run_options": {
+          "type": "string",
+          "description": "Additional docker run options",
+          "examples": ["--cap-add=SYS_ADMIN", "--privileged"]
+        },
+        "docker_compose_custom_start_command": {
+          "type": "string",
+          "description": "Custom docker compose start command",
+          "examples": ["docker compose up -d --build"]
+        },
+        "docker_compose_custom_build_command": {
+          "type": "string",
+          "description": "Custom docker compose build command",
+          "examples": ["docker compose build --no-cache"]
+        }
+      }
+    },
+    "domains": {
+      "type": "object",
+      "description": "Domain and port configuration",
+      "properties": {
+        "ports_exposes": {
+          "type": "string",
+          "description": "Ports to expose (comma-separated for multiple)",
+          "default": "3000",
+          "examples": ["3000", "80", "3000,8080"]
+        },
+        "ports_mappings": {
+          "type": "string",
+          "description": "Port mappings in format host:container (comma-separated)",
+          "examples": ["8080:3000", "80:3000,443:3001"]
+        },
+        "redirect": {
+          "type": "string",
+          "description": "Redirect configuration",
+          "enum": ["www", "non-www", "both"]
+        },
+        "custom_nginx_configuration": {
+          "type": "string",
+          "description": "Custom Nginx configuration block"
+        }
+      }
+    },
+    "network_aliases": {
+      "type": "array",
+      "description": "Custom network aliases for the container",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["api", "backend"]]
+    },
+    "http_basic_auth": {
+      "type": "object",
+      "description": "HTTP Basic Authentication settings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable HTTP Basic Authentication",
+          "default": false
+        },
+        "username": {
+          "type": "string",
+          "description": "Basic auth username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Basic auth password"
+        }
+      }
+    },
+    "health_check": {
+      "type": "object",
+      "description": "Container health check configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable health checks",
+          "default": false
+        },
+        "path": {
+          "type": "string",
+          "description": "Health check endpoint path",
+          "default": "/",
+          "examples": ["/health", "/api/health", "/ping"]
+        },
+        "port": {
+          "type": ["integer", "string"],
+          "description": "Port for health check"
+        },
+        "host": {
+          "type": "string",
+          "description": "Host for health check",
+          "default": "localhost"
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method for health check",
+          "enum": ["GET", "POST", "HEAD"],
+          "default": "GET"
+        },
+        "return_code": {
+          "type": "integer",
+          "description": "Expected HTTP return code",
+          "default": 200
+        },
+        "scheme": {
+          "type": "string",
+          "description": "Protocol scheme",
+          "enum": ["http", "https"],
+          "default": "http"
+        },
+        "response_text": {
+          "type": "string",
+          "description": "Expected response text to match"
+        },
+        "interval": {
+          "type": "integer",
+          "description": "Health check interval in seconds",
+          "default": 5,
+          "minimum": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Health check timeout in seconds",
+          "default": 5,
+          "minimum": 1
+        },
+        "retries": {
+          "type": "integer",
+          "description": "Number of retries before marking unhealthy",
+          "default": 10,
+          "minimum": 1
+        },
+        "start_period": {
+          "type": "integer",
+          "description": "Grace period before health checks start (seconds)",
+          "default": 5,
+          "minimum": 0
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "description": "Container resource limits",
+      "properties": {
+        "memory": {
+          "type": "string",
+          "description": "Memory limit (e.g., 512m, 1g)",
+          "examples": ["256m", "512m", "1g", "2g"]
+        },
+        "memory_swap": {
+          "type": "string",
+          "description": "Memory + swap limit",
+          "examples": ["1g", "2g"]
+        },
+        "memory_swappiness": {
+          "type": "integer",
+          "description": "Swappiness value (0-100)",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "memory_reservation": {
+          "type": "string",
+          "description": "Soft memory limit",
+          "examples": ["128m", "256m"]
+        },
+        "cpus": {
+          "type": "string",
+          "description": "CPU limit (e.g., 0.5, 1, 2)",
+          "examples": ["0.5", "1", "2"]
+        },
+        "cpuset": {
+          "type": "string",
+          "description": "CPUs to use (e.g., 0,1 or 0-3)",
+          "examples": ["0", "0,1", "0-3"]
+        },
+        "cpu_shares": {
+          "type": "integer",
+          "description": "CPU shares (relative weight)",
+          "minimum": 0
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Application behavior settings",
+      "properties": {
+        "is_static": {
+          "type": "boolean",
+          "description": "Treat as static site (serve files with Nginx)",
+          "default": false
+        },
+        "is_spa": {
+          "type": "boolean",
+          "description": "Enable SPA mode (redirect all routes to index.html)",
+          "default": false
+        },
+        "is_auto_deploy_enabled": {
+          "type": "boolean",
+          "description": "Auto-deploy on git push",
+          "default": true
+        },
+        "is_force_https_enabled": {
+          "type": "boolean",
+          "description": "Force HTTPS redirect",
+          "default": true
+        },
+        "is_preview_deployments_enabled": {
+          "type": "boolean",
+          "description": "Enable preview deployments for PRs",
+          "default": false
+        },
+        "is_pr_deployments_public_enabled": {
+          "type": "boolean",
+          "description": "Make PR deployments publicly accessible",
+          "default": false
+        },
+        "is_git_submodules_enabled": {
+          "type": "boolean",
+          "description": "Initialize git submodules",
+          "default": false
+        },
+        "is_git_lfs_enabled": {
+          "type": "boolean",
+          "description": "Enable Git LFS",
+          "default": false
+        },
+        "is_git_shallow_clone_enabled": {
+          "type": "boolean",
+          "description": "Use shallow clone (faster but limited history)",
+          "default": false
+        },
+        "is_build_server_enabled": {
+          "type": "boolean",
+          "description": "Use dedicated build server",
+          "default": false
+        },
+        "is_preserve_repository_enabled": {
+          "type": "boolean",
+          "description": "Preserve repository between builds",
+          "default": false
+        },
+        "is_container_label_escape_enabled": {
+          "type": "boolean",
+          "description": "Escape special characters in container labels",
+          "default": true
+        },
+        "is_container_label_readonly_enabled": {
+          "type": "boolean",
+          "description": "Make container labels read-only",
+          "default": false
+        },
+        "use_build_secrets": {
+          "type": "boolean",
+          "description": "Use Docker build secrets for environment variables",
+          "default": false
+        },
+        "inject_build_args_to_dockerfile": {
+          "type": "boolean",
+          "description": "Inject build args into Dockerfile",
+          "default": false
+        },
+        "include_source_commit_in_build": {
+          "type": "boolean",
+          "description": "Include source commit SHA in build metadata",
+          "default": false
+        },
+        "is_debug_enabled": {
+          "type": "boolean",
+          "description": "Enable debug mode",
+          "default": false
+        },
+        "is_consistent_container_name_enabled": {
+          "type": "boolean",
+          "description": "Use consistent container names across deployments",
+          "default": false
+        },
+        "connect_to_docker_network": {
+          "type": "string",
+          "description": "Additional Docker network to connect to"
+        },
+        "custom_internal_name": {
+          "type": "string",
+          "description": "Custom internal container name"
+        },
+        "is_env_sorting_enabled": {
+          "type": "boolean",
+          "description": "Sort environment variables alphabetically",
+          "default": false
+        }
+      }
+    },
+    "deployment_commands": {
+      "type": "object",
+      "description": "Pre and post deployment commands",
+      "properties": {
+        "pre_deployment_command": {
+          "type": "string",
+          "description": "Command to run before deployment"
+        },
+        "pre_deployment_command_container": {
+          "type": "string",
+          "description": "Container to run pre-deployment command in"
+        },
+        "post_deployment_command": {
+          "type": "string",
+          "description": "Command to run after deployment"
+        },
+        "post_deployment_command_container": {
+          "type": "string",
+          "description": "Container to run post-deployment command in"
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "description": "Preview deployment settings",
+      "properties": {
+        "preview_url_template": {
+          "type": "string",
+          "description": "Template for preview deployment URLs",
+          "examples": ["{{pr_id}}.preview.{{domain}}", "pr-{{pr_id}}.{{domain}}"]
+        }
+      }
+    },
+    "swarm": {
+      "type": "object",
+      "description": "Docker Swarm specific settings",
+      "properties": {
+        "swarm_replicas": {
+          "type": "integer",
+          "description": "Number of replicas in swarm mode",
+          "minimum": 1,
+          "default": 1
+        },
+        "swarm_placement_constraints": {
+          "type": "string",
+          "description": "Swarm placement constraints",
+          "examples": ["node.role==worker", "node.labels.type==compute"]
+        }
+      }
+    },
+    "docker_registry": {
+      "type": "object",
+      "description": "Docker registry settings for image builds",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Docker registry image name",
+          "examples": ["ghcr.io/myorg/myapp", "docker.io/myuser/myapp"]
+        },
+        "tag": {
+          "type": "string",
+          "description": "Docker image tag",
+          "default": "latest"
+        }
+      }
+    },
+    "persistent_storages": {
+      "type": "array",
+      "description": "Persistent volume mounts",
+      "items": {
+        "type": "object",
+        "required": ["name", "mount_path"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Volume name"
+          },
+          "mount_path": {
+            "type": "string",
+            "description": "Path inside container to mount volume",
+            "examples": ["/data", "/app/uploads", "/var/lib/data"]
+          },
+          "host_path": {
+            "type": "string",
+            "description": "Optional host path for bind mount"
+          }
+        }
+      }
+    },
+    "file_mounts": {
+      "type": "array",
+      "description": "File mounts (inject files into container)",
+      "items": {
+        "type": "object",
+        "required": ["mount_path"],
+        "properties": {
+          "mount_path": {
+            "type": "string",
+            "description": "Path inside container to mount file",
+            "examples": ["/app/config.json", "/etc/nginx/nginx.conf"]
+          },
+          "fs_path": {
+            "type": "string",
+            "description": "Path on host filesystem (auto-generated if not specified)"
+          },
+          "content": {
+            "type": "string",
+            "description": "File content (for inline file creation)"
+          }
+        }
+      }
+    },
+    "directory_mounts": {
+      "type": "array",
+      "description": "Directory mounts (bind mount directories)",
+      "items": {
+        "type": "object",
+        "required": ["source_path", "mount_path"],
+        "properties": {
+          "source_path": {
+            "type": "string",
+            "description": "Source path on host",
+            "examples": ["/opt/data", "/home/user/config"]
+          },
+          "mount_path": {
+            "type": "string",
+            "description": "Path inside container",
+            "examples": ["/data", "/config"]
+          }
+        }
+      }
+    },
+    "scheduled_tasks": {
+      "type": "array",
+      "description": "Scheduled tasks (cron jobs)",
+      "items": {
+        "type": "object",
+        "required": ["name", "command", "frequency"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Task name"
+          },
+          "command": {
+            "type": "string",
+            "description": "Command to execute",
+            "examples": ["php artisan schedule:run", "node cleanup.js", "/app/backup.sh"]
+          },
+          "frequency": {
+            "type": "string",
+            "description": "Cron expression for scheduling",
+            "examples": ["* * * * *", "0 * * * *", "0 0 * * *", "0 0 * * 0"]
+          },
+          "container": {
+            "type": "string",
+            "description": "Container to run command in (for compose apps)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the task is enabled",
+            "default": true
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Task timeout in seconds",
+            "default": 300
+          }
+        }
+      }
+    },
+    "environment_variables": {
+      "type": "object",
+      "description": "Environment variables configuration",
+      "properties": {
+        "production": {
+          "type": "array",
+          "description": "Production environment variables",
+          "items": {
+            "$ref": "#/definitions/environmentVariable"
+          }
+        },
+        "preview": {
+          "type": "array",
+          "description": "Preview deployment environment variables",
+          "items": {
+            "$ref": "#/definitions/environmentVariable"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "environmentVariable": {
+      "type": "object",
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Environment variable name",
+          "examples": ["DATABASE_URL", "API_KEY", "NODE_ENV"]
+        },
+        "value": {
+          "type": "string",
+          "description": "Environment variable value. Supports magic variables like $SERVICE_PASSWORD_32, $SERVICE_FQDN_APP, $SERVICE_URL_API",
+          "examples": ["production", "$SERVICE_PASSWORD_32", "$SERVICE_FQDN_API"]
+        },
+        "is_multiline": {
+          "type": "boolean",
+          "description": "Whether the value contains multiple lines",
+          "default": false
+        },
+        "is_literal": {
+          "type": "boolean",
+          "description": "Whether to treat value as literal (no variable expansion)",
+          "default": false
+        },
+        "is_buildtime": {
+          "type": "boolean",
+          "description": "Make available during build",
+          "default": true
+        },
+        "is_runtime": {
+          "type": "boolean",
+          "description": "Make available at runtime",
+          "default": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "$schema": "https://coolify.io/schemas/coolify.schema.json",
+      "version": "1.0",
+      "name": "My Node.js App",
+      "description": "A simple Node.js application",
+      "build": {
+        "type": "nixpacks",
+        "base_directory": "/",
+        "build_command": "npm run build",
+        "start_command": "npm start"
+      },
+      "domains": {
+        "ports_exposes": "3000"
+      },
+      "settings": {
+        "is_auto_deploy_enabled": true,
+        "is_force_https_enabled": true
+      },
+      "environment_variables": {
+        "production": [
+          {
+            "key": "NODE_ENV",
+            "value": "production"
+          },
+          {
+            "key": "DATABASE_PASSWORD",
+            "value": "$SERVICE_PASSWORD_32"
+          }
+        ]
+      }
+    }
+  ]
+}

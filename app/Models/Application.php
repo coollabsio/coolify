@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -2041,35 +2040,970 @@ class Application extends BaseModel
         return $generator->toArray();
     }
 
-    public function setConfig($config)
+    /**
+     * Apply configuration from a coolify.json config array or JSON string.
+     *
+     * @param  array|string  $config  The configuration to apply
+     * @param  bool  $fromRepository  If true, the config comes from a repository's coolify.json file.
+     *                                In this case, the 'source' section (repository, branch, commit_sha)
+     *                                is ignored since these are already set from the actual git source.
+     *                                If false (default), the config is from a copy-paste import and
+     *                                source settings will be applied if present.
+     */
+    public function setConfig(array|string $config, bool $fromRepository = false): void
     {
-        $validator = Validator::make(['config' => $config], [
-            'config' => 'required|json',
-        ]);
-        if ($validator->fails()) {
-            throw new \Exception('Invalid JSON format');
+        // Accept both JSON string and array
+        if (is_string($config)) {
+            $config = json_decode($config, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Invalid JSON format: '.json_last_error_msg());
+            }
         }
-        $config = json_decode($config, true);
 
-        $deepValidator = Validator::make(['config' => $config], [
-            'config.build_pack' => 'required|string',
-            'config.base_directory' => 'required|string',
-            'config.publish_directory' => 'required|string',
-            'config.ports_exposes' => 'required|string',
-            'config.settings.is_static' => 'required|boolean',
-        ]);
-        if ($deepValidator->fails()) {
-            throw new \Exception('Invalid data');
+        // Apply git source settings only for copy-paste import (not when loading from repository)
+        // When loading from a repository, the git source is already set from the actual repo
+        if (! $fromRepository && ($source = data_get($config, 'source'))) {
+            if (($value = data_get($source, 'repository')) !== null) {
+                $this->git_repository = $value;
+            }
+            if (($value = data_get($source, 'branch')) !== null) {
+                $this->git_branch = $value;
+            }
+            if (($value = data_get($source, 'commit_sha')) !== null) {
+                $this->git_commit_sha = $value;
+            }
         }
-        $config = $deepValidator->validated()['config'];
 
-        try {
-            $settings = data_get($config, 'settings', []);
-            data_forget($config, 'settings');
-            $this->update($config);
-            $this->settings()->update($settings);
-        } catch (\Exception $e) {
-            throw new \Exception('Failed to update application settings');
+        // Apply build settings
+        if ($build = data_get($config, 'build')) {
+            $buildMappings = [
+                'type' => 'build_pack',
+                'base_directory' => 'base_directory',
+                'publish_directory' => 'publish_directory',
+                'dockerfile_location' => 'dockerfile_location',
+                'docker_compose_location' => 'docker_compose_location',
+                'install_command' => 'install_command',
+                'build_command' => 'build_command',
+                'start_command' => 'start_command',
+                'watch_paths' => 'watch_paths',
+                'static_image' => 'static_image',
+                'dockerfile_target_build' => 'dockerfile_target_build',
+                'custom_docker_run_options' => 'custom_docker_run_options',
+                'docker_compose_custom_start_command' => 'docker_compose_custom_start_command',
+                'docker_compose_custom_build_command' => 'docker_compose_custom_build_command',
+            ];
+
+            foreach ($buildMappings as $configKey => $modelKey) {
+                if (($value = data_get($build, $configKey)) !== null) {
+                    $this->{$modelKey} = $value;
+                }
+            }
         }
+
+        // Apply domain settings
+        if ($domains = data_get($config, 'domains')) {
+            if (($value = data_get($domains, 'ports_exposes')) !== null) {
+                $this->ports_exposes = $value;
+            }
+            if (($value = data_get($domains, 'ports_mappings')) !== null) {
+                $this->ports_mappings = $value;
+            }
+            if (($value = data_get($domains, 'redirect')) !== null) {
+                $this->redirect = $value;
+            }
+            if (($value = data_get($domains, 'custom_nginx_configuration')) !== null) {
+                $this->custom_nginx_configuration = $value;
+            }
+        }
+
+        // Apply network aliases
+        if (($value = data_get($config, 'network_aliases')) !== null) {
+            $this->custom_network_aliases = is_array($value) ? implode(',', $value) : $value;
+        }
+
+        // Apply HTTP Basic Authentication
+        if ($httpAuth = data_get($config, 'http_basic_auth')) {
+            if (($value = data_get($httpAuth, 'enabled')) !== null) {
+                $this->is_http_basic_auth_enabled = $value;
+            }
+            if (($value = data_get($httpAuth, 'username')) !== null) {
+                $this->http_basic_auth_username = $value;
+            }
+            if (($value = data_get($httpAuth, 'password')) !== null) {
+                $this->http_basic_auth_password = $value;
+            }
+        }
+
+        // Apply health check settings
+        if ($healthCheck = data_get($config, 'health_check')) {
+            $healthMappings = [
+                'enabled' => 'health_check_enabled',
+                'path' => 'health_check_path',
+                'port' => 'health_check_port',
+                'host' => 'health_check_host',
+                'method' => 'health_check_method',
+                'return_code' => 'health_check_return_code',
+                'scheme' => 'health_check_scheme',
+                'response_text' => 'health_check_response_text',
+                'interval' => 'health_check_interval',
+                'timeout' => 'health_check_timeout',
+                'retries' => 'health_check_retries',
+                'start_period' => 'health_check_start_period',
+            ];
+
+            foreach ($healthMappings as $configKey => $modelKey) {
+                if (($value = data_get($healthCheck, $configKey)) !== null) {
+                    $this->{$modelKey} = $value;
+                }
+            }
+        }
+
+        // Apply resource limits
+        if ($limits = data_get($config, 'limits')) {
+            $limitMappings = [
+                'memory' => 'limits_memory',
+                'memory_swap' => 'limits_memory_swap',
+                'memory_swappiness' => 'limits_memory_swappiness',
+                'memory_reservation' => 'limits_memory_reservation',
+                'cpus' => 'limits_cpus',
+                'cpuset' => 'limits_cpuset',
+                'cpu_shares' => 'limits_cpu_shares',
+            ];
+
+            foreach ($limitMappings as $configKey => $modelKey) {
+                if (($value = data_get($limits, $configKey)) !== null) {
+                    $this->{$modelKey} = $value;
+                }
+            }
+        }
+
+        // Apply name and description
+        if (($value = data_get($config, 'name')) !== null) {
+            $this->name = $value;
+        }
+        if (($value = data_get($config, 'description')) !== null) {
+            $this->description = $value;
+        }
+
+        $this->save();
+
+        // Apply application settings
+        if ($settings = data_get($config, 'settings')) {
+            $settingMappings = [
+                'is_static' => 'is_static',
+                'is_spa' => 'is_spa',
+                'is_auto_deploy_enabled' => 'is_auto_deploy_enabled',
+                'is_force_https_enabled' => 'is_force_https_enabled',
+                'is_preview_deployments_enabled' => 'is_preview_deployments_enabled',
+                'is_pr_deployments_public_enabled' => 'is_pr_deployments_public_enabled',
+                'is_git_submodules_enabled' => 'is_git_submodules_enabled',
+                'is_git_lfs_enabled' => 'is_git_lfs_enabled',
+                'is_git_shallow_clone_enabled' => 'is_git_shallow_clone_enabled',
+                'is_build_server_enabled' => 'is_build_server_enabled',
+                'is_preserve_repository_enabled' => 'is_preserve_repository_enabled',
+                'is_container_label_escape_enabled' => 'is_container_label_escape_enabled',
+                'is_container_label_readonly_enabled' => 'is_container_label_readonly_enabled',
+                'use_build_secrets' => 'use_build_secrets',
+                'inject_build_args_to_dockerfile' => 'inject_build_args_to_dockerfile',
+                'include_source_commit_in_build' => 'include_source_commit_in_build',
+                'is_debug_enabled' => 'is_debug_enabled',
+                'is_consistent_container_name_enabled' => 'is_consistent_container_name_enabled',
+                'connect_to_docker_network' => 'connect_to_docker_network',
+                'custom_internal_name' => 'custom_internal_name',
+                'is_env_sorting_enabled' => 'is_env_sorting_enabled',
+            ];
+
+            $settingsToUpdate = [];
+            foreach ($settingMappings as $configKey => $modelKey) {
+                if (($value = data_get($settings, $configKey)) !== null) {
+                    $settingsToUpdate[$modelKey] = $value;
+                }
+            }
+
+            if (! empty($settingsToUpdate)) {
+                $this->settings()->update($settingsToUpdate);
+            }
+        }
+
+        // Apply pre/post deployment commands
+        if ($commands = data_get($config, 'deployment_commands')) {
+            if (($value = data_get($commands, 'pre_deployment_command')) !== null) {
+                $this->pre_deployment_command = $value;
+            }
+            if (($value = data_get($commands, 'pre_deployment_command_container')) !== null) {
+                $this->pre_deployment_command_container = $value;
+            }
+            if (($value = data_get($commands, 'post_deployment_command')) !== null) {
+                $this->post_deployment_command = $value;
+            }
+            if (($value = data_get($commands, 'post_deployment_command_container')) !== null) {
+                $this->post_deployment_command_container = $value;
+            }
+            $this->save();
+        }
+
+        // Apply preview settings
+        if ($preview = data_get($config, 'preview')) {
+            if (($value = data_get($preview, 'preview_url_template')) !== null) {
+                $this->preview_url_template = $value;
+                $this->save();
+            }
+        }
+
+        // Apply swarm settings
+        if ($swarm = data_get($config, 'swarm')) {
+            if (($value = data_get($swarm, 'swarm_replicas')) !== null) {
+                $this->swarm_replicas = $value;
+            }
+            if (($value = data_get($swarm, 'swarm_placement_constraints')) !== null) {
+                $this->swarm_placement_constraints = $value;
+            }
+            $this->save();
+        }
+
+        // Apply docker registry settings
+        if ($dockerRegistry = data_get($config, 'docker_registry')) {
+            if (($value = data_get($dockerRegistry, 'image')) !== null) {
+                $this->docker_registry_image_name = $value;
+            }
+            if (($value = data_get($dockerRegistry, 'tag')) !== null) {
+                $this->docker_registry_image_tag = $value;
+            }
+            $this->save();
+        }
+
+        // Apply persistent storages (Volume Mounts)
+        if ($persistentStorages = data_get($config, 'persistent_storages')) {
+            foreach ($persistentStorages as $storage) {
+                $name = data_get($storage, 'name');
+                $mountPath = data_get($storage, 'mount_path');
+
+                if (empty($name) || empty($mountPath)) {
+                    continue;
+                }
+
+                // Check if storage with this name already exists
+                $existingStorage = $this->persistentStorages()
+                    ->where('name', $name)
+                    ->first();
+
+                if ($existingStorage) {
+                    // Update existing storage
+                    $existingStorage->update([
+                        'mount_path' => $mountPath,
+                        'host_path' => data_get($storage, 'host_path'),
+                    ]);
+                } else {
+                    // Create new storage
+                    LocalPersistentVolume::create([
+                        'name' => $name,
+                        'mount_path' => $mountPath,
+                        'host_path' => data_get($storage, 'host_path'),
+                        'resource_id' => $this->id,
+                        'resource_type' => $this->getMorphClass(),
+                    ]);
+                }
+            }
+        }
+
+        // Apply file mounts
+        if ($fileMounts = data_get($config, 'file_mounts')) {
+            foreach ($fileMounts as $file) {
+                $mountPath = data_get($file, 'mount_path');
+
+                if (empty($mountPath)) {
+                    continue;
+                }
+
+                // Ensure mount_path starts with /
+                $mountPath = str($mountPath)->start('/')->value();
+
+                // Determine fs_path - use provided or generate default
+                $fsPath = data_get($file, 'fs_path');
+                if (empty($fsPath)) {
+                    $fsPath = application_configuration_dir().'/'.$this->uuid.$mountPath;
+                }
+
+                // Check if file mount already exists
+                $existingFile = $this->fileStorages()
+                    ->where('mount_path', $mountPath)
+                    ->where('is_directory', false)
+                    ->first();
+
+                if ($existingFile) {
+                    // Update existing file mount
+                    $existingFile->update([
+                        'fs_path' => $fsPath,
+                        'content' => data_get($file, 'content'),
+                    ]);
+                } else {
+                    // Create new file mount
+                    LocalFileVolume::create([
+                        'fs_path' => $fsPath,
+                        'mount_path' => $mountPath,
+                        'content' => data_get($file, 'content'),
+                        'is_directory' => false,
+                        'resource_id' => $this->id,
+                        'resource_type' => $this->getMorphClass(),
+                    ]);
+                }
+            }
+        }
+
+        // Apply directory mounts
+        if ($directoryMounts = data_get($config, 'directory_mounts')) {
+            foreach ($directoryMounts as $dir) {
+                $sourcePath = data_get($dir, 'source_path');
+                $mountPath = data_get($dir, 'mount_path');
+
+                if (empty($sourcePath) || empty($mountPath)) {
+                    continue;
+                }
+
+                // Ensure paths start with /
+                $sourcePath = str($sourcePath)->start('/')->value();
+                $mountPath = str($mountPath)->start('/')->value();
+
+                // Check if directory mount already exists
+                $existingDir = $this->fileStorages()
+                    ->where('mount_path', $mountPath)
+                    ->where('is_directory', true)
+                    ->first();
+
+                if ($existingDir) {
+                    // Update existing directory mount
+                    $existingDir->update([
+                        'fs_path' => $sourcePath,
+                    ]);
+                } else {
+                    // Create new directory mount
+                    LocalFileVolume::create([
+                        'fs_path' => $sourcePath,
+                        'mount_path' => $mountPath,
+                        'is_directory' => true,
+                        'resource_id' => $this->id,
+                        'resource_type' => $this->getMorphClass(),
+                    ]);
+                }
+            }
+        }
+
+        // Apply scheduled tasks
+        if ($scheduledTasks = data_get($config, 'scheduled_tasks')) {
+            foreach ($scheduledTasks as $task) {
+                $name = data_get($task, 'name');
+                $command = data_get($task, 'command');
+                $frequency = data_get($task, 'frequency');
+
+                if (empty($name) || empty($command) || empty($frequency)) {
+                    continue;
+                }
+
+                // Check if scheduled task with this name already exists
+                $existingTask = $this->scheduled_tasks()
+                    ->where('name', $name)
+                    ->first();
+
+                if ($existingTask) {
+                    // Update existing task
+                    $existingTask->update([
+                        'command' => $command,
+                        'frequency' => $frequency,
+                        'container' => data_get($task, 'container'),
+                        'enabled' => data_get($task, 'enabled', true),
+                        'timeout' => data_get($task, 'timeout', 300),
+                    ]);
+                } else {
+                    // Create new scheduled task
+                    ScheduledTask::create([
+                        'name' => $name,
+                        'command' => $command,
+                        'frequency' => $frequency,
+                        'container' => data_get($task, 'container'),
+                        'enabled' => data_get($task, 'enabled', true),
+                        'timeout' => data_get($task, 'timeout', 300),
+                        'application_id' => $this->id,
+                        'team_id' => $this->team()->id,
+                    ]);
+                }
+            }
+        }
+
+        // Apply environment variables
+        $this->applyEnvironmentVariablesFromConfig($config);
+    }
+
+    protected function applyEnvironmentVariablesFromConfig(array $config): void
+    {
+        $envVars = data_get($config, 'environment_variables', []);
+
+        // Process production environment variables
+        $productionVars = data_get($envVars, 'production', []);
+        foreach ($productionVars as $var) {
+            $this->createEnvironmentVariableFromConfig($var, false);
+        }
+
+        // Process preview environment variables
+        $previewVars = data_get($envVars, 'preview', []);
+        foreach ($previewVars as $var) {
+            $this->createEnvironmentVariableFromConfig($var, true);
+        }
+    }
+
+    protected function createEnvironmentVariableFromConfig(array $var, bool $isPreview): void
+    {
+        $key = data_get($var, 'key');
+        $value = data_get($var, 'value', '');
+
+        if (empty($key)) {
+            return;
+        }
+
+        // Skip SERVICE_* variables as they are auto-generated
+        if (str($key)->startsWith('SERVICE_')) {
+            return;
+        }
+
+        // Resolve magic environment variables
+        $value = $this->resolveMagicEnvironmentVariable($value);
+
+        // Check if variable already exists
+        $existingVar = $this->environment_variables()
+            ->where('key', $key)
+            ->where('is_preview', $isPreview)
+            ->first();
+
+        if ($existingVar) {
+            // Update existing variable
+            // Defaults: is_buildtime=true, is_runtime=true (available during build AND runtime)
+            $existingVar->update([
+                'value' => $value,
+                'is_multiline' => data_get($var, 'is_multiline', false),
+                'is_literal' => data_get($var, 'is_literal', false),
+                'is_buildtime' => data_get($var, 'is_buildtime', true),
+                'is_runtime' => data_get($var, 'is_runtime', true),
+            ]);
+        } else {
+            // Create new variable
+            // Defaults: is_buildtime=true, is_runtime=true (available during build AND runtime)
+            EnvironmentVariable::create([
+                'key' => $key,
+                'value' => $value,
+                'is_preview' => $isPreview,
+                'is_multiline' => data_get($var, 'is_multiline', false),
+                'is_literal' => data_get($var, 'is_literal', false),
+                'is_buildtime' => data_get($var, 'is_buildtime', true),
+                'is_runtime' => data_get($var, 'is_runtime', true),
+                'resourceable_id' => $this->id,
+                'resourceable_type' => $this->getMorphClass(),
+            ]);
+        }
+    }
+
+    protected function resolveMagicEnvironmentVariable(string $value): string
+    {
+        // Check if this is a magic SERVICE_* value
+        if (! str_starts_with($value, 'SERVICE_')) {
+            return $value;
+        }
+
+        // Extract command from SERVICE_COMMAND format
+        $command = substr($value, strlen('SERVICE_'));
+
+        // Map coolify.json magic values to generateEnvValue() commands
+        // generateEnvValue uses: PASSWORD, PASSWORD_64, USER, BASE64_XX, REALBASE64_XX, HEX_XX, etc.
+        $commandMappings = [
+            'PASSWORD' => 'PASSWORD_64',        // SERVICE_PASSWORD -> 64-char password
+            'UUID' => null,                      // SERVICE_UUID -> handled separately (Cuid2)
+        ];
+
+        // Check for direct mapping first
+        if (array_key_exists($command, $commandMappings)) {
+            if ($commandMappings[$command] === null) {
+                // SERVICE_UUID - Generate a Cuid2 (not supported by generateEnvValue)
+                return (string) new Cuid2;
+            }
+            $command = $commandMappings[$command];
+        }
+
+        // SERVICE_USER -> generateEnvValue('USER') returns 16-char random, add prefix
+        if ($command === 'USER') {
+            $generated = generateEnvValue('USER');
+
+            return $generated ? 'user_'.substr($generated, 0, 8) : 'user_'.Str::random(8);
+        }
+
+        // SERVICE_BASE64_XX -> REALBASE64_XX (actual base64 encoding)
+        if (preg_match('/^BASE64_(\d+)$/', $command, $matches)) {
+            $length = (int) $matches[1];
+            // Clamp between 8 and 256
+            $length = max(8, min(256, $length));
+            // Map to REALBASE64_XX if supported, otherwise generate directly
+            $realBase64Command = "REALBASE64_{$length}";
+            $generated = generateEnvValue($realBase64Command);
+            if ($generated) {
+                return $generated;
+            }
+
+            // Fallback: generate base64 directly
+            return base64_encode(Str::random($length));
+        }
+
+        // Try generateEnvValue for PASSWORD_XX and other commands
+        $generated = generateEnvValue($command);
+        if ($generated !== null) {
+            return $generated;
+        }
+
+        // If generateEnvValue returns null, handle PASSWORD_XX directly
+        if (preg_match('/^PASSWORD_(\d+)$/', $command, $matches)) {
+            $length = (int) $matches[1];
+            $length = max(8, min(256, $length));
+
+            return Str::password(length: $length, symbols: false);
+        }
+
+        // Not a recognized magic value, return as-is
+        return $value;
+    }
+
+    public function generateRepositoryConfig(): array
+    {
+        $config = [
+            'version' => '1.0',
+            'name' => $this->name,
+        ];
+
+        if ($this->description) {
+            $config['description'] = $this->description;
+        }
+
+        // Git source - optional, allows full app configuration from JSON
+        $gitSource = [];
+        if ($this->git_repository) {
+            $gitSource['repository'] = $this->git_repository;
+        }
+        if ($this->git_branch) {
+            $gitSource['branch'] = $this->git_branch;
+        }
+        if ($this->git_commit_sha && $this->git_commit_sha !== 'HEAD') {
+            $gitSource['commit_sha'] = $this->git_commit_sha;
+        }
+        if (! empty($gitSource)) {
+            $config['source'] = $gitSource;
+        }
+
+        // Build settings - only include non-default values
+        $build = [
+            'type' => $this->build_pack,
+        ];
+        if ($this->base_directory && $this->base_directory !== '/') {
+            $build['base_directory'] = $this->base_directory;
+        }
+        if ($this->publish_directory) {
+            $build['publish_directory'] = $this->publish_directory;
+        }
+        if ($this->dockerfile_location && $this->dockerfile_location !== '/Dockerfile') {
+            $build['dockerfile_location'] = $this->dockerfile_location;
+        }
+        if ($this->docker_compose_location && $this->docker_compose_location !== '/docker-compose.yml' && $this->docker_compose_location !== '/docker-compose.yaml') {
+            $build['docker_compose_location'] = $this->docker_compose_location;
+        }
+        if ($this->install_command) {
+            $build['install_command'] = $this->install_command;
+        }
+        if ($this->build_command) {
+            $build['build_command'] = $this->build_command;
+        }
+        if ($this->start_command) {
+            $build['start_command'] = $this->start_command;
+        }
+        if ($this->watch_paths) {
+            $build['watch_paths'] = $this->watch_paths;
+        }
+        // Advanced build options - exclude default static_image
+        if ($this->static_image && $this->static_image !== 'nginx:alpine') {
+            $build['static_image'] = $this->static_image;
+        }
+        if ($this->dockerfile_target_build) {
+            $build['dockerfile_target_build'] = $this->dockerfile_target_build;
+        }
+        if ($this->custom_docker_run_options) {
+            $build['custom_docker_run_options'] = $this->custom_docker_run_options;
+        }
+        if ($this->docker_compose_custom_start_command) {
+            $build['docker_compose_custom_start_command'] = $this->docker_compose_custom_start_command;
+        }
+        if ($this->docker_compose_custom_build_command) {
+            $build['docker_compose_custom_build_command'] = $this->docker_compose_custom_build_command;
+        }
+        $config['build'] = $build;
+
+        // Domain settings - only include non-default values
+        $domains = [];
+        if ($this->ports_exposes && $this->ports_exposes !== '80') {
+            $domains['ports_exposes'] = $this->ports_exposes;
+        }
+        if ($this->ports_mappings) {
+            $domains['ports_mappings'] = $this->ports_mappings;
+        }
+        if ($this->redirect && $this->redirect !== 'both') {
+            $domains['redirect'] = $this->redirect;
+        }
+        if ($this->custom_nginx_configuration) {
+            $domains['custom_nginx_configuration'] = $this->custom_nginx_configuration;
+        }
+        if (! empty($domains)) {
+            $config['domains'] = $domains;
+        }
+
+        // Environment variables (with decrypted values for export)
+        // Only include non-default flags to keep the export clean
+        // Filter out SERVICE_* variables as they are auto-generated by Coolify
+        $mapEnvVar = function ($var) {
+            $result = [
+                'key' => $var->key,
+                'value' => $var->value,
+            ];
+            // Only include flags if they differ from defaults (true)
+            if (! $var->is_buildtime) {
+                $result['is_buildtime'] = false;
+            }
+            if (! $var->is_runtime) {
+                $result['is_runtime'] = false;
+            }
+            // Only include if true (default is false)
+            if ($var->is_literal) {
+                $result['is_literal'] = true;
+            }
+            if ($var->is_multiline) {
+                $result['is_multiline'] = true;
+            }
+
+            return $result;
+        };
+
+        // Filter out auto-generated SERVICE_* variables (SERVICE_FQDN_*, SERVICE_URL_*, SERVICE_PASSWORD_*, etc.)
+        $filterServiceVars = function ($var) {
+            return ! str($var->key)->startsWith('SERVICE_');
+        };
+
+        $productionVars = $this->environment_variables()
+            ->where('is_preview', false)
+            ->get()
+            ->filter($filterServiceVars)
+            ->values()
+            ->map($mapEnvVar)
+            ->toArray();
+
+        $previewVars = $this->environment_variables()
+            ->where('is_preview', true)
+            ->get()
+            ->filter($filterServiceVars)
+            ->values()
+            ->map($mapEnvVar)
+            ->toArray();
+
+        if (! empty($productionVars) || ! empty($previewVars)) {
+            $config['environment_variables'] = [];
+            if (! empty($productionVars)) {
+                $config['environment_variables']['production'] = $productionVars;
+            }
+            if (! empty($previewVars)) {
+                $config['environment_variables']['preview'] = $previewVars;
+            }
+        }
+
+        // Health check settings - only include non-default values
+        // Default: health_check_enabled=false (changed in 2024_07_19 migration)
+        $healthCheck = [];
+        if ($this->health_check_enabled) {
+            $healthCheck['enabled'] = true;
+        }
+        if ($this->health_check_path && $this->health_check_path !== '/') {
+            $healthCheck['path'] = $this->health_check_path;
+        }
+        if ($this->health_check_port) {
+            $healthCheck['port'] = $this->health_check_port;
+        }
+        if ($this->health_check_host && $this->health_check_host !== 'localhost') {
+            $healthCheck['host'] = $this->health_check_host;
+        }
+        if ($this->health_check_method && $this->health_check_method !== 'GET') {
+            $healthCheck['method'] = $this->health_check_method;
+        }
+        if ($this->health_check_return_code && $this->health_check_return_code !== 200) {
+            $healthCheck['return_code'] = $this->health_check_return_code;
+        }
+        if ($this->health_check_scheme && $this->health_check_scheme !== 'http') {
+            $healthCheck['scheme'] = $this->health_check_scheme;
+        }
+        if ($this->health_check_response_text) {
+            $healthCheck['response_text'] = $this->health_check_response_text;
+        }
+        if ($this->health_check_interval && $this->health_check_interval !== 5) {
+            $healthCheck['interval'] = $this->health_check_interval;
+        }
+        if ($this->health_check_timeout && $this->health_check_timeout !== 5) {
+            $healthCheck['timeout'] = $this->health_check_timeout;
+        }
+        if ($this->health_check_retries && $this->health_check_retries !== 10) {
+            $healthCheck['retries'] = $this->health_check_retries;
+        }
+        if ($this->health_check_start_period && $this->health_check_start_period !== 5) {
+            $healthCheck['start_period'] = $this->health_check_start_period;
+        }
+        if (! empty($healthCheck)) {
+            $config['health_check'] = $healthCheck;
+        }
+
+        // Resource limits (only if non-default)
+        $limits = [];
+        if ($this->limits_memory && $this->limits_memory !== '0') {
+            $limits['memory'] = $this->limits_memory;
+        }
+        if ($this->limits_memory_swap && $this->limits_memory_swap !== '0') {
+            $limits['memory_swap'] = $this->limits_memory_swap;
+        }
+        if ($this->limits_memory_swappiness && $this->limits_memory_swappiness !== 60) {
+            $limits['memory_swappiness'] = $this->limits_memory_swappiness;
+        }
+        if ($this->limits_memory_reservation && $this->limits_memory_reservation !== '0') {
+            $limits['memory_reservation'] = $this->limits_memory_reservation;
+        }
+        if ($this->limits_cpus && $this->limits_cpus !== '0') {
+            $limits['cpus'] = $this->limits_cpus;
+        }
+        if ($this->limits_cpuset && $this->limits_cpuset !== '0') {
+            $limits['cpuset'] = $this->limits_cpuset;
+        }
+        if ($this->limits_cpu_shares && $this->limits_cpu_shares !== 1024) {
+            $limits['cpu_shares'] = $this->limits_cpu_shares;
+        }
+        if (! empty($limits)) {
+            $config['limits'] = $limits;
+        }
+
+        // Application settings - only export non-default values
+        $settings = $this->settings;
+        $configSettings = [];
+
+        // Settings with default=false - only include if true
+        if ($settings->is_static) {
+            $configSettings['is_static'] = true;
+        }
+        if ($settings->is_spa) {
+            $configSettings['is_spa'] = true;
+        }
+        if ($settings->is_preview_deployments_enabled) {
+            $configSettings['is_preview_deployments_enabled'] = true;
+        }
+        if ($settings->is_pr_deployments_public_enabled) {
+            $configSettings['is_pr_deployments_public_enabled'] = true;
+        }
+        if ($settings->is_build_server_enabled) {
+            $configSettings['is_build_server_enabled'] = true;
+        }
+        if ($settings->is_preserve_repository_enabled) {
+            $configSettings['is_preserve_repository_enabled'] = true;
+        }
+        if ($settings->use_build_secrets) {
+            $configSettings['use_build_secrets'] = true;
+        }
+        if ($settings->include_source_commit_in_build) {
+            $configSettings['include_source_commit_in_build'] = true;
+        }
+        if ($settings->is_debug_enabled) {
+            $configSettings['is_debug_enabled'] = true;
+        }
+        if ($settings->is_consistent_container_name_enabled) {
+            $configSettings['is_consistent_container_name_enabled'] = true;
+        }
+        if ($settings->connect_to_docker_network) {
+            $configSettings['connect_to_docker_network'] = true;
+        }
+        if ($settings->is_env_sorting_enabled) {
+            $configSettings['is_env_sorting_enabled'] = true;
+        }
+
+        // Settings with default=true - only include if false
+        if (! $settings->is_auto_deploy_enabled) {
+            $configSettings['is_auto_deploy_enabled'] = false;
+        }
+        if (! $settings->is_force_https_enabled) {
+            $configSettings['is_force_https_enabled'] = false;
+        }
+        if (! $settings->is_git_submodules_enabled) {
+            $configSettings['is_git_submodules_enabled'] = false;
+        }
+        if (! $settings->is_git_lfs_enabled) {
+            $configSettings['is_git_lfs_enabled'] = false;
+        }
+        if (! $settings->is_git_shallow_clone_enabled) {
+            $configSettings['is_git_shallow_clone_enabled'] = false;
+        }
+        if (! $settings->is_container_label_escape_enabled) {
+            $configSettings['is_container_label_escape_enabled'] = false;
+        }
+        if (! $settings->is_container_label_readonly_enabled) {
+            $configSettings['is_container_label_readonly_enabled'] = false;
+        }
+        if (! $settings->inject_build_args_to_dockerfile) {
+            $configSettings['inject_build_args_to_dockerfile'] = false;
+        }
+
+        // String settings - only include if set
+        if ($settings->custom_internal_name) {
+            $configSettings['custom_internal_name'] = $settings->custom_internal_name;
+        }
+
+        if (! empty($configSettings)) {
+            $config['settings'] = $configSettings;
+        }
+
+        // Network aliases
+        if ($this->custom_network_aliases) {
+            $config['network_aliases'] = explode(',', $this->custom_network_aliases);
+        }
+
+        // HTTP Basic Authentication (don't export password for security)
+        if ($this->is_http_basic_auth_enabled) {
+            $config['http_basic_auth'] = [
+                'enabled' => true,
+                'username' => $this->http_basic_auth_username,
+                // Password is intentionally not exported for security reasons
+            ];
+        }
+
+        // Pre/Post deployment commands
+        $deploymentCommands = [];
+        if ($this->pre_deployment_command) {
+            $deploymentCommands['pre_deployment_command'] = $this->pre_deployment_command;
+        }
+        if ($this->pre_deployment_command_container) {
+            $deploymentCommands['pre_deployment_command_container'] = $this->pre_deployment_command_container;
+        }
+        if ($this->post_deployment_command) {
+            $deploymentCommands['post_deployment_command'] = $this->post_deployment_command;
+        }
+        if ($this->post_deployment_command_container) {
+            $deploymentCommands['post_deployment_command_container'] = $this->post_deployment_command_container;
+        }
+        if (! empty($deploymentCommands)) {
+            $config['deployment_commands'] = $deploymentCommands;
+        }
+
+        // Preview settings - only include if different from default
+        if ($this->preview_url_template && $this->preview_url_template !== '{{pr_id}}.{{domain}}') {
+            $config['preview'] = [
+                'preview_url_template' => $this->preview_url_template,
+            ];
+        }
+
+        // Swarm settings
+        $swarm = [];
+        if ($this->swarm_replicas && $this->swarm_replicas !== 1) {
+            $swarm['swarm_replicas'] = $this->swarm_replicas;
+        }
+        if ($this->swarm_placement_constraints) {
+            $swarm['swarm_placement_constraints'] = $this->swarm_placement_constraints;
+        }
+        if (! empty($swarm)) {
+            $config['swarm'] = $swarm;
+        }
+
+        // Docker registry settings
+        $dockerRegistry = [];
+        if ($this->docker_registry_image_name) {
+            $dockerRegistry['image'] = $this->docker_registry_image_name;
+        }
+        if ($this->docker_registry_image_tag) {
+            $dockerRegistry['tag'] = $this->docker_registry_image_tag;
+        }
+        if (! empty($dockerRegistry)) {
+            $config['docker_registry'] = $dockerRegistry;
+        }
+
+        // Persistent storages (Volume Mounts)
+        $persistentStorages = $this->persistentStorages->map(function ($storage) {
+            $storageConfig = [
+                'name' => $storage->name,
+                'mount_path' => $storage->mount_path,
+            ];
+            if ($storage->host_path) {
+                $storageConfig['host_path'] = $storage->host_path;
+            }
+
+            return $storageConfig;
+        })->toArray();
+
+        if (! empty($persistentStorages)) {
+            $config['persistent_storages'] = $persistentStorages;
+        }
+
+        // File Mounts (single files with content)
+        $fileMounts = $this->fileStorages()
+            ->where('is_directory', false)
+            ->get()
+            ->map(function ($file) {
+                $fileConfig = [
+                    'mount_path' => $file->mount_path,
+                ];
+                // Include content if not binary
+                if ($file->content && $file->content !== '[binary file]') {
+                    $fileConfig['content'] = $file->content;
+                }
+                // Include fs_path if different from mount_path
+                if ($file->fs_path && $file->fs_path !== $file->mount_path) {
+                    $fileConfig['fs_path'] = $file->fs_path;
+                }
+
+                return $fileConfig;
+            })->toArray();
+
+        if (! empty($fileMounts)) {
+            $config['file_mounts'] = $fileMounts;
+        }
+
+        // Directory Mounts
+        $directoryMounts = $this->fileStorages()
+            ->where('is_directory', true)
+            ->get()
+            ->map(function ($dir) {
+                return [
+                    'source_path' => $dir->fs_path,
+                    'mount_path' => $dir->mount_path,
+                ];
+            })->toArray();
+
+        if (! empty($directoryMounts)) {
+            $config['directory_mounts'] = $directoryMounts;
+        }
+
+        // Scheduled Tasks (cron jobs)
+        $scheduledTasks = $this->scheduled_tasks->map(function ($task) {
+            $taskConfig = [
+                'name' => $task->name,
+                'command' => $task->command,
+                'frequency' => $task->frequency,
+            ];
+            if ($task->container) {
+                $taskConfig['container'] = $task->container;
+            }
+            if (! $task->enabled) {
+                $taskConfig['enabled'] = false;
+            }
+            if ($task->timeout && $task->timeout !== 300) {
+                $taskConfig['timeout'] = $task->timeout;
+            }
+
+            return $taskConfig;
+        })->toArray();
+
+        if (! empty($scheduledTasks)) {
+            $config['scheduled_tasks'] = $scheduledTasks;
+        }
+
+        return $config;
     }
 }

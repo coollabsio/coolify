@@ -193,6 +193,7 @@ class ApplicationsController extends Controller
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'use_coolify_json' => ['type' => 'boolean', 'description' => 'Check repository for coolify.json and apply configuration if found. Default is true.'],
                         ],
                     )
                 ),
@@ -344,6 +345,7 @@ class ApplicationsController extends Controller
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'use_coolify_json' => ['type' => 'boolean', 'description' => 'Check repository for coolify.json and apply configuration if found. Default is true.'],
                         ],
                     )
                 ),
@@ -495,6 +497,7 @@ class ApplicationsController extends Controller
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'use_coolify_json' => ['type' => 'boolean', 'description' => 'Check repository for coolify.json and apply configuration if found. Default is true.'],
                         ],
                     )
                 ),
@@ -933,6 +936,7 @@ class ApplicationsController extends Controller
             return $return;
         }
         $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'use_coolify_json'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -977,6 +981,7 @@ class ApplicationsController extends Controller
         $isStatic = $request->is_static;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $customNginxConfiguration = $request->custom_nginx_configuration;
+        $useCoolifyJson = $request->use_coolify_json ?? true;
 
         if (! is_null($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
@@ -1104,6 +1109,28 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
+
+            // Check for coolify.json configuration if enabled (default: true)
+            if ($useCoolifyJson) {
+                try {
+                    $gitUrl = $request->git_repository;
+                    if (! str_ends_with($gitUrl, '.git')) {
+                        $gitUrl = $gitUrl.'.git';
+                    }
+                    $config = loadConfigFromGit(
+                        $gitUrl,
+                        $application->git_branch,
+                        $application->base_directory ?? '/',
+                        $destination->server->id,
+                        $teamId
+                    );
+                    if ($config) {
+                        $application->setConfig($config, fromRepository: true);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('coolify.json: Failed to apply config via API - '.$e->getMessage());
+                }
+            }
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
@@ -1265,6 +1292,25 @@ class ApplicationsController extends Controller
             }
             $application->isConfigurationChanged(true);
 
+            // Check for coolify.json configuration if enabled (default: true)
+            if ($useCoolifyJson) {
+                try {
+                    $gitUrl = 'https://github.com/'.$application->git_repository.'.git';
+                    $config = loadConfigFromGit(
+                        $gitUrl,
+                        $application->git_branch,
+                        $application->base_directory ?? '/',
+                        $destination->server->id,
+                        $teamId
+                    );
+                    if ($config) {
+                        $application->setConfig($config, fromRepository: true);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('coolify.json: Failed to apply config via API - '.$e->getMessage());
+                }
+            }
+
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
@@ -1398,6 +1444,28 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
+
+            // Check for coolify.json configuration if enabled (default: true)
+            if ($useCoolifyJson) {
+                try {
+                    $gitUrl = $application->git_repository;
+                    if (! str_ends_with($gitUrl, '.git')) {
+                        $gitUrl = $gitUrl.'.git';
+                    }
+                    $config = loadConfigFromGit(
+                        $gitUrl,
+                        $application->git_branch,
+                        $application->base_directory ?? '/',
+                        $destination->server->id,
+                        $teamId
+                    );
+                    if ($config) {
+                        $application->setConfig($config, fromRepository: true);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('coolify.json: Failed to apply config via API - '.$e->getMessage());
+                }
+            }
 
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
