@@ -6,7 +6,6 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
 use App\Enums\ProxyTypes;
-use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -28,6 +27,8 @@ class Navbar extends Component
     public ?string $serverIp = null;
 
     public ?string $proxyStatus = 'unknown';
+
+    public ?string $lastNotifiedStatus = null;
 
     public function getListeners()
     {
@@ -133,6 +134,11 @@ class Navbar extends Component
             $this->dispatch('activityMonitor', $event['activityId']);
         }
 
+        // Skip notification if we already notified about this status (prevents duplicates)
+        if ($this->lastNotifiedStatus === $this->proxyStatus) {
+            return;
+        }
+
         switch ($this->proxyStatus) {
             case 'running':
                 $this->loadProxyConfiguration();
@@ -140,6 +146,7 @@ class Navbar extends Component
                 // Don't show during normal start/restart flows (starting, restarting, stopping)
                 if (in_array($previousStatus, ['exited', 'stopped', 'unknown', null])) {
                     $this->dispatch('success', 'Proxy is running.');
+                    $this->lastNotifiedStatus = $this->proxyStatus;
                 }
                 break;
             case 'exited':
@@ -147,25 +154,30 @@ class Navbar extends Component
                 // Don't show during normal stop/restart flows (stopping, restarting)
                 if (in_array($previousStatus, ['running'])) {
                     $this->dispatch('info', 'Proxy has exited.');
+                    $this->lastNotifiedStatus = $this->proxyStatus;
                 }
                 break;
             case 'stopping':
                 $this->dispatch('info', 'Proxy is stopping.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'starting':
                 $this->dispatch('info', 'Proxy is starting.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'restarting':
                 $this->dispatch('info', 'Proxy is restarting.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'error':
                 $this->dispatch('error', 'Proxy restart failed. Check logs.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'unknown':
-                $this->dispatch('info', 'Proxy status is unknown.');
+                // Don't notify for unknown status - too noisy
                 break;
             default:
-                $this->dispatch('info', 'Proxy status updated.');
+                // Don't notify for other statuses
                 break;
         }
 

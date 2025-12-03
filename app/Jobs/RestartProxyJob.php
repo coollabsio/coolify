@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
-use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -14,7 +13,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -36,8 +34,6 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            $teamId = $this->server->team_id;
-
             // Stop proxy
             StopProxy::run($this->server, restarting: true);
 
@@ -45,26 +41,14 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             $this->server->proxy->force_stop = false;
             $this->server->save();
 
-            // Start proxy asynchronously to get activity
+            // Start proxy asynchronously - the ProxyStatusChanged event will be dispatched
+            // when the remote process completes, which triggers ProxyStatusChangedNotification
+            // listener that handles UI updates and Traefik version checks
             $activity = StartProxy::run($this->server, force: true, restarting: true);
 
-            // Store activity ID and dispatch event with it
+            // Store activity ID for reference
             if ($activity && is_object($activity)) {
                 $this->activity_id = $activity->id;
-                ProxyStatusChangedUI::dispatch($teamId, $this->activity_id);
-            }
-
-            // Check Traefik version after restart (same as original behavior)
-            if ($this->server->proxyType() === ProxyTypes::TRAEFIK->value) {
-                $traefikVersions = get_traefik_versions();
-                if ($traefikVersions !== null) {
-                    CheckTraefikVersionForServerJob::dispatch($this->server, $traefikVersions);
-                } else {
-                    Log::warning('Traefik version check skipped: versions.json data unavailable', [
-                        'server_id' => $this->server->id,
-                        'server_name' => $this->server->name,
-                    ]);
-                }
             }
 
         } catch (\Throwable $e) {
