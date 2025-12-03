@@ -5,12 +5,9 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
-use App\Enums\ProxyTypes;
-use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class Navbar extends Component
@@ -70,19 +67,6 @@ class Navbar extends Component
 
             $activity = StartProxy::run($this->server, force: true, restarting: true);
             $this->dispatch('activityMonitor', $activity->id);
-
-            // Check Traefik version after restart to provide immediate feedback
-            if ($this->server->proxyType() === ProxyTypes::TRAEFIK->value) {
-                $traefikVersions = get_traefik_versions();
-                if ($traefikVersions !== null) {
-                    CheckTraefikVersionForServerJob::dispatch($this->server, $traefikVersions);
-                } else {
-                    Log::warning('Traefik version check skipped: versions.json data unavailable', [
-                        'server_id' => $this->server->id,
-                        'server_name' => $this->server->name,
-                    ]);
-                }
-            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
