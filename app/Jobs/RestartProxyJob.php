@@ -46,9 +46,11 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             // listener that handles UI updates and Traefik version checks
             $activity = StartProxy::run($this->server, force: true, restarting: true);
 
-            // Store activity ID for reference
+            // Store activity ID and dispatch event with it so UI can open activity monitor
             if ($activity && is_object($activity)) {
                 $this->activity_id = $activity->id;
+                // Dispatch event with activity ID so the UI can show logs
+                ProxyStatusChangedUI::dispatch($this->server->team_id, $this->activity_id);
             }
 
         } catch (\Throwable $e) {

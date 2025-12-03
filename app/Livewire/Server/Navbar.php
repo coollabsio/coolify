@@ -30,6 +30,8 @@ class Navbar extends Component
 
     public ?string $lastNotifiedStatus = null;
 
+    public bool $restartInitiated = false;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -65,11 +67,22 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
 
+            // Prevent duplicate restart messages (e.g., from double-click or re-render)
+            if ($this->restartInitiated) {
+                return;
+            }
+            $this->restartInitiated = true;
+
             // Always use background job for all servers
             RestartProxyJob::dispatch($this->server);
-            $this->dispatch('info', 'Proxy restart initiated. Monitor progress in activity logs.');
+            $this->dispatch('info', 'Proxy restart initiated.');
+
+            // Reset the flag after a short delay to allow future restarts
+            $this->restartInitiated = false;
 
         } catch (\Throwable $e) {
+            $this->restartInitiated = false;
+
             return handleError($e, $this);
         }
     }
