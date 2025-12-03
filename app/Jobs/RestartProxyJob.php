@@ -97,29 +97,39 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 
         // === STOP PHASE ===
         $commands = $commands->merge([
-            "echo '>>> Stopping proxy...'",
+            "echo 'Stopping proxy...'",
             "docker stop -t=$stopTimeout $containerName 2>/dev/null || true",
             "docker rm -f $containerName 2>/dev/null || true",
             '# Wait for container to be fully removed',
-            'for i in {1..10}; do',
+            'for i in {1..15}; do',
             "    if ! docker ps -a --format \"{{.Names}}\" | grep -q \"^$containerName$\"; then",
+            "        echo 'Container removed successfully.'",
             '        break',
             '    fi',
+            '    echo "Waiting for container to be removed... ($i/15)"',
             '    sleep 1',
+            '    # Force remove on each iteration in case it got stuck',
+            "    docker rm -f $containerName 2>/dev/null || true",
             'done',
-            "echo '>>> Proxy stopped successfully.'",
+            '# Final verification and force cleanup',
+            "if docker ps -a --format \"{{.Names}}\" | grep -q \"^$containerName$\"; then",
+            "    echo 'Container still exists after wait, forcing removal...'",
+            "    docker rm -f $containerName 2>/dev/null || true",
+            '    sleep 2',
+            'fi',
+            "echo 'Proxy stopped successfully.'",
         ]);
 
         // === START PHASE ===
         if ($this->server->isSwarmManager()) {
             $commands = $commands->merge([
-                "echo '>>> Starting proxy (Swarm mode)...'",
+                "echo 'Starting proxy (Swarm mode)...'",
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
                 'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
-                "echo '>>> Successfully started coolify-proxy.'",
+                "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
             if (isDev() && $proxyType === ProxyTypes::CADDY->value) {
@@ -127,34 +137,20 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
-                "echo '>>> Starting proxy...'",
+                "echo 'Starting proxy...'",
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
                 "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
                 'docker compose pull',
-                'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
-                "    echo 'Stopping and removing existing coolify-proxy.'",
-                '    docker stop coolify-proxy 2>/dev/null || true',
-                '    docker rm -f coolify-proxy 2>/dev/null || true',
-                '    # Wait for container to be fully removed',
-                '    for i in {1..10}; do',
-                '        if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
-                '            break',
-                '        fi',
-                '        echo "Waiting for coolify-proxy to be removed... ($i/10)"',
-                '        sleep 1',
-                '    done',
-                "    echo 'Successfully stopped and removed existing coolify-proxy.'",
-                'fi',
             ]);
             // Ensure required networks exist BEFORE docker compose up
             $commands = $commands->merge(ensureProxyNetworksExist($this->server));
             $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
                 'docker compose up -d --wait --remove-orphans',
-                "echo '>>> Successfully started coolify-proxy.'",
+                "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($this->server));
         }
