@@ -129,6 +129,16 @@ class ServerManagerJob implements ShouldQueue
             }
         }
 
+        $isSentinelEnabled = $server->isSentinelEnabled();
+        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
+        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
+
+        if ($shouldRestartSentinel) {
+            dispatch(function () use ($server) {
+                $server->restartContainer('coolify-sentinel');
+            });
+        }
+
         // Dispatch ServerStorageCheckJob if due (independent of Sentinel status)
         $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
         if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
@@ -147,15 +157,6 @@ class ServerManagerJob implements ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
-        $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
-
-        if ($shouldRestartSentinel) {
-            dispatch(function () use ($server) {
-                $server->restartContainer('coolify-sentinel');
-            });
-        }
     }
 
     private function shouldRunNow(string $frequency, ?string $timezone = null): bool
