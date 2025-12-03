@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
