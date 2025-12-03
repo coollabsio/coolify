@@ -779,6 +779,7 @@ class General extends Component
         try {
             $this->authorize('update', $this->application);
 
+            $this->resetErrorBag();
             $this->validate();
 
             $oldPortsExposes = $this->application->ports_exposes;
@@ -825,21 +826,28 @@ class General extends Component
                 $this->application->publish_directory = $this->publishDirectory;
             }
 
-            $this->application->save();
-            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
-                $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
-                $this->application->custom_labels = base64_encode($this->customLabels);
-                $this->application->save();
-            }
-
-            // Validate docker compose file path when base directory OR compose location changes
+            // Validate docker compose file path BEFORE saving to database
+            // This prevents invalid paths from being persisted when validation fails
             if ($this->buildPack === 'dockercompose' &&
                 ($oldDockerComposeLocation !== $this->dockerComposeLocation ||
                  $oldBaseDirectory !== $this->baseDirectory)) {
                 $compose_return = $this->loadComposeFile(showToast: false);
                 if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                    // Restore original values - don't persist invalid data
+                    $this->baseDirectory = $oldBaseDirectory;
+                    $this->dockerComposeLocation = $oldDockerComposeLocation;
+                    $this->application->base_directory = $oldBaseDirectory;
+                    $this->application->docker_compose_location = $oldDockerComposeLocation;
+
                     return;
                 }
+            }
+
+            $this->application->save();
+            if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
+                $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+                $this->application->custom_labels = base64_encode($this->customLabels);
+                $this->application->save();
             }
 
             if ($oldPortsExposes !== $this->portsExposes || $oldIsContainerLabelEscapeEnabled !== $this->isContainerLabelEscapeEnabled) {
