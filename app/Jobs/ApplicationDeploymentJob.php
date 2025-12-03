@@ -3177,7 +3177,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     'stderr',
                     hidden: true
                 );
-                \Log::warning("Failed to stop running container {$this->container_name}: {$e->getMessage()}");
 
                 return; // Don't re-throw - cleanup failures shouldn't fail successful deployments
             }
