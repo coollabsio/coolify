@@ -9,17 +9,24 @@
 node_modules
 /vendor
 
+*.log
+
+.ai
+CLAUDE.md
 /.cursor
 /.fleet
 /.idea
+/.junie
 /.nova
 /.vscode
+/.windsurfrules
 /.zed
-
-*.log
 
 .DS_Store
 Thumbs.db
+
+*.swo
+*.swp
 
 *.sqlite*
 
@@ -36,9 +43,12 @@ Homestead.yaml
 /public/build
 /public/hot
 /public/storage
+/public/vendor
 
 /storage/**
 !/storage/**/
+/storage/phpstan/**
+/storage/rector/**
 
 .git
 .gitattributes

@@ -45,7 +45,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureHttps(): void
     {
-        if (App::isProduction() && (bool) config('app.force_https')) {
+        if (App::isProduction() && config()->boolean('app.force_https')) {
             URL::forceScheme('https');
         }
     }
@@ -85,6 +85,7 @@ final class AppServiceProvider extends ServiceProvider
         if (! App::isProduction()) {
             Model::preventLazyLoading();
         }
+
         Model::preventSilentlyDiscardingAttributes();
         Model::preventAccessingMissingAttributes();
 

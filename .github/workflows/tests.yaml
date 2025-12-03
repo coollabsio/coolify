@@ -8,40 +8,46 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   composer-validate:
     name: Validate composer.json
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # https://github.com/actions/checkout/releases/tag/v6.0.0
         with:
           persist-credentials: false
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
         with:
-          php-version: "8.4"
+          php-version: "8.5.0" # https://github.com/php/php-src/releases/tag/php-8.5.0
 
       - name: Validate composer.json
         run: composer validate --check-lock --strict
 
   composer-audit:
     name: Composer Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     needs: [composer-validate]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # https://github.com/actions/checkout/releases/tag/v6.0.0
         with:
-          php-version: "8.4"
+          persist-credentials: false
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+        with:
+          php-version: "8.5.0" # https://github.com/php/php-src/releases/tag/php-8.5.0
 
       - name: Cache Composer packages
         id: composer-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # https://github.com/actions/cache/releases/tag/v4.3.0
         with:
           path: /vendor
           key: php-${{ hashFiles('composer.lock') }}
@@ -55,39 +61,40 @@ jobs:
 
   bun-audit:
     name: Bun Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     needs: [composer-validate]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # https://github.com/actions/checkout/releases/tag/v6.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # https://github.com/oven-sh/setup-bun/releases/tag/v2.0.2
         with:
-          bun-version: 1.2.16
+          bun-version: 1.3.3 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.3
       - name: Run Bun audit
         run: bun audit --frozen-lockfile
 
   test:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     needs: [composer-audit, bun-audit]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP with Xdebug
-        uses: shivammathur/setup-php@v2
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # https://github.com/actions/checkout/releases/tag/v6.0.0
         with:
-          php-version: "8.4"
-          coverage: xdebug
+          persist-credentials: false
 
-      # - name: Install aspell
-      #   run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
+      - name: Setup PHP 8.5 with Xdebug
+        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+        with:
+          php-version: "8.5.0" # https://github.com/php/php-src/releases/tag/php-8.5.0
+          coverage: xdebug-3.5.0 # https://github.com/xdebug/xdebug/releases/tag/3.5.0
 
       - name: Cache Composer packages
         id: composer-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # https://github.com/actions/cache/releases/tag/v4.3.0
         with:
           path: /vendor
           key: php-${{ hashFiles('composer.lock') }}

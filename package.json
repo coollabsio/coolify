@@ -1,5 +1,5 @@
 {
-    "name": "coolify",
+    "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
     "devDependencies": {
@@ -7,7 +7,7 @@
         "concurrently": "^9.2.1",
         "laravel-vite-plugin": "^2.0.1",
         "tailwindcss": "^4.1.17",
-        "vite": "^7.2.2"
+        "vite": "^7.2.6"
     },
     "scripts": {
         "build": "vite build",

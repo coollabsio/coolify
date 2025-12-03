@@ -11,7 +11,7 @@ return [
     'enable' => env('RAY_ENABLED', false),
 
     /*
-     * When enabled, all cache events  will automatically be sent to Ray.
+     * When enabled, all cache events will automatically be sent to Ray.
      */
     'send_cache_to_ray' => env('SEND_CACHE_TO_RAY', false),
 
@@ -100,7 +100,7 @@ return [
     /*
      * When enabled, all deprecation notices will be automatically sent to Ray.
      */
-    'send_deprecated_notices_to_ray' => env('SEND_DEPRECATED_NOTICES_TO_RAY', false),
+    'send_deprecated_notices_to_ray' => env('SEND_DEPRECATED_NOTICES_TO_RAY', true),
 
     /*
      * The host used to communicate with the Ray app.
