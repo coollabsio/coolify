@@ -34,6 +34,11 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
+            // Set status to restarting and notify UI immediately
+            $this->server->proxy->status = 'restarting';
+            $this->server->save();
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
+
             // Stop proxy
             StopProxy::run($this->server, restarting: true);
 
@@ -41,15 +46,14 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             $this->server->proxy->force_stop = false;
             $this->server->save();
 
-            // Start proxy asynchronously - the ProxyStatusChanged event will be dispatched
-            // when the remote process completes, which triggers ProxyStatusChangedNotification
-            // listener that handles UI updates and Traefik version checks
+            // Start proxy asynchronously - returns Activity immediately
+            // The ProxyStatusChanged event will be dispatched when the remote process completes,
+            // which triggers ProxyStatusChangedNotification listener
             $activity = StartProxy::run($this->server, force: true, restarting: true);
 
-            // Store activity ID and dispatch event with it so UI can open activity monitor
+            // Dispatch event with activity ID immediately so UI can show logs in real-time
             if ($activity && is_object($activity)) {
                 $this->activity_id = $activity->id;
-                // Dispatch event with activity ID so the UI can show logs
                 ProxyStatusChangedUI::dispatch($this->server->team_id, $this->activity_id);
             }
 
