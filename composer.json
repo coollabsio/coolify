@@ -68,7 +68,7 @@
         ],
         "refactor": "rector",
         "format": "pint --parallel",
-        "lint": "phpstan --memory-limit=2G",
+        "lint": "phpstan --memory-limit=2G --ansi",
         "test": [
             "@php artisan config:clear --ansi",
             "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
