@@ -139,15 +139,18 @@ class ServerManagerJob implements ShouldQueue
             });
         }
 
-        // Dispatch ServerStorageCheckJob if due (independent of Sentinel status)
-        $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
-        if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
-            $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
-        }
-        $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
+        // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
+        // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
+        if ($sentinelOutOfSync) {
+            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
+            if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
+                $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
+            }
+            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
 
-        if ($shouldRunStorageCheck) {
-            ServerStorageCheckJob::dispatch($server);
+            if ($shouldRunStorageCheck) {
+                ServerStorageCheckJob::dispatch($server);
+            }
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)

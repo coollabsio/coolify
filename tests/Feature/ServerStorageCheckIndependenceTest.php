@@ -19,7 +19,7 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-it('dispatches storage check when sentinel is in sync', function () {
+it('does not dispatch storage check when sentinel is in sync', function () {
     // Given: A server with Sentinel recently updated (in sync)
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -37,10 +37,8 @@ it('dispatches storage check when sentinel is in sync', function () {
     $job = new ServerManagerJob;
     $job->handle();
 
-    // Then: ServerStorageCheckJob should be dispatched
-    Queue::assertPushed(ServerStorageCheckJob::class, function ($job) use ($server) {
-        return $job->server->id === $server->id;
-    });
+    // Then: ServerStorageCheckJob should NOT be dispatched (Sentinel handles it via PushServerUpdateJob)
+    Queue::assertNotPushed(ServerStorageCheckJob::class);
 });
 
 it('dispatches storage check when sentinel is out of sync', function () {
@@ -93,12 +91,12 @@ it('dispatches storage check when sentinel is disabled', function () {
     });
 });
 
-it('respects custom hourly storage check frequency', function () {
-    // Given: A server with hourly storage check frequency
+it('respects custom hourly storage check frequency when sentinel is out of sync', function () {
+    // Given: A server with hourly storage check frequency and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
-        'sentinel_updated_at' => now(),
+        'sentinel_updated_at' => now()->subMinutes(10),
     ]);
 
     $server->settings->update([
@@ -117,12 +115,12 @@ it('respects custom hourly storage check frequency', function () {
     });
 });
 
-it('handles VALID_CRON_STRINGS mapping correctly', function () {
-    // Given: A server with 'hourly' string (should be converted to '0 * * * *')
+it('handles VALID_CRON_STRINGS mapping correctly when sentinel is out of sync', function () {
+    // Given: A server with 'hourly' string (should be converted to '0 * * * *') and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
-        'sentinel_updated_at' => now(),
+        'sentinel_updated_at' => now()->subMinutes(10),
     ]);
 
     $server->settings->update([
@@ -141,12 +139,12 @@ it('handles VALID_CRON_STRINGS mapping correctly', function () {
     });
 });
 
-it('respects server timezone for storage checks', function () {
-    // Given: A server in America/New_York timezone (UTC-5) configured for 11 PM local time
+it('respects server timezone for storage checks when sentinel is out of sync', function () {
+    // Given: A server in America/New_York timezone (UTC-5) configured for 11 PM local time and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
-        'sentinel_updated_at' => now(),
+        'sentinel_updated_at' => now()->subMinutes(10),
     ]);
 
     $server->settings->update([
