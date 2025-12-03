@@ -20,6 +20,9 @@ afterEach(function () {
 });
 
 it('does not dispatch storage check when sentinel is in sync', function () {
+    // When: ServerManagerJob runs at 11 PM
+    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
+
     // Given: A server with Sentinel recently updated (in sync)
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -31,9 +34,6 @@ it('does not dispatch storage check when sentinel is in sync', function () {
         'server_disk_usage_check_frequency' => '0 23 * * *',
         'server_timezone' => 'UTC',
     ]);
-
-    // When: ServerManagerJob runs at 11 PM
-    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -42,6 +42,9 @@ it('does not dispatch storage check when sentinel is in sync', function () {
 });
 
 it('dispatches storage check when sentinel is out of sync', function () {
+    // When: ServerManagerJob runs at 11 PM
+    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
+
     // Given: A server with Sentinel out of sync (last update 10 minutes ago)
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -53,9 +56,6 @@ it('dispatches storage check when sentinel is out of sync', function () {
         'server_disk_usage_check_frequency' => '0 23 * * *',
         'server_timezone' => 'UTC',
     ]);
-
-    // When: ServerManagerJob runs at 11 PM
-    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -67,6 +67,9 @@ it('dispatches storage check when sentinel is out of sync', function () {
 });
 
 it('dispatches storage check when sentinel is disabled', function () {
+    // When: ServerManagerJob runs at 11 PM
+    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
+
     // Given: A server with Sentinel disabled
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -79,9 +82,6 @@ it('dispatches storage check when sentinel is disabled', function () {
         'server_timezone' => 'UTC',
         'is_metrics_enabled' => false,
     ]);
-
-    // When: ServerManagerJob runs at 11 PM
-    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -92,6 +92,9 @@ it('dispatches storage check when sentinel is disabled', function () {
 });
 
 it('respects custom hourly storage check frequency when sentinel is out of sync', function () {
+    // When: ServerManagerJob runs at the top of the hour (23:00)
+    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
+
     // Given: A server with hourly storage check frequency and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -103,9 +106,6 @@ it('respects custom hourly storage check frequency when sentinel is out of sync'
         'server_disk_usage_check_frequency' => '0 * * * *',
         'server_timezone' => 'UTC',
     ]);
-
-    // When: ServerManagerJob runs at the top of the hour (23:00)
-    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -116,6 +116,9 @@ it('respects custom hourly storage check frequency when sentinel is out of sync'
 });
 
 it('handles VALID_CRON_STRINGS mapping correctly when sentinel is out of sync', function () {
+    // When: ServerManagerJob runs at the top of the hour
+    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
+
     // Given: A server with 'hourly' string (should be converted to '0 * * * *') and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -127,9 +130,6 @@ it('handles VALID_CRON_STRINGS mapping correctly when sentinel is out of sync', 
         'server_disk_usage_check_frequency' => 'hourly',
         'server_timezone' => 'UTC',
     ]);
-
-    // When: ServerManagerJob runs at the top of the hour
-    Carbon::setTestNow(Carbon::parse('2025-01-15 23:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -140,6 +140,9 @@ it('handles VALID_CRON_STRINGS mapping correctly when sentinel is out of sync', 
 });
 
 it('respects server timezone for storage checks when sentinel is out of sync', function () {
+    // When: ServerManagerJob runs at 11 PM New York time (4 AM UTC next day)
+    Carbon::setTestNow(Carbon::parse('2025-01-16 04:00:00', 'UTC'));
+
     // Given: A server in America/New_York timezone (UTC-5) configured for 11 PM local time and Sentinel out of sync
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -151,9 +154,6 @@ it('respects server timezone for storage checks when sentinel is out of sync', f
         'server_disk_usage_check_frequency' => '0 23 * * *',
         'server_timezone' => 'America/New_York',
     ]);
-
-    // When: ServerManagerJob runs at 11 PM New York time (4 AM UTC next day)
-    Carbon::setTestNow(Carbon::parse('2025-01-16 04:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
@@ -164,6 +164,9 @@ it('respects server timezone for storage checks when sentinel is out of sync', f
 });
 
 it('does not dispatch storage check outside schedule', function () {
+    // When: ServerManagerJob runs at 10 PM (not 11 PM)
+    Carbon::setTestNow(Carbon::parse('2025-01-15 22:00:00', 'UTC'));
+
     // Given: A server with daily storage check at 11 PM
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -175,9 +178,6 @@ it('does not dispatch storage check outside schedule', function () {
         'server_disk_usage_check_frequency' => '0 23 * * *',
         'server_timezone' => 'UTC',
     ]);
-
-    // When: ServerManagerJob runs at 10 PM (not 11 PM)
-    Carbon::setTestNow(Carbon::parse('2025-01-15 22:00:00', 'UTC'));
     $job = new ServerManagerJob;
     $job->handle();
 
