@@ -14,7 +14,7 @@
             <div class="pb-2 text-red-500">{{ $parseError }}</div>
         @endif
 
-        <x-forms.textarea useMonacoEditor monacoEditorLanguage="json" monacoJsonSchema="/schemas/coolify.schema.json"
+        <x-forms.textarea useMonacoEditor monacoEditorLanguage="json"
             rows="20" id="coolifyJson" autofocus wire:model.live.debounce.500ms="coolifyJson"
             placeholder='{
     "version": "1.0",

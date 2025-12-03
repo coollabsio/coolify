@@ -35,12 +35,6 @@ class ValidateAndInstallServerJob implements ShouldQueue
             // Mark validation as in progress
             $this->server->update(['is_validating' => true]);
 
-            Log::info('ValidateAndInstallServer: Starting validation', [
-                'server_id' => $this->server->id,
-                'server_name' => $this->server->name,
-                'attempt' => $this->numberOfTries + 1,
-            ]);
-
             // Validate connection
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $uptime) {
@@ -92,13 +86,6 @@ class ValidateAndInstallServerJob implements ShouldQueue
                     return;
                 }
 
-                Log::info('ValidateAndInstallServer: Installing prerequisites', [
-                    'server_id' => $this->server->id,
-                    'attempt' => $this->numberOfTries + 1,
-                    'missing_commands' => $validationResult['missing'],
-                    'found_commands' => $validationResult['found'],
-                ]);
-
                 // Install prerequisites
                 $this->server->installPrerequisites();
 
@@ -128,11 +115,6 @@ class ValidateAndInstallServerJob implements ShouldQueue
                     return;
                 }
 
-                Log::info('ValidateAndInstallServer: Installing Docker', [
-                    'server_id' => $this->server->id,
-                    'attempt' => $this->numberOfTries + 1,
-                ]);
-
                 // Install Docker
                 $this->server->installDocker();
 
@@ -157,12 +139,6 @@ class ValidateAndInstallServerJob implements ShouldQueue
 
                 return;
             }
-
-            // Validation successful!
-            Log::info('ValidateAndInstallServer: Validation successful', [
-                'server_id' => $this->server->id,
-                'server_name' => $this->server->name,
-            ]);
 
             // Start proxy if needed
             if (! $this->server->isBuildServer()) {

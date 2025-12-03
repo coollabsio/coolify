@@ -2966,8 +2966,6 @@ function getHelperVersion(): string
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id): ?array
 {
-    Log::info("coolify.json: Starting detection for {$repository} branch {$branch} base_dir {$base_directory}");
-
     $server = Server::where('id', $server_id)->where('team_id', $team_id)->first();
     if (! $server) {
         Log::warning("coolify.json: Server not found - server_id: {$server_id}, team_id: {$team_id}");
@@ -2985,8 +2983,6 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
         $pathsToCheck[] = ltrim($workdir, '/').'/coolify.json';
     }
     $pathsToCheck[] = 'coolify.json';
-
-    Log::info('coolify.json: Checking paths - '.implode(', ', $pathsToCheck));
 
     // Build sparse-checkout file list
     $fileList = collect($pathsToCheck)->map(fn ($path) => "./{$path}")->implode(' ');
@@ -3010,11 +3006,7 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     try {
         $output = instant_remote_process($commands, $server);
 
-        Log::info('coolify.json: Raw output length - '.strlen($output ?? ''));
-
         if (empty($output)) {
-            Log::info('coolify.json: No output from remote process');
-
             return null;
         }
 
@@ -3038,11 +3030,6 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
         // Warn about unknown top-level fields
         $knownFields = ['version', 'name', 'description', 'build', 'domains', 'environment_variables', 'health_check', 'limits', 'settings'];
         $unknownFields = array_diff(array_keys($config), $knownFields);
-        if (! empty($unknownFields)) {
-            Log::info('coolify.json: Unknown fields detected (will be ignored) - '.implode(', ', $unknownFields));
-        }
-
-        Log::info('coolify.json: Successfully loaded config with keys - '.implode(', ', array_keys($config)));
 
         return $config;
     } catch (\Exception $e) {
