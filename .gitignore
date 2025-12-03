@@ -51,4 +51,5 @@ Homestead.yaml
 !/storage/app
 !/storage/framework
 !/storage/logs
+!/storage/phpstan
 !/storage/rector
