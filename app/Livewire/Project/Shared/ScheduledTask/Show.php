@@ -40,7 +40,7 @@ class Show extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $container = null;
 
-    #[Validate(['integer', 'required', 'min:60', 'max:3600'])]
+    #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
     #[Locked]
