@@ -9,7 +9,7 @@
         selectedMoveEnvironment: null,
         currentProjectId: {{ $resource->environment->project->id }},
         currentEnvironmentId: {{ $resource->environment->id }},
-        servers: @js(
+        servers: Object.values(@js(
     $servers->map(
         fn($s) => [
             'id' => $s->id,
@@ -24,8 +24,8 @@
             ),
         ],
     ),
-),
-        projects: @js(
+)),
+        projects: Object.values(@js(
     $projects->map(
         fn($p) => [
             'id' => $p->id,
@@ -39,7 +39,7 @@
             ),
         ],
     ),
-),
+)),
         get availableDestinations() {
             if (!this.selectedCloneServer) return [];
             const server = this.servers.find(s => s.id == this.selectedCloneServer);
