@@ -43,7 +43,7 @@ class RestartProxyJobTest extends TestCase
         $job = new RestartProxyJob($server);
 
         $this->assertEquals(1, $job->tries);
-        $this->assertEquals(60, $job->timeout);
+        $this->assertEquals(120, $job->timeout);
         $this->assertNull($job->activity_id);
     }
 
