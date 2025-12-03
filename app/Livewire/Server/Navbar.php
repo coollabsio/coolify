@@ -6,6 +6,8 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
 use App\Enums\ProxyTypes;
+use App\Jobs\CheckTraefikVersionForServerJob;
+use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -61,13 +63,11 @@ class Navbar extends Component
     {
         try {
             $this->authorize('manageProxy', $this->server);
-            StopProxy::run($this->server, restarting: true);
 
-            $this->server->proxy->force_stop = false;
-            $this->server->save();
+            // Always use background job for all servers
+            RestartProxyJob::dispatch($this->server);
+            $this->dispatch('info', 'Proxy restart initiated. Monitor progress in activity logs.');
 
-            $activity = StartProxy::run($this->server, force: true, restarting: true);
-            $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -122,11 +122,16 @@ class Navbar extends Component
         }
     }
 
-    public function showNotification()
+    public function showNotification($event = null)
     {
         $previousStatus = $this->proxyStatus;
         $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+
+        // If event contains activityId, open activity monitor
+        if ($event && isset($event['activityId'])) {
+            $this->dispatch('activityMonitor', $event['activityId']);
+        }
 
         switch ($this->proxyStatus) {
             case 'running':
@@ -149,6 +154,12 @@ class Navbar extends Component
                 break;
             case 'starting':
                 $this->dispatch('info', 'Proxy is starting.');
+                break;
+            case 'restarting':
+                $this->dispatch('info', 'Proxy is restarting.');
+                break;
+            case 'error':
+                $this->dispatch('error', 'Proxy restart failed. Check logs.');
                 break;
             case 'unknown':
                 $this->dispatch('info', 'Proxy status is unknown.');
