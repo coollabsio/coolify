@@ -155,7 +155,8 @@ trait ExecuteRemoteCommand
     private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors)
     {
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+        $processTimeout = $this->timeout ?? config('constants.ssh.command_timeout');
+        $process = Process::timeout($processTimeout)->idleTimeout($processTimeout)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
             $output = str($output)->trim();
             if ($output->startsWith('╔')) {
                 $output = "\n".$output;
