@@ -75,7 +75,7 @@ class Navbar extends Component
 
             // Always use background job for all servers
             RestartProxyJob::dispatch($this->server);
-            $this->dispatch('info', 'Proxy restart initiated.');
+            // $this->dispatch('info', 'Proxy restart initiated.');
 
             // Reset the flag after a short delay to allow future restarts
             $this->restartInitiated = false;
@@ -171,15 +171,15 @@ class Navbar extends Component
                 }
                 break;
             case 'stopping':
-                $this->dispatch('info', 'Proxy is stopping.');
+                // $this->dispatch('info', 'Proxy is stopping.');
                 $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'starting':
-                $this->dispatch('info', 'Proxy is starting.');
+                // $this->dispatch('info', 'Proxy is starting.');
                 $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'restarting':
-                $this->dispatch('info', 'Proxy is restarting.');
+                // $this->dispatch('info', 'Proxy is restarting.');
                 $this->lastNotifiedStatus = $this->proxyStatus;
                 break;
             case 'error':

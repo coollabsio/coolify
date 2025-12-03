@@ -2,6 +2,13 @@
     <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
+            @if ($server->id === 0)
+                <div class="mb-4 p-3 text-sm bg-warning/10 border border-warning/30 rounded-lg text-warning">
+                    <span class="font-semibold">Note:</span> This is the localhost server where Coolify runs.
+                    During proxy restart, the connection may be temporarily lost.
+                    If logs stop updating, please refresh the browser after a few minutes.
+                </div>
+            @endif
             <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
