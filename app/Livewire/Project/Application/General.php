@@ -521,7 +521,7 @@ class General extends Component
         }
     }
 
-    public function loadComposeFile($isInit = false, $showToast = true)
+    public function loadComposeFile($isInit = false, $showToast = true, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         try {
             $this->authorize('update', $this->application);
@@ -530,7 +530,7 @@ class General extends Component
                 return;
             }
 
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit, $restoreBaseDirectory, $restoreDockerComposeLocation);
             if (is_null($this->parsedServices)) {
                 $showToast && $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -831,13 +831,22 @@ class General extends Component
             if ($this->buildPack === 'dockercompose' &&
                 ($oldDockerComposeLocation !== $this->dockerComposeLocation ||
                  $oldBaseDirectory !== $this->baseDirectory)) {
-                $compose_return = $this->loadComposeFile(showToast: false);
+                // Pass original values to loadComposeFile so it can restore them on failure
+                // The finally block in Application::loadComposeFile will save these original
+                // values if validation fails, preventing invalid paths from being persisted
+                $compose_return = $this->loadComposeFile(
+                    isInit: false,
+                    showToast: false,
+                    restoreBaseDirectory: $oldBaseDirectory,
+                    restoreDockerComposeLocation: $oldDockerComposeLocation
+                );
                 if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
-                    // Restore original values - don't persist invalid data
+                    // Validation failed - restore original values to component properties
                     $this->baseDirectory = $oldBaseDirectory;
                     $this->dockerComposeLocation = $oldDockerComposeLocation;
-                    $this->application->base_directory = $oldBaseDirectory;
-                    $this->application->docker_compose_location = $oldDockerComposeLocation;
+                    // The model was saved by loadComposeFile's finally block with original values
+                    // Refresh to sync component with database state
+                    $this->application->refresh();
 
                     return;
                 }

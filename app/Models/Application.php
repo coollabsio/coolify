@@ -1511,9 +1511,11 @@ class Application extends BaseModel
         }
     }
 
-    public function loadComposeFile($isInit = false)
+    public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
-        $initialDockerComposeLocation = $this->docker_compose_location;
+        // Use provided restore values or capture current values as fallback
+        $initialDockerComposeLocation = $restoreDockerComposeLocation ?? $this->docker_compose_location;
+        $initialBaseDirectory = $restoreBaseDirectory ?? $this->base_directory;
         if ($isInit && $this->docker_compose_raw) {
             return;
         }
@@ -1580,6 +1582,7 @@ class Application extends BaseModel
             throw new \RuntimeException($e->getMessage());
         } finally {
             $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
             $this->save();
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
