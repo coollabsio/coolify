@@ -59,6 +59,21 @@ return [
             'search_path' => 'public',
             'sslmode' => 'prefer',
         ],
+
+        'old_pgsql' => [
+            'driver' => 'pgsql',
+            'url' => env('OLD_DB_URL'),
+            'host' => env('OLD_DB_HOST', 'old-coolify-db'),
+            'port' => env('OLD_DB_PORT', '5555'),
+            'database' => env('OLD_DB_DATABASE', 'coolify'),
+            'username' => env('OLD_DB_USERNAME', 'coolify'),
+            'password' => env('OLD_DB_PASSWORD'),
+            'charset' => env('OLD_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
     ],
 
     /*
