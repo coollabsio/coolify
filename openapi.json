@@ -377,7 +377,7 @@
                                     "properties": {
                                         "uuid": {
                                             "type": "string",
-                                            "format": "uuid"
+                                            "format": "cuid2"
                                         }
                                     },
                                     "type": "object"
