@@ -6759,6 +6759,8 @@ components:
           type: integer
         concurrent_builds:
           type: integer
+        deployment_queue_limit:
+          type: integer
         dynamic_timeout:
           type: integer
         force_disabled:

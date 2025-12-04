@@ -388,7 +388,11 @@ class DeployController extends Controller
                         continue;
                     }
                 }
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force, $pr);
+                $result = $this->deploy_resource($resource, $force, $pr);
+                if (isset($result['status']) && $result['status'] === 429) {
+                    return response()->json(['message' => $result['message']], 429);
+                }
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
                 } else {
@@ -430,7 +434,11 @@ class DeployController extends Controller
                 continue;
             }
             foreach ($applications as $resource) {
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
+                $result = $this->deploy_resource($resource, $force);
+                if (isset($result['status']) && $result['status'] === 429) {
+                    return response()->json(['message' => $result['message']], 429);
+                }
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
                     $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
                 }
@@ -474,8 +482,11 @@ class DeployController extends Controller
                     deployment_uuid: $deployment_uuid,
                     force_rebuild: $force,
                     pull_request_id: $pr,
+                    is_api: true,
                 );
-                if ($result['status'] === 'skipped') {
+                if ($result['status'] === 'queue_full') {
+                    return ['message' => $result['message'], 'deployment_uuid' => null, 'status' => 429];
+                } elseif ($result['status'] === 'skipped') {
                     $message = $result['message'];
                 } else {
                     $message = "Application {$resource->name} deployment queued.";
