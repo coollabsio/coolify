@@ -19,7 +19,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => env('SESSION_DRIVER', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -74,7 +74,7 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
+    'connection' => env('SESSION_CONNECTION', 'sessions'),
 
     /*
     |--------------------------------------------------------------------------
@@ -102,7 +102,7 @@ return [
     |
     */
 
-    'store' => env('SESSION_STORE'),
+    'store' => env('SESSION_STORE', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -130,7 +130,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug((string) env('APP_NAME', 'laravel')).'-session',
+        Str::slug((string) env('APP_NAME', 'coolify')).'-session',
     ),
 
     /*
