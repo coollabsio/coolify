@@ -78,6 +78,8 @@ class InstallDocker
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('arch')) {
+                $command = $command->merge([$this->getArchDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -141,6 +143,15 @@ class InstallDocker
             'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && '.
             'zypper refresh && '.
             'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
+            'systemctl start docker && '.
+            'systemctl enable docker'.
+            ')';
+    }
+
+    private function getArchDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'pacman -S docker docker-compose docker-buildx --noconfirm && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
             ')';
