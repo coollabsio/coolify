@@ -2276,13 +2276,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                if (! is_null($env->real_value)) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                if (! is_null($env->real_value)) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
@@ -2291,7 +2291,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Add COOLIFY_* environment variables to Nixpacks build context
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         $coolify_envs->each(function ($value, $key) {
-            $this->env_nixpacks_args->push("--env {$key}={$value}");
+            // Only add environment variables with non-null and non-empty values
+            if (! is_null($value) && $value !== '') {
+                $this->env_nixpacks_args->push("--env {$key}={$value}");
+            }
         });
 
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
