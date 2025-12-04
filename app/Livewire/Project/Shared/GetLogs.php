@@ -43,6 +43,8 @@ class GetLogs extends Component
 
     public ?int $numberOfLines = 100;
 
+    public bool $expandByDefault = false;
+
     public function mount()
     {
         if (! is_null($this->resource)) {
@@ -90,6 +92,18 @@ class GetLogs extends Component
                 }
             }
         }
+    }
+
+    public function toggleTimestamps()
+    {
+        $this->showTimeStamps = ! $this->showTimeStamps;
+        $this->instantSave();
+        $this->getLogs(true);
+    }
+
+    public function toggleStreamLogs()
+    {
+        $this->streamLogs = ! $this->streamLogs;
     }
 
     public function getLogs($refresh = false)
