@@ -450,7 +450,7 @@
                 PostgreSQL
                 17 (default).</div>
             <div class="flex flex-col gap-6 pt-8">
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:17-alpine'))"
                     :disabled="selecting">
@@ -470,7 +470,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('supabase/postgres:17.4.1.032'))"
                     :disabled="selecting">
@@ -489,7 +489,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgis/postgis:17-3.5-alpine'))"
                     :disabled="selecting">
@@ -508,7 +508,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg17'))"
                     :disabled="selecting">

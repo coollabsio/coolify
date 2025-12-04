@@ -7,7 +7,7 @@
             <div class="flex flex-col justify-center gap-2 text-left ">
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 coolbox"
+                        <div class="gap-2 py-4 cursor-pointer group coolbox"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -20,7 +20,7 @@
                             </div>
                         </div>
                     @else
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 coolbox"
+                        <div class="gap-2 py-4 cursor-pointer group coolbox"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
