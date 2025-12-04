@@ -96,9 +96,18 @@ class GetLogs extends Component
 
     public function toggleTimestamps()
     {
+        $previousValue = $this->showTimeStamps;
         $this->showTimeStamps = ! $this->showTimeStamps;
-        $this->instantSave();
-        $this->getLogs(true);
+
+        try {
+            $this->instantSave();
+            $this->getLogs(true);
+        } catch (\Throwable $e) {
+            // Revert the flag to its previous value on failure
+            $this->showTimeStamps = $previousValue;
+
+            return handleError($e, $this);
+        }
     }
 
     public function toggleStreamLogs()

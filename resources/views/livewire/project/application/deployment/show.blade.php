@@ -11,6 +11,7 @@
         intervalId: null,
         showTimestamps: true,
         searchQuery: '',
+        renderTrigger: 0,
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
@@ -52,15 +53,53 @@
             return text.toLowerCase().includes(this.searchQuery.toLowerCase());
         },
         decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
+            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
+            let decoded = text;
+            let prev = '';
+            let iterations = 0;
+            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
+
+            while (decoded !== prev && iterations < maxIterations) {
+                prev = decoded;
+                const doc = new DOMParser().parseFromString(decoded, 'text/html');
+                decoded = doc.documentElement.textContent;
+                iterations++;
+            }
+            return decoded;
         },
-        highlightMatch(text) {
+        renderHighlightedLog(el, text) {
             const decoded = this.decodeHtml(text);
-            if (!this.searchQuery.trim()) return decoded;
-            const escaped = this.searchQuery.replace(/[.*+?^${}()|[\]\\]/g, String.fromCharCode(92) + '$&');
-            const regex = new RegExp('(' + escaped + ')', 'gi');
-            return decoded.replace(regex, '<mark class=bg-warning/50>$1</mark>');
+            el.textContent = '';
+
+            if (!this.searchQuery.trim()) {
+                el.textContent = decoded;
+                return;
+            }
+
+            const query = this.searchQuery.toLowerCase();
+            const lowerText = decoded.toLowerCase();
+            let lastIndex = 0;
+
+            let index = lowerText.indexOf(query, lastIndex);
+            while (index !== -1) {
+                // Add text before match
+                if (index > lastIndex) {
+                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                }
+                // Add highlighted match
+                const mark = document.createElement('span');
+                mark.className = 'log-highlight';
+                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                el.appendChild(mark);
+
+                lastIndex = index + this.searchQuery.length;
+                index = lowerText.indexOf(query, lastIndex);
+            }
+
+            // Add remaining text
+            if (lastIndex < decoded.length) {
+                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            }
         },
         getMatchCount() {
             if (!this.searchQuery.trim()) return 0;
@@ -94,6 +133,17 @@
             a.download = 'deployment-' + this.deploymentId + '-' + timestamp + '.txt';
             a.click();
             URL.revokeObjectURL(url);
+        },
+        init() {
+            // Re-render logs after Livewire updates
+            document.addEventListener('livewire:navigated', () => {
+                this.$nextTick(() => { this.renderTrigger++; });
+            });
+            Livewire.hook('commit', ({ succeed }) => {
+                succeed(() => {
+                    this.$nextTick(() => { this.renderTrigger++; });
+                });
+            });
         }
     }">
             <livewire:project.application.deployment-navbar
@@ -117,9 +167,9 @@
                     :class="fullscreen ? 'h-full' : 'mt-4 border border-dotted rounded-sm'">
                     <div
                         class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
-                        <span x-show="searchQuery" x-text="getMatchCount() + ' matches'"
+                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                        <span x-show="!searchQuery"></span>
+                        <span x-show="!searchQuery.trim()"></span>
                         <div class="flex items-center gap-2">
                             <div class="relative">
                                 <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -197,7 +247,7 @@
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
                         :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                         <div id="logs" class="flex flex-col font-mono">
-                            <div x-show="searchQuery && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
@@ -219,7 +269,7 @@
                                         'font-bold' => isset($line['command']) && $line['command'],
                                         'whitespace-pre-wrap',
                                     ])
-                                        x-html="highlightMatch($el.dataset.lineText)">{!! htmlspecialchars($lineContent) !!}</span>
+                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"></span>
                                 </div>
                             @empty
                                 <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>

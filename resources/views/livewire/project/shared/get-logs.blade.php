@@ -6,6 +6,7 @@
         alwaysScroll: false,
         intervalId: null,
         searchQuery: '',
+        renderTrigger: 0,
         containerName: '{{ $container ?? "logs" }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
@@ -47,19 +48,49 @@
             return line.toLowerCase().includes(this.searchQuery.toLowerCase());
         },
         decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
+            // Decode HTML entities, handling double-encoding
+            let decoded = text;
+            let prev = '';
+            while (decoded !== prev) {
+                prev = decoded;
+                const doc = new DOMParser().parseFromString(decoded, 'text/html');
+                decoded = doc.documentElement.textContent;
+            }
+            return decoded;
         },
-        highlightMatch(text) {
+        renderHighlightedLog(el, text) {
             const decoded = this.decodeHtml(text);
-            if (!this.searchQuery.trim()) return this.styleTimestamp(decoded);
-            const escaped = this.searchQuery.replace(/[.*+?^${}()|[\]\\]/g, String.fromCharCode(92) + '$&');
-            const regex = new RegExp('(' + escaped + ')', 'gi');
-            const highlighted = decoded.replace(regex, '<mark class=bg-warning/50>$1</mark>');
-            return this.styleTimestamp(highlighted);
-        },
-        styleTimestamp(text) {
-            return text.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)/g, '<span class=text-gray-500>$1</span>');
+            el.textContent = '';
+
+            if (!this.searchQuery.trim()) {
+                el.textContent = decoded;
+                return;
+            }
+
+            const query = this.searchQuery.toLowerCase();
+            const lowerText = decoded.toLowerCase();
+            let lastIndex = 0;
+
+            let index = lowerText.indexOf(query, lastIndex);
+            while (index !== -1) {
+                // Add text before match
+                if (index > lastIndex) {
+                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                }
+                // Add highlighted match
+                const mark = document.createElement('span');
+                mark.className = 'log-highlight';
+                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                el.appendChild(mark);
+
+                lastIndex = index + this.searchQuery.length;
+                index = lowerText.indexOf(query, lastIndex);
+            }
+
+            // Add remaining text
+            if (lastIndex < decoded.length) {
+                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            }
         },
         getMatchCount() {
             if (!this.searchQuery.trim()) return 0;
@@ -93,8 +124,17 @@
             a.download = this.containerName + '-logs-' + timestamp + '.txt';
             a.click();
             URL.revokeObjectURL(url);
+        },
+        init() {
+            if (this.expanded) { this.$wire.getLogs(); }
+            // Re-render logs after Livewire updates
+            Livewire.hook('commit', ({ succeed }) => {
+                succeed(() => {
+                    this.$nextTick(() => { this.renderTrigger++; });
+                });
+            });
         }
-    }" x-init="if (expanded) { $wire.getLogs(); }">
+    }">
         <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
             x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
             <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
@@ -121,9 +161,9 @@
                 :class="fullscreen ? 'h-full' : 'border border-solid rounded-sm'">
                 <div
                     class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
-                    <span x-show="searchQuery" x-text="getMatchCount() + ' matches'"
+                    <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
                         class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                    <span x-show="!searchQuery"></span>
+                    <span x-show="!searchQuery.trim()"></span>
                     <div class="flex items-center gap-2">
                         <form wire:submit="getLogs(true)" class="flex items-center">
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
@@ -221,30 +261,47 @@
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
                         <div id="logs" class="font-mono max-w-full cursor-default">
-                            <div x-show="searchQuery && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
                             @foreach (explode("\n", $outputs) as $line)
-                                                @php
-                                                    // Skip empty lines
-                                                    if (trim($line) === '') {
-                                                        continue;
-                                                    }
+                                @php
+                                    // Skip empty lines
+                                    if (trim($line) === '') {
+                                        continue;
+                                    }
 
-                                                    // Escape HTML for safety
-                                                    $escapedLine = htmlspecialchars($line);
-                                                @endphp
-                                                <div data-log-line data-log-content="{{ $escapedLine }}"
-                                                    x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }"
-                                                    x-html="highlightMatch($el.dataset.logContent)"
-                                                    class="break-all hover:bg-gray-100 dark:hover:bg-coolgray-200">
-                                                    {!! preg_replace(
-                                    '/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)/',
-                                    '<span class="text-gray-500 dark:text-gray-400">$1</span>',
-                                    $escapedLine,
-                                ) !!}
-                                                </div>
+                                    // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
+                                    $timestamp = '';
+                                    $logContent = $line;
+                                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s*(.*)$/', $line, $matches)) {
+                                        $year = $matches[1];
+                                        $month = $matches[2];
+                                        $day = $matches[3];
+                                        $time = $matches[4];
+                                        $microseconds = isset($matches[5]) ? substr($matches[5], 0, 6) : '000000';
+                                        $logContent = $matches[6];
+
+                                        // Convert month number to abbreviated name
+                                        $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                        $monthName = $monthNames[(int)$month - 1] ?? $month;
+
+                                        // Format: 2025-Dec-04 09:44:58.198879
+                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}.{$microseconds}";
+                                    }
+
+                                @endphp
+                                <div data-log-line data-log-content="{{ $line }}"
+                                    x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }"
+                                    class="flex gap-2 hover:bg-gray-100 dark:hover:bg-coolgray-500">
+                                    @if ($timestamp)
+                                        <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
+                                    @endif
+                                    <span data-line-text="{{ $logContent }}"
+                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
+                                        class="whitespace-pre-wrap break-all"></span>
+                                </div>
                             @endforeach
                         </div>
                     @else
