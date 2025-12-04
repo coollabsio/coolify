@@ -1,7 +1,8 @@
-<div class="my-4 border dark:border-coolgray-200 border-neutral-200">
+<div class="{{ $collapsible ? 'my-4 border dark:border-coolgray-200 border-neutral-200' : '' }}">
     <div id="screen" x-data="{
-        expanded: {{ $expandByDefault ? 'true' : 'false' }},
-        logsLoaded: {{ $expandByDefault ? 'true' : 'false' }},
+        collapsible: {{ $collapsible ? 'true' : 'false' }},
+        expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
+        logsLoaded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
@@ -139,41 +140,46 @@
             });
         }
     }">
-        <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
-            x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
-            <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg">
-                <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
-            </svg>
-            @if ($displayName)
-                <h4>{{ $displayName }}</h4>
-            @elseif ($resource?->type() === 'application' || str($resource?->type())->startsWith('standalone'))
-                <h4>{{ $container }}</h4>
-            @else
-                <h4>{{ str($container)->beforeLast('-')->headline() }}</h4>
-            @endif
-            @if ($pull_request)
-                <div>({{ $pull_request }})</div>
-            @endif
-            @if ($streamLogs)
-                <x-loading wire:poll.2000ms='getLogs(true)' />
-            @endif
-        </div>
-        <div x-show="expanded" x-collapse
-            :class="fullscreen ? 'fullscreen flex flex-col' : 'relative w-full py-4 mx-auto'">
+        @if ($collapsible)
+            <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
+                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
+                <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                </svg>
+                @if ($displayName)
+                    <h4>{{ $displayName }}</h4>
+                @elseif ($resource?->type() === 'application' || str($resource?->type())->startsWith('standalone'))
+                    <h4>{{ $container }}</h4>
+                @else
+                    <h4>{{ str($container)->beforeLast('-')->headline() }}</h4>
+                @endif
+                @if ($pull_request)
+                    <div>({{ $pull_request }})</div>
+                @endif
+                @if ($streamLogs)
+                    <x-loading wire:poll.2000ms='getLogs(true)' />
+                @endif
+            </div>
+        @endif
+        <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
+            :class="fullscreen ? 'fullscreen flex flex-col' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'">
             <div class="flex flex-col bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300 border-neutral-200"
                 :class="fullscreen ? 'h-full' : 'border border-solid rounded-sm'">
                 <div
                     class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
-                    <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
-                        class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                    <span x-show="!searchQuery.trim()"></span>
                     <div class="flex items-center gap-2">
-                        <form wire:submit="getLogs(true)" class="flex items-center">
+                        <form wire:submit="getLogs(true)" class="relative flex items-center">
+                            <span
+                                class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
                                 title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
-                                class="input input-sm w-20 text-center dark:bg-coolgray-300" />
+                                class="input input-sm w-24 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
+                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                            class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
                         <div class="relative">
                             <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"

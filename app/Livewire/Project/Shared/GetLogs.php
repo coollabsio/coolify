@@ -45,6 +45,8 @@ class GetLogs extends Component
 
     public bool $expandByDefault = false;
 
+    public bool $collapsible = true;
+
     public function mount()
     {
         if (! is_null($this->resource)) {
