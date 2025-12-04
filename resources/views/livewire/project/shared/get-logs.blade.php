@@ -48,13 +48,17 @@
             return line.toLowerCase().includes(this.searchQuery.toLowerCase());
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding
+            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
             let decoded = text;
             let prev = '';
-            while (decoded !== prev) {
+            let iterations = 0;
+            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
+
+            while (decoded !== prev && iterations < maxIterations) {
                 prev = decoded;
                 const doc = new DOMParser().parseFromString(decoded, 'text/html');
                 decoded = doc.documentElement.textContent;
+                iterations++;
             }
             return decoded;
         },
