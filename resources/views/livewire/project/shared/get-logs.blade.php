@@ -299,7 +299,7 @@
                                 <div data-log-line data-log-content="{{ $line }}"
                                     x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }"
                                     class="flex gap-2 hover:bg-gray-100 dark:hover:bg-coolgray-500">
-                                    @if ($timestamp)
+                                    @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
                                     <span data-line-text="{{ $logContent }}"
