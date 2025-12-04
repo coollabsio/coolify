@@ -3,7 +3,7 @@
 # slogan: RustFS is a high-performance distributed storage system built with Rust, compatible with Amazon S3 APIs.
 # category: storage
 # tags: object, storage, server, s3, api, rust
-# logo: svgs/rustfs.svg
+# logo: svgs/rustfs.png
 
 services:
   rustfs:
