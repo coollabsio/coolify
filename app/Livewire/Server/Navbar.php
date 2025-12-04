@@ -67,7 +67,7 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
 
-            // Prevent duplicate restart messages (e.g., from double-click or re-render)
+            // Prevent duplicate restart calls
             if ($this->restartInitiated) {
                 return;
             }
@@ -75,10 +75,6 @@ class Navbar extends Component
 
             // Always use background job for all servers
             RestartProxyJob::dispatch($this->server);
-            // $this->dispatch('info', 'Proxy restart initiated.');
-
-            // Reset the flag after a short delay to allow future restarts
-            $this->restartInitiated = false;
 
         } catch (\Throwable $e) {
             $this->restartInitiated = false;
@@ -145,6 +141,11 @@ class Navbar extends Component
         // If event contains activityId, open activity monitor
         if ($event && isset($event['activityId'])) {
             $this->dispatch('activityMonitor', $event['activityId']);
+        }
+
+        // Reset restart flag when proxy reaches a stable state
+        if (in_array($this->proxyStatus, ['running', 'exited', 'error'])) {
+            $this->restartInitiated = false;
         }
 
         // Skip notification if we already notified about this status (prevents duplicates)

@@ -176,6 +176,7 @@
                         }
                     });
                     $wire.$on('restartEvent', () => {
+                        if ($wire.restartInitiated) return;
                         $wire.$dispatch('info', 'Initiating proxy restart.');
                         window.dispatchEvent(new CustomEvent('startproxy'))
                         $wire.$call('restart');
