@@ -3,10 +3,12 @@
 namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
+use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
 use App\Models\Server;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 
 class StopService
 {
@@ -17,6 +19,17 @@ class StopService
     public function handle(Service $service, bool $deleteConnectedNetworks = false, bool $dockerCleanup = true)
     {
         try {
+            // Cancel any in-progress deployment activities so status doesn't stay stuck at "starting"
+            Activity::where('properties->type_uuid', $service->uuid)
+                ->where(function ($q) {
+                    $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
+                        ->orWhere('properties->status', ProcessStatus::QUEUED->value);
+                })
+                ->each(function ($activity) {
+                    $activity->properties = $activity->properties->put('status', ProcessStatus::CANCELLED->value);
+                    $activity->save();
+                });
+
             $server = $service->destination->server;
             if (! $server->isFunctional()) {
                 return 'Server is not functional';
