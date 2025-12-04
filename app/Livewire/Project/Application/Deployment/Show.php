@@ -64,10 +64,15 @@ class Show extends Component
 
     public function toggleDebug()
     {
-        $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
-        $this->application->settings->save();
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
-        $this->application_deployment_queue->refresh();
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
+            $this->application->settings->save();
+            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+            $this->application_deployment_queue->refresh();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function refreshQueue()
