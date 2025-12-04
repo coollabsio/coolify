@@ -31,6 +31,7 @@ class SslHelper
         $organizationName = self::DEFAULT_ORGANIZATION_NAME;
         $countryName = self::DEFAULT_COUNTRY_NAME;
         $stateName = self::DEFAULT_STATE_NAME;
+        $tempConfig = null;
 
         try {
             $privateKey = openssl_pkey_new([
@@ -113,6 +114,9 @@ class SslHelper
             CONF;
 
             $tempConfig = tmpfile();
+            if ($tempConfig === false) {
+                throw new \RuntimeException('Failed to create temporary configuration file for SSL generation.');
+            }
             fwrite($tempConfig, $config);
             $tempConfigPath = stream_get_meta_data($tempConfig)['uri'];
 
@@ -227,7 +231,9 @@ class SslHelper
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);
         } finally {
-            fclose($tempConfig);
+            if (is_resource($tempConfig)) {
+                fclose($tempConfig);
+            }
         }
     }
 }
