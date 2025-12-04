@@ -1,0 +1,28 @@
+# documentation: https://docs.craftycontrol.com/pages/getting-started/installation/docker/
+# slogan: Open source Minecraft server manager with web-based admin panel.
+# category: gaming
+# tags: minecraft, game-server, server-manager, gaming, java, bedrock
+# logo: svgs/crafty.svg
+# port: 8443
+
+services:
+  crafty:
+    image: registry.gitlab.com/crafty-controller/crafty-4:latest
+    environment:
+      - SERVICE_FQDN_CRAFTY_8443
+      - TZ=${TZ:-Etc/UTC}
+    ports:
+      - "8123:8123"
+      - "19132:19132/udp"
+      - "25565:25565"
+    volumes:
+      - crafty-backups:/crafty/backups
+      - crafty-logs:/crafty/logs
+      - crafty-servers:/crafty/servers
+      - crafty-config:/crafty/app/config
+      - crafty-import:/crafty/import
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsk https://127.0.0.1:8443 || exit 1"]
+      interval: 10s
+      timeout: 20s
+      retries: 5
