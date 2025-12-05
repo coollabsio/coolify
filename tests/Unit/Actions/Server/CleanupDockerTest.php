@@ -202,3 +202,52 @@ it('handles scenario where no container is running', function () {
     // Skip 2, leaving 0 to delete
     expect($imagesToDelete)->toHaveCount(0);
 });
+
+it('handles Docker Compose service images with uuid_servicename pattern', function () {
+    // Docker Compose with build: directive creates images like uuid_servicename:tag
+    $images = collect([
+        ['repository' => 'app-uuid_web', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid_web:commit1'],
+        ['repository' => 'app-uuid_web', 'tag' => 'commit2', 'created_at' => '2024-01-02 10:00:00', 'image_ref' => 'app-uuid_web:commit2'],
+        ['repository' => 'app-uuid_worker', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid_worker:commit1'],
+        ['repository' => 'app-uuid_worker', 'tag' => 'commit2', 'created_at' => '2024-01-02 10:00:00', 'image_ref' => 'app-uuid_worker:commit2'],
+    ]);
+
+    // All images should be categorized as regular images (not PR, not build)
+    $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
+    $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+
+    expect($prImages)->toHaveCount(0);
+    expect($regularImages)->toHaveCount(4);
+});
+
+it('correctly excludes Docker Compose images from general prune', function () {
+    // Test the grep pattern that excludes application images
+    // Pattern should match both uuid:tag and uuid_servicename:tag
+    $appUuid = 'abc123def456';
+    $excludePattern = preg_quote($appUuid, '/');
+
+    // Images that should be EXCLUDED (protected)
+    $protectedImages = [
+        "{$appUuid}:commit1",           // Standard app image
+        "{$appUuid}_web:commit1",       // Docker Compose service
+        "{$appUuid}_worker:commit2",    // Docker Compose service
+    ];
+
+    // Images that should be INCLUDED (deleted)
+    $deletableImages = [
+        'other-app:latest',
+        'nginx:alpine',
+        'postgres:15',
+    ];
+
+    // Test the regex pattern used in buildImagePruneCommand
+    $pattern = "/^({$excludePattern})[_:].+/";
+
+    foreach ($protectedImages as $image) {
+        expect(preg_match($pattern, $image))->toBe(1, "Image {$image} should be protected");
+    }
+
+    foreach ($deletableImages as $image) {
+        expect(preg_match($pattern, $image))->toBe(0, "Image {$image} should be deletable");
+    }
+});

@@ -97,8 +97,9 @@ class CleanupDocker
             // - Are not application images (don't match app repos)
             // - Don't have coolify.managed=true label
             // Images in use by containers will fail silently with docker rmi
+            // Pattern matches both uuid:tag and uuid_servicename:tag (Docker Compose with build)
             $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
-                "grep -v -E '^({$excludePatterns}):' | ".
+                "grep -v -E '^({$excludePatterns})[_:].+' | ".
                 "grep -v '<none>' | ".
                 "xargs -r -I {} sh -c 'docker inspect --format \"{{{{index .Config.Labels \\\"coolify.managed\\\"}}}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
         }
@@ -124,7 +125,8 @@ class CleanupDocker
             $currentTag = trim($currentTag ?? '');
 
             // List all images for this application with their creation timestamps
-            $listCommand = "docker images --format '{{.Repository}}:{{.Tag}}#{{.CreatedAt}}' --filter reference='{$imageRepository}' 2>/dev/null || true";
+            // Use wildcard to match both uuid:tag and uuid_servicename:tag (Docker Compose with build)
+            $listCommand = "docker images --format '{{.Repository}}:{{.Tag}}#{{.CreatedAt}}' --filter reference='{$imageRepository}*' 2>/dev/null || true";
             $output = instant_remote_process([$listCommand], $server, false);
 
             if (empty($output)) {
