@@ -33,6 +33,10 @@ class UpdatePackage
                     $commandAll = 'apt update && apt upgrade -y';
                     $commandInstall = 'apt install -y '.$package;
                     break;
+                case 'nixos':
+                    $commandAll = 'nix-channel --update nixos && nixos-rebuild switch';
+                    $commandInstall = 'nix-channel --update nixos && nixos-rebuild switch';
+                    break;
                 default:
                     return [
                         'error' => 'OS not supported',

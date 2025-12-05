@@ -18,7 +18,7 @@
                     <h2>Server Patching</h2>
                     <span class="text-xs text-neutral-500">(experimental)</span>
                     <x-helper
-                        helper="Only available for apt, dnf and zypper package managers atm, more coming
+                        helper="Only available for apt, dnf, zypper, and nixos package managers atm, more coming
             soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
                     @if (isDev())
                         <x-forms.button type="button" wire:click="sendTestEmail">
@@ -43,13 +43,33 @@
                                     @endif
                                     @if (isset($updates) && count($updates) > 0)
                                         <div class="pb-2">
+                                            @if ($packageManager === 'nixos')
+                                                <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                                                    <div class="flex items-center gap-2 mb-2">
+                                                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                                                            <path fill="currentColor" d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16"/>
+                                                        </svg>
+                                                        <h3 class="font-medium text-yellow-800 dark:text-yellow-200">NixOS System Update Notice</h3>
+                                                    </div>
+                                                    <div class="text-sm text-yellow-700 dark:text-yellow-300">
+                                                        <p class="mb-2">NixOS uses atomic system-wide updates. This will:</p>
+                                                        <ul class="list-disc list-inside space-y-1 ml-2">
+                                                            <li>Update the entire system configuration atomically</li>
+                                                            <li>Rebuild the system with latest channel packages</li>
+                                                            <li>May require system reboot</li>
+                                                            <li>Could temporarily interrupt running services</li>
+                                                        </ul>
+                                                        <p class="mt-2 font-medium">Ensure you have backups and maintenance window available.</p>
+                                                    </div>
+                                                </div>
+                                            @endif
                                             <x-modal-confirmation title="Confirm package update?"
                                                 buttonTitle="Update All
                                             Packages"
                                                 isHighlightedButton submitAction="updateAllPackages" dispatchAction
                                                 :actions="[
                                                     'All packages will be updated to the latest version.',
-                                                    'This action could restart your currently running containers if docker will be updated.',
+                                                    $packageManager === 'nixos' ? 'NixOS will perform atomic system rebuild - services may be interrupted.' : 'This action could restart your currently running containers if docker will be updated.',
                                                 ]" confirmationText="Update All Packages"
                                                 confirmationLabel="Please confirm the execution of the actions by entering the name below"
                                                 shortConfirmationLabel="Name" :confirmWithPassword=false
@@ -70,8 +90,8 @@
                                                         <tr>
                                                             <td>
                                                                 <div class="flex gap-2 items-center">
-                                                                    @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
-                                                                        <x-helper :helper="'This package will restart your currently running containers'">
+                                                                    @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel') || data_get($update, 'is_system_update'))
+                                                                        <x-helper :helper="data_get($update, 'is_system_update') ? 'This is a system-wide update that may interrupt services' : 'This package will restart your currently running containers'">
                                                                             <x-slot:icon>
                                                                                 <svg class="w-4 h-4 text-red-500 block flex-shrink-0"
                                                                                     viewBox="0 0 256 256"
@@ -83,7 +103,12 @@
                                                                             </x-slot:icon>
                                                                         </x-helper>
                                                                     @endif
-                                                                    <span class="break-all">{{ data_get($update, 'package') }}</span>
+                                                                    <div>
+                                                                        <span class="break-all">{{ data_get($update, 'package') }}</span>
+                                                                        @if (data_get($update, 'description'))
+                                                                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ data_get($update, 'description') }}</div>
+                                                                        @endif
+                                                                    </div>
                                                                 </div>
                                                             </td>
                                                             <td class="whitespace-nowrap">
@@ -92,11 +117,19 @@
                                                                     @if ($packageManager !== 'dnf' && data_get($update, 'current_version'))
                                                                         <x-helper helper="Current: {{ data_get($update, 'current_version') }}" />
                                                                     @endif
+                                                                    @if (data_get($update, 'package_count') && data_get($update, 'package_count') !== 'unknown')
+                                                                        <span class="text-xs text-gray-500">({{ data_get($update, 'package_count') }} packages)</span>
+                                                                    @endif
                                                                 </div>
                                                             </td>
                                                             <td class="whitespace-nowrap">
-                                                                <x-forms.button type="button"
-                                                                    wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">Update</x-forms.button>
+                                                                @if ($packageManager === 'nixos')
+                                                                    <x-forms.button type="button"
+                                                                        wire:click="$dispatch('updateAllPackages')">Update System</x-forms.button>
+                                                                @else
+                                                                    <x-forms.button type="button"
+                                                                        wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">Update</x-forms.button>
+                                                                @endif
                                                             </td>
                                                         </tr>
                                                     @endforeach
