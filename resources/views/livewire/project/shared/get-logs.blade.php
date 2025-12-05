@@ -2,7 +2,7 @@
     <div id="screen" x-data="{
         collapsible: {{ $collapsible ? 'true' : 'false' }},
         expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
-        logsLoaded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
+        logsLoaded: false,
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
@@ -156,7 +156,10 @@
             URL.revokeObjectURL(url);
         },
         init() {
-            if (this.expanded) { this.$wire.getLogs(); }
+            if (this.expanded) {
+                this.$wire.getLogs();
+                this.logsLoaded = true;
+            }
             // Re-render logs after Livewire updates
             Livewire.hook('commit', ({ succeed }) => {
                 succeed(() => {

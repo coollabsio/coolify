@@ -122,7 +122,7 @@ class GetLogs extends Component
         if (! $this->server->isFunctional()) {
             return;
         }
-        if (! $refresh && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
+        if (! $refresh && ! $this->expandByDefault && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
         if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
