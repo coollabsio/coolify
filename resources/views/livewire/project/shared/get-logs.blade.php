@@ -6,6 +6,7 @@
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
+        colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
         renderTrigger: 0,
         containerName: '{{ $container ?? "logs" }}',
@@ -43,6 +44,30 @@
                 clearInterval(this.intervalId);
                 this.intervalId = null;
             }
+        },
+        toggleColorLogs() {
+            this.colorLogs = !this.colorLogs;
+            localStorage.setItem('coolify-color-logs', this.colorLogs);
+        },
+        getLogLevel(text) {
+            const lowerText = text.toLowerCase();
+            // Error detection (highest priority)
+            if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(lowerText)) {
+                return 'error';
+            }
+            // Warning detection
+            if (/\b(warn|warning|wrn|caution)\b/.test(lowerText)) {
+                return 'warning';
+            }
+            // Debug detection
+            if (/\b(debug|dbg|trace|verbose)\b/.test(lowerText)) {
+                return 'debug';
+            }
+            // Info detection
+            if (/\b(info|inf|notice)\b/.test(lowerText)) {
+                return 'info';
+            }
+            return null;
         },
         matchesSearch(line) {
             if (!this.searchQuery.trim()) return true;
@@ -174,7 +199,7 @@
                                 class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
                                 title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
-                                class="input input-sm w-24 pl-11 text-center dark:bg-coolgray-300" />
+                                class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
                         <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
@@ -219,6 +244,15 @@
                                 stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                        </button>
+                        <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
+                            :class="colorLogs ? '!text-warning' : ''"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                             </svg>
                         </button>
                         <button wire:click="toggleStreamLogs"
@@ -303,8 +337,14 @@
 
                                 @endphp
                                 <div data-log-line data-log-content="{{ $line }}"
-                                    x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }"
-                                    class="flex gap-2 hover:bg-gray-100 dark:hover:bg-coolgray-500">
+                                    x-bind:class="{
+                                        'hidden': !matchesSearch($el.dataset.logContent),
+                                        'bg-red-500/10 dark:bg-red-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'error',
+                                        'bg-yellow-500/10 dark:bg-yellow-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'warning',
+                                        'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
+                                        'bg-blue-500/10 dark:bg-blue-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'info',
+                                    }"
+                                    class="flex gap-2">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
