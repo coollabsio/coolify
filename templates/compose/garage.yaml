@@ -53,7 +53,7 @@ services:
           admin_token_file = "env:GARAGE_ADMIN_TOKEN"
           metrics_token_file = "env:GARAGE_METRICS_TOKEN"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3903/health"]
+      test: ["CMD", "/garage", "stats", "-a"]
       interval: 10s
       timeout: 5s
       retries: 5
