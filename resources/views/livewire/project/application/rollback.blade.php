@@ -21,18 +21,29 @@
                 <div class="w-2/4 p-2">
                     <div
                         class="bg-white border rounded-sm dark:border-coolgray-300 dark:bg-coolgray-100 border-neutral-200">
+                        @php
+                            $tag = data_get($image, 'tag');
+                            $date = data_get($image, 'created_at');
+                            $interval = \Illuminate\Support\Carbon::parse($date);
+                            // Check if tag looks like a commit SHA (hex string) or PR tag (pr-N)
+                            $isCommitSha = preg_match('/^[0-9a-f]{7,128}$/i', $tag);
+                            $isPrTag = preg_match('/^pr-\d+$/', $tag);
+                            $isRollbackable = $isCommitSha || $isPrTag;
+                        @endphp
                         <div class="p-2">
                             <div class="">
                                 @if (data_get($image, 'is_current'))
                                     <span class="font-bold dark:text-warning">LIVE</span>
                                     |
                                 @endif
-                                SHA: {{ data_get($image, 'tag') }}
+                                @if ($isCommitSha)
+                                    SHA: {{ $tag }}
+                                @elseif ($isPrTag)
+                                    PR: {{ $tag }}
+                                @else
+                                    Tag: {{ $tag }}
+                                @endif
                             </div>
-                            @php
-                                $date = data_get($image, 'created_at');
-                                $interval = \Illuminate\Support\Carbon::parse($date);
-                            @endphp
                             <div class="text-xs">{{ $interval->diffForHumans() }}</div>
                             <div class="text-xs">{{ $date }}</div>
                         </div>
@@ -42,9 +53,13 @@
                                     <x-forms.button disabled tooltip="This image is currently running.">
                                         Rollback
                                     </x-forms.button>
+                                @elseif (!$isRollbackable)
+                                    <x-forms.button disabled tooltip="Rollback not available for '{{ $tag }}' tag. Only commit-based tags support rollback. Re-deploy to create a rollback-enabled image.">
+                                        Rollback
+                                    </x-forms.button>
                                 @else
                                     <x-forms.button class="dark:bg-coolgray-100"
-                                        wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
+                                        wire:click="rollbackImage('{{ $tag }}')">
                                         Rollback
                                     </x-forms.button>
                                 @endif
