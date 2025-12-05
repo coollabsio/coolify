@@ -115,8 +115,10 @@ class CleanupDocker
             $applications = $server->applications();
         }
 
+        $disableRetention = $server->settings->disable_application_image_retention ?? false;
+
         foreach ($applications as $application) {
-            $imagesToKeep = $application->settings->docker_images_to_keep ?? 2;
+            $imagesToKeep = $disableRetention ? 0 : ($application->settings->docker_images_to_keep ?? 2);
             $imageRepository = $application->docker_registry_image_name ?? $application->uuid;
 
             // Get the currently running image tag

@@ -7,12 +7,18 @@
     </div>
     <div class="pb-4">You can easily rollback to a previously built (local) images quickly.</div>
 
+    @if($serverRetentionDisabled)
+        <x-callout type="warning" class="mb-4">
+            Image retention is disabled at the server level. This setting has no effect until the server administrator enables it.
+        </x-callout>
+    @endif
+
     <div class="pb-4">
         <form wire:submit="saveSettings" class="flex items-end gap-2 w-96">
             <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Images to keep for rollback"
-                helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup."
-                canGate="update" :canResource="$application" />
-            <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+                helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable image retention at the server level, which overrides this setting."
+                canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
+            <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">Save</x-forms.button>
         </form>
     </div>
     <div wire:target='loadImages' wire:loading.remove>

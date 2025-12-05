@@ -23,10 +23,14 @@ class Rollback extends Component
     #[Validate(['integer', 'min:0', 'max:100'])]
     public int $dockerImagesToKeep = 2;
 
+    public bool $serverRetentionDisabled = false;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
         $this->dockerImagesToKeep = $this->application->settings->docker_images_to_keep ?? 2;
+        $server = $this->application->destination->server;
+        $this->serverRetentionDisabled = $server->settings->disable_application_image_retention ?? false;
     }
 
     public function saveSettings()
