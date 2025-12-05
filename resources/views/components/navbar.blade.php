@@ -104,6 +104,7 @@
         <li class="flex-1 overflow-x-hidden">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
+                    <livewire:recents-menu />
                     <li>
                         <a title="Dashboard" href="/"
                             class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
