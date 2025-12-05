@@ -2,11 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Events\RecentsUpdated;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\UserRecentPage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -43,6 +45,31 @@ class Dashboard extends Component
     public function refreshPinnedPages(): void
     {
         $this->loadPinnedPages();
+    }
+
+    public function unpinPage(string $url): void
+    {
+        $user = auth()->user();
+        $team = $user?->currentTeam();
+
+        if (! $team) {
+            return;
+        }
+
+        // Rate limit: 10 pins per minute per user
+        $key = 'toggle-pin:'.$user->id;
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            return;
+        }
+        RateLimiter::hit($key, 60);
+
+        UserRecentPage::togglePin($user->id, $team->id, $url);
+
+        // Refresh local state
+        $this->loadPinnedPages();
+
+        // Broadcast update to other tabs/windows (including recents menu)
+        event(new RecentsUpdated($user->id));
     }
 
     public function render()

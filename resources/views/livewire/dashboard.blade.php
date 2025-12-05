@@ -21,19 +21,23 @@
             </div>
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($pinnedPages as $pinned)
-                    <a href="/{{ $pinned['url'] }}" class="gap-2 cursor-pointer coolbox group">
-                        <div class="flex flex-col justify-center mx-6">
+                    <div class="gap-2 coolbox group relative">
+                        <a href="/{{ $pinned['url'] }}" class="flex flex-col justify-center mx-6 flex-1 cursor-pointer">
                             <div class="flex items-center gap-2 box-title">
-                                <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                </svg>
                                 {{ $pinned['label'] }}
                             </div>
                             @if (!empty($pinned['sublabel']))
                                 <div class="box-description">{{ $pinned['sublabel'] }}</div>
                             @endif
-                        </div>
-                    </a>
+                        </a>
+                        <button wire:click="unpinPage('{{ $pinned['url'] }}')"
+                            class="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-coolgray-300 rounded transition-colors"
+                            title="Unpin">
+                            <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                        </button>
+                    </div>
                 @endforeach
             </div>
         </section>
