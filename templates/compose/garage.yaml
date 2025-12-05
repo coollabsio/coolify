@@ -35,8 +35,7 @@ services:
           compression_level = 1
           block_size = "1M"
 
-          [rpc]
-          bind_addr = "[::]:3901"
+          rpc_bind_addr = "[::]:3901"
           rpc_secret_file = "env:GARAGE_RPC_SECRET"
           bootstrap_peers = []
 
