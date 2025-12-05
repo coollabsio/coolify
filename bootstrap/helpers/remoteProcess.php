@@ -118,7 +118,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null): ?string
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -129,8 +129,8 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     $effectiveTimeout = $timeout ?? config('constants.ssh.command_timeout');
 
     return \App\Helpers\SshRetryHandler::retry(
-        function () use ($server, $command_string, $effectiveTimeout) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
+        function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
