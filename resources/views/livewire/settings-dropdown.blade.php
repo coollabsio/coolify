@@ -110,7 +110,7 @@
             class="relative p-2 dark:text-neutral-400 hover:dark:text-white transition-colors cursor-pointer"
             title="Preferences">
             <!-- Sliders Icon -->
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Preferences">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Preferences">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
@@ -230,6 +230,19 @@
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10h4v4h-4v-4z" />
                         </svg>
                         <span>90%</span>
+                    </button>
+
+                    <!-- Recents Section -->
+                    <div
+                        class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
+                        Recents</div>
+                    <button @click="localStorage.setItem('recents_enabled', localStorage.getItem('recents_enabled') === 'false' ? 'true' : 'false'); window.location.reload()"
+                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        <span x-text="localStorage.getItem('recents_enabled') === 'false' ? 'Enable' : 'Disable'"></span>
                     </button>
                 </div>
             </div>
