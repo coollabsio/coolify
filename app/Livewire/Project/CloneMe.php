@@ -212,12 +212,19 @@ class CloneMe extends Component
 
                 $fileStorages = $database->fileStorages()->get();
                 foreach ($fileStorages as $storage) {
+                    // Update fs_path to use new database UUID
+                    $newFsPath = $storage->fs_path;
+                    if ($newFsPath && str_contains($newFsPath, $database->uuid)) {
+                        $newFsPath = str($newFsPath)->replace($database->uuid, $newDatabase->uuid)->toString();
+                    }
+
                     $newStorage = $storage->replicate([
                         'id',
                         'created_at',
                         'updated_at',
                     ])->fill([
                         'resource_id' => $newDatabase->id,
+                        'fs_path' => $newFsPath,
                     ]);
                     $newStorage->save();
                 }
@@ -340,12 +347,19 @@ class CloneMe extends Component
 
                     $fileStorages = $application->fileStorages()->get();
                     foreach ($fileStorages as $storage) {
+                        // Update fs_path to use new service application UUID
+                        $newFsPath = $storage->fs_path;
+                        if ($newFsPath && str_contains($newFsPath, $application->uuid)) {
+                            $newFsPath = str($newFsPath)->replace($application->uuid, $application->uuid)->toString();
+                        }
+
                         $newStorage = $storage->replicate([
                             'id',
                             'created_at',
                             'updated_at',
                         ])->fill([
                             'resource_id' => $application->id,
+                            'fs_path' => $newFsPath,
                         ]);
                         $newStorage->save();
                     }
@@ -394,12 +408,19 @@ class CloneMe extends Component
 
                     $fileStorages = $database->fileStorages()->get();
                     foreach ($fileStorages as $storage) {
+                        // Update fs_path to use new service database UUID
+                        $newFsPath = $storage->fs_path;
+                        if ($newFsPath && str_contains($newFsPath, $database->uuid)) {
+                            $newFsPath = str($newFsPath)->replace($database->uuid, $database->uuid)->toString();
+                        }
+
                         $newStorage = $storage->replicate([
                             'id',
                             'created_at',
                             'updated_at',
                         ])->fill([
                             'resource_id' => $database->id,
+                            'fs_path' => $newFsPath,
                         ]);
                         $newStorage->save();
                     }
@@ -423,7 +444,6 @@ class CloneMe extends Component
 
                 $newService->parse();
             }
-
         } catch (\Exception $e) {
             handleError($e, $this);
 

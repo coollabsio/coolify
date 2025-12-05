@@ -313,12 +313,19 @@ function clone_application(Application $source, $destination, array $overrides =
     // Clone file storages
     $fileStorages = $source->fileStorages()->get();
     foreach ($fileStorages as $storage) {
+        // Update fs_path to use new application UUID
+        $newFsPath = $storage->fs_path;
+        if ($newFsPath && str_contains($newFsPath, $source->uuid)) {
+            $newFsPath = str($newFsPath)->replace($source->uuid, $newApplication->uuid)->toString();
+        }
+
         $newStorage = $storage->replicate([
             'id',
             'created_at',
             'updated_at',
         ])->fill([
             'resource_id' => $newApplication->id,
+            'fs_path' => $newFsPath,
         ]);
         $newStorage->save();
     }
