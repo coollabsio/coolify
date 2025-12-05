@@ -58,6 +58,7 @@ const SPECIFIC_SERVICES = [
     'ghcr.io/coollabsio/minio',
     'coollabsio/minio',
     'svhd/logto',
+    'dxflrs/garage',
 ];
 
 // Based on /etc/os-release
