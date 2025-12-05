@@ -144,8 +144,8 @@ class TrackRecentPages
             return ['label' => $label, 'sublabel' => null];
         }
 
-        // Storage routes
-        if (str_starts_with($routeName, 'storage.')) {
+        // Storage show route (specific storage)
+        if ($routeName === 'storage.show') {
             $uuid = $request->route('storage_uuid');
             if ($uuid) {
                 $storage = S3Storage::where('uuid', $uuid)->first();
