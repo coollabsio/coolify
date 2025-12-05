@@ -76,45 +76,48 @@ class UserRecentPage extends Model
 
     public static function togglePin(int $userId, int $teamId, string $url): bool
     {
-        $record = self::where('user_id', $userId)
-            ->where('team_id', $teamId)
-            ->first();
+        return \DB::transaction(function () use ($userId, $teamId, $url) {
+            $record = self::where('user_id', $userId)
+                ->where('team_id', $teamId)
+                ->lockForUpdate()
+                ->first();
 
-        if (! $record) {
-            return false;
-        }
-
-        $pages = collect($record->pages);
-        $index = $pages->search(fn ($p) => $p['url'] === $url);
-
-        if ($index === false) {
-            return false;
-        }
-
-        $page = $pages[$index];
-        $currentlyPinned = $page['pinned'] ?? false;
-
-        // Check if we can pin (max 5 pinned)
-        if (! $currentlyPinned) {
-            $pinnedCount = $pages->filter(fn ($p) => ! empty($p['pinned']))->count();
-            if ($pinnedCount >= 5) {
-                return false; // Can't pin more
+            if (! $record) {
+                return false;
             }
-        }
 
-        $page['pinned'] = ! $currentlyPinned;
-        $page['pinned_at'] = $page['pinned'] ? now()->toISOString() : null;
+            $pages = collect($record->pages);
+            $index = $pages->search(fn ($p) => $p['url'] === $url);
 
-        $pages[$index] = $page;
+            if ($index === false) {
+                return false;
+            }
 
-        // Re-sort: pinned first (by pinned_at desc), then unpinned (by visited_at desc)
-        $pinned = $pages->filter(fn ($p) => ! empty($p['pinned']))->sortByDesc('pinned_at');
-        $unpinned = $pages->reject(fn ($p) => ! empty($p['pinned']))->sortByDesc('visited_at');
+            $page = $pages[$index];
+            $currentlyPinned = $page['pinned'] ?? false;
 
-        $record->pages = $pinned->merge($unpinned)->values()->all();
-        $record->save();
+            // Check if we can pin (max 5 pinned)
+            if (! $currentlyPinned) {
+                $pinnedCount = $pages->filter(fn ($p) => ! empty($p['pinned']))->count();
+                if ($pinnedCount >= 5) {
+                    return false; // Can't pin more
+                }
+            }
 
-        return $page['pinned'];
+            $page['pinned'] = ! $currentlyPinned;
+            $page['pinned_at'] = $page['pinned'] ? now()->toISOString() : null;
+
+            $pages[$index] = $page;
+
+            // Re-sort: pinned first (by pinned_at desc), then unpinned (by visited_at desc)
+            $pinned = $pages->filter(fn ($p) => ! empty($p['pinned']))->sortByDesc('pinned_at');
+            $unpinned = $pages->reject(fn ($p) => ! empty($p['pinned']))->sortByDesc('visited_at');
+
+            $record->pages = $pinned->merge($unpinned)->values()->all();
+            $record->save();
+
+            return $page['pinned'];
+        });
     }
 
     public static function getRecent(int $userId, int $teamId): array
