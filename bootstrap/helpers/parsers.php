@@ -358,7 +358,7 @@ function parseDockerVolumeString(string $volumeString): array
     ];
 }
 
-function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null): Collection
+function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
@@ -1324,6 +1324,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             ->values();
 
         $payload['env_file'] = $envFiles;
+
+        // Inject commit-based image tag for services with build directive (for rollback support)
+        // Only inject if service has build but no explicit image defined
+        $hasBuild = data_get($service, 'build') !== null;
+        $hasImage = data_get($service, 'image') !== null;
+        if ($hasBuild && ! $hasImage && $commit) {
+            $imageTag = str($commit)->substr(0, 128)->value();
+            if ($isPullRequest) {
+                $imageTag = "pr-{$pullRequestId}";
+            }
+            $imageRepo = "{$uuid}_{$serviceName}";
+            $payload['image'] = "{$imageRepo}:{$imageTag}";
+        }
+
         if ($isPullRequest) {
             $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
