@@ -89,8 +89,9 @@ class CleanupDocker
         } else {
             // Build grep pattern to exclude application image repositories
             $excludePatterns = $applicationImageRepos->map(function ($repo) {
-                // Escape special characters for grep basic regex
-                return preg_quote($repo, '/');
+                // Escape special characters for grep extended regex (ERE)
+                // ERE special chars: . \ + * ? [ ^ ] $ ( ) { } |
+                return preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $repo);
             })->implode('|');
 
             // Delete unused images that:
