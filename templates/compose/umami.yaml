@@ -7,7 +7,7 @@
 
 services:
   umami:
-    image: ghcr.io/umami-software/umami:3.0.1
+    image: ghcr.io/umami-software/umami:3.0.2
     environment:
       - SERVICE_URL_UMAMI_3000
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
