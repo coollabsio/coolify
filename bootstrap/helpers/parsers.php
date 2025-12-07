@@ -1145,11 +1145,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $template = $resource->preview_url_template;
                         $host = $url->getHost();
                         $schema = $url->getScheme();
+                        $portInt = $url->getPort();
+                        $port = $portInt !== null ? ':'.$portInt : '';
                         $random = new Cuid2;
                         $preview_fqdn = str_replace('{{random}}', $random, $template);
                         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                         $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
-                        $preview_fqdn = "$schema://$preview_fqdn";
+                        $preview_fqdn = "$schema://$preview_fqdn{$port}";
                         $preview->fqdn = $preview_fqdn;
                         $preview->save();
 
