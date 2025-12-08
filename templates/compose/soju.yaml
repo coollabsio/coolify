@@ -1,0 +1,49 @@
+# documentation: https://soju.im/
+# slogan: A user-friendly IRC bouncer with a modern web interface
+# category: communication
+# tags: irc, bouncer, chat, messaging, relay
+# logo: svgs/soju.svg
+# port: 80
+
+services:
+  soju:
+    image: codeberg.org/emersion/soju:latest
+    volumes:
+      - soju-db:/db
+      - soju-uploads:/uploads
+      - type: bind
+        source: ./soju/config
+        target: /soju-config
+        content: |
+          db sqlite3 /db/main.db
+          message-store db
+          file-upload fs /uploads/
+          listen irc+insecure://
+          listen http+insecure://
+          listen unix+admin://
+    networks:
+      default:
+        aliases:
+          - gamja-backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 6667 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  gamja:
+    image: codeberg.org/emersion/gamja:latest
+    environment:
+      - SERVICE_FQDN_GAMJA_80
+    depends_on:
+      soju:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  soju-db:
+  soju-uploads:
