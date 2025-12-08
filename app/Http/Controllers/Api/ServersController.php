@@ -513,7 +513,7 @@ class ServersController extends Controller
             $request->offsetSet('instant_validate', false);
         }
         if (is_null($request->start_proxy)) {
-            // Default start_proxy to true when instant_validate is true
+            // Default start_proxy to match instant_validate when not specified
             $request->offsetSet('start_proxy', $request->instant_validate);
         }
         if ($request->proxy_type) {
@@ -556,7 +556,7 @@ class ServersController extends Controller
         }
 
         // Start proxy if requested and not a build server
-        if ($request->start_proxy && ! $request->is_build_server) {
+        if ($request->start_proxy && ! $server->isBuildServer()) {
             try {
                 $proxyShouldRun = CheckProxy::run($server, false);
                 if ($proxyShouldRun) {
