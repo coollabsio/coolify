@@ -160,4 +160,14 @@ class InstallDocker
     {
         return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
     }
+
+    private function getArchDockerInstallCommand(): string
+    {
+        // Use -Syu to perform full system upgrade before installing Docker
+        // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
+        // as they can lead to broken dependencies and system instability
+        return 'pacman -Syu --noconfirm docker docker-compose && '.
+            'systemctl enable docker.service && '.
+            'systemctl start docker.service';
+    }
 }
