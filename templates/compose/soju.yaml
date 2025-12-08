@@ -13,37 +13,24 @@ services:
       - soju-uploads:/uploads
       - type: bind
         source: ./soju/config
-        target: /etc/soju/config
+        target: /soju-config
         content: |
           db sqlite3 /db/main.db
           message-store db
           file-upload fs /uploads/
           listen irc+insecure://0.0.0.0:6667
           listen ws+insecure://0.0.0.0:80
-          listen unix+admin:///run/soju/admin
     networks:
       default:
         aliases:
           - gamja-backend
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 6667 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
   gamja:
     image: codeberg.org/emersion/gamja:latest
     environment:
       - SERVICE_FQDN_GAMJA_80
-      - GAMJA_SERVER=ws://soju:80
     depends_on:
-      soju:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      - soju
 
 volumes:
   soju-db:
