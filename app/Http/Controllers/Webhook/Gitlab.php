@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Webhook;
 
+use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -224,22 +225,22 @@ class Gitlab extends Controller
                     } elseif ($action === 'closed' || $action === 'close' || $action === 'merge') {
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
-                            $found->delete();
-                            $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                            // Use comprehensive cleanup that cancels active deployments,
+                            // kills helper containers, and removes all PR containers
+                            CleanupPreviewDeployment::run($application, $pull_request_id, $found);
+
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'success',
-                                'message' => 'Preview Deployment closed',
+                                'message' => 'Preview deployment closed.',
                             ]);
-
-                            return response($return_payloads);
+                        } else {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'failed',
+                                'message' => 'No preview deployment found.',
+                            ]);
                         }
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'failed',
-                            'message' => 'No Preview Deployment found',
-                        ]);
                     } else {
                         $return_payloads->push([
                             'application' => $application->name,
