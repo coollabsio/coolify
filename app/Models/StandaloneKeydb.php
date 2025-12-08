@@ -44,9 +44,23 @@ class StandaloneKeydb extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for KeyDB databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneKeydb::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all KeyDB databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneKeydb::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute

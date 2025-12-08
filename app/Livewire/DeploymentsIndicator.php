@@ -14,7 +14,7 @@ class DeploymentsIndicator extends Component
     #[Computed]
     public function deployments()
     {
-        $servers = Server::ownedByCurrentTeam()->get();
+        $servers = Server::ownedByCurrentTeamCached();
 
         return ApplicationDeploymentQueue::with(['application.environment.project'])
             ->whereIn('status', ['in_progress', 'queued'])
