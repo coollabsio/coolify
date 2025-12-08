@@ -21,6 +21,13 @@ class UpdatePackage
                 ];
             }
 
+            // Validate that package name is provided when not updating all packages
+            if (! $all && ($package === null || $package === '')) {
+                return [
+                    'error' => "Package name required when 'all' is false.",
+                ];
+            }
+
             // Sanitize package name to prevent command injection
             // Only allow alphanumeric characters, hyphens, underscores, periods, plus signs, and colons
             // These are valid characters in package names across most package managers

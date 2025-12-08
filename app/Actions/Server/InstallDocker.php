@@ -166,7 +166,8 @@ class InstallDocker
         // Use -Syu to perform full system upgrade before installing Docker
         // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
         // as they can lead to broken dependencies and system instability
-        return 'pacman -Syu --noconfirm docker docker-compose && '.
+        // Use --needed to skip reinstalling packages that are already up-to-date (idempotent)
+        return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
     }
