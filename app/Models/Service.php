@@ -712,6 +712,84 @@ class Service extends BaseModel
 
                     $fields->put('MinIO', $data->toArray());
                     break;
+                case $image->contains('garage'):
+                    $data = collect([]);
+                    $s3_api_url = $this->environment_variables()->where('key', 'GARAGE_S3_API_URL')->first();
+                    $web_url = $this->environment_variables()->where('key', 'GARAGE_WEB_URL')->first();
+                    $admin_url = $this->environment_variables()->where('key', 'GARAGE_ADMIN_URL')->first();
+                    $admin_token = $this->environment_variables()->where('key', 'GARAGE_ADMIN_TOKEN')->first();
+                    if (is_null($admin_token)) {
+                        $admin_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGE')->first();
+                    }
+                    $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
+                    if (is_null($rpc_secret)) {
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                    }
+                    $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
+                    if (is_null($metrics_token)) {
+                        $metrics_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGEMETRICS')->first();
+                    }
+
+                    if ($s3_api_url) {
+                        $data = $data->merge([
+                            'S3 API URL' => [
+                                'key' => data_get($s3_api_url, 'key'),
+                                'value' => data_get($s3_api_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($web_url) {
+                        $data = $data->merge([
+                            'Web URL' => [
+                                'key' => data_get($web_url, 'key'),
+                                'value' => data_get($web_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_url) {
+                        $data = $data->merge([
+                            'Admin URL' => [
+                                'key' => data_get($admin_url, 'key'),
+                                'value' => data_get($admin_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_token) {
+                        $data = $data->merge([
+                            'Admin Token' => [
+                                'key' => data_get($admin_token, 'key'),
+                                'value' => data_get($admin_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($rpc_secret) {
+                        $data = $data->merge([
+                            'RPC Secret' => [
+                                'key' => data_get($rpc_secret, 'key'),
+                                'value' => data_get($rpc_secret, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($metrics_token) {
+                        $data = $data->merge([
+                            'Metrics Token' => [
+                                'key' => data_get($metrics_token, 'key'),
+                                'value' => data_get($metrics_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Garage', $data->toArray());
+                    break;
                 case $image->contains('weblate'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
-use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -15,23 +14,6 @@ class Bitbucket extends Controller
     public function manual(Request $request)
     {
         try {
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Bitbicket::manual_bitbucket", $json);
-
-                return;
-            }
             $return_payloads = collect([]);
             $payload = $request->collect();
             $headers = $request->headers->all();

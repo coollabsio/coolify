@@ -5389,7 +5389,6 @@ All notable changes to this project will be documented in this file.
 - Add static ipv4 ipv6 support
 - Server disabled by overflow
 - Preview deployment logs
-- Collect webhooks during maintenance
 - Logs and execute commands with several servers
 
 ### 🐛 Bug Fixes

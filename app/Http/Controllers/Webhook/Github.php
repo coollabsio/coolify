@@ -14,7 +14,6 @@ use App\Models\PrivateKey;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -25,30 +24,6 @@ class Github extends Controller
         try {
             $return_payloads = collect([]);
             $x_github_delivery = request()->header('X-GitHub-Delivery');
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $files = Storage::disk('webhooks-during-maintenance')->files();
-                $github_delivery_found = collect($files)->filter(function ($file) use ($x_github_delivery) {
-                    return Str::contains($file, $x_github_delivery);
-                })->first();
-                if ($github_delivery_found) {
-                    return;
-                }
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::manual_{$x_github_delivery}", $json);
-
-                return;
-            }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
             $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');
@@ -310,30 +285,6 @@ class Github extends Controller
             $return_payloads = collect([]);
             $id = null;
             $x_github_delivery = $request->header('X-GitHub-Delivery');
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $files = Storage::disk('webhooks-during-maintenance')->files();
-                $github_delivery_found = collect($files)->filter(function ($file) use ($x_github_delivery) {
-                    return Str::contains($file, $x_github_delivery);
-                })->first();
-                if ($github_delivery_found) {
-                    return;
-                }
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::normal_{$x_github_delivery}", $json);
-
-                return;
-            }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
             $x_github_hook_installation_target_id = $request->header('X-GitHub-Hook-Installation-Target-Id');
             $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
@@ -624,23 +575,6 @@ class Github extends Controller
     {
         try {
             $installation_id = $request->get('installation_id');
-            if (app()->isDownForMaintenance()) {
-                $epoch = now()->valueOf();
-                $data = [
-                    'attributes' => $request->attributes->all(),
-                    'request' => $request->request->all(),
-                    'query' => $request->query->all(),
-                    'server' => $request->server->all(),
-                    'files' => $request->files->all(),
-                    'cookies' => $request->cookies->all(),
-                    'headers' => $request->headers->all(),
-                    'content' => $request->getContent(),
-                ];
-                $json = json_encode($data);
-                Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::install_{$installation_id}", $json);
-
-                return;
-            }
             $source = $request->get('source');
             $setup_action = $request->get('setup_action');
             $github_app = GithubApp::where('uuid', $source)->firstOrFail();

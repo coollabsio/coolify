@@ -230,7 +230,7 @@
 }
 
 @utility coolbox {
-    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded-lg border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
+    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
 }
 
 @utility on-box {

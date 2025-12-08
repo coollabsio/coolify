@@ -56,18 +56,18 @@
         <h3 class="py-2 pt-4">Advanced</h3>
         <div class="w-96 flex flex-col gap-1">
             @if (str($application->image)->contains('pocketbase'))
-                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isGzipEnabled"
+                <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isGzipEnabled"
                     label="Enable Gzip Compression"
                     helper="Pocketbase does not need gzip compression, otherwise SSE will not work." disabled />
             @else
-                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isGzipEnabled"
+                <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isGzipEnabled"
                     label="Enable Gzip Compression"
                     helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
             @endif
-            <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isStripprefixEnabled"
+            <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isStripprefixEnabled"
                 label="Strip Prefixes"
                 helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api." />
-            <x-forms.checkbox canGate="update" :canResource="$application" instantSave label="Exclude from service status"
+            <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
                 id="excludeFromStatus"></x-forms.checkbox>
             <x-forms.checkbox canGate="update" :canResource="$application"

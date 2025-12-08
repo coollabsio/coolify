@@ -186,3 +186,14 @@ section {
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
+
+.log-highlight {
+    background-color: rgba(234, 179, 8, 0.4);
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.dark .log-highlight {
+    background-color: rgba(234, 179, 8, 0.3);
+}

@@ -620,7 +620,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
-            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
+            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
@@ -670,13 +670,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $build_command = "DOCKER_BUILDKIT=1 {$build_command}";
             }
 
-            // Append build arguments if not using build secrets (matching default behavior)
+            // Inject build arguments after build subcommand if not using build secrets
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
                 // Escape single quotes for bash -c context used by executeInDocker
                 $build_args_string = str_replace("'", "'\\''", $build_args_string);
-                $build_command .= " {$build_args_string}";
-                $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+
+                // Inject build args right after 'build' subcommand (not at the end)
+                $original_command = $build_command;
+                $build_command = injectDockerComposeBuildArgs($build_command, $build_args_string);
+
+                // Only log if build args were actually injected (command was modified)
+                if ($build_command !== $original_command) {
+                    $this->application_deployment_queue->addLogEntry('Adding build arguments to custom Docker Compose build command.');
+                }
             }
 
             $this->execute_remote_command(
@@ -1806,9 +1813,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        }
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
                             $this->newVersionIsHealthy = false;
+                            $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
                             break;
                         }
@@ -2274,13 +2281,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                if (! is_null($env->real_value)) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                if (! is_null($env->real_value)) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
@@ -2289,7 +2296,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Add COOLIFY_* environment variables to Nixpacks build context
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         $coolify_envs->each(function ($value, $key) {
-            $this->env_nixpacks_args->push("--env {$key}={$value}");
+            // Only add environment variables with non-null and non-empty values
+            if (! is_null($value) && $value !== '') {
+                $this->env_nixpacks_args->push("--env {$key}={$value}");
+            }
         });
 
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
@@ -3180,6 +3190,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $this->graceful_shutdown_container($this->container_name);
             }
         } catch (Exception $e) {
+            // If new version is healthy, this is just cleanup - don't fail the deployment
+            if ($this->newVersionIsHealthy || $force) {
+                $this->application_deployment_queue->addLogEntry(
+                    "Warning: Could not remove old container: {$e->getMessage()}",
+                    'stderr',
+                    hidden: true
+                );
+
+                return; // Don't re-throw - cleanup failures shouldn't fail successful deployments
+            }
+
+            // Only re-throw if deployment hasn't succeeded yet
             throw new DeploymentException("Failed to stop running container: {$e->getMessage()}", $e->getCode(), $e);
         }
     }

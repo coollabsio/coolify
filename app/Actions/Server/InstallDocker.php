@@ -78,6 +78,8 @@ class InstallDocker
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('arch')) {
+                $command = $command->merge([$this->getArchDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -144,6 +146,14 @@ class InstallDocker
             'systemctl start docker && '.
             'systemctl enable docker'.
             ')';
+    }
+
+    private function getArchDockerInstallCommand(): string
+    {
+        return 'pacman -Syyy --noconfirm && '.
+            'pacman -S docker docker-compose --noconfirm && '.
+            'systemctl start docker && '.
+            'systemctl enable docker';
     }
 
     private function getGenericDockerInstallCommand(): string

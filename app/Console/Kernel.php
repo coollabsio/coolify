@@ -2,7 +2,6 @@
 
 namespace App\Console;
 
-use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckTraefikVersionJob;
@@ -100,17 +99,7 @@ class Kernel extends ConsoleKernel
         } else {
             $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
         }
-        foreach ($servers as $server) {
-            try {
-                if ($server->isSentinelEnabled()) {
-                    $this->scheduleInstance->job(function () use ($server) {
-                        CheckAndStartSentinelJob::dispatch($server);
-                    })->cron($this->updateCheckFrequency)->timezone($this->instanceTimezone)->onOneServer();
-                }
-            } catch (\Exception $e) {
-                Log::error('Error pulling images: '.$e->getMessage());
-            }
-        }
+        // Sentinel update checks are now handled by ServerManagerJob
         $this->scheduleInstance->job(new CheckHelperImageJob)
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
