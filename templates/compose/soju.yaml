@@ -11,6 +11,7 @@ services:
     volumes:
       - soju-db:/db
       - soju-uploads:/uploads
+      - soju-run:/run/soju
       - type: bind
         source: ./soju/config
         target: /soju-config
@@ -20,6 +21,7 @@ services:
           file-upload fs /uploads/
           listen irc+insecure://0.0.0.0:6667
           listen ws+insecure://0.0.0.0:80
+          listen unix+admin:///run/soju/admin
     networks:
       default:
         aliases:
@@ -35,3 +37,4 @@ services:
 volumes:
   soju-db:
   soju-uploads:
+  soju-run:
