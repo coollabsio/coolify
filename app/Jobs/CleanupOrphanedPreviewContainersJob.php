@@ -179,6 +179,16 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     private function removeContainer($container, Server $server): void
     {
         $containerName = data_get($container, 'Names');
+
+        if (empty($containerName)) {
+            Log::warning('CleanupOrphanedPreviewContainersJob - Cannot remove container: missing container name', [
+                'container_data' => $container,
+                'server' => $server->name,
+            ]);
+
+            return;
+        }
+
         $applicationId = $this->extractApplicationId($container);
         $pullRequestId = $this->extractPullRequestId($container);
 
@@ -189,9 +199,11 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
             'server' => $server->name,
         ]);
 
+        $escapedContainerName = escapeshellarg($containerName);
+
         try {
             instant_remote_process(
-                ["docker rm -f {$containerName}"],
+                ["docker rm -f {$escapedContainerName}"],
                 $server,
                 false
             );
