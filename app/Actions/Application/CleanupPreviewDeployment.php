@@ -157,8 +157,9 @@ class CleanupPreviewDeployment
                     foreach ($containers as $container) {
                         $containerName = data_get($container, 'Names');
                         if ($containerName) {
+                            $escapedContainerName = escapeshellarg($containerName);
                             instant_remote_process(
-                                ["docker rm -f $containerName"],
+                                ["docker rm -f {$escapedContainerName}"],
                                 $server
                             );
                             $killed++;
