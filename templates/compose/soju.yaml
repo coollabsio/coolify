@@ -13,14 +13,14 @@ services:
       - soju-uploads:/uploads
       - type: bind
         source: ./soju/config
-        target: /soju-config
+        target: /etc/soju/config
         content: |
           db sqlite3 /db/main.db
           message-store db
           file-upload fs /uploads/
-          listen irc+insecure://
-          listen http+insecure://
-          listen unix+admin://
+          listen irc+insecure://0.0.0.0:6667
+          listen ws+insecure://0.0.0.0:80
+          listen unix+admin:///run/soju/admin
     networks:
       default:
         aliases:
@@ -35,6 +35,7 @@ services:
     image: codeberg.org/emersion/gamja:latest
     environment:
       - SERVICE_FQDN_GAMJA_80
+      - GAMJA_SERVER=ws://soju:80
     depends_on:
       soju:
         condition: service_healthy
