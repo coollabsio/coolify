@@ -236,7 +236,14 @@ EOD;
         $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
-        $this->container = $this->resource->uuid;
+        
+        // Handle ServiceDatabase container naming differently
+        if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $this->container = $this->resource->name . '-' . $this->resource->service->uuid;
+        } else {
+            $this->container = $this->resource->uuid;
+        }
+        
         if (str(data_get($this, 'resource.status'))->startsWith('running')) {
             $this->containers->push($this->container);
         }
@@ -604,6 +611,39 @@ EOD;
                 $restoreCommand = $this->mongodbRestoreCommand;
                 if ($this->dumpAll === false) {
                     $restoreCommand .= "{$tmpPath}";
+                }
+                break;
+            case \App\Models\ServiceDatabase::class:
+                // Get the database type from ServiceDatabase
+                $dbType = $this->resource->databaseType();
+                
+                // Build restore command based on database type
+                if (str_contains($dbType, 'postgresql') || str_contains($dbType, 'postgres') || str_contains($dbType, 'postgis')) {
+                    // PostgreSQL restore
+                    if ($this->dumpAll) {
+                        $restoreCommand = "psql -U \$POSTGRES_USER -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()\" && \\psql -U \$POSTGRES_USER -t -c \"SELECT datname FROM pg_database WHERE NOT datistemplate\" | xargs -I {} dropdb -U \$POSTGRES_USER --if-exists {} && \\createdb -U \$POSTGRES_USER postgres && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
+                    } else {
+                        $restoreCommand = "pg_restore -U \$POSTGRES_USER -d \$POSTGRES_DB {$tmpPath}";
+                    }
+                } elseif (str_contains($dbType, 'mysql')) {
+                    // MySQL restore
+                    if ($this->dumpAll) {
+                        $restoreCommand = "for pid in $(mysql -u root -p\$MYSQL_ROOT_PASSWORD -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do mysql -u root -p\$MYSQL_ROOT_PASSWORD -e \"KILL \$pid\" 2>/dev/null || true; done && \\mysql -u root -p\$MYSQL_ROOT_PASSWORD -N -e \"SELECT CONCAT('DROP DATABASE IF EXISTS \\\`',schema_name,'\\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');\" | mysql -u root -p\$MYSQL_ROOT_PASSWORD && \\mysql -u root -p\$MYSQL_ROOT_PASSWORD -e \"CREATE DATABASE IF NOT EXISTS \\\`default\\\`;\" && \\(gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | sed -e '/^CREATE DATABASE/d' -e '/^USE \\\`mysql\\\`/d' | mysql -u root -p\$MYSQL_ROOT_PASSWORD default";
+                    } else {
+                        $restoreCommand = "mysql -u \$MYSQL_USER -p\$MYSQL_PASSWORD \$MYSQL_DATABASE < {$tmpPath}";
+                    }
+                } elseif (str_contains($dbType, 'mariadb')) {
+                    // MariaDB restore
+                    if ($this->dumpAll) {
+                        $restoreCommand = "for pid in $(mariadb -u root -p\$MARIADB_ROOT_PASSWORD -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do mariadb -u root -p\$MARIADB_ROOT_PASSWORD -e \"KILL \$pid\" 2>/dev/null || true; done && \\mariadb -u root -p\$MARIADB_ROOT_PASSWORD -N -e \"SELECT CONCAT('DROP DATABASE IF EXISTS \\\`',schema_name,'\\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');\" | mariadb -u root -p\$MARIADB_ROOT_PASSWORD && \\mariadb -u root -p\$MARIADB_ROOT_PASSWORD -e \"CREATE DATABASE IF NOT EXISTS \\\`default\\\`;\" && \\(gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | sed -e '/^CREATE DATABASE/d' -e '/^USE \\\`mysql\\\`/d' | mariadb -u root -p\$MARIADB_ROOT_PASSWORD default";
+                    } else {
+                        $restoreCommand = "mariadb -u \$MARIADB_USER -p\$MARIADB_PASSWORD \$MARIADB_DATABASE < {$tmpPath}";
+                    }
+                } elseif (str_contains($dbType, 'mongo')) {
+                    // MongoDB restore
+                    $restoreCommand = "mongorestore --authenticationDatabase=admin --username \$MONGO_INITDB_ROOT_USERNAME --password \$MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive={$tmpPath}";
+                } else {
+                    $restoreCommand = '';
                 }
                 break;
             default:
