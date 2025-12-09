@@ -17,7 +17,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Visus\Cuid2\Cuid2;
 
 class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -107,17 +106,13 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function performBackup(): void
     {
-        $attempts = 0;
-        do {
-            $this->backup_log_uuid = (string) new Cuid2;
-            $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
-            $attempts++;
-            if ($attempts >= 3 && $exists) {
-                throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
-            }
-        } while ($exists);
+        $this->backup_log_uuid = ScheduledDatabaseBackupExecution::generateUniqueUuid();
 
         $backupType = $this->backup->pgbackrest_backup_type ?? 'full';
+        $repoIndexes = $this->backup->getPgbackrestRepoIndexes();
+
+        $hasLocalRepo = $this->backup->pgbackrestHasLocalRepo();
+        $hasS3Repo = $this->backup->pgbackrestUsesS3();
 
         $this->backup_log = ScheduledDatabaseBackupExecution::create([
             'uuid' => $this->backup_log_uuid,
@@ -125,14 +120,12 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
             'filename' => "pgbackrest:{$this->stanzaName}:{$backupType}",
             'scheduled_database_backup_id' => $this->backup->id,
             'status' => 'running',
-            'local_storage_deleted' => false,
+            'local_storage_deleted' => ! $hasLocalRepo,
+            's3_uploaded' => $hasS3Repo ? false : null,
+            'pgbackrest_repo_indexes' => $repoIndexes,
         ]);
 
         try {
-            if (! $this->database->isPgbackrestEnabled()) {
-                throw new \Exception('pgBackRest is not enabled for this database');
-            }
-
             fixPgbackrestPermissions($this->database);
             $this->assertPostgresReadyForPgbackrest();
             $this->ensureStanzaExists();
@@ -147,6 +140,7 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'size' => $lastBackup['size'] ?? 0,
                 'pgbackrest_label' => $lastBackup['label'] ?? null,
                 'finished_at' => Carbon::now()->toImmutable(),
+                's3_uploaded' => $hasS3Repo ? true : null,
             ]);
 
             $this->team->notify(new BackupSuccess($this->backup, $this->database, $this->database->postgres_db));
@@ -176,8 +170,8 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function assertPostgresReadyForPgbackrest(): void
     {
-        $user = $this->database->postgres_user;
-        $db = $this->database->postgres_db;
+        $user = escapeshellarg($this->database->postgres_user);
+        $db = escapeshellarg($this->database->postgres_db);
 
         $checkCommand = "docker exec {$this->containerName} psql -U {$user} -d {$db} -A -t -F '|' -c \"SELECT name, setting, pending_restart FROM pg_settings WHERE name IN ('archive_mode','wal_level');\"";
 
@@ -186,7 +180,7 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($output === '' || str_contains($output, 'psql:')) {
             throw new \Exception(
-                "Unable to verify PostgreSQL configuration for pgBackRest. ".
+                'Unable to verify PostgreSQL configuration for pgBackRest. '.
                 "Check that the container is running and 'psql' is available."
             );
         }
@@ -301,7 +295,7 @@ class PgbackrestBackupJob implements ShouldBeEncrypted, ShouldQueue
         throw new \Exception($message);
     }
 
-    private function throwBackupFailure(int $exitCode, string $output): void
+    private function throwBackupFailure(int $exitCode, string $output): never
     {
         $logCommand = "docker exec {$this->containerName} cat /var/lib/pgbackrest/log/{$this->stanzaName}-backup.log 2>/dev/null | tail -100";
         $logOutput = instant_remote_process([$logCommand], $this->server, throwError: false);

@@ -8,6 +8,7 @@ use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\StandalonePostgresql;
+use App\Services\PgbackrestService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -163,7 +164,7 @@ class BackupExecutions extends Component
                 if ($database instanceof StandalonePostgresql) {
                     $backupLabel = $this->findBackupLabelForExecution($database, $execution);
                     if ($backupLabel) {
-                        $deleteResult = deletePgbackrestBackup($database, $backupLabel);
+                        $deleteResult = PgbackrestService::for($database)->deleteBackup($backupLabel);
                         if (! $deleteResult['success']) {
                             $this->dispatch('error', $deleteResult['message']);
 
@@ -261,7 +262,7 @@ class BackupExecutions extends Component
             return null;
         }
 
-        $backups = getPgbackrestBackupList($database);
+        $backups = PgbackrestService::for($database)->getBackupList();
         $exists = $backups->contains('label', $execution->pgbackrest_label);
 
         return $exists ? $execution->pgbackrest_label : null;
@@ -289,7 +290,7 @@ class BackupExecutions extends Component
             return ['deletable' => false, 'reason' => 'Backup not found in repository'];
         }
 
-        return isPgbackrestBackupDeletable($database, $backupLabel);
+        return PgbackrestService::for($database)->isBackupDeletable($backupLabel);
     }
 
     public function refreshBackupExecutions(): void

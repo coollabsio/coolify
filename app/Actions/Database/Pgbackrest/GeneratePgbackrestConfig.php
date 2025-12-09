@@ -9,43 +9,68 @@ class GeneratePgbackrestConfig
 {
     use AsAction;
 
+    public static function usesS3(StandalonePostgresql $database): bool
+    {
+        return $database->pgbackrestRepos()
+            ->where('type', 's3')
+            ->exists();
+    }
+
+    public static function hasLocalRepo(StandalonePostgresql $database): bool
+    {
+        return $database->pgbackrestRepos()
+            ->where('type', 'posix')
+            ->exists();
+    }
+
     public function handle(StandalonePostgresql $database): string
     {
         $stanzaName = $database->getPgbackrestStanzaName();
-        $repoType = $database->pgbackrest_repo_type ?? 'posix';
 
-        $retentionFull = $database->pgbackrest_retention_full ?? config('constants.pgbackrest.default_retention_full', 2);
-        $retentionDiff = $database->pgbackrest_retention_diff ?? config('constants.pgbackrest.default_retention_diff', 7);
-        $retentionFullType = $database->pgbackrest_retention_full_type ?? 'count';
-        $retentionArchive = $database->pgbackrest_retention_archive ?? null;
-        $retentionArchiveType = $database->pgbackrest_retention_archive_type ?? 'full';
-        $compressType = $database->pgbackrest_compress_type ?? config('constants.pgbackrest.default_compress_type', 'lz4');
-        $compressLevel = $database->pgbackrest_compress_level ?? config('constants.pgbackrest.default_compress_level', 6);
-        $logLevel = $database->pgbackrest_log_level ?? config('constants.pgbackrest.default_log_level', 'info');
+        $compressType = $database->pgbackrest_compress_type
+            ?? config('constants.pgbackrest.default_compress_type', 'lz4');
+        $compressLevel = $database->pgbackrest_compress_level
+            ?? config('constants.pgbackrest.default_compress_level', 6);
+        $logLevel = $database->pgbackrest_log_level
+            ?? config('constants.pgbackrest.default_log_level', 'info');
+
+        $repos = $database->pgbackrestRepos()
+            ->with('s3Storage')
+            ->orderBy('repo_index')
+            ->get();
 
         $config = [];
-
         $config[] = '[global]';
 
-        if ($repoType === 's3') {
-            $config[] = 'repo1-type=s3';
-            $config[] = "repo1-path=/coolify/{$database->uuid}";
-            $config[] = "repo1-s3-bucket={$database->pgbackrest_s3_bucket}";
-            $config[] = "repo1-s3-endpoint={$database->pgbackrest_s3_endpoint}";
-            $config[] = "repo1-s3-region={$database->pgbackrest_s3_region}";
-            $config[] = 'repo1-s3-uri-style='.($database->pgbackrest_s3_uri_style ?? 'path');
-            $config[] = 'repo1-s3-verify-tls='.($database->pgbackrest_s3_verify_tls ? 'y' : 'n');
-        } else {
-            $config[] = 'repo1-path=/var/lib/pgbackrest';
+        foreach ($repos as $repo) {
+            $idx = $repo->repo_index;
+
+            if ($repo->type === 'posix') {
+                $config[] = "repo{$idx}-path={$repo->path}";
+            } elseif ($repo->type === 's3' && $repo->s3Storage) {
+                $config[] = "repo{$idx}-type=s3";
+                $config[] = "repo{$idx}-path={$repo->path}";
+                $config[] = "repo{$idx}-s3-bucket={$repo->s3Storage->bucket}";
+                $config[] = "repo{$idx}-s3-endpoint={$repo->s3Storage->endpoint}";
+                $config[] = "repo{$idx}-s3-region={$repo->s3Storage->region}";
+                $config[] = "repo{$idx}-s3-uri-style=path";
+            }
+
+            $retentionFull = $repo->retention_full_effective;
+            $retentionDiff = $repo->retention_diff_effective;
+            $retentionFullType = $repo->retention_full_type_effective;
+            $retentionArchive = $repo->retention_archive_effective;
+            $retentionArchiveType = $repo->retention_archive_type_effective;
+
+            $config[] = "repo{$idx}-retention-full-type={$retentionFullType}";
+            $config[] = "repo{$idx}-retention-full={$retentionFull}";
+            $config[] = "repo{$idx}-retention-diff={$retentionDiff}";
+            $config[] = "repo{$idx}-retention-archive-type={$retentionArchiveType}";
+            if ($retentionArchive !== null) {
+                $config[] = "repo{$idx}-retention-archive={$retentionArchive}";
+            }
         }
 
-        $config[] = "repo1-retention-full-type={$retentionFullType}";
-        $config[] = "repo1-retention-full={$retentionFull}";
-        $config[] = "repo1-retention-diff={$retentionDiff}";
-        $config[] = "repo1-retention-archive-type={$retentionArchiveType}";
-        if ($retentionArchive !== null) {
-            $config[] = "repo1-retention-archive={$retentionArchive}";
-        }
         $config[] = "compress-type={$compressType}";
         $config[] = "compress-level={$compressLevel}";
         $config[] = "log-level-console={$logLevel}";
@@ -80,34 +105,41 @@ class GeneratePgbackrestConfig
         ];
     }
 
-    /**
-     * Check if S3 configuration is complete.
-     */
     public static function isS3ConfigComplete(StandalonePostgresql $database): bool
     {
-        if (($database->pgbackrest_repo_type ?? 'posix') !== 's3') {
-            return true;
+        $s3Repos = $database->pgbackrestRepos()
+            ->where('type', 's3')
+            ->with('s3Storage')
+            ->get();
+
+        foreach ($s3Repos as $repo) {
+            if (! $repo->s3Storage || ! $repo->s3Storage->isUsable()) {
+                return false;
+            }
         }
 
-        return ! empty($database->pgbackrest_s3_bucket)
-            && ! empty($database->pgbackrest_s3_endpoint)
-            && ! empty($database->pgbackrest_s3_region)
-            && ! empty($database->pgbackrest_s3_key)
-            && ! empty($database->pgbackrest_s3_secret);
+        return true;
     }
 
-    /**
-     * Get S3 credential environment variables for container use.
-     */
     public static function getS3EnvVars(StandalonePostgresql $database): array
     {
-        if (($database->pgbackrest_repo_type ?? 'posix') !== 's3') {
-            return [];
+        $vars = [];
+
+        $s3Repos = $database->pgbackrestRepos()
+            ->where('type', 's3')
+            ->with('s3Storage')
+            ->get();
+
+        foreach ($s3Repos as $repo) {
+            if (! $repo->s3Storage || ! $repo->s3Storage->isUsable()) {
+                continue;
+            }
+
+            $idx = $repo->repo_index;
+            $vars["PGBACKREST_REPO{$idx}_S3_KEY"] = $repo->s3Storage->key;
+            $vars["PGBACKREST_REPO{$idx}_S3_KEY_SECRET"] = $repo->s3Storage->secret;
         }
 
-        return [
-            'PGBACKREST_REPO1_S3_KEY' => $database->pgbackrest_s3_key,
-            'PGBACKREST_REPO1_S3_KEY_SECRET' => $database->pgbackrest_s3_secret,
-        ];
+        return $vars;
     }
 }

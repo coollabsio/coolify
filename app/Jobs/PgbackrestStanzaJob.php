@@ -85,7 +85,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
                 'stanza' => $stanzaName,
             ]);
 
-            $team = $this->database->team;
+            $team = $this->database->team();
             $team?->notify(new PgbackrestStanzaCreated($this->database));
         } else {
             Log::info('pgBackRest stanza already exists', [
@@ -133,7 +133,7 @@ class PgbackrestStanzaJob implements ShouldBeEncrypted, ShouldQueue
             'error' => $exception->getMessage(),
         ]);
 
-        $team = $this->database->team;
+        $team = $this->database->team();
         $team?->notify(new PgbackrestStanzaFailed($this->database, $exception->getMessage()));
     }
 }

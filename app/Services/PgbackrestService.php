@@ -53,19 +53,23 @@ class PgbackrestService
     }
 
     /**
-     * Get the repository type (posix or s3).
-     */
-    public function getRepoType(): string
-    {
-        return $this->database->pgbackrest_repo_type ?? 'posix';
-    }
-
-    /**
      * Check if using S3 repository.
      */
     public function isS3Repo(): bool
     {
-        return $this->getRepoType() === 's3';
+        return $this->database->pgbackrestRepos()
+            ->where('type', 's3')
+            ->exists();
+    }
+
+    /**
+     * Check if has local repository.
+     */
+    public function hasLocalRepo(): bool
+    {
+        return $this->database->pgbackrestRepos()
+            ->where('type', 'posix')
+            ->exists();
     }
 
     /**
@@ -453,7 +457,8 @@ class PgbackrestService
     {
         $diagnostics = [
             'stanza' => $this->getStanzaName(),
-            'repo_type' => $this->getRepoType(),
+            'has_local_repo' => $this->hasLocalRepo(),
+            'has_s3_repo' => $this->isS3Repo(),
             'backup_label' => $backupLabel ?? 'latest',
             'target_time' => $targetTime,
         ];
@@ -485,7 +490,7 @@ class PgbackrestService
             ];
         }
 
-        if (! $this->isS3Repo() && empty($mounts['pgbackrest_repo'])) {
+        if ($this->hasLocalRepo() && empty($mounts['pgbackrest_repo'])) {
             return [
                 'valid' => false,
                 'message' => 'pgBackRest repository path could not be resolved for local repository.',
@@ -689,7 +694,7 @@ class PgbackrestService
 
         if ($includePaths) {
             $command .= ' --pg1-path=/var/lib/postgresql/data';
-            if (! $this->isS3Repo()) {
+            if ($this->hasLocalRepo()) {
                 $command .= ' --repo1-path=/var/lib/pgbackrest';
             }
         }
@@ -747,7 +752,7 @@ class PgbackrestService
             return '';
         }
 
-        if (! $this->isS3Repo() && empty($mounts['pgbackrest_repo'])) {
+        if ($this->hasLocalRepo() && empty($mounts['pgbackrest_repo'])) {
             if ($throwError) {
                 throw new \RuntimeException('pgBackRest repository path could not be resolved for local repository.');
             }
@@ -758,8 +763,10 @@ class PgbackrestService
         $image = $this->database->image;
         $volumeArgs = "-v {$mounts['pgbackrest_config']}:/etc/pgbackrest ";
 
-        if (! $this->isS3Repo()) {
+        if ($this->hasLocalRepo()) {
             $volumeArgs .= "-v {$mounts['pgbackrest_repo']}:/var/lib/pgbackrest ";
+        } else {
+            $volumeArgs .= '-v pgbackrest-s3-logs-'.escapeshellarg($this->database->uuid).':/var/lib/pgbackrest ';
         }
 
         if ($withDataDir && ! empty($mounts['data_volume'])) {
@@ -774,7 +781,6 @@ class PgbackrestService
                     $envArgs .= ' -e '.escapeshellarg("{$key}={$value}");
                 }
             }
-            $volumeArgs .= '-v pgbackrest-s3-logs-'.escapeshellarg($this->database->uuid).':/var/lib/pgbackrest ';
         }
 
         $cmd = 'docker run --rm '.$envArgs.' '.$volumeArgs.
@@ -809,23 +815,14 @@ class PgbackrestService
      */
     private function resolvePathsFromFilesystem(string $containerName): array
     {
-        $configDir = database_configuration_dir()."/{$containerName}";
-        $defaultConfig = "{$configDir}/pgbackrest";
-        $defaultRepo = "{$configDir}/pgbackrest-repo";
+        $defaultConfig = $this->database->getPgbackrestConfigDir();
+        $defaultRepo = $this->database->getPgbackrestRepoDir();
 
         $checkProdCmd = "test -d {$defaultRepo} && echo 'EXISTS' || echo 'MISSING'";
         $prodCheck = instant_remote_process([$checkProdCmd], $this->server, throwError: false);
 
         if (trim($prodCheck) === 'EXISTS') {
             return ['config' => $defaultConfig, 'repo' => $defaultRepo];
-        }
-
-        $devConfigDir = "/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/{$containerName}";
-        $devCheckCmd = "test -d {$devConfigDir}/pgbackrest-repo && echo 'EXISTS' || echo 'MISSING'";
-        $devCheck = instant_remote_process([$devCheckCmd], $this->server, throwError: false);
-
-        if (trim($devCheck) === 'EXISTS') {
-            return ['config' => "{$devConfigDir}/pgbackrest", 'repo' => "{$devConfigDir}/pgbackrest-repo"];
         }
 
         return ['config' => $defaultConfig, 'repo' => $defaultRepo];
@@ -911,14 +908,25 @@ class PgbackrestService
     {
         $mounts = $this->getMounts();
 
+        $repos = $this->database->pgbackrestRepos()
+            ->with('s3Storage')
+            ->get()
+            ->map(fn ($repo) => [
+                'index' => $repo->repo_index,
+                'type' => $repo->type,
+                'path' => $repo->path,
+                's3_bucket' => $repo->s3Storage?->bucket,
+                's3_endpoint' => $repo->s3Storage?->endpoint,
+                's3_region' => $repo->s3Storage?->region,
+            ])
+            ->toArray();
+
         return [
             'database_uuid' => $this->database->uuid,
             'stanza' => $this->getStanzaName(),
-            'repo_type' => $this->getRepoType(),
-            'is_s3' => $this->isS3Repo(),
-            's3_bucket' => $this->isS3Repo() ? $this->database->pgbackrest_s3_bucket : null,
-            's3_endpoint' => $this->isS3Repo() ? $this->database->pgbackrest_s3_endpoint : null,
-            's3_region' => $this->isS3Repo() ? $this->database->pgbackrest_s3_region : null,
+            'repos' => $repos,
+            'has_local_repo' => $this->hasLocalRepo(),
+            'has_s3_repo' => $this->isS3Repo(),
             'mounts' => $mounts,
             'container_running' => $this->isContainerRunning(),
             'enabled' => $this->isEnabled(),

@@ -61,6 +61,7 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             'repo_type' => $this->service->getRepoType(),
         ]);
 
+        $this->database->update(['pgbackrest_restore_started_at' => now()]);
         $this->updateRestoreStatus('running', 'Running pre-flight checks...');
 
         try {

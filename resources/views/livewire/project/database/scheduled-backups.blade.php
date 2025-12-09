@@ -96,10 +96,16 @@
                                 @if ($backup->save_s3)
                                     • S3: Enabled
                                 @endif
+                                @if ($backup->use_pgbackrest)
+                                    • pgBackRest
+                                @endif
                             @else
                                 Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
                                     • S3: Enabled
+                                @endif
+                                @if ($backup->use_pgbackrest)
+                                    • pgBackRest
                                 @endif
                             @endif
                         </div>
@@ -184,6 +190,9 @@
                                 @if ($backup->save_s3)
                                     • S3: Enabled
                                 @endif
+                                @if ($backup->use_pgbackrest)
+                                    • pgBackRest
+                                @endif
                                 <br>Total Executions: {{ $backup->executions()->count() }}
                                 @php
                                     $successCount = $backup->executions()->where('status', 'success')->count();
@@ -203,6 +212,9 @@
                                 Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
                                     • S3: Enabled
+                                @endif
+                                @if ($backup->use_pgbackrest)
+                                    • pgBackRest
                                 @endif
                             @endif
                         </div>

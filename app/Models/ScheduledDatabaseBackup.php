@@ -99,4 +99,31 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         return $this->executions()->where('status', 'running')->exists();
     }
+
+    public function pgbackrestRepos()
+    {
+        return $this->belongsToMany(
+            PgbackrestRepo::class,
+            'pgbackrest_repo_scheduled_backup'
+        );
+    }
+
+    public function getPgbackrestRepoIndexes(): array
+    {
+        return $this->pgbackrestRepos
+            ->pluck('repo_index')
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function pgbackrestUsesS3(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 's3')->exists();
+    }
+
+    public function pgbackrestHasLocalRepo(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 'posix')->exists();
+    }
 }

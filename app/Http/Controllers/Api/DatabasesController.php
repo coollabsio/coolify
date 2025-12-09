@@ -2837,7 +2837,7 @@ class DatabasesController extends Controller
         }
 
         return response()->json([
-            'enabled' => $database->pgbackrest_enabled ?? false,
+            'enabled' => $database->isPgbackrestEnabled(),
             'retention_full' => $database->pgbackrest_retention_full ?? 2,
             'retention_diff' => $database->pgbackrest_retention_diff ?? 7,
             'log_level' => $database->pgbackrest_log_level ?? 'info',

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\InstanceSettings;
+use App\Models\PgbackrestRepo;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\StandalonePostgresql;
 use Exception;
@@ -89,6 +90,21 @@ class BackupEdit extends Component
     #[Validate(['required', 'string', 'in:full,diff,incr'])]
     public string $pgbackrestBackupType = 'full';
 
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionFull = 2;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionDiff = 7;
+
+    #[Validate(['required', 'string', 'in:count,time'])]
+    public string $pgbackrestRetentionFullType = 'count';
+
+    #[Validate(['nullable', 'integer', 'min:1'])]
+    public ?int $pgbackrestRetentionArchive = null;
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $pgbackrestRetentionArchiveType = 'full';
+
     public bool $pgbackrestAvailable = false;
 
     public function mount()
@@ -100,9 +116,7 @@ class BackupEdit extends Component
 
             $database = $this->backup->database;
             $this->status = $database->status ?? null;
-            if ($database instanceof StandalonePostgresql && $database->isPgbackrestEnabled()) {
-                $this->pgbackrestAvailable = true;
-            }
+            $this->pgbackrestAvailable = $database instanceof StandalonePostgresql;
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -148,6 +162,12 @@ class BackupEdit extends Component
             $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
             $this->customValidate();
             $this->backup->save();
+
+            if ($this->usePgbackrest && $this->pgbackrestAvailable) {
+                $this->syncPgbackrestRepos();
+            } else {
+                $this->backup->pgbackrestRepos()->detach();
+            }
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
@@ -166,7 +186,103 @@ class BackupEdit extends Component
             $this->timeout = $this->backup->timeout;
             $this->usePgbackrest = $this->backup->use_pgbackrest ?? false;
             $this->pgbackrestBackupType = $this->backup->pgbackrest_backup_type ?? 'full';
+
+            $this->loadPgbackrestRetentionFromRepos();
         }
+    }
+
+    private function loadPgbackrestRetentionFromRepos(): void
+    {
+        $repo = $this->backup->pgbackrestRepos()->first();
+        if ($repo) {
+            $this->pgbackrestRetentionFull = $repo->retention_full_effective;
+            $this->pgbackrestRetentionDiff = $repo->retention_diff_effective;
+            $this->pgbackrestRetentionFullType = $repo->retention_full_type_effective;
+            $this->pgbackrestRetentionArchive = $repo->retention_archive_effective;
+            $this->pgbackrestRetentionArchiveType = $repo->retention_archive_type_effective;
+        } else {
+            $this->pgbackrestRetentionFull = config('constants.pgbackrest.default_retention_full', 2);
+            $this->pgbackrestRetentionDiff = config('constants.pgbackrest.default_retention_diff', 7);
+            $this->pgbackrestRetentionFullType = 'count';
+            $this->pgbackrestRetentionArchive = null;
+            $this->pgbackrestRetentionArchiveType = 'full';
+        }
+    }
+
+    private function syncPgbackrestRepos(): void
+    {
+        $database = $this->backup->database;
+        if (! $database instanceof StandalonePostgresql) {
+            return;
+        }
+
+        $needsLocalRepo = ! $this->disableLocalBackup;
+        $needsS3Repo = $this->saveS3 && $this->s3StorageId;
+
+        $repoIdsToAttach = [];
+
+        if ($needsLocalRepo) {
+            $localRepo = $this->findOrCreatePosixRepo($database);
+            $repoIdsToAttach[] = $localRepo->id;
+        }
+
+        if ($needsS3Repo) {
+            $s3Repo = $this->findOrCreateS3Repo($database, (int) $this->s3StorageId);
+            $repoIdsToAttach[] = $s3Repo->id;
+        }
+
+        $this->backup->pgbackrestRepos()->sync($repoIdsToAttach);
+    }
+
+    private function findOrCreatePosixRepo(StandalonePostgresql $database): PgbackrestRepo
+    {
+        $repo = $database->pgbackrestRepos()
+            ->where('type', 'posix')
+            ->first();
+
+        if (! $repo) {
+            $repo = PgbackrestRepo::create([
+                'standalone_postgresql_id' => $database->id,
+                'type' => 'posix',
+                'path' => '/var/lib/pgbackrest',
+            ]);
+        }
+
+        $this->updateRepoRetention($repo);
+
+        return $repo;
+    }
+
+    private function findOrCreateS3Repo(StandalonePostgresql $database, int $s3StorageId): PgbackrestRepo
+    {
+        $repo = $database->pgbackrestRepos()
+            ->where('type', 's3')
+            ->where('s3_storage_id', $s3StorageId)
+            ->first();
+
+        if (! $repo) {
+            $repo = PgbackrestRepo::create([
+                'standalone_postgresql_id' => $database->id,
+                'type' => 's3',
+                'path' => '/pgbackrest/'.$database->uuid,
+                's3_storage_id' => $s3StorageId,
+            ]);
+        }
+
+        $this->updateRepoRetention($repo);
+
+        return $repo;
+    }
+
+    private function updateRepoRetention(PgbackrestRepo $repo): void
+    {
+        $repo->update([
+            'retention_full' => $this->pgbackrestRetentionFull,
+            'retention_diff' => $this->pgbackrestRetentionDiff,
+            'retention_full_type' => $this->pgbackrestRetentionFullType,
+            'retention_archive' => $this->pgbackrestRetentionArchive,
+            'retention_archive_type' => $this->pgbackrestRetentionArchiveType,
+        ]);
     }
 
     public function delete($password)

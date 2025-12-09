@@ -486,7 +486,9 @@ BASH;
     {
         $stanzaName = $this->database->getPgbackrestStanzaName();
 
-        $this->commands[] = "until docker exec {$container_name} pg_isready -U {$this->database->postgres_user} -d {$this->database->postgres_db} > /dev/null 2>&1; do sleep 2; done";
+        $user = escapeshellarg($this->database->postgres_user);
+        $db = escapeshellarg($this->database->postgres_db);
+        $this->commands[] = "until docker exec {$container_name} pg_isready -U {$user} -d {$db} > /dev/null 2>&1; do sleep 2; done";
         $this->commands[] = "STANZA_CHECK=\$(docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} info' 2>&1 || true)";
         $this->commands[] = "if echo \"\$STANZA_CHECK\" | grep -q 'missing stanza'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-create'; elif echo \"\$STANZA_CHECK\" | grep -q 'stanza version'; then docker exec {$container_name} su postgres -c 'pgbackrest --stanza={$stanzaName} stanza-upgrade' 2>/dev/null || true; fi";
     }

@@ -63,6 +63,45 @@
                                     <option value="incr">Incremental</option>
                                 </x-forms.select>
                             </div>
+                            <div class="pt-4" x-data="{ retentionType: '{{ $pgbackrestRetentionFullType }}' }">
+                                <h5 class="font-medium pb-2">pgBackRest Retention</h5>
+                                <p class="text-sm text-neutral-400 pb-3">
+                                    pgBackRest manages its own backup retention. These settings apply to all repositories attached to this schedule.
+                                </p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div>
+                                        <x-forms.select label="Full Retention Type" id="pgbackrestRetentionFullType"
+                                            x-model="retentionType"
+                                            helper="'Count' retains a fixed number of backups. 'Time' retains backups for a number of days.">
+                                            <option value="count">Count (number of backups)</option>
+                                            <option value="time">Time (days)</option>
+                                        </x-forms.select>
+                                    </div>
+                                    <div x-show="retentionType === 'time'">
+                                        <x-forms.input label="Days to Keep Full Backups" id="pgbackrestRetentionFull"
+                                            type="number" min="1"
+                                            helper="Full backups older than this many days will be removed." />
+                                    </div>
+                                    <div x-show="retentionType === 'count'" x-cloak>
+                                        <x-forms.input label="Full Backups to Keep" id="pgbackrestRetentionFull"
+                                            type="number" min="1"
+                                            helper="Number of full backups to retain. Oldest beyond this count are deleted." />
+                                    </div>
+                                    <div>
+                                        <x-forms.input label="Diff Backups to Keep" id="pgbackrestRetentionDiff"
+                                            type="number" min="1"
+                                            helper="Number of differential backups to retain per full backup." />
+                                    </div>
+                                    <div>
+                                        <x-forms.select label="Point-in-Time Recovery" id="pgbackrestRetentionArchiveType"
+                                            helper="Controls WAL archive retention for point-in-time recovery (PITR). 'Standard' lets you restore to any moment in time. 'Minimal' only allows restoring to exact backup points, not times in between - but uses less storage. Backups are always valid regardless of this setting.">
+                                            <option value="full">Standard (restore to any time)</option>
+                                            <option value="diff">Reduced (less PITR range)</option>
+                                            <option value="incr">Minimal (backup points only)</option>
+                                        </x-forms.select>
+                                    </div>
+                                </div>
+                            </div>
                         @endif
                     </div>
                 @endif
@@ -107,46 +146,48 @@
             <x-forms.input label="Timeout" id="timeout" helper="The timeout of the backup job in seconds." />
         </div>
 
-        <h3 class="mt-6 mb-2 text-lg font-medium">Backup Retention Settings</h3>
-        <div class="mb-4">
-            <ul class="list-disc pl-6 space-y-2">
-                <li>Setting a value to 0 means unlimited retention.</li>
-                <li>The retention rules work independently - whichever limit is reached first will trigger cleanup.</li>
-            </ul>
-        </div>
-
-        <div class="flex gap-6 flex-col">
-            <div>
-                <h4 class="mb-3 font-medium">Local Backup Retention</h4>
-                <div class="flex gap-2">
-                    <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountLocally"
-                        type="number" min="0"
-                        helper="Keeps only the specified number of most recent backups on the server. Set to 0 for unlimited backups." />
-                    <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysLocally" type="number"
-                        min="0"
-                        helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit." />
-                    <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageLocally"
-                        type="number" min="0"
-                        helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage." />
-                </div>
+        @if (!$usePgbackrest)
+            <h3 class="mt-6 mb-2 text-lg font-medium">Backup Retention Settings</h3>
+            <div class="mb-4">
+                <ul class="list-disc pl-6 space-y-2">
+                    <li>Setting a value to 0 means unlimited retention.</li>
+                    <li>The retention rules work independently - whichever limit is reached first will trigger cleanup.</li>
+                </ul>
             </div>
 
-            @if ($backup->save_s3)
+            <div class="flex gap-6 flex-col">
                 <div>
-                    <h4 class="mb-3 font-medium">S3 Storage Retention</h4>
+                    <h4 class="mb-3 font-medium">Local Backup Retention</h4>
                     <div class="flex gap-2">
-                        <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountS3"
+                        <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountLocally"
                             type="number" min="0"
-                            helper="Keeps only the specified number of most recent backups on S3 storage. Set to 0 for unlimited backups." />
-                        <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysS3" type="number"
+                            helper="Keeps only the specified number of most recent backups on the server. Set to 0 for unlimited backups." />
+                        <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysLocally" type="number"
                             min="0"
-                            helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit." />
-                        <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageS3"
+                            helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit." />
+                        <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageLocally"
                             type="number" min="0"
-                            helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage." />
+                            helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage." />
                     </div>
                 </div>
-            @endif
-        </div>
+
+                @if ($backup->save_s3)
+                    <div>
+                        <h4 class="mb-3 font-medium">S3 Storage Retention</h4>
+                        <div class="flex gap-2">
+                            <x-forms.input label="Number of backups to keep" id="databaseBackupRetentionAmountS3"
+                                type="number" min="0"
+                                helper="Keeps only the specified number of most recent backups on S3 storage. Set to 0 for unlimited backups." />
+                            <x-forms.input label="Days to keep backups" id="databaseBackupRetentionDaysS3" type="number"
+                                min="0"
+                                helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit." />
+                            <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageS3"
+                                type="number" min="0"
+                                helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage." />
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @endif
     </div>
 </form>

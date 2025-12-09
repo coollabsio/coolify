@@ -26,7 +26,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
-use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -296,16 +295,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
             foreach ($databasesToBackup as $database) {
-                // Generate unique UUID for each database backup execution
-                $attempts = 0;
-                do {
-                    $this->backup_log_uuid = (string) new Cuid2;
-                    $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
-                    $attempts++;
-                    if ($attempts >= 3 && $exists) {
-                        throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
-                    }
-                } while ($exists);
+                $this->backup_log_uuid = ScheduledDatabaseBackupExecution::generateUniqueUuid();
 
                 $size = 0;
                 $localBackupSucceeded = false;
@@ -482,7 +472,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     throw new \Exception('MongoDB credentials not found. Ensure MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD environment variables are available in the container.');
                 }
             }
-            \Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
+            Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             if ($databaseWithCollections === 'all') {
                 $commands[] = 'mkdir -p '.$this->backup_dir;
                 if (str($this->database->image)->startsWith('mongo:4')) {

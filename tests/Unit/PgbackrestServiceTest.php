@@ -141,6 +141,11 @@ it('buildRestoreCommand uses immediate type when no target time', function () {
 });
 
 it('buildRestoreCommand includes paths when includePaths is true', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 'posix')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(true);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
     $service = PgbackrestService::for($this->database);
 
     $command = $service->buildRestoreCommand(null, null, includePaths: true);
@@ -238,4 +243,72 @@ it('clearMountCache returns self for chaining', function () {
     $result = $service->clearMountCache();
 
     expect($result)->toBe($service);
+});
+
+it('isS3Repo returns true when S3 repo exists', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 's3')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(true);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+    expect($service->isS3Repo())->toBeTrue();
+});
+
+it('isS3Repo returns false when no S3 repo exists', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 's3')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(false);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+    expect($service->isS3Repo())->toBeFalse();
+});
+
+it('hasLocalRepo returns true when posix repo exists', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 'posix')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(true);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+    expect($service->hasLocalRepo())->toBeTrue();
+});
+
+it('hasLocalRepo returns false when no posix repo exists', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 'posix')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(false);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+    expect($service->hasLocalRepo())->toBeFalse();
+});
+
+it('buildRestoreCommand includes repo1-path when local repo exists', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 'posix')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(true);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+
+    $command = $service->buildRestoreCommand(null, null, includePaths: true);
+
+    expect($command)->toContain('--repo1-path=/var/lib/pgbackrest');
+    expect($command)->toContain('--pg1-path=/var/lib/postgresql/data');
+});
+
+it('buildRestoreCommand excludes repo1-path when no local repo', function () {
+    $mockRelation = Mockery::mock();
+    $mockRelation->shouldReceive('where')->with('type', 'posix')->andReturnSelf();
+    $mockRelation->shouldReceive('exists')->andReturn(false);
+    $this->database->shouldReceive('pgbackrestRepos')->andReturn($mockRelation);
+
+    $service = PgbackrestService::for($this->database);
+
+    $command = $service->buildRestoreCommand(null, null, includePaths: true);
+
+    expect($command)->not->toContain('--repo1-path=/var/lib/pgbackrest');
+    expect($command)->toContain('--pg1-path=/var/lib/postgresql/data');
 });
