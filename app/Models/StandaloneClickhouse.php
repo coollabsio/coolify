@@ -44,9 +44,23 @@ class StandaloneClickhouse extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for ClickHouse databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneClickhouse::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all ClickHouse databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneClickhouse::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute

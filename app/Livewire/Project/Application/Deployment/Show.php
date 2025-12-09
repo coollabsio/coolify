@@ -18,6 +18,8 @@ class Show extends Component
 
     public $isKeepAliveOn = true;
 
+    public bool $is_debug_enabled = false;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -56,7 +58,21 @@ class Show extends Component
         $this->application_deployment_queue = $application_deployment_queue;
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
+        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
+    }
+
+    public function toggleDebug()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
+            $this->application->settings->save();
+            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+            $this->application_deployment_queue->refresh();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function refreshQueue()

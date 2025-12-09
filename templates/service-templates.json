@@ -1146,6 +1146,24 @@
         "minversion": "0.0.0",
         "port": "5800"
     },
+    "fizzy": {
+        "documentation": "https://github.com/basecamp/fizzy?utm_source=coolify.io",
+        "slogan": "Kanban tracking tool for issues and ideas by 37signals",
+        "compose": "c2VydmljZXM6CiAgZml6enk6CiAgICBpbWFnZTogJ2doY3IuaW8vYmFzZWNhbXAvZml6enk6bWFpbicKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSVpaWV84MAogICAgICAtIFNFQ1JFVF9LRVlfQkFTRT0kU0VSVklDRV9QQVNTV09SRF9GSVpaWQogICAgICAtIFJBSUxTX01BU1RFUl9LRVk9JFNFUlZJQ0VfUEFTU1dPUkRfNjRfTUFTVEVSS0VZCiAgICAgIC0gUkFJTFNfRU5WPXByb2R1Y3Rpb24KICAgICAgLSBSQUlMU19MT0dfVE9fU1RET1VUPXRydWUKICAgICAgLSBSQUlMU19TRVJWRV9TVEFUSUNfRklMRVM9dHJ1ZQogICAgICAtIERBVEFCQVNFX0FEQVBURVI9c3FsaXRlCiAgICAgIC0gU09MSURfUVVFVUVfQ09OTkVDVFNfVE89ZmFsc2UKICAgICAgLSBWQVBJRF9QUklWQVRFX0tFWT0kVkFQSURfUFJJVkFURV9LRVkKICAgICAgLSBWQVBJRF9QVUJMSUNfS0VZPSRWQVBJRF9QVUJMSUNfS0VZCiAgICB2b2x1bWVzOgogICAgICAtICdmaXp6eS1kYXRhOi9yYWlscy9kYicKICAgICAgLSAnZml6enktc3RvcmFnZTovcmFpbHMvc3RvcmFnZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MC91cCcKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMzBzCg==",
+        "tags": [
+            "kanban",
+            "project management",
+            "issues",
+            "rails",
+            "ruby",
+            "basecamp",
+            "37signals"
+        ],
+        "category": "productivity",
+        "logo": "svgs/fizzy.png",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "flipt": {
         "documentation": "https://docs.flipt.io/cloud/overview?utm_source=coolify.io",
         "slogan": "Flipt is a fully managed feature flag solution that enables you to keep your feature flags and remote config next to your code in Git.",
@@ -4280,23 +4298,6 @@
         "minversion": "0.0.0",
         "port": "4242"
     },
-    "unsend": {
-        "documentation": "https://docs.unsend.dev/get-started/self-hosting?utm_source=coolify.io",
-        "slogan": "Unsend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.",
-        "compose": "c2VydmljZXM6CiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1NFUlZJQ0VfREJfUE9TVEdSRVM6LXVuc2VuZH0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgICB2b2x1bWVzOgogICAgICAtICd1bnNlbmQtcG9zdGdyZXMtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgcmVkaXM6CiAgICBpbWFnZTogJ3JlZGlzOjcnCiAgICB2b2x1bWVzOgogICAgICAtICd1bnNlbmQtcmVkaXMtZGF0YTovZGF0YScKICAgIGNvbW1hbmQ6CiAgICAgIC0gcmVkaXMtc2VydmVyCiAgICAgIC0gJy0tbWF4bWVtb3J5LXBvbGljeScKICAgICAgLSBub2V2aWN0aW9uCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSBQSU5HCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMjAKICB1bnNlbmQ6CiAgICBpbWFnZTogJ3Vuc2VuZC91bnNlbmQ6bGF0ZXN0JwogICAgZXhwb3NlOgogICAgICAtIDMwMDAKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9VTlNFTkRfMzAwMAogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXNxbDovLyR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfToke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9QHBvc3RncmVzOjU0MzIvJHtTRVJWSUNFX0RCX1BPU1RHUkVTOi11bnNlbmR9JwogICAgICAtICdORVhUQVVUSF9VUkw9JHtTRVJWSUNFX0ZRRE5fVU5TRU5EfScKICAgICAgLSAnTkVYVEFVVEhfU0VDUkVUPSR7U0VSVklDRV9CQVNFNjRfNjRfTkVYVEFVVEhTRUNSRVR9JwogICAgICAtICdBV1NfQUNDRVNTX0tFWT0ke0FXU19BQ0NFU1NfS0VZOj99JwogICAgICAtICdBV1NfU0VDUkVUX0tFWT0ke0FXU19TRUNSRVRfS0VZOj99JwogICAgICAtICdBV1NfREVGQVVMVF9SRUdJT049JHtBV1NfREVGQVVMVF9SRUdJT046P30nCiAgICAgIC0gJ0dJVEhVQl9JRD0ke0dJVEhVQl9JRH0nCiAgICAgIC0gJ0dJVEhVQl9TRUNSRVQ9JHtHSVRIVUJfU0VDUkVUfScKICAgICAgLSAnUkVESVNfVVJMPXJlZGlzOi8vcmVkaXM6NjM3OScKICAgICAgLSAnTkVYVF9QVUJMSUNfSVNfQ0xPVUQ9JHtORVhUX1BVQkxJQ19JU19DTE9VRDotZmFsc2V9JwogICAgICAtICdBUElfUkFURV9MSU1JVD0ke0FQSV9SQVRFX0xJTUlUOi0xfScKICAgICAgLSBIT1NUTkFNRT0wLjAuMC4wCiAgICBkZXBlbmRzX29uOgogICAgICBwb3N0Z3JlczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgICByZWRpczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICd3Z2V0IC1xTy0gaHR0cDovL3Vuc2VuZDozMDAwIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHJldHJpZXM6IDEwCiAgICAgIHRpbWVvdXQ6IDJzCg==",
-        "tags": [
-            "resend",
-            "mailer",
-            "marketing emails",
-            "transaction emails",
-            "self-hosting",
-            "postmark"
-        ],
-        "category": "messaging",
-        "logo": "svgs/unsend.svg",
-        "minversion": "0.0.0",
-        "port": "3000"
-    },
     "unstructured": {
         "documentation": "https://github.com/Unstructured-IO/unstructured-api?tab=readme-ov-file#--general-pre-processing-pipeline-for-documents?utm_source=coolify.io",
         "slogan": "Unstructured provides a platform and tools to ingest and process unstructured documents for Retrieval Augmented Generation (RAG) and model fine-tuning.",
@@ -4336,6 +4337,23 @@
         "logo": "svgs/uptime-kuma.svg",
         "minversion": "0.0.0",
         "port": "3001"
+    },
+    "usesend": {
+        "documentation": "https://docs.usesend.com/self-hosting/overview?utm_source=coolify.io",
+        "slogan": "Usesend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.",
+        "compose": "c2VydmljZXM6CiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1NFUlZJQ0VfREJfUE9TVEdSRVM6LXVzZXNlbmR9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogICAgdm9sdW1lczoKICAgICAgLSAndXNlc2VuZC1wb3N0Z3Jlcy1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6NycKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3VzZXNlbmQtcmVkaXMtZGF0YTovZGF0YScKICAgIGNvbW1hbmQ6CiAgICAgIC0gcmVkaXMtc2VydmVyCiAgICAgIC0gJy0tbWF4bWVtb3J5LXBvbGljeScKICAgICAgLSBub2V2aWN0aW9uCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gcmVkaXMtY2xpCiAgICAgICAgLSBQSU5HCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMjAKICB1c2VzZW5kOgogICAgaW1hZ2U6ICd1c2VzZW5kL3VzZXNlbmQ6bGF0ZXN0JwogICAgZXhwb3NlOgogICAgICAtIDMwMDAKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9VU0VTRU5EXzMwMDAKICAgICAgLSAnREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly8ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU306JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfUBwb3N0Z3Jlczo1NDMyLyR7U0VSVklDRV9EQl9QT1NUR1JFUzotdXNlc2VuZH0nCiAgICAgIC0gJ05FWFRBVVRIX1VSTD0ke1NFUlZJQ0VfRlFETl9VU0VTRU5EfScKICAgICAgLSAnTkVYVEFVVEhfU0VDUkVUPSR7U0VSVklDRV9CQVNFNjRfNjRfTkVYVEFVVEhTRUNSRVR9JwogICAgICAtICdBV1NfQUNDRVNTX0tFWT0ke0FXU19BQ0NFU1NfS0VZOj99JwogICAgICAtICdBV1NfU0VDUkVUX0tFWT0ke0FXU19TRUNSRVRfS0VZOj99JwogICAgICAtICdBV1NfREVGQVVMVF9SRUdJT049JHtBV1NfREVGQVVMVF9SRUdJT046P30nCiAgICAgIC0gJ0dJVEhVQl9JRD0ke0dJVEhVQl9JRDo/fScKICAgICAgLSAnR0lUSFVCX1NFQ1JFVD0ke0dJVEhVQl9TRUNSRVQ6P30nCiAgICAgIC0gJ1JFRElTX1VSTD1yZWRpczovL3JlZGlzOjYzNzknCiAgICAgIC0gJ05FWFRfUFVCTElDX0lTX0NMT1VEPSR7TkVYVF9QVUJMSUNfSVNfQ0xPVUQ6LWZhbHNlfScKICAgICAgLSAnQVBJX1JBVEVfTElNSVQ9JHtBUElfUkFURV9MSU1JVDotMX0nCiAgICAgIC0gSE9TVE5BTUU9MC4wLjAuMAogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgcmVkaXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tIGh0dHA6Ly91c2VzZW5kOjMwMDAgfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgcmV0cmllczogMTAKICAgICAgdGltZW91dDogMnMK",
+        "tags": [
+            "resend",
+            "mailer",
+            "marketing emails",
+            "transaction emails",
+            "self-hosting",
+            "postmark"
+        ],
+        "category": "messaging",
+        "logo": "svgs/usesend.svg",
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "vaultwarden": {
         "documentation": "https://github.com/dani-garcia/vaultwarden?utm_source=coolify.io",

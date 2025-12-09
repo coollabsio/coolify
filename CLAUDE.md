@@ -222,6 +222,7 @@ class MyComponent extends Component
 - Queue heavy operations
 - Optimize database queries with proper indexes
 - Use chunking for large data operations
+- **CRITICAL**: Use `ownedByCurrentTeamCached()` instead of `ownedByCurrentTeam()->get()`
 
 ### Code Style
 - Follow PSR-12 coding standards
@@ -318,3 +319,4 @@ This file contains high-level guidelines for Claude Code. For **more detailed, t
 
 Random other things you should remember:
 - App\Models\Application::team must return a relationship instance., always use team()
+- Always use `Model::ownedByCurrentTeamCached()` instead of `Model::ownedByCurrentTeam()->get()` for team-scoped queries to avoid duplicate database queries

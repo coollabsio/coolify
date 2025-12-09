@@ -312,6 +312,36 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
                 $LOGTO_ADMIN_ENDPOINT->value.':3002',
             ]);
             break;
+        case $type?->contains('garage'):
+            $GARAGE_S3_API_URL = $variables->where('key', 'GARAGE_S3_API_URL')->first();
+            $GARAGE_WEB_URL = $variables->where('key', 'GARAGE_WEB_URL')->first();
+            $GARAGE_ADMIN_URL = $variables->where('key', 'GARAGE_ADMIN_URL')->first();
+
+            if (is_null($GARAGE_S3_API_URL) || is_null($GARAGE_WEB_URL) || is_null($GARAGE_ADMIN_URL)) {
+                return collect([]);
+            }
+
+            if (str($GARAGE_S3_API_URL->value ?? '')->isEmpty()) {
+                $GARAGE_S3_API_URL->update([
+                    'value' => generateUrl(server: $server, random: 's3-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_WEB_URL->value ?? '')->isEmpty()) {
+                $GARAGE_WEB_URL->update([
+                    'value' => generateUrl(server: $server, random: 'web-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_ADMIN_URL->value ?? '')->isEmpty()) {
+                $GARAGE_ADMIN_URL->update([
+                    'value' => generateUrl(server: $server, random: 'admin-'.$uuid, forceHttps: true),
+                ]);
+            }
+            $payload = collect([
+                $GARAGE_S3_API_URL->value.':3900',
+                $GARAGE_WEB_URL->value.':3902',
+                $GARAGE_ADMIN_URL->value.':3903',
+            ]);
+            break;
     }
 
     return $payload;
@@ -770,10 +800,26 @@ function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
     }
     $imageName = $image->before(':');
 
-    // First check if it's a known database image
+    // Extract base image name (ignore registry prefix)
+    // Examples:
+    //   docker.io/library/postgres -> postgres
+    //   ghcr.io/postgrest/postgrest -> postgrest
+    //   postgres -> postgres
+    //   postgrest/postgrest -> postgrest
+    $baseImageName = $imageName;
+    if (str($imageName)->contains('/')) {
+        $baseImageName = str($imageName)->afterLast('/');
+    }
+
+    // Check if base image name exactly matches a known database image
     $isKnownDatabase = false;
     foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
-        if (str($imageName)->contains($database_docker_image)) {
+        // Extract base name from database pattern for comparison
+        $databaseBaseName = str($database_docker_image)->contains('/')
+            ? str($database_docker_image)->afterLast('/')
+            : $database_docker_image;
+
+        if ($baseImageName == $databaseBaseName) {
             $isKnownDatabase = true;
             break;
         }

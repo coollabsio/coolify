@@ -21,7 +21,7 @@
                 <div class="flex flex-col justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
                         <div class="flex">
-                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 coolbox"
+                            <div class="w-full gap-2 py-4 group coolbox"
                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
                                 wire:key="{{ $ghapp->id }}">
                                 <div class="flex mr-4">
@@ -95,15 +95,35 @@
                                     @endif
                                 </div>
                                 @if ($build_pack === 'dockercompose')
-                                    <div x-data="{ baseDir: '{{ $base_directory }}', composeLocation: '{{ $docker_compose_location }}' }" class="gap-2 flex flex-col">
-                                        <x-forms.input placeholder="/" wire:model.blur="base_directory"
+                                    <div x-data="{
+                                        baseDir: '{{ $base_directory }}',
+                                        composeLocation: '{{ $docker_compose_location }}',
+                                        normalizePath(path) {
+                                            if (!path || path.trim() === '') return '/';
+                                            path = path.trim();
+                                            // Remove trailing slashes
+                                            path = path.replace(/\/+$/, '');
+                                            // Ensure leading slash
+                                            if (!path.startsWith('/')) {
+                                                path = '/' + path;
+                                            }
+                                            return path;
+                                        },
+                                        normalizeBaseDir() {
+                                            this.baseDir = this.normalizePath(this.baseDir);
+                                        },
+                                        normalizeComposeLocation() {
+                                            this.composeLocation = this.normalizePath(this.composeLocation);
+                                        }
+                                    }" class="gap-2 flex flex-col">
+                                        <x-forms.input placeholder="/" wire:model.defer="base_directory"
                                             label="Base Directory"
-                                            helper="Directory to use as root. Useful for monorepos."
-                                            x-model="baseDir" />
+                                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
+                                            @blur="normalizeBaseDir()" />
                                         <x-forms.input placeholder="/docker-compose.yaml"
-                                            wire:model.blur="docker_compose_location" label="Docker Compose Location"
+                                            wire:model.defer="docker_compose_location" label="Docker Compose Location"
                                             helper="It is calculated together with the Base Directory."
-                                            x-model="composeLocation" />
+                                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
                                         <div class="pt-2">
                                             <span>
                                                 Compose file location in your repository: </span><span
