@@ -45,9 +45,23 @@ class StandalonePostgresql extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for PostgreSQL databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandalonePostgresql::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all PostgreSQL databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandalonePostgresql::ownedByCurrentTeam()->get();
+        });
     }
 
     public function workdir()

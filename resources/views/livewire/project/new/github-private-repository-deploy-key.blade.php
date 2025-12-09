@@ -7,7 +7,7 @@
             <div class="flex flex-col justify-center gap-2 text-left ">
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 coolbox"
+                        <div class="gap-2 py-4 cursor-pointer group coolbox"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -20,7 +20,7 @@
                             </div>
                         </div>
                     @else
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 coolbox"
+                        <div class="gap-2 py-4 cursor-pointer group coolbox"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -61,12 +61,33 @@
                     @endif
                 </div>
                 @if ($build_pack === 'dockercompose')
-                    <div x-data="{ baseDir: '{{ $base_directory }}', composeLocation: '{{ $docker_compose_location }}' }" class="gap-2 flex flex-col">
-                        <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
-                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir" />
-                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.blur="docker_compose_location"
+                    <div x-data="{
+                        baseDir: '{{ $base_directory }}',
+                        composeLocation: '{{ $docker_compose_location }}',
+                        normalizePath(path) {
+                            if (!path || path.trim() === '') return '/';
+                            path = path.trim();
+                            // Remove trailing slashes
+                            path = path.replace(/\/+$/, '');
+                            // Ensure leading slash
+                            if (!path.startsWith('/')) {
+                                path = '/' + path;
+                            }
+                            return path;
+                        },
+                        normalizeBaseDir() {
+                            this.baseDir = this.normalizePath(this.baseDir);
+                        },
+                        normalizeComposeLocation() {
+                            this.composeLocation = this.normalizePath(this.composeLocation);
+                        }
+                    }" class="gap-2 flex flex-col">
+                        <x-forms.input placeholder="/" wire:model.defer="base_directory" label="Base Directory"
+                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
+                            @blur="normalizeBaseDir()" />
+                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.defer="docker_compose_location"
                             label="Docker Compose Location" helper="It is calculated together with the Base Directory."
-                            x-model="composeLocation" />
+                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
                         <div class="pt-2">
                             <span>
                                 Compose file location in your repository: </span><span class='dark:text-warning'

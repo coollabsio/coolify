@@ -75,16 +75,6 @@ class GithubPrivateRepository extends Component
         $this->github_apps = GithubApp::private();
     }
 
-    public function updatedBaseDirectory()
-    {
-        if ($this->base_directory) {
-            $this->base_directory = rtrim($this->base_directory, '/');
-            if (! str($this->base_directory)->startsWith('/')) {
-                $this->base_directory = '/'.$this->base_directory;
-            }
-        }
-    }
-
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {

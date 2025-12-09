@@ -40,7 +40,7 @@ class Show extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $container = null;
 
-    #[Validate(['integer', 'required', 'min:60', 'max:3600'])]
+    #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
     #[Locked]
@@ -72,7 +72,7 @@ class Show extends Component
             } elseif ($service_uuid) {
                 $this->type = 'service';
                 $this->service_uuid = $service_uuid;
-                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $service_uuid)->firstOrFail();
+                $this->resource = Service::ownedByCurrentTeamCached()->where('uuid', $service_uuid)->firstOrFail();
             }
             $this->parameters = [
                 'environment_uuid' => $environment_uuid,
