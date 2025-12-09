@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Services\DatabaseOperationLockService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -67,7 +68,7 @@ class Import extends Component
     private function validateServerPath(string $path): bool
     {
         // Must be an absolute path
-        if (! str_starts_with($path, '/')) {
+        if (!str_starts_with($path, '/')) {
             return false;
         }
 
@@ -187,7 +188,7 @@ mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF 
 mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`default\`;" && \
 (gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mariadb -u root -p$MARIADB_ROOT_PASSWORD default
 EOD;
-                    $this->restoreCommandText = $this->mariadbRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mariadb -u root -p$MARIADB_ROOT_PASSWORD default';
+                    $this->restoreCommandText = $this->mariadbRestoreCommand . ' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mariadb -u root -p$MARIADB_ROOT_PASSWORD default';
                 } else {
                     $this->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
                 }
@@ -202,7 +203,7 @@ mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT CONCAT('DROP DATABASE IF EXIS
 mysql -u root -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`default\`;" && \
 (gunzip -cf $tmpPath 2>/dev/null || cat $tmpPath) | sed -e '/^CREATE DATABASE/d' -e '/^USE \`mysql\`/d' | mysql -u root -p$MYSQL_ROOT_PASSWORD default
 EOD;
-                    $this->restoreCommandText = $this->mysqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mysql -u root -p$MYSQL_ROOT_PASSWORD default';
+                    $this->restoreCommandText = $this->mysqlRestoreCommand . ' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mysql -u root -p$MYSQL_ROOT_PASSWORD default';
                 } else {
                     $this->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
                 }
@@ -214,7 +215,7 @@ psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activit
 psql -U $POSTGRES_USER -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U $POSTGRES_USER --if-exists {} && \
 createdb -U $POSTGRES_USER postgres
 EOD;
-                    $this->restoreCommandText = $this->postgresqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U $POSTGRES_USER postgres';
+                    $this->restoreCommandText = $this->postgresqlRestoreCommand . ' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U $POSTGRES_USER postgres';
                 } else {
                     $this->postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
                 }
@@ -226,24 +227,31 @@ EOD;
     public function getContainers()
     {
         $this->containers = collect();
-        if (! data_get($this->parameters, 'database_uuid')) {
-            abort(404);
+
+        // If resource was passed directly (e.g., from ServiceDatabase blade template), use it
+        // Otherwise, look up by route parameter (for standalone databases)
+        if (!$this->resource) {
+            if (!data_get($this->parameters, 'database_uuid')) {
+                abort(404);
+            }
+            $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
+            if (is_null($resource)) {
+                abort(404);
+            }
+            $this->resource = $resource;
         }
-        $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
-        if (is_null($resource)) {
-            abort(404);
-        }
-        $this->authorize('view', $resource);
-        $this->resource = $resource;
-        $this->server = $this->resource->destination->server;
-        
-        // Handle ServiceDatabase container naming differently
+
+        $this->authorize('view', $this->resource);
+
+        // Get server - handle both standalone and service databases
         if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $this->server = $this->resource->service->destination->server;
             $this->container = $this->resource->name . '-' . $this->resource->service->uuid;
         } else {
+            $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
         }
-        
+
         if (str(data_get($this, 'resource.status'))->startsWith('running')) {
             $this->containers->push($this->container);
         }
@@ -262,7 +270,7 @@ EOD;
     {
         if (filled($this->customLocation)) {
             // Validate the custom location to prevent command injection
-            if (! $this->validateServerPath($this->customLocation)) {
+            if (!$this->validateServerPath($this->customLocation)) {
                 $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
 
                 return;
@@ -294,6 +302,14 @@ EOD;
             return;
         }
         try {
+            // Acquire lock to prevent deployments during import
+            if (!DatabaseOperationLockService::acquireLock($this->resource, 'import')) {
+                $lockInfo = DatabaseOperationLockService::getLockInfo($this->resource);
+                $operation = $lockInfo['operation'] ?? 'unknown';
+                $this->dispatch('error', "A {$operation} operation is already in progress. Please wait for it to complete.");
+                return;
+            }
+
             $this->importRunning = true;
             $this->importCommands = [];
             $backupFileName = "upload/{$this->resource->uuid}/restore";
@@ -301,18 +317,18 @@ EOD;
             // Check if an uploaded file exists first (takes priority over custom location)
             if (Storage::exists($backupFileName)) {
                 $path = Storage::path($backupFileName);
-                $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
+                $tmpPath = '/tmp/' . basename($backupFileName) . '_' . $this->resource->uuid;
                 instant_scp($path, $tmpPath, $this->server);
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
             } elseif (filled($this->customLocation)) {
                 // Validate the custom location to prevent command injection
-                if (! $this->validateServerPath($this->customLocation)) {
+                if (!$this->validateServerPath($this->customLocation)) {
                     $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters.');
 
                     return;
                 }
-                $tmpPath = '/tmp/restore_'.$this->resource->uuid;
+                $tmpPath = '/tmp/restore_' . $this->resource->uuid;
                 $escapedCustomLocation = escapeshellarg($this->customLocation);
                 $this->importCommands[] = "docker cp {$escapedCustomLocation} {$this->container}:{$tmpPath}";
             } else {
@@ -334,12 +350,14 @@ EOD;
             $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
             $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
-            if (! empty($this->importCommands)) {
+            if (!empty($this->importCommands)) {
                 $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'RestoreJobFinished', callEventData: [
                     'scriptPath' => $scriptPath,
                     'tmpPath' => $tmpPath,
                     'container' => $this->container,
                     'serverId' => $this->server->id,
+                    'resourceClass' => $this->resource->getMorphClass(),
+                    'resourceId' => $this->resource->id,
                 ]);
 
                 // Track the activity ID
@@ -350,6 +368,8 @@ EOD;
                 $this->dispatch('databaserestore');
             }
         } catch (\Throwable $e) {
+            // Release lock on error
+            DatabaseOperationLockService::releaseLock($this->resource);
             return handleError($e, $this);
         } finally {
             $this->filename = null;
@@ -387,7 +407,7 @@ EOD;
 
     public function checkS3File()
     {
-        if (! $this->s3StorageId) {
+        if (!$this->s3StorageId) {
             $this->dispatch('error', 'Please select an S3 storage.');
 
             return;
@@ -403,7 +423,7 @@ EOD;
         $cleanPath = ltrim($this->s3Path, '/');
 
         // Validate the S3 path early to prevent command injection in subsequent operations
-        if (! $this->validateS3Path($cleanPath)) {
+        if (!$this->validateS3Path($cleanPath)) {
             $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
 
             return;
@@ -413,7 +433,7 @@ EOD;
             $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
-            if (! $this->validateBucketName($s3Storage->bucket)) {
+            if (!$this->validateBucketName($s3Storage->bucket)) {
                 $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
 
                 return;
@@ -434,7 +454,7 @@ EOD;
             ]);
 
             // Check if file exists
-            if (! $disk->exists($cleanPath)) {
+            if (!$disk->exists($cleanPath)) {
                 $this->dispatch('error', 'File not found in S3. Please check the path.');
 
                 return;
@@ -443,7 +463,7 @@ EOD;
             // Get file size
             $this->s3FileSize = $disk->size($cleanPath);
 
-            $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
+            $this->dispatch('success', 'File found in S3. Size: ' . formatBytes($this->s3FileSize));
         } catch (\Throwable $e) {
             $this->s3FileSize = null;
 
@@ -455,7 +475,7 @@ EOD;
     {
         $this->authorize('update', $this->resource);
 
-        if (! $this->s3StorageId || blank($this->s3Path)) {
+        if (!$this->s3StorageId || blank($this->s3Path)) {
             $this->dispatch('error', 'Please select S3 storage and provide a path first.');
 
             return;
@@ -468,6 +488,14 @@ EOD;
         }
 
         try {
+            // Acquire lock to prevent deployments during import
+            if (!DatabaseOperationLockService::acquireLock($this->resource, 'import')) {
+                $lockInfo = DatabaseOperationLockService::getLockInfo($this->resource);
+                $operation = $lockInfo['operation'] ?? 'unknown';
+                $this->dispatch('error', "A {$operation} operation is already in progress. Please wait for it to complete.");
+                return;
+            }
+
             $this->importRunning = true;
 
             $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
@@ -478,7 +506,7 @@ EOD;
             $endpoint = $s3Storage->endpoint;
 
             // Validate bucket name to prevent command injection
-            if (! $this->validateBucketName($bucket)) {
+            if (!$this->validateBucketName($bucket)) {
                 $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
 
                 return;
@@ -488,7 +516,7 @@ EOD;
             $cleanPath = ltrim($this->s3Path, '/');
 
             // Validate the S3 path to prevent command injection
-            if (! $this->validateS3Path($cleanPath)) {
+            if (!$this->validateS3Path($cleanPath)) {
                 $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
 
                 return;
@@ -504,9 +532,9 @@ EOD;
 
             // Generate unique names for this operation
             $containerName = "s3-restore-{$this->resource->uuid}";
-            $helperTmpPath = '/tmp/'.basename($cleanPath);
-            $serverTmpPath = "/tmp/s3-restore-{$this->resource->uuid}-".basename($cleanPath);
-            $containerTmpPath = "/tmp/restore_{$this->resource->uuid}-".basename($cleanPath);
+            $helperTmpPath = '/tmp/' . basename($cleanPath);
+            $serverTmpPath = "/tmp/s3-restore-{$this->resource->uuid}-" . basename($cleanPath);
+            $containerTmpPath = "/tmp/restore_{$this->resource->uuid}-" . basename($cleanPath);
             $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
 
             // Prepare all commands in sequence
@@ -564,6 +592,8 @@ EOD;
                 'containerTmpPath' => $containerTmpPath,
                 'container' => $this->container,
                 'serverId' => $this->server->id,
+                'resourceClass' => $this->resource->getMorphClass(),
+                'resourceId' => $this->resource->id,
             ]);
 
             // Track the activity ID
@@ -575,6 +605,8 @@ EOD;
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (\Throwable $e) {
             $this->importRunning = false;
+            // Release lock on error
+            DatabaseOperationLockService::releaseLock($this->resource);
 
             return handleError($e, $this);
         }
@@ -616,7 +648,7 @@ EOD;
             case \App\Models\ServiceDatabase::class:
                 // Get the database type from ServiceDatabase
                 $dbType = $this->resource->databaseType();
-                
+
                 // Build restore command based on database type
                 if (str_contains($dbType, 'postgresql') || str_contains($dbType, 'postgres') || str_contains($dbType, 'postgis')) {
                     // PostgreSQL restore
