@@ -201,8 +201,13 @@ class BackupExecutions extends Component
         $executionId = (int) trim((string) $executionId, "'\"");
         $execution = ScheduledDatabaseBackupExecution::find($executionId);
 
+        $this->showRestoreProgress = true;
+        $this->restoreStatus = 'running';
+        $this->restoreMessage = 'Validating restore request...';
+
         if (! $execution) {
-            $this->dispatch('error', 'Backup execution not found.');
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = 'Backup execution not found.';
 
             return;
         }
@@ -210,7 +215,8 @@ class BackupExecutions extends Component
         $database = $this->database;
 
         if (! $database instanceof StandalonePostgresql) {
-            $this->dispatch('error', 'pgBackRest restore is only available for PostgreSQL databases.');
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = 'pgBackRest restore is only available for PostgreSQL databases.';
 
             return;
         }
@@ -218,14 +224,16 @@ class BackupExecutions extends Component
         $this->authorize('update', $database);
 
         if (! $database->isPgbackrestEnabled()) {
-            $this->dispatch('error', 'pgBackRest is not enabled for this database.');
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = 'pgBackRest is not enabled for this database.';
 
             return;
         }
 
         $filename = $execution->filename;
         if (! str_starts_with($filename, 'pgbackrest:')) {
-            $this->dispatch('error', 'This is not a pgBackRest backup.');
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = 'This is not a pgBackRest backup.';
 
             return;
         }
@@ -233,27 +241,28 @@ class BackupExecutions extends Component
         $backupLabel = $execution->pgbackrest_label;
 
         if (empty($backupLabel)) {
-            $this->dispatch('error', 'This backup does not have a pgBackRest label stored. It may be from an older version.');
-
-            return;
-        }
-
-        $restoreAction = new RestoreFromPgbackrest;
-        $validation = $restoreAction->validateRestore($database, $backupLabel);
-
-        if (! $validation['valid']) {
-            $this->dispatch('error', $validation['message']);
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = 'This backup does not have a pgBackRest label stored. It may be from an older version.';
 
             return;
         }
 
         $this->restoreBackupLabel = $backupLabel;
-        $this->restoreStatus = 'running';
+        $this->restoreMessage = 'Running pre-flight validation...';
+
+        $restoreAction = new RestoreFromPgbackrest;
+        $validation = $restoreAction->validateRestore($database, $backupLabel);
+
+        if (! $validation['valid']) {
+            $this->restoreStatus = 'failed';
+            $this->restoreMessage = $validation['message'];
+
+            return;
+        }
+
         $this->restoreMessage = "Starting restore from backup: {$backupLabel}";
-        $this->showRestoreProgress = true;
 
         PgbackrestRestoreJob::dispatch($database, $backupLabel, null, true);
-        $this->dispatch('success', 'Restore job started. Please wait...');
     }
 
     private function findBackupLabelForExecution(StandalonePostgresql $database, ScheduledDatabaseBackupExecution $execution): ?string

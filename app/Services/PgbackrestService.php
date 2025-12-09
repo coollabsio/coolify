@@ -57,9 +57,13 @@ class PgbackrestService
      */
     public function isS3Repo(): bool
     {
-        return $this->database->pgbackrestRepos()
-            ->where('type', 's3')
-            ->exists();
+        if ($this->database->pgbackrestRepos()->where('type', 's3')->exists()) {
+            return true;
+        }
+
+        $legacyType = $this->database->pgbackrest_repo_type ?? 'posix';
+
+        return in_array($legacyType, ['s3', 's3+posix'], true);
     }
 
     /**
@@ -67,9 +71,13 @@ class PgbackrestService
      */
     public function hasLocalRepo(): bool
     {
-        return $this->database->pgbackrestRepos()
-            ->where('type', 'posix')
-            ->exists();
+        if ($this->database->pgbackrestRepos()->where('type', 'posix')->exists()) {
+            return true;
+        }
+
+        $legacyType = $this->database->pgbackrest_repo_type ?? 'posix';
+
+        return in_array($legacyType, ['posix', 's3+posix'], true);
     }
 
     /**
@@ -533,10 +541,21 @@ class PgbackrestService
             $info = json_decode($output, true);
 
             if (json_last_error() !== JSON_ERROR_NONE || ! is_array($info)) {
+                $rawOutput = trim($output ?? '');
+                $errorHint = '';
+
+                if (str_contains($rawOutput, 'unable to find stanza')) {
+                    $errorHint = ' The stanza may not have been created yet. Try running a backup first.';
+                } elseif (str_contains($rawOutput, 'S3') || str_contains($rawOutput, 's3')) {
+                    $errorHint = ' There may be an issue with S3 credentials or connectivity.';
+                } elseif (empty($rawOutput)) {
+                    $errorHint = ' No output received - the pgBackRest container may have failed to start.';
+                }
+
                 return [
                     'valid' => false,
-                    'message' => 'Failed to parse pgBackRest info output. The repository may be corrupted or inaccessible.',
-                    'diagnostics' => array_merge($diagnostics, ['raw_output' => substr($output, 0, 500)]),
+                    'message' => 'Failed to parse pgBackRest info output.'.$errorHint."\n\nRaw output: ".substr($rawOutput, 0, 300),
+                    'diagnostics' => array_merge($diagnostics, ['raw_output' => substr($rawOutput, 0, 500)]),
                 ];
             }
 
@@ -806,7 +825,7 @@ class PgbackrestService
 
         $cmd = 'docker run --rm '.$envArgs.' '.$volumeArgs.
             "{$image} sh -c '".
-            'apk add --no-cache pgbackrest 2>/dev/null || (apt-get update && apt-get install -y pgbackrest) 2>/dev/null; '.
+            '(apk add --no-cache pgbackrest >/dev/null 2>&1 || (apt-get update >/dev/null 2>&1 && apt-get install -y pgbackrest >/dev/null 2>&1)); '.
             'mkdir -p /var/lib/pgbackrest/log /tmp/pgbackrest 2>/dev/null || true; '.
             'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest 2>/dev/null || true; '.
             ($withDataDir ? 'chown -R postgres:postgres /var/lib/postgresql/data 2>/dev/null || true; ' : '').
