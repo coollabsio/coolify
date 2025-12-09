@@ -16,14 +16,23 @@ use Illuminate\Support\Facades\Log;
  * UI components transform this to human-readable format (e.g., "Running (Healthy)").
  *
  * State Priority (highest to lowest):
- * 1. Restarting → degraded:unhealthy
- * 2. Crash Loop (exited with restarts) → degraded:unhealthy
- * 3. Mixed (running + exited) → degraded:unhealthy
- * 4. Running → running:healthy/unhealthy/unknown
- * 5. Dead/Removing → degraded:unhealthy
- * 6. Paused → paused:unknown
- * 7. Starting/Created → starting:unknown
- * 8. Exited → exited
+ * 1. Degraded (from sub-resources) → degraded:unhealthy
+ * 2. Restarting → degraded:unhealthy (or restarting:unknown if preserveRestarting=true)
+ * 3. Crash Loop (exited with restarts) → degraded:unhealthy
+ * 4. Mixed (running + exited) → degraded:unhealthy
+ * 5. Mixed (running + starting) → starting:unknown
+ * 6. Running → running:healthy/unhealthy/unknown
+ * 7. Dead/Removing → degraded:unhealthy
+ * 8. Paused → paused:unknown
+ * 9. Starting/Created → starting:unknown
+ * 10. Exited → exited
+ *
+ * The $preserveRestarting parameter controls whether "restarting" containers should be
+ * reported as "restarting:unknown" (true) or "degraded:unhealthy" (false, default).
+ * - Use preserveRestarting=true for individual sub-resources (ServiceApplication/ServiceDatabase)
+ *   so they show "Restarting" in the UI.
+ * - Use preserveRestarting=false for overall Service status aggregation where any restarting
+ *   container should mark the entire service as "Degraded".
  */
 class ContainerStatusAggregator
 {
@@ -32,9 +41,10 @@ class ContainerStatusAggregator
      *
      * @param  Collection  $containerStatuses  Collection of status strings (e.g., "running (healthy)", "running:healthy")
      * @param  int  $maxRestartCount  Maximum restart count across containers (for crash loop detection)
+     * @param  bool  $preserveRestarting  If true, "restarting" containers return "restarting:unknown" instead of "degraded:unhealthy"
      * @return string Aggregated status in colon format (e.g., "running:healthy")
      */
-    public function aggregateFromStrings(Collection $containerStatuses, int $maxRestartCount = 0): string
+    public function aggregateFromStrings(Collection $containerStatuses, int $maxRestartCount = 0, bool $preserveRestarting = false): string
     {
         // Validate maxRestartCount parameter
         if ($maxRestartCount < 0) {
@@ -64,10 +74,16 @@ class ContainerStatusAggregator
         $hasStarting = false;
         $hasPaused = false;
         $hasDead = false;
+        $hasDegraded = false;
 
         // Parse each status string and set flags
         foreach ($containerStatuses as $status) {
-            if (str($status)->contains('restarting')) {
+            if (str($status)->contains('degraded')) {
+                $hasDegraded = true;
+                if (str($status)->contains('unhealthy')) {
+                    $hasUnhealthy = true;
+                }
+            } elseif (str($status)->contains('restarting')) {
                 $hasRestarting = true;
             } elseif (str($status)->contains('running')) {
                 $hasRunning = true;
@@ -98,7 +114,9 @@ class ContainerStatusAggregator
             $hasStarting,
             $hasPaused,
             $hasDead,
-            $maxRestartCount
+            $hasDegraded,
+            $maxRestartCount,
+            $preserveRestarting
         );
     }
 
@@ -107,9 +125,10 @@ class ContainerStatusAggregator
      *
      * @param  Collection  $containers  Collection of Docker container objects with State property
      * @param  int  $maxRestartCount  Maximum restart count across containers (for crash loop detection)
+     * @param  bool  $preserveRestarting  If true, "restarting" containers return "restarting:unknown" instead of "degraded:unhealthy"
      * @return string Aggregated status in colon format (e.g., "running:healthy")
      */
-    public function aggregateFromContainers(Collection $containers, int $maxRestartCount = 0): string
+    public function aggregateFromContainers(Collection $containers, int $maxRestartCount = 0, bool $preserveRestarting = false): string
     {
         // Validate maxRestartCount parameter
         if ($maxRestartCount < 0) {
@@ -175,7 +194,9 @@ class ContainerStatusAggregator
             $hasStarting,
             $hasPaused,
             $hasDead,
-            $maxRestartCount
+            false, // $hasDegraded - not applicable for container objects, only for status strings
+            $maxRestartCount,
+            $preserveRestarting
         );
     }
 
@@ -190,7 +211,9 @@ class ContainerStatusAggregator
      * @param  bool  $hasStarting  Has at least one starting/created container
      * @param  bool  $hasPaused  Has at least one paused container
      * @param  bool  $hasDead  Has at least one dead/removing container
+     * @param  bool  $hasDegraded  Has at least one degraded container
      * @param  int  $maxRestartCount  Maximum restart count (for crash loop detection)
+     * @param  bool  $preserveRestarting  If true, return "restarting:unknown" instead of "degraded:unhealthy" for restarting containers
      * @return string Status in colon format (e.g., "running:healthy")
      */
     private function resolveStatus(
@@ -202,24 +225,40 @@ class ContainerStatusAggregator
         bool $hasStarting,
         bool $hasPaused,
         bool $hasDead,
-        int $maxRestartCount
+        bool $hasDegraded,
+        int $maxRestartCount,
+        bool $preserveRestarting = false
     ): string {
-        // Priority 1: Restarting containers (degraded state)
-        if ($hasRestarting) {
+        // Priority 1: Degraded containers from sub-resources (highest priority)
+        // If any service/application within a service stack is degraded, the entire stack is degraded
+        if ($hasDegraded) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 2: Crash loop detection (exited with restart count > 0)
+        // Priority 2: Restarting containers
+        // When preserveRestarting is true (for individual sub-resources), keep as "restarting"
+        // When false (for overall service status), mark as "degraded"
+        if ($hasRestarting) {
+            return $preserveRestarting ? 'restarting:unknown' : 'degraded:unhealthy';
+        }
+
+        // Priority 3: Crash loop detection (exited with restart count > 0)
         if ($hasExited && $maxRestartCount > 0) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 3: Mixed state (some running, some exited = degraded)
+        // Priority 4: Mixed state (some running, some exited = degraded)
         if ($hasRunning && $hasExited) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 4: Running containers (check health status)
+        // Priority 5: Mixed state (some running, some starting = still starting)
+        // If any component is still starting, the entire service stack is not fully ready
+        if ($hasRunning && $hasStarting) {
+            return 'starting:unknown';
+        }
+
+        // Priority 6: Running containers (check health status)
         if ($hasRunning) {
             if ($hasUnhealthy) {
                 return 'running:unhealthy';
@@ -230,22 +269,22 @@ class ContainerStatusAggregator
             }
         }
 
-        // Priority 5: Dead or removing containers
+        // Priority 7: Dead or removing containers
         if ($hasDead) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 6: Paused containers
+        // Priority 8: Paused containers
         if ($hasPaused) {
             return 'paused:unknown';
         }
 
-        // Priority 7: Starting/created containers
+        // Priority 9: Starting/created containers
         if ($hasStarting) {
             return 'starting:unknown';
         }
 
-        // Priority 8: All containers exited (no restart count = truly stopped)
+        // Priority 10: All containers exited (no restart count = truly stopped)
         return 'exited';
     }
 }

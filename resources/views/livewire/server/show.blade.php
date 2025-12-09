@@ -337,7 +337,8 @@
                                         <x-slot:title>Sentinel Logs</x-slot:title>
                                         <x-slot:content>
                                             <livewire:project.shared.get-logs :server="$server"
-                                                container="coolify-sentinel" displayName="Sentinel" lazy />
+                                                container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
+                                                lazy />
                                         </x-slot:content>
                                         <x-forms.button @click="slideOverOpen=true"
                                             :disabled="$isValidating">Logs</x-forms.button>
@@ -353,7 +354,8 @@
                                         <x-slot:title>Sentinel Logs</x-slot:title>
                                         <x-slot:content>
                                             <livewire:project.shared.get-logs :server="$server"
-                                                container="coolify-sentinel" displayName="Sentinel" lazy />
+                                                container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
+                                                lazy />
                                         </x-slot:content>
                                         <x-forms.button @click="slideOverOpen=true"
                                             :disabled="$isValidating">Logs</x-forms.button>

@@ -144,7 +144,7 @@
                             <x-slot:title>Proxy Logs</x-slot:title>
                             <x-slot:content>
                                 <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                    container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
                             </x-slot:content>
                             <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
                                 @click="slideOverOpen=true">Logs</x-forms.button>

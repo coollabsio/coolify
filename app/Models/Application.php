@@ -338,9 +338,23 @@ class Application extends BaseModel
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for applications owned by current team.
+     * If you need all applications without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all applications owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Application::ownedByCurrentTeam()->get();
+        });
     }
 
     public function getContainersToStop(Server $server, bool $previewDeployments = false): array
@@ -1500,10 +1514,10 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
-    public function parse(int $pull_request_id = 0, ?int $preview_id = null)
+    public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return applicationParser($this, $pull_request_id, $preview_id);
+            return applicationParser($this, $pull_request_id, $preview_id, $commit);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
@@ -1511,9 +1525,11 @@ class Application extends BaseModel
         }
     }
 
-    public function loadComposeFile($isInit = false)
+    public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
-        $initialDockerComposeLocation = $this->docker_compose_location;
+        // Use provided restore values or capture current values as fallback
+        $initialDockerComposeLocation = $restoreDockerComposeLocation ?? $this->docker_compose_location;
+        $initialBaseDirectory = $restoreBaseDirectory ?? $this->base_directory;
         if ($isInit && $this->docker_compose_raw) {
             return;
         }
@@ -1580,6 +1596,7 @@ class Application extends BaseModel
             throw new \RuntimeException($e->getMessage());
         } finally {
             $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
             $this->save();
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",

@@ -45,9 +45,23 @@ class StandaloneMariadb extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for MariaDB databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneMariadb::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all MariaDB databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneMariadb::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute

@@ -461,9 +461,10 @@ class GetContainersStatus
         }
 
         // Use ContainerStatusAggregator service for state machine logic
+        // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
         $aggregator = new ContainerStatusAggregator;
 
-        return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount);
+        return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
     }
 
     private function aggregateServiceContainerStatuses($services)
@@ -518,8 +519,9 @@ class GetContainersStatus
             }
 
             // Use ContainerStatusAggregator service for state machine logic
+            // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, preserveRestarting: true);
 
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus) {

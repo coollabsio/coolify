@@ -83,7 +83,7 @@
             if (!html) return '';
             const URL_RE = /^(https?:|mailto:)/i;
             const config = {
-                ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'p', 'pre', 's', 'span', 'strong',
+                ALLOWED_TAGS: ['a', 'b', 'br', 'code', 'del', 'div', 'em', 'i', 'mark', 'p', 'pre', 's', 'span', 'strong',
                     'u'
                 ],
                 ALLOWED_ATTR: ['class', 'href', 'target', 'title', 'rel'],

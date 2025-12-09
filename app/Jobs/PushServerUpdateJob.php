@@ -300,8 +300,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
 
             // Use ContainerStatusAggregator service for state machine logic
+            // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
 
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
@@ -360,8 +361,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
             // Use ContainerStatusAggregator service for state machine logic
             // NOTE: Sentinel does NOT provide restart count data, so maxRestartCount is always 0
+            // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
 
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {

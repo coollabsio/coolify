@@ -450,7 +450,7 @@
                 PostgreSQL
                 17 (default).</div>
             <div class="flex flex-col gap-6 pt-8">
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:17-alpine'))"
                     :disabled="selecting">
@@ -460,17 +460,18 @@
                             PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                         </div>
                     </div>
-                    <div class="flex-1"></div>
-
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
-                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
-                            target="_blank">
-                            Documentation
-                        </a>
-                    </div>
+                    <a href="https://hub.docker.com/_/postgres/" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('supabase/postgres:17.4.1.032'))"
                     :disabled="selecting">
@@ -480,16 +481,18 @@
                             Supabase is a modern, open-source alternative to PostgreSQL with lots of extensions.
                         </div>
                     </div>
-                    <div class="flex-1"></div>
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
-                            target="_blank">
-                            Documentation
-                        </a>
-                    </div>
+                    <a href="https://github.com/supabase/postgres" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgis/postgis:17-3.5-alpine'))"
                     :disabled="selecting">
@@ -499,16 +502,18 @@
                             PostGIS is a PostgreSQL extension for geographic objects.
                         </div>
                     </div>
-                    <div class="flex-1"></div>
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
-                            target="_blank">
-                            Documentation
-                        </a>
-                    </div>
+                    <a href="https://github.com/postgis/docker-postgis" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
                 </div>
-                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg17'))"
                     :disabled="selecting">
@@ -518,15 +523,16 @@
                             PGVector is a PostgreSQL extension for vector data types.
                         </div>
                     </div>
-                    <div class="flex-1"></div>
-
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
-                            target="_blank">
-                            Documentation
-                        </a>
-                    </div>
+                    <a href="https://github.com/pgvector/pgvector" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
                 </div>
             </div>
         </div>

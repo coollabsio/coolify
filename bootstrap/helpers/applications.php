@@ -68,10 +68,16 @@ function queue_application_deployment(Application $application, string $deployme
     ]);
 
     if ($no_questions_asked) {
+        $deployment->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
         );
     } elseif (next_queuable($server_id, $application_id, $commit, $pull_request_id)) {
+        $deployment->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
         );
