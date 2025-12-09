@@ -242,12 +242,26 @@ class Server extends BaseModel
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
     }
 
+    /**
+     * Get query builder for servers owned by current team.
+     * If you need all servers without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
         return Server::whereTeamId($teamId)->with('settings', 'swarmDockers', 'standaloneDockers')->select($selectArray->all())->orderBy('name');
+    }
+
+    /**
+     * Get all servers owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Server::ownedByCurrentTeam()->get();
+        });
     }
 
     public static function isUsable()

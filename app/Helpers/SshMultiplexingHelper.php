@@ -149,7 +149,7 @@ class SshMultiplexingHelper
         return $scp_command;
     }
 
-    public static function generateSshCommand(Server $server, string $command)
+    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false)
     {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
@@ -168,7 +168,7 @@ class SshMultiplexingHelper
         $ssh_command = "timeout $timeout ssh ";
 
         $multiplexingSuccessful = false;
-        if (self::isMultiplexingEnabled()) {
+        if (! $disableMultiplexing && self::isMultiplexingEnabled()) {
             try {
                 $multiplexingSuccessful = self::ensureMultiplexedConnection($server);
                 if ($multiplexingSuccessful) {

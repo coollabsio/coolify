@@ -126,6 +126,70 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('starting:unknown');
     });
 
+    test('returns degraded:unhealthy for single degraded container', function () {
+        $statuses = collect(['degraded:unhealthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('returns degraded:unhealthy when mixing degraded with running healthy', function () {
+        $statuses = collect(['degraded:unhealthy', 'running:healthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('returns degraded:unhealthy when mixing running healthy with degraded', function () {
+        $statuses = collect(['running:healthy', 'degraded:unhealthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('returns degraded:unhealthy for multiple degraded containers', function () {
+        $statuses = collect(['degraded:unhealthy', 'degraded:unhealthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('degraded status overrides all other non-critical states', function () {
+        $statuses = collect(['degraded:unhealthy', 'running:healthy', 'starting', 'paused']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('returns starting:unknown when mixing starting with running healthy (service not fully ready)', function () {
+        $statuses = collect(['starting:unknown', 'running:healthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('starting:unknown');
+    });
+
+    test('returns starting:unknown when mixing created with running healthy', function () {
+        $statuses = collect(['created', 'running:healthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('starting:unknown');
+    });
+
+    test('returns starting:unknown for multiple starting containers with some running', function () {
+        $statuses = collect(['starting:unknown', 'starting:unknown', 'running:healthy']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('starting:unknown');
+    });
+
     test('handles parentheses format input (backward compatibility)', function () {
         $statuses = collect(['running (healthy)', 'running (unhealthy)']);
 
@@ -166,8 +230,16 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('prioritizes running over paused/starting/exited', function () {
-        $statuses = collect(['running:healthy', 'starting', 'paused']);
+    test('mixed running and starting returns starting', function () {
+        $statuses = collect(['running:healthy', 'starting']);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('starting:unknown');
+    });
+
+    test('prioritizes running over paused/exited when no starting', function () {
+        $statuses = collect(['running:healthy', 'paused', 'exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses);
 
@@ -398,7 +470,23 @@ describe('aggregateFromContainers', function () {
 });
 
 describe('state priority enforcement', function () {
-    test('restarting has highest priority', function () {
+    test('degraded from sub-resources has highest priority', function () {
+        $statuses = collect([
+            'degraded:unhealthy',
+            'restarting',
+            'running:healthy',
+            'dead',
+            'paused',
+            'starting',
+            'exited',
+        ]);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('restarting has second highest priority', function () {
         $statuses = collect([
             'restarting',
             'running:healthy',
@@ -413,7 +501,7 @@ describe('state priority enforcement', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('crash loop has second highest priority', function () {
+    test('crash loop has third highest priority', function () {
         $statuses = collect([
             'exited',
             'running:healthy',
@@ -426,7 +514,7 @@ describe('state priority enforcement', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('mixed state (running + exited) has third priority', function () {
+    test('mixed state (running + exited) has fourth priority', function () {
         $statuses = collect([
             'running:healthy',
             'exited',
@@ -437,6 +525,18 @@ describe('state priority enforcement', function () {
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 0);
 
         expect($result)->toBe('degraded:unhealthy');
+    });
+
+    test('mixed state (running + starting) has fifth priority', function () {
+        $statuses = collect([
+            'running:healthy',
+            'starting',
+            'paused',
+        ]);
+
+        $result = $this->aggregator->aggregateFromStrings($statuses);
+
+        expect($result)->toBe('starting:unknown');
     });
 
     test('running:unhealthy has priority over running:unknown', function () {

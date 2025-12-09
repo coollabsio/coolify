@@ -61,6 +61,7 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_terminal_enabled' => 'boolean',
+        'disable_application_image_retention' => 'boolean',
     ];
 
     protected static function booted()

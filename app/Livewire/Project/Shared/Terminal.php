@@ -11,20 +11,6 @@ class Terminal extends Component
 {
     public bool $hasShell = true;
 
-    public function getListeners()
-    {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'closeTerminal',
-        ];
-    }
-
-    public function closeTerminal()
-    {
-        $this->dispatch('reloadWindow');
-    }
-
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);

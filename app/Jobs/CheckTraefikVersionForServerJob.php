@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Bus\Queueable;
@@ -38,6 +39,8 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
         $this->server->update(['detected_traefik_version' => $currentVersion]);
 
         if (! $currentVersion) {
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
+
             return;
         }
 
@@ -48,16 +51,22 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
 
         // Handle empty/null response from SSH command
         if (empty(trim($imageTag))) {
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
+
             return;
         }
 
         if (str_contains(strtolower(trim($imageTag)), ':latest')) {
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
+
             return;
         }
 
         // Parse current version to extract major.minor.patch
         $current = ltrim($currentVersion, 'v');
         if (! preg_match('/^(\d+\.\d+)\.(\d+)$/', $current, $matches)) {
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
+
             return;
         }
 
@@ -76,6 +85,8 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
                 // No newer branch found, clear outdated info
                 $this->server->update(['traefik_outdated_info' => null]);
             }
+
+            ProxyStatusChangedUI::dispatch($this->server->team_id);
 
             return;
         }
@@ -96,6 +107,9 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
             // Fully up to date
             $this->server->update(['traefik_outdated_info' => null]);
         }
+
+        // Dispatch UI update event so warning state refreshes in real-time
+        ProxyStatusChangedUI::dispatch($this->server->team_id);
     }
 
     /**

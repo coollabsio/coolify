@@ -139,7 +139,9 @@ class ScheduledTaskJob implements ShouldQueue
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $exec = "docker exec {$containerName} {$cmd}";
-                    $this->task_output = instant_remote_process([$exec], $this->server, true);
+                    // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
+                    // See: https://github.com/coollabsio/coolify/issues/6736
+                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,

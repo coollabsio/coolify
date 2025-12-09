@@ -44,9 +44,23 @@ class StandaloneDragonfly extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for Dragonfly databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneDragonfly::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all Dragonfly databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneDragonfly::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute
