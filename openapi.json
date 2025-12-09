@@ -361,6 +361,10 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
                                 "type": "object"
@@ -771,6 +775,10 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
                                 "type": "object"
@@ -1181,6 +1189,10 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
                                 "type": "object"
@@ -1520,6 +1532,10 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
                                 "type": "object"
@@ -1842,6 +1858,10 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
                                 "type": "object"
