@@ -1127,7 +1127,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'private-gh-app') {
             $validationRules = [
@@ -1287,7 +1287,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'private-deploy-key') {
 
@@ -1421,7 +1421,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerfile') {
             $validationRules = [
@@ -1516,7 +1516,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
@@ -1614,7 +1614,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockercompose') {
             $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw', 'force_domain_override'];
