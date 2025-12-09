@@ -33,6 +33,9 @@ export function initializeTerminalComponent() {
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
+            // Visibility handling - prevent disconnects when tab loses focus
+            isDocumentVisible: true,
+            wasConnectedBeforeHidden: false,
 
             init() {
                 this.setupTerminal();
@@ -90,6 +93,11 @@ export function initializeTerminalComponent() {
                     document.addEventListener(event, () => {
                         this.cleanup();
                     }, { once: true });
+                });
+
+                // Handle visibility changes to prevent disconnects when tab loses focus
+                document.addEventListener('visibilitychange', () => {
+                    this.handleVisibilityChange();
                 });
 
                 window.onresize = () => {
@@ -451,11 +459,45 @@ export function initializeTerminalComponent() {
             },
 
             keepAlive() {
+                // Skip keepalive when document is hidden to prevent unnecessary disconnects
+                if (!this.isDocumentVisible) {
+                    return;
+                }
+
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.sendMessage({ ping: true });
                 } else if (this.connectionState === 'disconnected') {
                     // Attempt to reconnect if we're disconnected
                     this.initializeWebSocket();
+                }
+            },
+
+            handleVisibilityChange() {
+                const wasVisible = this.isDocumentVisible;
+                this.isDocumentVisible = !document.hidden;
+
+                if (!this.isDocumentVisible) {
+                    // Tab is now hidden - pause heartbeat monitoring to prevent false disconnects
+                    this.wasConnectedBeforeHidden = this.connectionState === 'connected';
+                    if (this.pingTimeoutId) {
+                        clearTimeout(this.pingTimeoutId);
+                        this.pingTimeoutId = null;
+                    }
+                    console.log('[Terminal] Tab hidden, pausing heartbeat monitoring');
+                } else if (wasVisible === false) {
+                    // Tab is now visible again
+                    console.log('[Terminal] Tab visible, resuming connection management');
+
+                    if (this.wasConnectedBeforeHidden && this.socket && this.socket.readyState === WebSocket.OPEN) {
+                        // Send immediate ping to verify connection is still alive
+                        this.heartbeatMissed = 0;
+                        this.sendMessage({ ping: true });
+                        this.resetPingTimeout();
+                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
+                        // Was connected before but now disconnected - attempt reconnection
+                        this.reconnectAttempts = 0;
+                        this.initializeWebSocket();
+                    }
                 }
             },
 

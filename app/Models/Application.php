@@ -338,9 +338,23 @@ class Application extends BaseModel
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for applications owned by current team.
+     * If you need all applications without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all applications owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Application::ownedByCurrentTeam()->get();
+        });
     }
 
     public function getContainersToStop(Server $server, bool $previewDeployments = false): array
