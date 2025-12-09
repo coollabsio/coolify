@@ -58,7 +58,8 @@ class PgbackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             'database_uuid' => $this->database->uuid,
             'backup_label' => $this->backupLabel,
             'target_time' => $this->targetTime,
-            'repo_type' => $this->service->getRepoType(),
+            'has_local_repo' => $this->service->hasLocalRepo(),
+            'has_s3_repo' => $this->service->isS3Repo(),
         ]);
 
         $this->database->update(['pgbackrest_restore_started_at' => now()]);

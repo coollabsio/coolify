@@ -386,30 +386,51 @@ class PgbackrestService
 
         $backup = $backups->firstWhere('label', $label);
         if (! $backup) {
-            return ['deletable' => false, 'reason' => 'Backup not found in repository'];
+            return ['deletable' => false, 'reason' => 'Backup not found in repository', 'backup' => null];
         }
 
-        $dependents = $backups->filter(fn ($b) => ($b['prior'] ?? null) === $label);
+        $dependents = $this->findAllDependents($label, $backups);
 
         if ($dependents->isNotEmpty()) {
             $dependentLabels = $dependents->pluck('label')->join(', ');
 
             return [
                 'deletable' => false,
-                'reason' => "This backup has dependent backups that would become unrestorable: {$dependentLabels}",
+                'reason' => "This backup has dependent backups that would also be deleted: {$dependentLabels}",
                 'dependents' => $dependents->pluck('label')->toArray(),
+                'backup' => $backup,
             ];
         }
 
-        return ['deletable' => true, 'reason' => null];
+        return ['deletable' => true, 'reason' => null, 'backup' => $backup];
+    }
+
+    /**
+     * Find all backups that depend on a given backup (recursively).
+     */
+    private function findAllDependents(string $label, Collection $backups): Collection
+    {
+        $directDependents = $backups->filter(fn ($b) => ($b['prior'] ?? null) === $label);
+
+        $allDependents = collect();
+        foreach ($directDependents as $dependent) {
+            $allDependents->push($dependent);
+            $nestedDependents = $this->findAllDependents($dependent['label'], $backups);
+            $allDependents = $allDependents->merge($nestedDependents);
+        }
+
+        return $allDependents;
     }
 
     /**
      * Delete a backup from the repository.
+     *
+     * Will not delete if the backup has dependent incremental/differential backups.
      */
     public function deleteBackup(string $label): array
     {
         $deletableCheck = $this->isBackupDeletable($label);
+
         if (! $deletableCheck['deletable']) {
             return ['success' => false, 'message' => $deletableCheck['reason']];
         }

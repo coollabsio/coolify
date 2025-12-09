@@ -64,7 +64,6 @@
                                 </x-forms.select>
                             </div>
                             <div class="pt-4" x-data="{ retentionType: '{{ $pgbackrestRetentionFullType }}' }">
-                                <h5 class="font-medium pb-2">pgBackRest Retention</h5>
                                 <p class="text-sm text-neutral-400 pb-3">
                                     pgBackRest manages its own backup retention. These settings apply to all repositories attached to this schedule.
                                 </p>
