@@ -176,8 +176,23 @@ class Import extends Component
 
     public function updatedDumpAll($value)
     {
-        switch ($this->resource->getMorphClass()) {
+        $morphClass = $this->resource->getMorphClass();
+        
+        // Handle ServiceDatabase by checking the database type
+        if ($morphClass === \App\Models\ServiceDatabase::class) {
+            $dbType = $this->resource->databaseType();
+            if (str_contains($dbType, 'mysql')) {
+                $morphClass = 'mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $morphClass = 'mariadb';
+            } elseif (str_contains($dbType, 'postgres')) {
+                $morphClass = 'postgresql';
+            }
+        }
+        
+        switch ($morphClass) {
             case \App\Models\StandaloneMariadb::class:
+            case 'mariadb':
                 if ($value === true) {
                     $this->mariadbRestoreCommand = <<<'EOD'
 for pid in $(mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -193,6 +208,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMysql::class:
+            case 'mysql':
                 if ($value === true) {
                     $this->mysqlRestoreCommand = <<<'EOD'
 for pid in $(mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -208,6 +224,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandalonePostgresql::class:
+            case 'postgresql':
                 if ($value === true) {
                     $this->postgresqlRestoreCommand = <<<'EOD'
 psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
@@ -236,7 +253,14 @@ EOD;
         $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
-        $this->container = $this->resource->uuid;
+        
+        // Handle ServiceDatabase container naming
+        if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $this->container = $this->resource->name . '-' . $this->resource->service->uuid;
+        } else {
+            $this->container = $this->resource->uuid;
+        }
+        
         if (str(data_get($this, 'resource.status'))->startsWith('running')) {
             $this->containers->push($this->container);
         }
@@ -248,6 +272,15 @@ EOD;
             $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
+        }
+        
+        // Mark unsupported ServiceDatabase types (Redis, KeyDB, etc.)
+        if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $dbType = $this->resource->databaseType();
+            if (str_contains($dbType, 'redis') || str_contains($dbType, 'keydb') || 
+                str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse')) {
+                $this->unsupported = true;
+            }
         }
     }
 
@@ -575,8 +608,25 @@ EOD;
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        switch ($this->resource->getMorphClass()) {
+        $morphClass = $this->resource->getMorphClass();
+        
+        // Handle ServiceDatabase by checking the database type
+        if ($morphClass === \App\Models\ServiceDatabase::class) {
+            $dbType = $this->resource->databaseType();
+            if (str_contains($dbType, 'mysql')) {
+                $morphClass = 'mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $morphClass = 'mariadb';
+            } elseif (str_contains($dbType, 'postgres')) {
+                $morphClass = 'postgresql';
+            } elseif (str_contains($dbType, 'mongo')) {
+                $morphClass = 'mongodb';
+            }
+        }
+        
+        switch ($morphClass) {
             case \App\Models\StandaloneMariadb::class:
+            case 'mariadb':
                 $restoreCommand = $this->mariadbRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
@@ -585,6 +635,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMysql::class:
+            case 'mysql':
                 $restoreCommand = $this->mysqlRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
@@ -593,6 +644,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandalonePostgresql::class:
+            case 'postgresql':
                 $restoreCommand = $this->postgresqlRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
@@ -601,6 +653,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMongodb::class:
+            case 'mongodb':
                 $restoreCommand = $this->mongodbRestoreCommand;
                 if ($this->dumpAll === false) {
                     $restoreCommand .= "{$tmpPath}";
