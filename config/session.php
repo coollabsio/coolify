@@ -19,7 +19,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => env('SESSION_DRIVER', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -33,7 +33,7 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    'lifetime' => (int) env('SESSION_LIFETIME', 1440),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
@@ -52,19 +52,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Session File Location
-    |--------------------------------------------------------------------------
-    |
-    | When utilizing the "file" session driver, the session files are placed
-    | on disk. The default storage location is defined here; however, you
-    | are free to provide another location where they should be stored.
-    |
-    */
-
-    'files' => storage_path('framework/sessions'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Session Database Connection
     |--------------------------------------------------------------------------
     |
@@ -74,20 +61,7 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Session Database Table
-    |--------------------------------------------------------------------------
-    |
-    | When using the "database" session driver, you may specify the table to
-    | be used to store sessions. Of course, a sensible default is defined
-    | for you; however, you're welcome to change this to another table.
-    |
-    */
-
-    'table' => env('SESSION_TABLE', 'sessions'),
+    'connection' => env('SESSION_CONNECTION', 'sessions'),
 
     /*
     |--------------------------------------------------------------------------
@@ -102,7 +76,7 @@ return [
     |
     */
 
-    'store' => env('SESSION_STORE'),
+    'store' => env('SESSION_STORE', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -130,7 +104,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug((string) env('APP_NAME', 'laravel')).'-session',
+        Str::slug((string) env('APP_NAME', 'coolify')).'-session',
     ),
 
     /*

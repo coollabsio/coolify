@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [5.0.0-alpha.1] – 2026-XX-XX
+## [5.0.0-alpha.1] - 2026-XX-XX
 
 ### Release Highlights
 
@@ -22,10 +22,12 @@ All notable changes to this project will be documented in this file.
   -
 - **Laravel Configurations:**
   - Changed hashing algorithm from `bcrypt` to `argon2id` for enhanced security
-  - Encrypt user sessions and expire inactive sessions after 24h
+  - Use Redis for sessions and expire inactive sessions after 24h
+  - Encrypt user sessions data
   - Redirect Laravel logs to `stderr` so they can be viewed in docker logs
   - Configured production logging to rotate automatically and keep only the last 10 days of logs to reduce disk usage
   - Changed production log level from `debug` to `warning` to reduce disk usage and avoid logging sensitive information
+  - Configured separate Redis connections for cache, jobs and sessions for easier debugging and separation
   - Updated all Laravel config files to the latest version and removed all unused config options
 - Changed license from `Apache-2.0` to `AGPL-3.0`
 
@@ -35,7 +37,8 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
--
+- Session cleanup job as we now use Redis for sessions with a TTL
+- A lot of legacy code, outdated configs and dependencies
 
 ### Fixed
 
