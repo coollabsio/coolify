@@ -157,7 +157,7 @@
         },
         init() {
             if (this.expanded) {
-                this.$wire.getLogs();
+                this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
             // Re-render logs after Livewire updates
@@ -170,7 +170,7 @@
     }">
         @if ($collapsible)
             <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
-                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
+                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
                 <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
@@ -191,9 +191,10 @@
             </div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
-            :class="fullscreen ? 'fullscreen flex flex-col' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'">
-            <div class="flex flex-col bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300 border-neutral-200"
-                :class="fullscreen ? 'h-full' : 'border border-solid rounded-sm'">
+            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"
+            :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
+            <div class="flex flex-col dark:text-white dark:border-coolgray-300 border-neutral-200"
+                :class="fullscreen ? 'h-full w-full bg-white dark:bg-coolgray-100' : 'bg-white dark:bg-coolgray-100 border border-solid rounded-sm'">
                 <div
                     class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                     <div class="flex items-center gap-2">
@@ -359,7 +360,7 @@
                         </div>
                     @else
                         <pre id="logs"
-                            class="font-mono whitespace-pre-wrap break-all max-w-full">Refresh to get the logs...</pre>
+                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
                     @endif
                 </div>
             </div>
