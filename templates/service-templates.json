@@ -3953,6 +3953,22 @@
         "logo": "svgs/default.webp",
         "minversion": "0.0.0"
     },
+    "soju": {
+        "documentation": "https://soju.im/?utm_source=coolify.io",
+        "slogan": "A user-friendly IRC bouncer with a modern web interface",
+        "compose": "c2VydmljZXM6CiAgc29qdToKICAgIGltYWdlOiAnY29kZWJlcmcub3JnL2VtZXJzaW9uL3NvanU6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnc29qdS1kYjovZGInCiAgICAgIC0gJ3NvanUtdXBsb2FkczovdXBsb2FkcycKICAgICAgLSAnc29qdS1ydW46L3J1bi9zb2p1JwogICAgICAtCiAgICAgICAgdHlwZTogYmluZAogICAgICAgIHNvdXJjZTogLi9zb2p1L2NvbmZpZwogICAgICAgIHRhcmdldDogL3NvanUtY29uZmlnCiAgICAgICAgY29udGVudDogImRiIHNxbGl0ZTMgL2RiL21haW4uZGJcbm1lc3NhZ2Utc3RvcmUgZGJcbmZpbGUtdXBsb2FkIGZzIC91cGxvYWRzL1xubGlzdGVuIGlyYytpbnNlY3VyZTovLzAuMC4wLjA6NjY2N1xubGlzdGVuIHdzK2luc2VjdXJlOi8vMC4wLjAuMDo4MFxubGlzdGVuIHVuaXgrYWRtaW46Ly8vcnVuL3NvanUvYWRtaW5cbiIKICAgIG5ldHdvcmtzOgogICAgICBkZWZhdWx0OgogICAgICAgIGFsaWFzZXM6CiAgICAgICAgICAtIGdhbWphLWJhY2tlbmQKICBnYW1qYToKICAgIGltYWdlOiAnY29kZWJlcmcub3JnL2VtZXJzaW9uL2dhbWphOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HQU1KQV84MAogICAgZGVwZW5kc19vbjoKICAgICAgLSBzb2p1CnZvbHVtZXM6CiAgc29qdS1kYjogbnVsbAogIHNvanUtdXBsb2FkczogbnVsbAogIHNvanUtcnVuOiBudWxsCg==",
+        "tags": [
+            "irc",
+            "bouncer",
+            "chat",
+            "messaging",
+            "relay"
+        ],
+        "category": "communication",
+        "logo": "svgs/soju.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "soketi": {
         "documentation": "https://docs.soketi.app?utm_source=coolify.io",
         "slogan": "Soketi is your simple, fast, and resilient open-source WebSockets server.",

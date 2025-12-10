@@ -33,7 +33,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
@@ -299,24 +298,6 @@ function generate_application_name(string $git_repository, string $git_branch, ?
     }
 
     return Str::kebab("$git_repository:$git_branch-$cuid");
-}
-
-/**
- * Sort branches by priority: main first, master second, then alphabetically.
- *
- * @param  Collection  $branches  Collection of branch objects with 'name' key
- */
-function sortBranchesByPriority(Collection $branches): Collection
-{
-    return $branches->sortBy(function ($branch) {
-        $name = data_get($branch, 'name');
-
-        return match ($name) {
-            'main' => '0_main',
-            'master' => '1_master',
-            default => '2_'.$name,
-        };
-    })->values();
 }
 
 function base_ip(): string
@@ -3329,55 +3310,17 @@ function formatContainerStatus(string $status): string
 }
 
 /**
- * Check if password confirmation should be skipped.
- * Returns true if:
- * - Two-step confirmation is globally disabled
- * - User has no password (OAuth users)
+ * Convert a path from the SSH target perspective to the Docker host perspective.
  *
- * Used by modal-confirmation.blade.php to determine if password step should be shown.
- *
- * @return bool True if password confirmation should be skipped
+ * In dev mode, SSH commands run in coolify-testing-host where the volume is mounted
+ * at /data/coolify, but Docker Compose runs on the host where the same volume is at
+ * /var/lib/docker/volumes/coolify_dev_coolify_data/_data.
  */
-function shouldSkipPasswordConfirmation(): bool
+function convertPathToDockerHost(string $path): string
 {
-    // Skip if two-step confirmation is globally disabled
-    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-        return true;
+    if (isDev()) {
+        return str_replace('/data/coolify', '/var/lib/docker/volumes/coolify_dev_coolify_data/_data', $path);
     }
 
-    // Skip if user has no password (OAuth users)
-    if (! Auth::user()?->hasPassword()) {
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * Verify password for two-step confirmation.
- * Skips verification if:
- * - Two-step confirmation is globally disabled
- * - User has no password (OAuth users)
- *
- * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
- * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
- * @return bool True if verification passed (or skipped), false if password is incorrect
- */
-function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
-{
-    // Skip if password confirmation should be skipped
-    if (shouldSkipPasswordConfirmation()) {
-        return true;
-    }
-
-    // Verify the password
-    if (! Hash::check($password, Auth::user()->password)) {
-        if ($component) {
-            $component->addError('password', 'The provided password is incorrect.');
-        }
-
-        return false;
-    }
-
-    return true;
+    return $path;
 }

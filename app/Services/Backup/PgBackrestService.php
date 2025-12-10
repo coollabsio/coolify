@@ -1,0 +1,353 @@
+<?php
+
+namespace App\Services\Backup;
+
+use App\Models\PgbackrestRepo;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\StandalonePostgresql;
+
+class PgBackrestService
+{
+    public const PGDATA_PATH = '/var/lib/postgresql/data';
+
+    public const REPO_PATH = '/var/lib/pgbackrest';
+
+    public const CONFIG_PATH = '/etc/pgbackrest';
+
+    public const DEFAULT_COMPRESS_TYPE = 'lz4';
+
+    public const DEFAULT_COMPRESS_LEVEL = 6;
+
+    public const DEFAULT_LOG_LEVEL = 'info';
+
+    public static function getStanzaName(StandalonePostgresql $database): string
+    {
+        return $database->uuid;
+    }
+
+    public static function generateConfig(StandalonePostgresql $database): ?string
+    {
+        $pgbackrestBackups = $database->pgbackrestBackups()->where('enabled', true)->get();
+
+        if ($pgbackrestBackups->isEmpty()) {
+            return null;
+        }
+
+        $backup = $pgbackrestBackups->first();
+        $stanza = self::getStanzaName($database);
+
+        $repos = $backup->enabledPgbackrestRepos()->get();
+        if ($repos->isEmpty()) {
+            return null;
+        }
+
+        $config = "[global]\n";
+        $config .= 'log-level-console='.($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL)."\n";
+        $config .= 'log-level-file='.($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL)."\n";
+        $config .= 'compress-type='.($backup->pgbackrest_compress_type ?? self::DEFAULT_COMPRESS_TYPE)."\n";
+        $config .= 'compress-level='.($backup->pgbackrest_compress_level ?? self::DEFAULT_COMPRESS_LEVEL)."\n";
+        $config .= "start-fast=y\n";
+        $config .= "stop-auto=y\n";
+        $config .= "delta=y\n";
+        $config .= "process-max=2\n";
+
+        if ($backup->pgbackrest_archive_mode === 'minimal') {
+            $config .= "archive-check=n\n";
+        }
+
+        $config .= "\n[{$stanza}]\n";
+        $config .= 'pg1-path='.self::PGDATA_PATH."\n";
+
+        $validRepoCount = 0;
+        foreach ($repos as $repo) {
+            $repoConfig = self::generateRepoConfig($repo, $database);
+            if (! empty($repoConfig)) {
+                $config .= $repoConfig;
+                $validRepoCount++;
+            }
+        }
+
+        if ($validRepoCount === 0) {
+            return null;
+        }
+
+        return $config;
+    }
+
+    public static function generateRepoConfig(PgbackrestRepo $repo, StandalonePostgresql $database): string
+    {
+        $repoKey = $repo->getRepoKey();
+        $settings = [];
+
+        if ($repo->isS3()) {
+            $s3 = $repo->s3Storage;
+            if (! $s3) {
+                return '';
+            }
+
+            try {
+                validateShellSafePath($s3->bucket, 'S3 bucket');
+                validateShellSafePath($s3->endpoint, 'S3 endpoint');
+            } catch (\Exception $e) {
+                throw new \Exception('Invalid S3 configuration: '.$e->getMessage());
+            }
+
+            $settings = [
+                "{$repoKey}-type" => 's3',
+                "{$repoKey}-path" => "/{$database->uuid}",
+                "{$repoKey}-s3-bucket" => $s3->bucket,
+                "{$repoKey}-s3-endpoint" => self::cleanEndpoint($s3->endpoint),
+                "{$repoKey}-s3-region" => $s3->region ?: 'us-east-1',
+                "{$repoKey}-s3-uri-style" => 'path',
+            ];
+        } else {
+            $repoPath = $repo->getEffectivePath();
+            $settings = [
+                "{$repoKey}-type" => 'posix',
+                "{$repoKey}-path" => $repoPath,
+            ];
+        }
+
+        $retentionFull = $repo->retention_full ?: 2;
+        $retentionDiff = $repo->retention_diff ?: 7;
+        $retentionFullType = $repo->retention_full_type === 'time' ? 'time' : 'count';
+
+        $settings["{$repoKey}-retention-full-type"] = $retentionFullType;
+        $settings["{$repoKey}-retention-full"] = $retentionFull;
+        $settings["{$repoKey}-retention-diff"] = $retentionDiff;
+
+        return implode("\n", array_map(fn ($k, $v) => "{$k}={$v}", array_keys($settings), $settings))."\n";
+    }
+
+    public static function cleanEndpoint(string $endpoint): string
+    {
+        $endpoint = preg_replace('#^https?://#', '', $endpoint);
+        $endpoint = rtrim($endpoint, '/');
+
+        return $endpoint;
+    }
+
+    public static function getInstallCommand(): string
+    {
+        return <<<'BASH'
+if ! command -v pgbackrest &> /dev/null; then
+    if command -v apk >/dev/null 2>&1; then
+        echo "Installing pgBackRest via apk..."
+        apk add --no-cache pgbackrest
+    elif command -v apt-get >/dev/null 2>&1; then
+        echo "Installing pgBackRest via apt..."
+        apt-get update && apt-get install -y --no-install-recommends pgbackrest && rm -rf /var/lib/apt/lists/*
+    elif command -v yum >/dev/null 2>&1; then
+        echo "Installing pgBackRest via yum..."
+        yum install -y pgbackrest
+    else
+        echo "ERROR: Could not detect package manager to install pgBackRest"
+        exit 1
+    fi
+else
+    echo "pgBackRest already installed"
+fi
+BASH;
+    }
+
+    public static function buildInstallAndSetupCommand(string $command): string
+    {
+        $installCmd = self::getInstallCommand();
+        $setupCmd = 'mkdir -p /var/lib/pgbackrest/log /tmp/pgbackrest 2>/dev/null || true';
+        $clearLocksCmd = 'rm -rf /tmp/pgbackrest/*.lock 2>/dev/null || true';
+        $permsCmd = 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true';
+
+        return "{$installCmd}; {$setupCmd}; {$clearLocksCmd}; {$permsCmd}; su postgres -c \"{$command}\"";
+    }
+
+    public static function buildS3EnvVars(ScheduledDatabaseBackup $backup): array
+    {
+        $envVars = [];
+        $repos = $backup->enabledPgbackrestRepos()->get();
+
+        foreach ($repos as $repo) {
+            if ($repo->isS3() && $repo->s3Storage) {
+                $s3 = $repo->s3Storage;
+                $repoNum = $repo->repo_number;
+                $envVars["PGBACKREST_REPO{$repoNum}_S3_KEY"] = $s3->key;
+                $envVars["PGBACKREST_REPO{$repoNum}_S3_KEY_SECRET"] = $s3->secret;
+            }
+        }
+
+        return $envVars;
+    }
+
+    public static function buildS3EnvVarsForRepo(PgbackrestRepo $repo): array
+    {
+        if (! $repo->isS3() || ! $repo->s3Storage) {
+            return [];
+        }
+
+        $s3 = $repo->s3Storage;
+        $repoNum = $repo->repo_number;
+
+        return [
+            "PGBACKREST_REPO{$repoNum}_S3_KEY" => $s3->key,
+            "PGBACKREST_REPO{$repoNum}_S3_KEY_SECRET" => $s3->secret,
+        ];
+    }
+
+    public static function buildBackupCommand(
+        string $stanza,
+        string $type = 'full',
+        ?string $logLevel = null,
+        ?int $repoNumber = null
+    ): string {
+        $cmd = "pgbackrest --stanza={$stanza}";
+
+        if ($logLevel) {
+            $cmd .= " --log-level-console={$logLevel}";
+        }
+
+        if ($repoNumber !== null) {
+            $cmd .= " --repo={$repoNumber}";
+        }
+
+        $cmd .= " --type={$type} backup";
+
+        return $cmd;
+    }
+
+    public static function buildRestoreCommand(
+        string $stanza,
+        ?string $label = null,
+        ?string $targetTime = null,
+        ?string $logLevel = null,
+        ?int $repoNumber = null
+    ): string {
+        $cmd = "pgbackrest --stanza={$stanza}";
+
+        if ($logLevel) {
+            $cmd .= " --log-level-console={$logLevel}";
+        }
+
+        if ($repoNumber !== null) {
+            $cmd .= " --repo={$repoNumber}";
+        }
+
+        if ($label) {
+            $cmd .= " --set={$label}";
+        }
+
+        if ($targetTime) {
+            $cmd .= " --type=time --target=\"{$targetTime}\" --target-action=promote";
+        }
+
+        $cmd .= ' restore';
+
+        return $cmd;
+    }
+
+    public static function buildInfoCommand(string $stanza, bool $json = true, ?int $repoNumber = null): string
+    {
+        $cmd = "pgbackrest --stanza={$stanza}";
+
+        if ($repoNumber !== null) {
+            $cmd .= " --repo={$repoNumber}";
+        }
+
+        if ($json) {
+            $cmd .= ' --output=json';
+        }
+
+        $cmd .= ' info';
+
+        return $cmd;
+    }
+
+    public static function buildStanzaCreateCommand(string $stanza): string
+    {
+        return "pgbackrest --stanza={$stanza} --log-level-console=info stanza-create";
+    }
+
+    public static function buildExpireCommand(
+        string $stanza,
+        ?int $repoNumber = null
+    ): string {
+        $cmd = "pgbackrest --stanza={$stanza}";
+
+        if ($repoNumber !== null) {
+            $cmd .= " --repo={$repoNumber}";
+        }
+
+        $cmd .= ' expire';
+
+        return $cmd;
+    }
+
+    public static function parseInfoJson(string $json): ?array
+    {
+        $data = json_decode($json, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return null;
+        }
+
+        return $data;
+    }
+
+    public static function getLatestBackup(array $info): ?array
+    {
+        if (empty($info) || ! isset($info[0]['backup'])) {
+            return null;
+        }
+
+        $backups = $info[0]['backup'] ?? [];
+
+        if (empty($backups)) {
+            return null;
+        }
+
+        return end($backups);
+    }
+
+    public static function findBackupByLabel(array $info, string $label): ?array
+    {
+        if (empty($info) || ! isset($info[0]['backup'])) {
+            return null;
+        }
+
+        foreach ($info[0]['backup'] as $backup) {
+            if (($backup['label'] ?? '') === $label) {
+                return $backup;
+            }
+        }
+
+        return null;
+    }
+
+    public static function getBackupSize(array $backup): int
+    {
+        return $backup['info']['repository']['size'] ?? 0;
+    }
+
+    public static function getBackupType(array $backup): string
+    {
+        return $backup['type'] ?? 'full';
+    }
+
+    public static function stanzaExists(array $info): bool
+    {
+        if (empty($info) || ! isset($info[0])) {
+            return false;
+        }
+
+        $status = $info[0]['status'] ?? [];
+
+        return ($status['code'] ?? 0) === 0;
+    }
+
+    public static function hasBackups(array $info): bool
+    {
+        if (empty($info) || ! isset($info[0]['backup'])) {
+            return false;
+        }
+
+        return count($info[0]['backup']) > 0;
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\PgBackrestRestore;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
@@ -11,9 +12,11 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Models\DatabaseRestore;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Illuminate\Http\Request;
@@ -640,6 +643,12 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Number of backups to retain in S3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage (MB) for S3 backups'],
+                        'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest'], 'default' => 'native'],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
+                        'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
+                        'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
+                        'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
+                        'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
                     ],
                 ),
             )
@@ -676,7 +685,15 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = [
+            'save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup',
+            'database_backup_retention_amount_locally', 'database_backup_retention_days_locally',
+            'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3',
+            'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3',
+            's3_storage_uuid',
+            'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level',
+            'pgbackrest_log_level', 'pgbackrest_archive_mode',
+        ];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -703,6 +720,12 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'engine' => 'string|in:native,pgbackrest|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
+            'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
         ]);
 
         if ($validator->fails()) {
@@ -723,6 +746,14 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('manageBackups', $database);
+
+        // Validate pgBackRest can only be used with PostgreSQL
+        if ($request->input('engine') === 'pgbackrest' && $database->type() !== 'standalone-postgresql') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['engine' => ['pgBackRest engine is only supported for PostgreSQL databases.']],
+            ], 422);
+        }
 
         // Validate frequency is a valid cron expression
         $isValid = validate_cron_expression($request->frequency);
@@ -867,6 +898,12 @@ class DatabasesController extends Controller
                         'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Retention amount of the backup in s3'],
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage of the backup in S3'],
+                        'engine' => ['type' => 'string', 'description' => 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)', 'enum' => ['native', 'pgbackrest']],
+                        'pgbackrest_backup_type' => ['type' => 'string', 'description' => 'pgBackRest backup type', 'enum' => ['full', 'diff', 'incr']],
+                        'pgbackrest_compress_type' => ['type' => 'string', 'description' => 'pgBackRest compression type', 'enum' => ['lz4', 'gzip', 'zstd', 'none']],
+                        'pgbackrest_compress_level' => ['type' => 'integer', 'description' => 'pgBackRest compression level (0-9)'],
+                        'pgbackrest_log_level' => ['type' => 'string', 'description' => 'pgBackRest log level', 'enum' => ['off', 'error', 'warn', 'info', 'detail', 'debug', 'trace']],
+                        'pgbackrest_archive_mode' => ['type' => 'string', 'description' => 'pgBackRest archive mode for WAL archiving', 'enum' => ['standard', 'reduced', 'minimal']],
                     ],
                 ),
             )
@@ -896,7 +933,15 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = [
+            'save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup',
+            'database_backup_retention_amount_locally', 'database_backup_retention_days_locally',
+            'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3',
+            'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3',
+            's3_storage_uuid',
+            'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level',
+            'pgbackrest_log_level', 'pgbackrest_archive_mode',
+        ];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -921,6 +966,12 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'engine' => 'string|in:native,pgbackrest|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,diff,incr|nullable',
+            'pgbackrest_compress_type' => 'string|in:lz4,gzip,zstd,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -946,6 +997,14 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+
+        // Validate pgBackRest can only be used with PostgreSQL
+        if ($request->input('engine') === 'pgbackrest' && $database->type() !== 'standalone-postgresql') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['engine' => ['pgBackRest engine is only supported for PostgreSQL databases.']],
+            ], 422);
+        }
 
         if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
             return response()->json([
@@ -2748,5 +2807,263 @@ class DatabasesController extends Controller
             ],
             200
         );
+    }
+
+    #[OA\Post(
+        summary: 'Restore Database',
+        description: 'Restore a PostgreSQL database from a PgBackRest backup.',
+        path: '/databases/{uuid}/restore',
+        operationId: 'restore-database',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'execution_uuid', type: 'string', description: 'UUID of backup execution to restore from (optional, uses latest if not specified)'),
+                    new OA\Property(property: 'target_time', type: 'string', description: 'ISO 8601 timestamp for point-in-time recovery (optional)'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restore initiated',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database restore initiated.'],
+                                'restore_uuid' => ['type' => 'string', 'example' => 'abc123'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function restore_database(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        if (! $database instanceof StandalonePostgresql) {
+            return response()->json(['message' => 'PgBackRest restore is only available for PostgreSQL databases.'], 400);
+        }
+
+        $this->authorize('manage', $database);
+
+        if (! $database->hasPgBackrestBackups()) {
+            return response()->json(['message' => 'No PgBackRest backup configuration found for this database.'], 400);
+        }
+
+        $execution = null;
+        if ($request->has('execution_uuid')) {
+            $execution = ScheduledDatabaseBackupExecution::where('uuid', $request->execution_uuid)
+                ->whereHas('scheduledDatabaseBackup', function ($query) use ($database) {
+                    $query->where('database_id', $database->id)
+                        ->where('database_type', $database->getMorphClass())
+                        ->where('engine', 'pgbackrest');
+                })
+                ->where('status', 'success')
+                ->first();
+
+            if (! $execution) {
+                return response()->json(['message' => 'Backup execution not found or not a successful PgBackRest backup.'], 404);
+            }
+        }
+
+        $targetTime = $request->input('target_time');
+
+        $restore = PgBackrestRestore::run($database, $execution, $targetTime);
+
+        return response()->json([
+            'message' => 'Database restore initiated.',
+            'restore_uuid' => $restore->uuid,
+        ], 200);
+    }
+
+    #[OA\Get(
+        summary: 'List Restores',
+        description: 'List all restore operations for a database.',
+        path: '/databases/{uuid}/restores',
+        operationId: 'list-database-restores',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of restores',
+                content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object'))
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function list_restores(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $restores = DatabaseRestore::where('database_id', $database->id)
+            ->where('database_type', $database->getMorphClass())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($restores);
+    }
+
+    #[OA\Get(
+        summary: 'Restore Status',
+        description: 'Get the status of a restore operation.',
+        path: '/databases/{uuid}/restores/{restore_uuid}',
+        operationId: 'get-restore-status',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'restore_uuid',
+                in: 'path',
+                description: 'UUID of the restore operation.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Restore status',
+                content: new OA\JsonContent(type: 'object')
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function restore_status(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $uuid = $request->route('uuid');
+        $restoreUuid = $request->route('restore_uuid');
+
+        if (! $uuid || ! $restoreUuid) {
+            return response()->json(['message' => 'UUID and restore_uuid are required.'], 400);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        $restore = DatabaseRestore::where('uuid', $restoreUuid)
+            ->where('database_id', $database->id)
+            ->where('database_type', $database->getMorphClass())
+            ->first();
+
+        if (! $restore) {
+            return response()->json(['message' => 'Restore not found.'], 404);
+        }
+
+        return response()->json($restore);
     }
 }
