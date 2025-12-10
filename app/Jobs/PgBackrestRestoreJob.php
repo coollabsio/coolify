@@ -246,9 +246,10 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             throw new RuntimeException('PGDATA volume not found.');
         }
 
-        $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
+        $volumeName = $pgdataVolume->host_path ?: $pgdataVolume->name;
+        $backupVolumeName = "{$pgdataVolume->name}_backup_{$timestamp}";
 
-        $checkCmd = "docker run --rm -v {$mount}:/data alpine sh -c 'test -n \"$(ls -A /data 2>/dev/null)\" && echo OK || echo EMPTY'";
+        $checkCmd = "docker run --rm -v {$volumeName}:/data alpine sh -c 'test -n \"$(ls -A /data 2>/dev/null)\" && echo OK || echo EMPTY'";
         $checkResult = instant_remote_process([$checkCmd], $server, false, false, 30, disableMultiplexing: true);
 
         if (trim($checkResult) === 'EMPTY') {
@@ -257,24 +258,24 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             return null;
         }
 
-        $backupPath = "{$mount}_backup_{$timestamp}";
+        instant_remote_process(["docker volume create {$backupVolumeName}"], $server, false, false, 30, disableMultiplexing: true);
 
-        $backupCmd = "docker run --rm -v {$mount}:/data -v {$mount}_backup_{$timestamp}:/backup alpine sh -c 'cp -a /data/. /backup/'";
-        instant_remote_process([$backupCmd], $server, true, false, 600, disableMultiplexing: true);
+        $copyCmd = "docker run --rm -v {$volumeName}:/source:ro -v {$backupVolumeName}:/backup alpine sh -c 'cp -a /source/. /backup/'";
+        instant_remote_process([$copyCmd], $server, true, false, 300, disableMultiplexing: true);
 
-        $verifyCmd = "docker run --rm -v {$backupPath}:/backup alpine sh -c 'test -n \"$(ls -A /backup 2>/dev/null)\" && echo OK'";
+        $verifyCmd = "docker run --rm -v {$backupVolumeName}:/backup alpine sh -c 'test -n \"$(ls -A /backup 2>/dev/null)\" && echo OK'";
         $result = instant_remote_process([$verifyCmd], $server, false, false, 30, disableMultiplexing: true);
 
         if (trim($result) !== 'OK') {
-            throw new RuntimeException('PGDATA backup verification failed: backup directory is empty or inaccessible.');
+            throw new RuntimeException('PGDATA backup verification failed: backup volume is empty or inaccessible.');
         }
 
-        $this->restore->appendLog("PGDATA backed up to temporary location: {$backupPath}");
+        $this->restore->appendLog("PGDATA backed up to volume: {$backupVolumeName}");
 
-        return $backupPath;
+        return $backupVolumeName;
     }
 
-    private function recoverFromBackup(string $backupPath): void
+    private function recoverFromBackup(string $backupVolumeName): void
     {
         try {
             $server = $this->database->destination->server;
@@ -286,11 +287,15 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
+            $volumeName = $pgdataVolume->host_path ?: $pgdataVolume->name;
 
             $this->restore->appendLog('Recovering PGDATA from backup...');
-            $recoverCmd = "docker run --rm -v {$mount}:/data -v {$backupPath}:/backup alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true && cp -a /backup/* /data/ 2>/dev/null || true'";
-            instant_remote_process([$recoverCmd], $server, false, false, 600, disableMultiplexing: true);
+
+            $clearCmd = "docker run --rm -v {$volumeName}:/data alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true'";
+            instant_remote_process([$clearCmd], $server, false, false, 60, disableMultiplexing: true);
+
+            $copyCmd = "docker run --rm -v {$backupVolumeName}:/source:ro -v {$volumeName}:/data alpine sh -c 'cp -a /source/. /data/'";
+            instant_remote_process([$copyCmd], $server, true, false, 300, disableMultiplexing: true);
 
             $this->restore->appendLog('PGDATA recovered from backup.');
         } catch (Throwable $e) {
@@ -298,17 +303,16 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function removePgDataBackup(string $backupPath): void
+    private function removePgDataBackup(string $backupVolumeName): void
     {
         try {
             $server = $this->database->destination->server;
 
-            $rmCmd = "docker run --rm -v {$backupPath}:/backup alpine sh -c 'rm -rf /backup/* /backup/.[!.]* /backup/..?* 2>/dev/null || true'";
-            instant_remote_process([$rmCmd], $server, false, false, 300, disableMultiplexing: true);
+            instant_remote_process(["docker volume rm {$backupVolumeName} 2>/dev/null || true"], $server, false, false, 60, disableMultiplexing: true);
 
-            $this->restore->appendLog('Temporary backup removed.');
+            $this->restore->appendLog('Temporary backup volume removed.');
         } catch (Throwable $e) {
-            $this->restore->appendLog('Warning: Failed to remove temporary backup: '.$e->getMessage());
+            $this->restore->appendLog('Warning: Failed to remove temporary backup volume: '.$e->getMessage());
         }
     }
 

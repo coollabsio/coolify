@@ -192,6 +192,19 @@ BASH;
         ];
     }
 
+    public static function buildDockerEnvArgs(array $envVars): string
+    {
+        $args = '';
+        foreach ($envVars as $key => $value) {
+            if (! preg_match('/^[A-Z_][A-Z0-9_]*$/i', $key)) {
+                throw new \InvalidArgumentException("Invalid environment variable name: {$key}");
+            }
+            $args .= ' -e '.escapeshellarg("{$key}={$value}");
+        }
+
+        return $args;
+    }
+
     public static function buildBackupCommand(
         string $stanza,
         string $type = 'full',
@@ -214,6 +227,38 @@ BASH;
         $cmd .= " --type={$escapedType} backup";
 
         return $cmd;
+    }
+
+    public static function wrapWithLockWait(string $command, int $maxWaitSeconds = 900, int $intervalSeconds = 10): string
+    {
+        if ($intervalSeconds <= 0) {
+            throw new \InvalidArgumentException('Interval seconds must be greater than 0');
+        }
+        if ($maxWaitSeconds <= 0) {
+            throw new \InvalidArgumentException('Max wait seconds must be greater than 0');
+        }
+
+        $maxAttempts = (int) ceil($maxWaitSeconds / $intervalSeconds);
+
+        return <<<BASH
+attempt=0
+max_attempts={$maxAttempts}
+while [ \$attempt -lt \$max_attempts ]; do
+    {$command}
+    exit_code=\$?
+    if [ \$exit_code -eq 0 ]; then
+        exit 0
+    elif [ \$exit_code -eq 50 ]; then
+        echo "Lock held by another process, waiting {$intervalSeconds}s before retry (\$((attempt+1))/\$max_attempts)..."
+        sleep {$intervalSeconds}
+        attempt=\$((attempt+1))
+    else
+        exit \$exit_code
+    fi
+done
+echo "ERROR: Timeout waiting for lock after {$maxWaitSeconds} seconds"
+exit 50
+BASH;
     }
 
     public static function buildRestoreCommand(
