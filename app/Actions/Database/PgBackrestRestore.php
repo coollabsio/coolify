@@ -38,6 +38,7 @@ class PgBackrestRestore
     {
         return [
             'database' => ['required'],
+            'targetTime' => ['nullable', 'date'],
         ];
     }
 }

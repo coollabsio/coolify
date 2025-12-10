@@ -69,6 +69,7 @@ return new class extends Migration
             $table->timestamp('target_time')->nullable();
 
             $table->string('status')->default('pending');
+            $table->index('status');
             $table->longText('message')->nullable();
             $table->longText('log')->nullable();
 
@@ -79,6 +80,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::table('database_restores', function (Blueprint $table) {
+            $table->dropIndex(['status']);
+        });
         Schema::dropIfExists('database_restores');
         Schema::dropIfExists('pgbackrest_repos');
 

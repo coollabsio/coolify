@@ -17,6 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
@@ -38,8 +39,6 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        $server = $this->database->destination->server;
-        $containerName = $this->database->uuid;
         $stanza = PgBackrestService::getStanzaName($this->database);
         $backupTimestamp = time();
 
@@ -124,54 +123,54 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $this->restore->appendLog('Running pre-flight validation.');
 
         if (! $this->database->hasPgBackrestBackups()) {
-            throw new \RuntimeException('No PgBackRest backup configuration found for this database.');
+            throw new RuntimeException('No PgBackRest backup configuration found for this database.');
         }
 
         $backup = $this->database->pgbackrestBackups()->where('enabled', true)->first();
         if (! $backup) {
-            throw new \RuntimeException('No enabled PgBackRest backup configuration found.');
+            throw new RuntimeException('No enabled PgBackRest backup configuration found.');
         }
 
         $s3Repos = $backup->pgbackrestRepos()->where('type', 's3')->where('enabled', true)->get();
         foreach ($s3Repos as $s3Repo) {
             $s3 = $s3Repo->s3Storage;
             if (! $s3) {
-                throw new \RuntimeException("S3 storage configuration not found for repo {$s3Repo->repo_number}.");
+                throw new RuntimeException("S3 storage configuration not found for repo {$s3Repo->repo_number}.");
             }
 
             try {
                 $s3->testConnection(shouldSave: true);
             } catch (Throwable $e) {
-                throw new \RuntimeException("S3 connection test failed for repo {$s3Repo->repo_number}: ".$e->getMessage());
+                throw new RuntimeException("S3 connection test failed for repo {$s3Repo->repo_number}: ".$e->getMessage());
             }
         }
 
         $pgdataVolume = $this->database->pgdataVolume();
         if (! $pgdataVolume) {
-            throw new \RuntimeException('PGDATA volume not found.');
+            throw new RuntimeException('PGDATA volume not found.');
         }
 
         $repoVolume = $this->database->pgbackrestRepoVolume();
         $hasLocalRepo = $backup->hasLocalRepo();
         if (! $repoVolume && $hasLocalRepo) {
-            throw new \RuntimeException('PgBackRest repository volume not found.');
+            throw new RuntimeException('PgBackRest repository volume not found.');
         }
 
         $this->restore->appendLog('Verifying backup exists in repository via sidecar container.');
         $info = $this->runInfoSidecar($stanza, $backup);
 
         if (! PgBackrestService::stanzaExists($info)) {
-            throw new \RuntimeException('PgBackRest stanza does not exist or is not healthy.');
+            throw new RuntimeException('PgBackRest stanza does not exist or is not healthy.');
         }
 
         if (! PgBackrestService::hasBackups($info)) {
-            throw new \RuntimeException('No backups found in PgBackRest repository.');
+            throw new RuntimeException('No backups found in PgBackRest repository.');
         }
 
         if ($this->execution && $this->execution->pgbackrest_label) {
             $targetBackup = PgBackrestService::findBackupByLabel($info, $this->execution->pgbackrest_label);
             if (! $targetBackup) {
-                throw new \RuntimeException("Backup with label '{$this->execution->pgbackrest_label}' not found in repository.");
+                throw new RuntimeException("Backup with label '{$this->execution->pgbackrest_label}' not found in repository.");
             }
             $this->restore->appendLog("Target backup verified: {$this->execution->pgbackrest_label}");
         } else {
@@ -203,8 +202,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $s3EnvVars = PgBackrestService::buildS3EnvVars($backup);
         foreach ($s3EnvVars as $key => $value) {
-            $escapedValue = addslashes($value);
-            $envPieces[] = "-e {$key}=\"{$escapedValue}\"";
+            $envPieces[] = '-e '.$key.'='.escapeshellarg($value);
         }
 
         $infoCmd = PgBackrestService::buildInfoCommand($stanza, true);
@@ -223,7 +221,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $output = instant_remote_process([$cmd], $server, false, false, 120, disableMultiplexing: true);
 
         if ($output === null || $output === '') {
-            throw new \RuntimeException('Failed to get PgBackRest info - command returned no output. Command: '.$cmd);
+            throw new RuntimeException('Failed to get PgBackRest info - command returned no output. Command: '.$cmd);
         }
 
         $jsonStart = strpos($output, '[');
@@ -233,7 +231,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $info = PgBackrestService::parseInfoJson($output);
         if ($info === null) {
-            throw new \RuntimeException('Failed to parse PgBackRest info output: '.$output);
+            throw new RuntimeException('Failed to parse PgBackRest info output: '.$output);
         }
 
         return $info;
@@ -245,7 +243,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $pgdataVolume = $this->database->pgdataVolume();
 
         if (! $pgdataVolume) {
-            throw new \RuntimeException('PGDATA volume not found.');
+            throw new RuntimeException('PGDATA volume not found.');
         }
 
         $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
@@ -268,7 +266,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $result = instant_remote_process([$verifyCmd], $server, false, false, 30, disableMultiplexing: true);
 
         if (trim($result) !== 'OK') {
-            throw new \RuntimeException('PGDATA backup verification failed: backup directory is empty or inaccessible.');
+            throw new RuntimeException('PGDATA backup verification failed: backup directory is empty or inaccessible.');
         }
 
         $this->restore->appendLog("PGDATA backed up to temporary location: {$backupPath}");
@@ -320,7 +318,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $pgdataVolume = $this->database->pgdataVolume();
 
         if (! $pgdataVolume) {
-            throw new \RuntimeException('PGDATA volume not found.');
+            throw new RuntimeException('PGDATA volume not found.');
         }
 
         $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
@@ -336,7 +334,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $pgdataVolume = $this->database->pgdataVolume();
             if (! $pgdataVolume) {
-                throw new \RuntimeException('PGDATA volume not found.');
+                throw new RuntimeException('PGDATA volume not found.');
             }
 
             $server = $this->database->destination->server;
@@ -347,12 +345,12 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             $result = instant_remote_process([$checkCmd], $server, false, false, 30, disableMultiplexing: true);
 
             if (trim($result) !== 'OK') {
-                throw new \RuntimeException('Restored PGDATA does not contain valid PostgreSQL data (PG_VERSION not found).');
+                throw new RuntimeException('Restored PGDATA does not contain valid PostgreSQL data (PG_VERSION not found).');
             }
 
             $this->restore->appendLog('Restored database verified successfully.');
         } catch (Throwable $e) {
-            throw new \RuntimeException('Database verification failed: '.$e->getMessage());
+            throw new RuntimeException('Database verification failed: '.$e->getMessage());
         }
     }
 
@@ -364,7 +362,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $backup = $this->database->pgbackrestBackups()->where('enabled', true)->first();
         if (! $backup) {
-            throw new \RuntimeException('No enabled PgBackRest backup configuration found.');
+            throw new RuntimeException('No enabled PgBackRest backup configuration found.');
         }
 
         $pgdataVolume = $this->database->pgdataVolume();
@@ -386,8 +384,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $s3EnvVars = PgBackrestService::buildS3EnvVars($backup);
         foreach ($s3EnvVars as $key => $value) {
-            $escapedValue = addslashes($value);
-            $envPieces[] = "-e {$key}=\"{$escapedValue}\"";
+            $envPieces[] = '-e '.$key.'='.escapeshellarg($value);
         }
 
         $restoreCmd = PgBackrestService::buildRestoreCommand(
