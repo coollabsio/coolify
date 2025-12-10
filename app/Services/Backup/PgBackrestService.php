@@ -198,17 +198,20 @@ BASH;
         ?string $logLevel = null,
         ?int $repoNumber = null
     ): string {
-        $cmd = "pgbackrest --stanza={$stanza}";
+        $escapedStanza = escapeshellarg($stanza);
+        $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($logLevel) {
-            $cmd .= " --log-level-console={$logLevel}";
+            $escapedLogLevel = escapeshellarg($logLevel);
+            $cmd .= " --log-level-console={$escapedLogLevel}";
         }
 
         if ($repoNumber !== null) {
-            $cmd .= " --repo={$repoNumber}";
+            $cmd .= ' --repo='.((int) $repoNumber);
         }
 
-        $cmd .= " --type={$type} backup";
+        $escapedType = escapeshellarg($type);
+        $cmd .= " --type={$escapedType} backup";
 
         return $cmd;
     }
@@ -220,22 +223,26 @@ BASH;
         ?string $logLevel = null,
         ?int $repoNumber = null
     ): string {
-        $cmd = "pgbackrest --stanza={$stanza}";
+        $escapedStanza = escapeshellarg($stanza);
+        $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($logLevel) {
-            $cmd .= " --log-level-console={$logLevel}";
+            $escapedLogLevel = escapeshellarg($logLevel);
+            $cmd .= " --log-level-console={$escapedLogLevel}";
         }
 
         if ($repoNumber !== null) {
-            $cmd .= " --repo={$repoNumber}";
+            $cmd .= ' --repo='.((int) $repoNumber);
         }
 
         if ($label) {
-            $cmd .= " --set={$label}";
+            $escapedLabel = escapeshellarg($label);
+            $cmd .= " --set={$escapedLabel}";
         }
 
         if ($targetTime) {
-            $cmd .= " --type=time --target=\"{$targetTime}\" --target-action=promote";
+            $escapedTargetTime = escapeshellarg($targetTime);
+            $cmd .= " --type=time --target={$escapedTargetTime} --target-action=promote";
         }
 
         $cmd .= ' restore';
@@ -245,10 +252,11 @@ BASH;
 
     public static function buildInfoCommand(string $stanza, bool $json = true, ?int $repoNumber = null): string
     {
-        $cmd = "pgbackrest --stanza={$stanza}";
+        $escapedStanza = escapeshellarg($stanza);
+        $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($repoNumber !== null) {
-            $cmd .= " --repo={$repoNumber}";
+            $cmd .= ' --repo='.((int) $repoNumber);
         }
 
         if ($json) {
@@ -262,17 +270,20 @@ BASH;
 
     public static function buildStanzaCreateCommand(string $stanza): string
     {
-        return "pgbackrest --stanza={$stanza} --log-level-console=info stanza-create";
+        $escapedStanza = escapeshellarg($stanza);
+
+        return "pgbackrest --stanza={$escapedStanza} --log-level-console=info stanza-create";
     }
 
     public static function buildExpireCommand(
         string $stanza,
         ?int $repoNumber = null
     ): string {
-        $cmd = "pgbackrest --stanza={$stanza}";
+        $escapedStanza = escapeshellarg($stanza);
+        $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($repoNumber !== null) {
-            $cmd .= " --repo={$repoNumber}";
+            $cmd .= ' --repo='.((int) $repoNumber);
         }
 
         $cmd .= ' expire';

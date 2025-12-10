@@ -47,6 +47,51 @@ class DatabasesController extends Controller
         return serializeApiResponse($database);
     }
 
+    /**
+     * Allowed fields for backup configuration API requests.
+     */
+    private function getBackupConfigFields(): array
+    {
+        return [
+            'save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup',
+            'database_backup_retention_amount_locally', 'database_backup_retention_days_locally',
+            'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3',
+            'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3',
+            's3_storage_uuid',
+            'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level',
+            'pgbackrest_log_level', 'pgbackrest_archive_mode',
+        ];
+    }
+
+    /**
+     * Build backup configuration data from request input.
+     * Converts s3_storage_uuid to s3_storage_id and filters to allowed fields.
+     *
+     * @return array{data: array, error: \Illuminate\Http\JsonResponse|null}
+     */
+    private function buildBackupConfig(Request $request, bool $requireSaveS3 = false): array
+    {
+        $backupData = $request->only($this->getBackupConfigFields());
+
+        if (isset($backupData['s3_storage_uuid'])) {
+            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
+            if ($s3Storage) {
+                $backupData['s3_storage_id'] = $s3Storage->id;
+            } elseif ($requireSaveS3 || $request->boolean('save_s3')) {
+                return [
+                    'data' => [],
+                    'error' => response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                    ], 422),
+                ];
+            }
+            unset($backupData['s3_storage_uuid']);
+        }
+
+        return ['data' => $backupData, 'error' => null];
+    }
+
     #[OA\Get(
         summary: 'List',
         description: 'List all databases.',
@@ -685,22 +730,13 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = [
-            'save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup',
-            'database_backup_retention_amount_locally', 'database_backup_retention_days_locally',
-            'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3',
-            'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3',
-            's3_storage_uuid',
-            'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level',
-            'pgbackrest_log_level', 'pgbackrest_archive_mode',
-        ];
+        $backupConfigFields = $this->getBackupConfigFields();
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
-        // Validate incoming request is valid JSON
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
@@ -796,21 +832,11 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        $backupData = $request->only($backupConfigFields);
-
-        // Convert s3_storage_uuid to s3_storage_id
-        if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
-            if ($s3Storage) {
-                $backupData['s3_storage_id'] = $s3Storage->id;
-            } elseif ($request->boolean('save_s3')) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
-            unset($backupData['s3_storage_uuid']);
+        $result = $this->buildBackupConfig($request);
+        if ($result['error']) {
+            return $result['error'];
         }
+        $backupData = $result['data'];
 
         // Set default databases_to_backup based on database type if not provided
         if (! isset($backupData['databases_to_backup']) || empty($backupData['databases_to_backup'])) {
@@ -933,25 +959,18 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = [
-            'save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup',
-            'database_backup_retention_amount_locally', 'database_backup_retention_days_locally',
-            'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3',
-            'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3',
-            's3_storage_uuid',
-            'engine', 'pgbackrest_backup_type', 'pgbackrest_compress_type', 'pgbackrest_compress_level',
-            'pgbackrest_log_level', 'pgbackrest_archive_mode',
-        ];
+        $backupConfigFields = $this->getBackupConfigFields();
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        // this check if the request is a valid json
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
+
         $validator = customApiValidator($request->all(), [
             'save_s3' => 'boolean',
             'backup_now' => 'boolean|nullable',
@@ -973,6 +992,7 @@ class DatabasesController extends Controller
             'pgbackrest_log_level' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
             'pgbackrest_archive_mode' => 'string|in:standard,reduced,minimal|nullable',
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -984,7 +1004,6 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'UUID is required.'], 404);
         }
 
-        // Validate scheduled_backup_uuid is provided
         if (! $request->scheduled_backup_uuid) {
             return response()->json(['message' => 'Scheduled backup UUID is required.'], 400);
         }
@@ -1012,6 +1031,7 @@ class DatabasesController extends Controller
                 'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid field is required when save_s3 is true.']],
             ], 422);
         }
+
         if ($request->filled('s3_storage_uuid')) {
             $existsInTeam = S3Storage::ownedByCurrentTeam()->where('uuid', $request->s3_storage_uuid)->exists();
             if (! $existsInTeam) {
@@ -1042,21 +1062,11 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        $backupData = $request->only($backupConfigFields);
-
-        // Convert s3_storage_uuid to s3_storage_id
-        if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
-            if ($s3Storage) {
-                $backupData['s3_storage_id'] = $s3Storage->id;
-            } elseif ($request->boolean('save_s3')) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
-                ], 422);
-            }
-            unset($backupData['s3_storage_uuid']);
+        $result = $this->buildBackupConfig($request);
+        if ($result['error']) {
+            return $result['error'];
         }
+        $backupData = $result['data'];
 
         $backupConfig->update($backupData);
 
@@ -2883,6 +2893,18 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'UUID is required.'], 400);
         }
 
+        $validator = customApiValidator($request->all(), [
+            'execution_uuid' => 'string|uuid|nullable',
+            'target_time' => 'date|nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
@@ -2899,7 +2921,7 @@ class DatabasesController extends Controller
         }
 
         $execution = null;
-        if ($request->has('execution_uuid')) {
+        if ($request->filled('execution_uuid')) {
             $execution = ScheduledDatabaseBackupExecution::where('uuid', $request->execution_uuid)
                 ->whereHas('scheduledDatabaseBackup', function ($query) use ($database) {
                     $query->where('database_id', $database->id)
@@ -2914,7 +2936,10 @@ class DatabasesController extends Controller
             }
         }
 
-        $targetTime = $request->input('target_time');
+        $targetTime = null;
+        if ($request->filled('target_time')) {
+            $targetTime = \Carbon\Carbon::parse($request->input('target_time'))->toIso8601String();
+        }
 
         $restore = PgBackrestRestore::run($database, $execution, $targetTime);
 

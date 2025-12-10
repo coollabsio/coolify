@@ -52,11 +52,14 @@ class DatabaseRestore extends BaseModel
         return in_array($this->status, ['success', 'failed']);
     }
 
-    public function appendLog(string $message): void
+    public function appendLog(string $message, bool $persist = true): void
     {
         $timestamp = now()->format('Y-m-d H:i:s');
         $this->log = ($this->log ?? '')."[{$timestamp}] {$message}\n";
-        $this->save();
+
+        if ($persist) {
+            $this->save();
+        }
     }
 
     public function updateStatus(string $status, ?string $message = null): void
@@ -65,7 +68,7 @@ class DatabaseRestore extends BaseModel
 
         if ($message !== null) {
             $this->message = $message;
-            $this->appendLog($message);
+            $this->appendLog($message, persist: false);
         }
 
         if ($this->isFinished()) {

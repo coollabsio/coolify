@@ -127,7 +127,7 @@ class BackupExecutions extends Component
 
     public function confirmRestore(int $executionId)
     {
-        $execution = ScheduledDatabaseBackupExecution::find($executionId);
+        $execution = $this->backup->executions()->where('id', $executionId)->first();
         if (! $execution || ! $execution->canRestore()) {
             $this->dispatch('error', 'This backup cannot be restored.');
 
@@ -144,17 +144,9 @@ class BackupExecutions extends Component
         $this->showRestoreModal = false;
     }
 
-    public function startRestore(int $executionId, $password = null, $selectedActions = [])
+    public function startRestore(int $executionId)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! $password || ! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
-        }
-
-        $execution = ScheduledDatabaseBackupExecution::find($executionId);
+        $execution = $this->backup->executions()->where('id', $executionId)->first();
         if (! $execution || ! $execution->canRestore()) {
             $this->dispatch('error', 'This backup cannot be restored.');
 
@@ -268,6 +260,7 @@ class BackupExecutions extends Component
     {
         $this->backup = $backup;
         $this->database = $backup->database;
+        $this->authorize('view', $this->database);
         $this->updateCurrentPage();
         $this->loadExecutions();
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -43,12 +44,14 @@ class ScheduledDatabaseBackup extends BaseModel
 
     public function localRepo(): ?PgbackrestRepo
     {
-        return $this->pgbackrestRepos()->where('type', 'posix')->first();
+        return $this->enabledPgbackrestRepos()->where('type', 'posix')->first()
+            ?? $this->pgbackrestRepos()->where('type', 'posix')->first();
     }
 
     public function s3Repo(): ?PgbackrestRepo
     {
-        return $this->pgbackrestRepos()->where('type', 's3')->first();
+        return $this->enabledPgbackrestRepos()->where('type', 's3')->first()
+            ?? $this->pgbackrestRepos()->where('type', 's3')->first();
     }
 
     public function hasLocalRepo(): bool
@@ -61,7 +64,7 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->pgbackrestRepos()->where('type', 's3')->where('enabled', true)->exists();
     }
 
-    public function restores(): HasMany
+    public function restores(): HasManyThrough
     {
         return $this->hasManyThrough(
             DatabaseRestore::class,

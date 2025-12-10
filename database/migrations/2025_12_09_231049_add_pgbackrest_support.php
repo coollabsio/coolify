@@ -52,10 +52,34 @@ return new class extends Migration
 
             $table->unique(['scheduled_database_backup_id', 'repo_number']);
         });
+
+        Schema::create('database_restores', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+
+            $table->morphs('database');
+
+            $table->foreignId('scheduled_database_backup_execution_id')
+                ->nullable()
+                ->constrained('scheduled_database_backup_executions')
+                ->nullOnDelete();
+
+            $table->string('engine')->default('pgbackrest');
+            $table->string('target_label')->nullable();
+            $table->timestamp('target_time')->nullable();
+
+            $table->string('status')->default('pending');
+            $table->longText('message')->nullable();
+            $table->longText('log')->nullable();
+
+            $table->timestamps();
+            $table->timestamp('finished_at')->nullable();
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('database_restores');
         Schema::dropIfExists('pgbackrest_repos');
 
         Schema::table('scheduled_database_backup_executions', function (Blueprint $table) {

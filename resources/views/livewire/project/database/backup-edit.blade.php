@@ -24,7 +24,7 @@
             <x-forms.checkbox instantSave label="Use pgBackRest" 
                 id="usePgbackrest"
                 :checked="$engine === 'pgbackrest'"
-                wire:click="$set('engine', '{{ $engine === 'pgbackrest' ? 'native' : 'pgbackrest' }}')"
+                wire:click="togglePgbackrestEngine"
                 helper="Use pgBackRest instead of pg_dump for efficient incremental backups with point-in-time recovery support." />
         @endif
         @if ($engine !== 'pgbackrest')
@@ -166,7 +166,7 @@
             @endif
 
             {{-- Local Repository Settings --}}
-            @if (!$disableLocalBackup || !$saveS3)
+            @if ($this->showLocalRepoSettings)
                 <div class="mb-6">
                     <h4 class="mb-3">Local Repository</h4>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
