@@ -2434,6 +2434,30 @@ paths:
                 database_backup_retention_max_storage_s3:
                   type: integer
                   description: 'Max storage (MB) for S3 backups'
+                engine:
+                  type: string
+                  description: 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)'
+                  enum: [native, pgbackrest]
+                  default: native
+                pgbackrest_backup_type:
+                  type: string
+                  description: 'pgBackRest backup type'
+                  enum: [full, diff, incr]
+                pgbackrest_compress_type:
+                  type: string
+                  description: 'pgBackRest compression type'
+                  enum: [lz4, gzip, zstd, none]
+                pgbackrest_compress_level:
+                  type: integer
+                  description: 'pgBackRest compression level (0-9)'
+                pgbackrest_log_level:
+                  type: string
+                  description: 'pgBackRest log level'
+                  enum: ['off', error, warn, info, detail, debug, trace]
+                pgbackrest_archive_mode:
+                  type: string
+                  description: 'pgBackRest archive mode for WAL archiving'
+                  enum: [standard, reduced, minimal]
               type: object
       responses:
         '201':
@@ -2828,6 +2852,29 @@ paths:
                 database_backup_retention_max_storage_s3:
                   type: integer
                   description: 'Max storage of the backup in S3'
+                engine:
+                  type: string
+                  description: 'Backup engine: native (pg_dump) or pgbackrest (PostgreSQL only)'
+                  enum: [native, pgbackrest]
+                pgbackrest_backup_type:
+                  type: string
+                  description: 'pgBackRest backup type'
+                  enum: [full, diff, incr]
+                pgbackrest_compress_type:
+                  type: string
+                  description: 'pgBackRest compression type'
+                  enum: [lz4, gzip, zstd, none]
+                pgbackrest_compress_level:
+                  type: integer
+                  description: 'pgBackRest compression level (0-9)'
+                pgbackrest_log_level:
+                  type: string
+                  description: 'pgBackRest log level'
+                  enum: ['off', error, warn, info, detail, debug, trace]
+                pgbackrest_archive_mode:
+                  type: string
+                  description: 'pgBackRest archive mode for WAL archiving'
+                  enum: [standard, reduced, minimal]
               type: object
       responses:
         '200':
@@ -3799,6 +3846,123 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/restore':
+    post:
+      tags:
+        - Databases
+      summary: 'Restore Database'
+      description: 'Restore a PostgreSQL database from a PgBackRest backup.'
+      operationId: restore-database
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                execution_uuid:
+                  description: 'UUID of backup execution to restore from (optional, uses latest if not specified)'
+                  type: string
+                target_time:
+                  description: 'ISO 8601 timestamp for point-in-time recovery (optional)'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Restore initiated'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Database restore initiated.' }
+                  restore_uuid: { type: string, example: abc123 }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/restores':
+    get:
+      tags:
+        - Databases
+      summary: 'List Restores'
+      description: 'List all restore operations for a database.'
+      operationId: list-database-restores
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 'List of restores'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/restores/{restore_uuid}':
+    get:
+      tags:
+        - Databases
+      summary: 'Restore Status'
+      description: 'Get the status of a restore operation.'
+      operationId: get-restore-status
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: restore_uuid
+          in: path
+          description: 'UUID of the restore operation.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Restore status'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
       security:

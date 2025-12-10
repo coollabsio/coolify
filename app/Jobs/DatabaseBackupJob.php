@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Services\Backup\PgBackrestService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -113,6 +114,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if (! $status->startsWith('running') && $this->database->id !== 0) {
                 return;
             }
+
+            if ($this->backup->isPgBackrest() && $this->database instanceof StandalonePostgresql) {
+                $this->run_pgbackrest_backup();
+
+                return;
+            }
+
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
                 $serviceUuid = $this->database->service->uuid;
@@ -680,6 +688,199 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    private function run_pgbackrest_backup(): void
+    {
+        $stanza = PgBackrestService::getStanzaName($this->database);
+        $backupType = $this->backup->pgbackrest_backup_type ?: 'full';
+        $this->container_name = $this->database->uuid;
+
+        $attempts = 0;
+        do {
+            $this->backup_log_uuid = (string) new Cuid2;
+            $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
+            $attempts++;
+            if ($attempts >= 3 && $exists) {
+                throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
+            }
+        } while ($exists);
+
+        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+            'uuid' => $this->backup_log_uuid,
+            'database_name' => $this->database->postgres_db,
+            'scheduled_database_backup_id' => $this->backup->id,
+            'status' => 'running',
+            'engine' => 'pgbackrest',
+            'pgbackrest_backup_type' => $backupType,
+            'pgbackrest_stanza' => $stanza,
+        ]);
+
+        try {
+            $this->update_pgbackrest_config();
+
+            $backupCmd = PgBackrestService::buildBackupCommand($stanza, $backupType, 'info');
+
+            $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
+            if (! empty($s3EnvVars)) {
+                $envExport = '';
+                foreach ($s3EnvVars as $key => $value) {
+                    $escapedValue = addslashes($value);
+                    $envExport .= "export {$key}=\"{$escapedValue}\"; ";
+                }
+                $backupFullCmd = "docker exec {$this->container_name} sh -c '{$envExport} {$backupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
+            } else {
+                $backupFullCmd = "docker exec {$this->container_name} sh -c '{$backupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
+            }
+
+            $rawOutput = instant_remote_process([$backupFullCmd], $this->server, false, false, $this->timeout, disableMultiplexing: true);
+            $rawOutput = trim($rawOutput) ?: '';
+
+            $exitCode = 0;
+            if (preg_match('/EXIT_CODE:(\d+)$/', $rawOutput, $matches)) {
+                $exitCode = (int) $matches[1];
+                $this->backup_output = trim(preg_replace('/EXIT_CODE:\d+$/', '', $rawOutput)) ?: null;
+            } else {
+                $this->backup_output = $rawOutput ?: null;
+            }
+
+            if ($exitCode !== 0) {
+                $errorMessage = $this->backup_output ?: "pgBackRest backup failed with exit code {$exitCode}";
+                throw new \RuntimeException($errorMessage, $exitCode);
+            }
+
+            $infoCmd = PgBackrestService::buildInfoCommand($stanza, true);
+
+            if (! empty($s3EnvVars)) {
+                $envExport = '';
+                foreach ($s3EnvVars as $key => $value) {
+                    $escapedValue = addslashes($value);
+                    $envExport .= "export {$key}=\"{$escapedValue}\"; ";
+                }
+                $infoJson = instant_remote_process(
+                    ["docker exec {$this->container_name} sh -c '{$envExport} {$infoCmd}'"],
+                    $this->server,
+                    false,
+                    false,
+                    120,
+                    disableMultiplexing: true
+                );
+            } else {
+                $infoJson = instant_remote_process(
+                    ["docker exec {$this->container_name} {$infoCmd}"],
+                    $this->server,
+                    false,
+                    false,
+                    120,
+                    disableMultiplexing: true
+                );
+            }
+
+            $info = PgBackrestService::parseInfoJson($infoJson);
+            $latestBackup = $info ? PgBackrestService::getLatestBackup($info) : null;
+
+            $label = $latestBackup['label'] ?? null;
+            $type = $latestBackup ? PgBackrestService::getBackupType($latestBackup) : $backupType;
+            $size = $latestBackup ? PgBackrestService::getBackupSize($latestBackup) : 0;
+
+            $this->run_pgbackrest_expire($stanza);
+
+            $this->backup_log->update([
+                'status' => 'success',
+                'message' => $this->backup_output,
+                'size' => $size,
+                'filename' => "pgbackrest:{$label}",
+                'engine' => 'pgbackrest',
+                'pgbackrest_backup_type' => $type,
+                'pgbackrest_label' => $label,
+                'pgbackrest_repo_size' => $size,
+                's3_uploaded' => $this->backup->hasS3Repo() ? true : null,
+                'finished_at' => Carbon::now(),
+            ]);
+
+            $this->team->notify(new BackupSuccess($this->backup, $this->database, $this->database->postgres_db));
+
+        } catch (Throwable $e) {
+            $errorMsg = $this->backup_output ?? $e->getMessage();
+            if ($this->backup_output && $e->getMessage() !== $this->backup_output) {
+                $errorMsg = $this->backup_output;
+            }
+
+            $this->backup_log->update([
+                'status' => 'failed',
+                'message' => $errorMsg,
+                'finished_at' => Carbon::now(),
+            ]);
+
+            $this->team->notify(new BackupFailed(
+                $this->backup,
+                $this->database,
+                $errorMsg,
+                $this->database->postgres_db
+            ));
+
+            throw $e;
+        } finally {
+            BackupCreated::dispatch($this->team->id);
+        }
+    }
+
+    private function run_pgbackrest_expire(string $stanza): void
+    {
+        try {
+            $repos = $this->backup->enabledPgbackrestRepos()->get();
+
+            foreach ($repos as $repo) {
+                $expireCmd = PgBackrestService::buildExpireCommand($stanza, $repo->repo_number);
+
+                $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
+                if (! empty($s3EnvVars)) {
+                    $envExport = '';
+                    foreach ($s3EnvVars as $key => $value) {
+                        $escapedValue = addslashes($value);
+                        $envExport .= "export {$key}=\"{$escapedValue}\"; ";
+                    }
+                    instant_remote_process(
+                        ["docker exec {$this->container_name} sh -c '{$envExport} {$expireCmd}'"],
+                        $this->server,
+                        false,
+                        false,
+                        $this->timeout,
+                        disableMultiplexing: true
+                    );
+                } else {
+                    instant_remote_process(
+                        ["docker exec {$this->container_name} {$expireCmd}"],
+                        $this->server,
+                        false,
+                        false,
+                        $this->timeout,
+                        disableMultiplexing: true
+                    );
+                }
+            }
+        } catch (Throwable $e) {
+            Log::warning('PgBackRest expire failed', [
+                'stanza' => $stanza,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function update_pgbackrest_config(): void
+    {
+        $config = PgBackrestService::generateConfig($this->database);
+
+        if ($config === null) {
+            throw new \Exception('No valid pgBackRest repository configured. Please configure at least one repository (local or S3).');
+        }
+
+        $configBase64 = base64_encode($config);
+        $configPath = PgBackrestService::CONFIG_PATH;
+
+        instant_remote_process([
+            "docker exec {$this->container_name} sh -c 'echo {$configBase64} | base64 -d > {$configPath}/pgbackrest.conf'",
+        ], $this->server, true, false, 60, disableMultiplexing: true);
     }
 
     public function failed(?Throwable $exception): void

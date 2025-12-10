@@ -10,6 +10,67 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'enabled' => 'boolean',
+            'save_s3' => 'boolean',
+            'dump_all' => 'boolean',
+            'disable_local_backup' => 'boolean',
+            'pgbackrest_compress_level' => 'integer',
+        ];
+    }
+
+    public function isPgBackrest(): bool
+    {
+        return $this->engine === 'pgbackrest';
+    }
+
+    public function isNative(): bool
+    {
+        return $this->engine === 'native' || $this->engine === null;
+    }
+
+    public function pgbackrestRepos(): HasMany
+    {
+        return $this->hasMany(PgbackrestRepo::class)->orderBy('repo_number');
+    }
+
+    public function enabledPgbackrestRepos(): HasMany
+    {
+        return $this->hasMany(PgbackrestRepo::class)->where('enabled', true)->orderBy('repo_number');
+    }
+
+    public function localRepo(): ?PgbackrestRepo
+    {
+        return $this->pgbackrestRepos()->where('type', 'posix')->first();
+    }
+
+    public function s3Repo(): ?PgbackrestRepo
+    {
+        return $this->pgbackrestRepos()->where('type', 's3')->first();
+    }
+
+    public function hasLocalRepo(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 'posix')->where('enabled', true)->exists();
+    }
+
+    public function hasS3Repo(): bool
+    {
+        return $this->pgbackrestRepos()->where('type', 's3')->where('enabled', true)->exists();
+    }
+
+    public function restores(): HasMany
+    {
+        return $this->hasManyThrough(
+            DatabaseRestore::class,
+            ScheduledDatabaseBackupExecution::class,
+            'scheduled_database_backup_id',
+            'scheduled_database_backup_execution_id'
+        );
+    }
+
     public static function ownedByCurrentTeam()
     {
         return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');

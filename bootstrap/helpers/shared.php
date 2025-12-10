@@ -3381,3 +3381,19 @@ function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $compon
 
     return true;
 }
+
+/**
+ * Convert a path from the SSH target perspective to the Docker host perspective.
+ *
+ * In dev mode, SSH commands run in coolify-testing-host where the volume is mounted
+ * at /data/coolify, but Docker Compose runs on the host where the same volume is at
+ * /var/lib/docker/volumes/coolify_dev_coolify_data/_data.
+ */
+function convertPathToDockerHost(string $path): string
+{
+    if (isDev()) {
+        return str_replace('/data/coolify', '/var/lib/docker/volumes/coolify_dev_coolify_data/_data', $path);
+    }
+
+    return $path;
+}
