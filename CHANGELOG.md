@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
   - Changed hashing algorithm from `bcrypt` to `argon2id` for enhanced security
   - Use Redis for sessions and expire inactive sessions after 24h (previously 14 days)
   - Encrypt user sessions data
+  - Expire password reset tokens after 10 minutes (previously 60 minutes)
   - Redirect Laravel logs to `stderr` so they can be viewed in docker logs
   - Configured production logging to rotate automatically and keep only the last 10 days of logs to reduce disk usage
   - Changed production log level from `debug` to `warning` to reduce disk usage and avoid logging sensitive information
@@ -87,7 +88,8 @@ All notable changes to this project will be documented in this file.
 
 ### Refactored
 
-- Completely refactored all database migrations for a cleaner, more consistent and optimized schema
+- Completely refactored all database migrations for a cleaner, more consistent and stable database schema
+- Completely refactored all database models
 
 ## Issues
 
