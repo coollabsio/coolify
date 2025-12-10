@@ -400,7 +400,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $sidecarName = 'pgbackrest-restore-'.$this->database->uuid.'-'.time();
 
-        $fullRestoreScript = $this->getInstallAndRunCommand($restoreCmd).' && chown -R 999:999 '.PgBackrestService::PGDATA_PATH;
+        $fullRestoreScript = $this->getInstallAndRunCommand($restoreCmd);
 
         $cmd = sprintf(
             'docker run --rm --name %s --network %s %s %s %s sh -c \'%s\' 2>&1',
