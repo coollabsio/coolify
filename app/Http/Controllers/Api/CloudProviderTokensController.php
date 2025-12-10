@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
-use App\Services\HetznerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
@@ -489,7 +488,7 @@ class CloudProviderTokensController extends Controller
             ),
         ]
     )]
-    public function validate(Request $request)
+    public function validateToken(Request $request)
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
