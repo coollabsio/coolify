@@ -148,14 +148,6 @@ class InstallDocker
             ')';
     }
 
-    private function getArchDockerInstallCommand(): string
-    {
-        return 'pacman -Syyy --noconfirm && '.
-            'pacman -S docker docker-compose --noconfirm && '.
-            'systemctl start docker && '.
-            'systemctl enable docker';
-    }
-
     private function getGenericDockerInstallCommand(): string
     {
         return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
