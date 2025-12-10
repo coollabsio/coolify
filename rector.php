@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
+use Rector\CodingStyle\Rector\ClassLike\NewlineBetweenClassLikeStmtsRector;
 use Rector\Config\RectorConfig;
 use Rector\Php80\Rector\NotIdentical\MbStrContainsRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
@@ -31,6 +32,7 @@ return RectorConfig::configure()
     ->withSkip([
         __DIR__.'/bootstrap/cache',
         AddOverrideAttributeToOverriddenMethodsRector::class,
+        NewlineBetweenClassLikeStmtsRector::class,
     ])
     ->withCache(__DIR__.'/storage/rector', FileCacheStorage::class)
     ->withPhpSets()
