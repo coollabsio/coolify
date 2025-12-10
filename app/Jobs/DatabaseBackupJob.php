@@ -471,7 +471,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     throw new \Exception('MongoDB credentials not found. Ensure MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD environment variables are available in the container.');
                 }
             }
-            \Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
+            Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             if ($databaseWithCollections === 'all') {
                 $commands[] = 'mkdir -p '.$this->backup_dir;
                 if (str($this->database->image)->startsWith('mongo:4')) {
@@ -703,18 +703,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->update_pgbackrest_config();
 
             $backupCmd = PgBackrestService::buildBackupCommand($stanza, $backupType, 'info');
+            $backupCmdWithWait = PgBackrestService::wrapWithLockWait($backupCmd);
 
             $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
-            if (! empty($s3EnvVars)) {
-                $envExport = '';
-                foreach ($s3EnvVars as $key => $value) {
-                    $escapedValue = addslashes($value);
-                    $envExport .= "export {$key}=\"{$escapedValue}\"; ";
-                }
-                $backupFullCmd = "docker exec {$this->container_name} sh -c '{$envExport} {$backupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
-            } else {
-                $backupFullCmd = "docker exec {$this->container_name} sh -c '{$backupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
-            }
+            $dockerEnvArgs = PgBackrestService::buildDockerEnvArgs($s3EnvVars);
+            $fixPermsCmd = 'chown -R postgres:postgres /var/lib/pgbackrest /tmp/pgbackrest /var/log/pgbackrest 2>/dev/null || true';
+            $escapedBackupCmd = escapeshellarg($backupCmdWithWait);
+            $containerName = escapeshellarg($this->container_name);
+            $backupFullCmd = "docker exec{$dockerEnvArgs} {$containerName} sh -c '{$fixPermsCmd}; su postgres -c {$escapedBackupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
 
             $rawOutput = instant_remote_process([$backupFullCmd], $this->server, false, false, $this->timeout, disableMultiplexing: true);
             $rawOutput = trim($rawOutput) ?: '';
@@ -733,31 +729,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $infoCmd = PgBackrestService::buildInfoCommand($stanza, true);
-
-            if (! empty($s3EnvVars)) {
-                $envExport = '';
-                foreach ($s3EnvVars as $key => $value) {
-                    $escapedValue = addslashes($value);
-                    $envExport .= "export {$key}=\"{$escapedValue}\"; ";
-                }
-                $infoJson = instant_remote_process(
-                    ["docker exec {$this->container_name} sh -c '{$envExport} {$infoCmd}'"],
-                    $this->server,
-                    false,
-                    false,
-                    120,
-                    disableMultiplexing: true
-                );
-            } else {
-                $infoJson = instant_remote_process(
-                    ["docker exec {$this->container_name} {$infoCmd}"],
-                    $this->server,
-                    false,
-                    false,
-                    120,
-                    disableMultiplexing: true
-                );
-            }
+            $escapedInfoCmd = escapeshellarg($infoCmd);
+            $infoJson = instant_remote_process(
+                ["docker exec{$dockerEnvArgs} {$containerName} su postgres -c {$escapedInfoCmd}"],
+                $this->server,
+                false,
+                false,
+                120,
+                disableMultiplexing: true
+            );
 
             $info = PgBackrestService::parseInfoJson($infoJson);
             $latestBackup = $info ? PgBackrestService::getLatestBackup($info) : null;
@@ -812,35 +792,22 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $repos = $this->backup->enabledPgbackrestRepos()->get();
+            $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
+            $dockerEnvArgs = PgBackrestService::buildDockerEnvArgs($s3EnvVars);
+            $containerName = escapeshellarg($this->container_name);
 
             foreach ($repos as $repo) {
                 $expireCmd = PgBackrestService::buildExpireCommand($stanza, $repo->repo_number);
+                $escapedExpireCmd = escapeshellarg($expireCmd);
 
-                $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
-                if (! empty($s3EnvVars)) {
-                    $envExport = '';
-                    foreach ($s3EnvVars as $key => $value) {
-                        $escapedValue = addslashes($value);
-                        $envExport .= "export {$key}=\"{$escapedValue}\"; ";
-                    }
-                    instant_remote_process(
-                        ["docker exec {$this->container_name} sh -c '{$envExport} {$expireCmd}'"],
-                        $this->server,
-                        false,
-                        false,
-                        $this->timeout,
-                        disableMultiplexing: true
-                    );
-                } else {
-                    instant_remote_process(
-                        ["docker exec {$this->container_name} {$expireCmd}"],
-                        $this->server,
-                        false,
-                        false,
-                        $this->timeout,
-                        disableMultiplexing: true
-                    );
-                }
+                instant_remote_process(
+                    ["docker exec{$dockerEnvArgs} {$containerName} sh -c {$escapedExpireCmd}"],
+                    $this->server,
+                    false,
+                    false,
+                    $this->timeout,
+                    disableMultiplexing: true
+                );
             }
         } catch (Throwable $e) {
             Log::warning('PgBackRest expire failed', [
@@ -860,9 +827,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $configBase64 = base64_encode($config);
         $configPath = PgBackrestService::CONFIG_PATH;
+        $containerName = escapeshellarg($this->container_name);
 
         instant_remote_process([
-            "docker exec {$this->container_name} sh -c 'echo {$configBase64} | base64 -d > {$configPath}/pgbackrest.conf'",
+            "docker exec {$containerName} sh -c 'echo {$configBase64} | base64 -d > {$configPath}/pgbackrest.conf'",
         ], $this->server, true, false, 60, disableMultiplexing: true);
     }
 

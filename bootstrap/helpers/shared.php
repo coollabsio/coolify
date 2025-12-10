@@ -3392,8 +3392,41 @@ function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $compon
 function convertPathToDockerHost(string $path): string
 {
     if (isDev()) {
-        return str_replace('/data/coolify', '/var/lib/docker/volumes/coolify_dev_coolify_data/_data', $path);
+        static $volumePath = null;
+        if ($volumePath === null) {
+            $volumePath = discoverDevCoolifyVolumePath();
+        }
+
+        return str_replace('/data/coolify', $volumePath, $path);
     }
 
     return $path;
+}
+
+function discoverDevCoolifyVolumePath(): string
+{
+    $fallback = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data';
+
+    try {
+        $server = \App\Models\Server::find(0);
+        if ($server) {
+            $output = instant_remote_process(
+                ["cat /proc/self/mountinfo | grep '/data/coolify ' | head -1"],
+                $server,
+                false,
+                false,
+                10,
+                disableMultiplexing: true
+            );
+            if (preg_match('#(/var/lib/docker/volumes/[^/]+_dev_coolify_data/_data)\s+/data/coolify#', $output, $matches)) {
+                return $matches[1];
+            }
+            if (preg_match('#/docker/volumes/([^/]+_dev_coolify_data)/_data\s+/data/coolify#', $output, $matches)) {
+                return '/var/lib/docker/volumes/'.$matches[1].'/_data';
+            }
+        }
+    } catch (Throwable $e) {
+    }
+
+    return $fallback;
 }
