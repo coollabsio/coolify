@@ -386,7 +386,7 @@ describe('POST /api/v1/cloud-tokens/{uuid}/validate', function () {
         ])->postJson("/api/v1/cloud-tokens/{$token->uuid}/validate");
 
         $response->assertStatus(200);
-        $response->assertJson(['valid' => false, 'message' => 'Token is invalid.']);
+        $response->assertJson(['valid' => false, 'message' => 'Invalid hetzner token. Please check your API token.']);
     });
 
     test('validates a valid DigitalOcean token', function () {

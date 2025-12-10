@@ -525,7 +525,7 @@ class CloudProviderTokensController extends Controller
 
         return response()->json([
             'valid' => $validation['valid'],
-            'message' => $validation['valid'] ? 'Token is valid.' : 'Failed to validate token.',
+            'message' => $validation['valid'] ? 'Token is valid.' : $validation['error'],
         ]);
     }
 }
