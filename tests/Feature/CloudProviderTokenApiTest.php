@@ -15,7 +15,7 @@ beforeEach(function () {
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
     // Create an API token for the user
-    $this->token = $this->user->createToken('test-token', ['*'], $this->team->id);
+    $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
 });
 

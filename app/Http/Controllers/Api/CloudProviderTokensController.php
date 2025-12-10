@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 class CloudProviderTokensController extends Controller
@@ -18,6 +19,43 @@ class CloudProviderTokensController extends Controller
         ]);
 
         return serializeApiResponse($token);
+    }
+
+    /**
+     * Validate a provider token against the provider's API.
+     *
+     * @return array{valid: bool, error: string|null}
+     */
+    private function validateProviderToken(string $provider, string $token): array
+    {
+        try {
+            $response = match ($provider) {
+                'hetzner' => Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers'),
+                'digitalocean' => Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.digitalocean.com/v2/account'),
+                default => null,
+            };
+
+            if ($response === null) {
+                return ['valid' => false, 'error' => 'Unsupported provider.'];
+            }
+
+            if ($response->successful()) {
+                return ['valid' => true, 'error' => null];
+            }
+
+            return ['valid' => false, 'error' => "Invalid {$provider} token. Please check your API token."];
+        } catch (\Throwable $e) {
+            Log::error('Failed to validate cloud provider token', [
+                'provider' => $provider,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return ['valid' => false, 'error' => 'Failed to validate token with provider API.'];
+        }
     }
 
     #[OA\Get(
@@ -210,13 +248,16 @@ class CloudProviderTokensController extends Controller
             return $return;
         }
 
-        $validator = customApiValidator($request->all(), [
+        // Use request body only (excludes any route parameters)
+        $body = $request->json()->all();
+
+        $validator = customApiValidator($body, [
             'provider' => 'required|string|in:hetzner,digitalocean',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ]);
 
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        $extraFields = array_diff(array_keys($body), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             if (! empty($extraFields)) {
@@ -232,42 +273,17 @@ class CloudProviderTokensController extends Controller
         }
 
         // Validate token with the provider's API
-        $isValid = false;
-        $errorMessage = 'Invalid token.';
+        $validation = $this->validateProviderToken($body['provider'], $body['token']);
 
-        try {
-            if ($request->provider === 'hetzner') {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$request->token,
-                ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-
-                $isValid = $response->successful();
-                if (! $isValid) {
-                    $errorMessage = 'Invalid Hetzner token. Please check your API token.';
-                }
-            } elseif ($request->provider === 'digitalocean') {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$request->token,
-                ])->timeout(10)->get('https://api.digitalocean.com/v2/account');
-
-                $isValid = $response->successful();
-                if (! $isValid) {
-                    $errorMessage = 'Invalid DigitalOcean token. Please check your API token.';
-                }
-            }
-        } catch (\Throwable $e) {
-            return response()->json(['message' => 'Failed to validate token with provider API: '.$e->getMessage()], 400);
-        }
-
-        if (! $isValid) {
-            return response()->json(['message' => $errorMessage], 400);
+        if (! $validation['valid']) {
+            return response()->json(['message' => $validation['error']], 400);
         }
 
         $cloudProviderToken = CloudProviderToken::create([
             'team_id' => $teamId,
-            'provider' => $request->provider,
-            'token' => $request->token,
-            'name' => $request->name,
+            'provider' => $body['provider'],
+            'token' => $body['token'],
+            'name' => $body['name'],
         ]);
 
         return response()->json([
@@ -343,11 +359,14 @@ class CloudProviderTokensController extends Controller
             return $return;
         }
 
-        $validator = customApiValidator($request->all(), [
+        // Use request body only (excludes route parameters like uuid)
+        $body = $request->json()->all();
+
+        $validator = customApiValidator($body, [
             'name' => 'required|string|max:255',
         ]);
 
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        $extraFields = array_diff(array_keys($body), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             if (! empty($extraFields)) {
@@ -362,12 +381,13 @@ class CloudProviderTokensController extends Controller
             ], 422);
         }
 
-        $token = CloudProviderToken::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        // Use route parameter for UUID lookup
+        $token = CloudProviderToken::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
         if (! $token) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
 
-        $token->update($request->only(['name']));
+        $token->update(array_intersect_key($body, array_flip($allowedFields)));
 
         return response()->json([
             'uuid' => $token->uuid,
@@ -501,35 +521,11 @@ class CloudProviderTokensController extends Controller
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
 
-        $isValid = false;
-        $message = 'Token is invalid.';
-
-        try {
-            if ($cloudToken->provider === 'hetzner') {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$cloudToken->token,
-                ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-
-                $isValid = $response->successful();
-                $message = $isValid ? 'Token is valid.' : 'Token is invalid.';
-            } elseif ($cloudToken->provider === 'digitalocean') {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$cloudToken->token,
-                ])->timeout(10)->get('https://api.digitalocean.com/v2/account');
-
-                $isValid = $response->successful();
-                $message = $isValid ? 'Token is valid.' : 'Token is invalid.';
-            }
-        } catch (\Throwable $e) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Failed to validate token: '.$e->getMessage(),
-            ]);
-        }
+        $validation = $this->validateProviderToken($cloudToken->provider, $cloudToken->token);
 
         return response()->json([
-            'valid' => $isValid,
-            'message' => $message,
+            'valid' => $validation['valid'],
+            'message' => $validation['valid'] ? 'Token is valid.' : 'Failed to validate token.',
         ]);
     }
 }
