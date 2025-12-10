@@ -298,16 +298,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
             foreach ($databasesToBackup as $database) {
-                // Generate unique UUID for each database backup execution
-                $attempts = 0;
-                do {
-                    $this->backup_log_uuid = (string) new Cuid2;
-                    $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
-                    $attempts++;
-                    if ($attempts >= 3 && $exists) {
-                        throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
-                    }
-                } while ($exists);
+                $this->backup_log_uuid = (string) new Cuid2;
 
                 $size = 0;
                 $localBackupSucceeded = false;
@@ -696,15 +687,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $backupType = $this->backup->pgbackrest_backup_type ?: 'full';
         $this->container_name = $this->database->uuid;
 
-        $attempts = 0;
-        do {
-            $this->backup_log_uuid = (string) new Cuid2;
-            $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
-            $attempts++;
-            if ($attempts >= 3 && $exists) {
-                throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
-            }
-        } while ($exists);
+        $this->backup_log_uuid = (string) new Cuid2;
 
         $this->backup_log = ScheduledDatabaseBackupExecution::create([
             'uuid' => $this->backup_log_uuid,
