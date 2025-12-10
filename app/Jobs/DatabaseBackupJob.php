@@ -26,6 +26,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 use Visus\Cuid2\Cuid2;
 
@@ -822,7 +823,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $config = PgBackrestService::generateConfig($this->database);
 
         if ($config === null) {
-            throw new \Exception('No valid pgBackRest repository configured. Please configure at least one repository (local or S3).');
+            throw new RuntimeException('No valid pgBackRest repository configured. Please configure at least one repository (local or S3).');
         }
 
         $configBase64 = base64_encode($config);

@@ -9,6 +9,7 @@ use App\Models\StandalonePostgresql;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -133,6 +134,14 @@ class BackupEdit extends Component
      */
     public function togglePgbackrestEngine(): void
     {
+        $this->authorize('update', $this->backup->database);
+
+        if (! $this->isPostgresql()) {
+            $this->engine = 'native';
+
+            return;
+        }
+
         $this->engine = $this->engine === 'pgbackrest' ? 'native' : 'pgbackrest';
     }
 
@@ -157,18 +166,20 @@ class BackupEdit extends Component
             $this->backup->timeout = $this->timeout;
 
             if ($this->engine === 'pgbackrest') {
-                $this->backup->save_s3 = $this->saveS3;
-                $this->backup->disable_local_backup = $this->saveS3 && $this->disableLocalBackup;
+                DB::transaction(function () {
+                    $this->backup->save_s3 = $this->saveS3;
+                    $this->backup->disable_local_backup = $this->saveS3 && $this->disableLocalBackup;
 
-                $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
-                $this->backup->pgbackrest_compress_type = $this->pgbackrestCompressType;
-                $this->backup->pgbackrest_compress_level = $this->pgbackrestCompressLevel;
-                $this->backup->pgbackrest_log_level = $this->pgbackrestLogLevel;
-                $this->backup->pgbackrest_archive_mode = $this->pgbackrestArchiveMode;
+                    $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
+                    $this->backup->pgbackrest_compress_type = $this->pgbackrestCompressType;
+                    $this->backup->pgbackrest_compress_level = $this->pgbackrestCompressLevel;
+                    $this->backup->pgbackrest_log_level = $this->pgbackrestLogLevel;
+                    $this->backup->pgbackrest_archive_mode = $this->pgbackrestArchiveMode;
 
-                $this->customValidate();
-                $this->backup->save();
-                $this->syncPgbackrestRepos();
+                    $this->customValidate();
+                    $this->backup->save();
+                    $this->syncPgbackrestRepos();
+                });
             } else {
                 $this->backup->save_s3 = $this->saveS3;
                 $this->backup->disable_local_backup = $this->disableLocalBackup;
