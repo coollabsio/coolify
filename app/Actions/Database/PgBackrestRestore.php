@@ -18,18 +18,8 @@ class PgBackrestRestore
         ?ScheduledDatabaseBackupExecution $execution = null,
         ?string $targetTime = null
     ): DatabaseRestore {
-        $attempts = 0;
-        do {
-            $uuid = (string) new Cuid2;
-            $exists = DatabaseRestore::where('uuid', $uuid)->exists();
-            $attempts++;
-            if ($attempts >= 3 && $exists) {
-                throw new \Exception('Unable to generate unique UUID for restore after 3 attempts');
-            }
-        } while ($exists);
-
         $restore = DatabaseRestore::create([
-            'uuid' => $uuid,
+            'uuid' => (string) new Cuid2,
             'database_id' => $database->id,
             'database_type' => $database->getMorphClass(),
             'engine' => 'pgbackrest',

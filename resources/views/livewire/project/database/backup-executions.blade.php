@@ -192,20 +192,22 @@
                             @endif
                             {{-- Show Restore button for successful pgBackRest backups --}}
                             @if (data_get($execution, 'engine') === 'pgbackrest' && data_get($execution, 'pgbackrest_label'))
-                                <x-modal-confirmation 
-                                    title="Restore Database from pgBackRest Backup?" 
-                                    buttonTitle="Restore" 
-                                    isErrorButton
-                                    submitAction="startRestore({{ data_get($execution, 'id') }})" 
-                                    :actions="[
-                                        'This will stop the PostgreSQL database and restore it from the selected backup.',
-                                        'All data written after this backup was taken will be permanently lost.',
-                                        'The database will be temporarily unavailable during the restore process.',
-                                        'After restore, the database will automatically restart.',
-                                    ]"
-                                    confirmationText="restore"
-                                    confirmationLabel="Please type 'restore' to confirm this action"
-                                    shortConfirmationLabel="Confirmation" />
+                                @can('manage', $database)
+                                    <x-modal-confirmation 
+                                        title="Restore Database from pgBackRest Backup?" 
+                                        buttonTitle="Restore" 
+                                        isErrorButton
+                                        submitAction="startRestore({{ data_get($execution, 'id') }})" 
+                                        :actions="[
+                                            'This will stop the PostgreSQL database and restore it from the selected backup.',
+                                            'All data written after this backup was taken will be permanently lost.',
+                                            'The database will be temporarily unavailable during the restore process.',
+                                            'After restore, the database will automatically restart.',
+                                        ]"
+                                        confirmationText="restore"
+                                        confirmationLabel="Please type 'restore' to confirm this action"
+                                        shortConfirmationLabel="Confirmation" />
+                                @endcan
                             @endif
                         @endif
                         @php
@@ -296,24 +298,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2">Type <code class="px-1 py-0.5 bg-gray-200 dark:bg-coolgray-300 rounded">restore</code> to confirm:</label>
-                        <input type="text" 
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-coolgray-400 rounded-md bg-white dark:bg-coolgray-200 text-black dark:text-white"
-                            placeholder="restore"
-                            x-data="{ value: '' }"
-                            x-model="value"
-                            x-ref="restoreConfirmInput" />
-                    </div>
+                    <div x-data="{ confirmValue: '' }">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Type <code class="px-1 py-0.5 bg-gray-200 dark:bg-coolgray-300 rounded">restore</code> to confirm:</label>
+                            <input type="text" 
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-coolgray-400 rounded-md bg-white dark:bg-coolgray-200 text-black dark:text-white"
+                                placeholder="restore"
+                                x-model="confirmValue" />
+                        </div>
 
-                    <div class="flex justify-end gap-3">
-                        <x-forms.button wire:click="cancelRestore">Cancel</x-forms.button>
-                        <x-forms.button isError 
-                            x-data
-                            x-on:click="if ($refs.restoreConfirmInput && $refs.restoreConfirmInput.value === 'restore') { $wire.startRestore($refs.restoreConfirmInput.value) }"
-                            x-bind:disabled="!$refs.restoreConfirmInput || $refs.restoreConfirmInput.value !== 'restore'">
-                            Restore Database
-                        </x-forms.button>
+                        <div class="flex justify-end gap-3">
+                            <x-forms.button wire:click="cancelRestore">Cancel</x-forms.button>
+                            <x-forms.button isError 
+                                x-on:click="if (confirmValue === 'restore') { $wire.startRestore({{ $restoreExecutionId }}) }"
+                                x-bind:disabled="confirmValue !== 'restore'">
+                                Restore Database
+                            </x-forms.button>
+                        </div>
                     </div>
                 </div>
             </div>

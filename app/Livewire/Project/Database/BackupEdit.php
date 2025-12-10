@@ -122,6 +122,19 @@ class BackupEdit extends Component
     #[Validate(['nullable', 'integer', 'min:1'])]
     public ?int $s3RepoRetentionDiff = 7;
 
+    public function getShowLocalRepoSettingsProperty(): bool
+    {
+        return ! $this->disableLocalBackup || ! $this->saveS3;
+    }
+
+    /**
+     * Toggle between pgBackRest and native backup engines.
+     */
+    public function togglePgbackrestEngine(): void
+    {
+        $this->engine = $this->engine === 'pgbackrest' ? 'native' : 'pgbackrest';
+    }
+
     public function mount()
     {
         try {
@@ -140,6 +153,8 @@ class BackupEdit extends Component
             $this->backup->frequency = $this->frequency;
             $this->backup->engine = $this->engine;
 
+            $this->backup->timeout = $this->timeout;
+
             if ($this->engine === 'pgbackrest') {
                 $this->backup->save_s3 = $this->saveS3;
                 $this->backup->disable_local_backup = $this->saveS3 && $this->disableLocalBackup;
@@ -150,6 +165,7 @@ class BackupEdit extends Component
                 $this->backup->pgbackrest_log_level = $this->pgbackrestLogLevel;
                 $this->backup->pgbackrest_archive_mode = $this->pgbackrestArchiveMode;
 
+                $this->customValidate();
                 $this->backup->save();
                 $this->syncPgbackrestRepos();
             } else {
@@ -169,9 +185,9 @@ class BackupEdit extends Component
                         $dbName = trim($db);
                         try {
                             validateShellSafePath($dbName, 'database name');
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             $position = $index + 1;
-                            throw new \Exception(
+                            throw new Exception(
                                 "Database #{$position} ('{$dbName}') validation failed: ".
                                 $e->getMessage()
                             );
@@ -181,12 +197,10 @@ class BackupEdit extends Component
 
                 $this->backup->databases_to_backup = $this->databasesToBackup;
                 $this->backup->dump_all = $this->dumpAll;
+
+                $this->customValidate();
                 $this->backup->save();
             }
-
-            $this->backup->timeout = $this->timeout;
-            $this->customValidate();
-            $this->backup->save();
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
@@ -245,17 +259,22 @@ class BackupEdit extends Component
     private function syncPgbackrestRepos(): void
     {
         $hasLocal = ! $this->disableLocalBackup;
+
+        if ($this->saveS3 && empty($this->s3RepoStorageId)) {
+            if ($this->s3s->isNotEmpty()) {
+                $this->s3RepoStorageId = $this->s3s->first()->id;
+            } else {
+                throw new Exception('S3 storage must be selected when S3 backups are enabled.');
+            }
+        }
+
         $hasS3 = $this->saveS3 && ! empty($this->s3RepoStorageId);
 
         if (! $hasLocal && ! $hasS3) {
-            throw new \Exception(
+            throw new Exception(
                 'At least one backup repository (local or S3) must be enabled for pgBackRest. '.
                 'Either enable local backups or configure S3 storage and enable it.'
             );
-        }
-
-        if ($hasS3 && empty($this->s3RepoStorageId)) {
-            throw new \Exception('S3 storage must be selected when S3 backups are enabled.');
         }
 
         $repoNumber = 1;
@@ -279,10 +298,6 @@ class BackupEdit extends Component
         }
 
         if ($hasS3) {
-            if (empty($this->s3RepoStorageId)) {
-                throw new \Exception('S3 Storage is required when enabling S3 backups for pgBackRest.');
-            }
-
             $s3Repo = $this->backup->s3Repo();
             if (! $s3Repo) {
                 $s3Repo = new PgbackrestRepo;
@@ -352,7 +367,7 @@ class BackupEdit extends Component
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
 
             return handleError($e, $this);
@@ -383,7 +398,7 @@ class BackupEdit extends Component
 
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
-            throw new \Exception('Invalid Cron / Human expression');
+            throw new Exception('Invalid Cron / Human expression');
         }
         $this->validate();
     }

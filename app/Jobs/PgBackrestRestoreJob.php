@@ -67,9 +67,10 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
                 $this->restore->appendLog('Starting PostgreSQL after restore.');
                 StartPostgresql::run($this->database);
 
-                // Restore succeeded, safely remove the backup
-                $this->restore->appendLog('Removing backup of previous database.');
-                $this->removePgDataBackup($backupPath);
+                if ($backupPath) {
+                    $this->restore->appendLog('Removing backup of previous database.');
+                    $this->removePgDataBackup($backupPath);
+                }
 
                 $this->restore->updateStatus('success', 'PgBackRest restore completed successfully.');
 
@@ -82,9 +83,10 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
                     ));
                 }
             } catch (Throwable $restoreError) {
-                // Restore failed, attempt to recover
                 $this->restore->appendLog('Restore failed, attempting to recover from backup: '.$restoreError->getMessage());
-                $this->recoverFromBackup($backupPath);
+                if ($backupPath) {
+                    $this->recoverFromBackup($backupPath);
+                }
                 throw $restoreError;
             }
         } catch (Throwable $e) {
@@ -237,7 +239,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         return $info;
     }
 
-    private function backupCurrentPgData(int $timestamp): string
+    private function backupCurrentPgData(int $timestamp): ?string
     {
         $server = $this->database->destination->server;
         $pgdataVolume = $this->database->pgdataVolume();
@@ -247,10 +249,27 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
+
+        $checkCmd = "docker run --rm -v {$mount}:/data alpine sh -c 'test -n \"$(ls -A /data 2>/dev/null)\" && echo OK || echo EMPTY'";
+        $checkResult = instant_remote_process([$checkCmd], $server, false, false, 30, disableMultiplexing: true);
+
+        if (trim($checkResult) === 'EMPTY') {
+            $this->restore->appendLog('No existing PGDATA to backup (directory is empty).');
+
+            return null;
+        }
+
         $backupPath = "{$mount}_backup_{$timestamp}";
 
-        $backupCmd = "docker run --rm -v {$mount}:/data -v {$mount}_backup_{$timestamp}:/backup alpine sh -c 'cp -a /data/* /backup/ 2>/dev/null || true'";
-        instant_remote_process([$backupCmd], $server, false, false, 600, disableMultiplexing: true);
+        $backupCmd = "docker run --rm -v {$mount}:/data -v {$mount}_backup_{$timestamp}:/backup alpine sh -c 'cp -a /data/. /backup/'";
+        instant_remote_process([$backupCmd], $server, true, false, 600, disableMultiplexing: true);
+
+        $verifyCmd = "docker run --rm -v {$backupPath}:/backup alpine sh -c 'test -n \"$(ls -A /backup 2>/dev/null)\" && echo OK'";
+        $result = instant_remote_process([$verifyCmd], $server, false, false, 30, disableMultiplexing: true);
+
+        if (trim($result) !== 'OK') {
+            throw new \RuntimeException('PGDATA backup verification failed: backup directory is empty or inaccessible.');
+        }
 
         $this->restore->appendLog("PGDATA backed up to temporary location: {$backupPath}");
 

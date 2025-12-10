@@ -338,7 +338,11 @@ class StartPostgresql
         $content = $this->database->postgres_conf ?? '';
 
         if (! str($content)->contains('listen_addresses')) {
-            $content .= "\nlisten_addresses = '*'";
+            if ($this->database->is_public) {
+                $content .= "\nlisten_addresses = '*'";
+            } else {
+                $content .= "\nlisten_addresses = 'localhost'";
+            }
         }
 
         if ($this->hasPgBackrest) {
@@ -350,11 +354,9 @@ class StartPostgresql
                 $content .= "\narchive_mode = on";
             }
 
-            if (str($content)->contains('archive_command')) {
-                $content = preg_replace("/archive_command\s*=\s*'[^']*'/", "archive_command = '{$archiveCommand}'", $content);
-            } else {
-                $content .= "\narchive_command = '{$archiveCommand}'";
-            }
+            $content = preg_replace('/^\s*archive_command\s*=.*$/m', '', $content);
+            $content = preg_replace('/\n{3,}/', "\n\n", $content);
+            $content .= "\narchive_command = '{$archiveCommand}'";
 
             if (! str($content)->contains('wal_level')) {
                 $content .= "\nwal_level = replica";
