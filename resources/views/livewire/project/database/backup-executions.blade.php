@@ -249,6 +249,7 @@
         </script>
 
         {{-- Restore Confirmation Modal --}}
+        @can('manage', $database)
         @if ($showRestoreModal && $restoreExecutionId)
             @php
                 $restoreExecution = $executions->firstWhere('id', $restoreExecutionId);
@@ -319,6 +320,7 @@
                 </div>
             </div>
         @endif
+        @endcan
 
         {{-- Restore Progress Modal --}}
         @if ($showRestoreProgressModal && $currentRestore)

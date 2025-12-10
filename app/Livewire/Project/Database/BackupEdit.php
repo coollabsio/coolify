@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Database;
 use App\Models\InstanceSettings;
 use App\Models\PgbackrestRepo;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\StandalonePostgresql;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -417,7 +418,7 @@ class BackupEdit extends Component
 
     public function isPostgresql(): bool
     {
-        return $this->backup->database_type === 'App\Models\StandalonePostgresql';
+        return $this->backup->database_type === StandalonePostgresql::class;
     }
 
     public function render()
