@@ -29,6 +29,7 @@ class UserRecentPage extends Model
 
     public static function recordVisit(int $userId, int $teamId, string $url, string $label, ?string $sublabel = null): void
     {
+        // No transaction/locking needed - minor race conditions are acceptable for recent pages
         $record = self::firstOrCreate(
             ['user_id' => $userId, 'team_id' => $teamId],
             ['pages' => []]

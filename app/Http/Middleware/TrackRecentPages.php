@@ -4,11 +4,14 @@ namespace App\Http\Middleware;
 
 use App\Events\RecentsUpdated;
 use App\Models\Application;
+use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use App\Models\UserRecentPage;
 use Closure;
 use Illuminate\Http\Request;
@@ -27,63 +30,55 @@ class TrackRecentPages
             ! $request->ajax() &&
             ! $request->wantsJson()) {
 
-            $this->trackVisit($request);
+            // Capture what we need before the request ends
+            $route = $request->route();
+            $routeName = $route?->getName();
+            $routeParams = $route?->parameters() ?? [];
+            $path = $request->path();
+            $userId = auth()->id();
+            $teamId = auth()->user()?->currentTeam()?->id;
+            if (isset($routeName) && isset($userId) && isset($teamId)) {
+                // Defer all tracking work to after the response is sent (zero impact on page load)
+                dispatch(function () use ($routeName, $routeParams, $path, $userId, $teamId) {
+                    $this->trackVisitDeferred($routeName, $routeParams, $path, $userId, $teamId);
+                })->afterResponse();
+            }
         }
 
         return $response;
     }
 
-    protected function trackVisit(Request $request): void
+    protected function trackVisitDeferred(string $routeName, array $routeParams, string $path, int $userId, int $teamId): void
     {
-        $route = $request->route();
-        if (! $route || ! $route->getName()) {
-            return;
-        }
-
-        $labelData = $this->deriveLabelAndSublabel($request, $route);
+        $labelData = $this->deriveLabelAndSublabel($routeName, $routeParams);
         if (! $labelData['label']) {
             return;
         }
 
-        $user = auth()->user();
-        if (! $user || $user->id === null) {
-            return;
-        }
-
-        $team = $user->currentTeam();
-        if (! $team) {
-            return;
-        }
-
-        $path = $request->path();
         if ($path === '' || $path === '/') {
             $path = 'dashboard';
         }
 
         UserRecentPage::recordVisit(
-            $user->id,
-            $team->id,
+            $userId,
+            $teamId,
             $path,
             $labelData['label'],
             $labelData['sublabel']
         );
 
-        // Broadcast event to update all user's browser sessions (delay allows WebSocket to connect first)
-        $userId = $user->id;
-        dispatch(function () use ($userId) {
-            RecentsUpdated::dispatch($userId);
-        })->delay(now()->addSeconds(2));
+        // Broadcast event to update all user's browser sessions
+        RecentsUpdated::dispatch($userId);
     }
 
-    protected function deriveLabelAndSublabel(Request $request, $route): array
+    protected function deriveLabelAndSublabel(string $routeName, array $routeParams): array
     {
-        $routeName = $route->getName();
         $label = null;
         $sublabel = null;
 
         // Application routes
         if (str_starts_with($routeName, 'project.application')) {
-            $uuid = $request->route('application_uuid');
+            $uuid = $routeParams['application_uuid'] ?? null;
             if ($uuid) {
                 $app = Application::where('uuid', $uuid)->first();
                 $label = $app?->name;
@@ -95,7 +90,7 @@ class TrackRecentPages
 
         // Database routes
         if (str_starts_with($routeName, 'project.database')) {
-            $uuid = $request->route('database_uuid');
+            $uuid = $routeParams['database_uuid'] ?? null;
             if ($uuid) {
                 $resource = queryResourcesByUuid($uuid);
                 $label = $resource?->name;
@@ -107,7 +102,7 @@ class TrackRecentPages
 
         // Service routes
         if (str_starts_with($routeName, 'project.service')) {
-            $uuid = $request->route('service_uuid');
+            $uuid = $routeParams['service_uuid'] ?? null;
             if ($uuid) {
                 $service = Service::where('uuid', $uuid)->first();
                 $label = $service?->name;
@@ -119,7 +114,7 @@ class TrackRecentPages
 
         // Server routes
         if (str_starts_with($routeName, 'server.')) {
-            $uuid = $request->route('server_uuid');
+            $uuid = $routeParams['server_uuid'] ?? null;
             if ($uuid) {
                 $server = Server::where('uuid', $uuid)->first();
                 $label = $server?->name;
@@ -135,7 +130,7 @@ class TrackRecentPages
             $routeName === 'project.show' ||
             $routeName === 'project.edit' ||
             $routeName === 'project.clone-me') {
-            $uuid = $request->route('project_uuid');
+            $uuid = $routeParams['project_uuid'] ?? null;
             if ($uuid) {
                 $project = Project::where('uuid', $uuid)->first();
                 $label = $project?->name;
@@ -146,7 +141,7 @@ class TrackRecentPages
 
         // Storage show route (specific storage)
         if ($routeName === 'storage.show') {
-            $uuid = $request->route('storage_uuid');
+            $uuid = $routeParams['storage_uuid'] ?? null;
             if ($uuid) {
                 $storage = S3Storage::where('uuid', $uuid)->first();
                 $label = 'S3 Storages';
@@ -162,7 +157,7 @@ class TrackRecentPages
 
             // Private key detail page - show key name as sublabel
             if ($routeName === 'security.private-key.show') {
-                $uuid = $request->route('private_key_uuid');
+                $uuid = $routeParams['private_key_uuid'] ?? null;
                 if ($uuid) {
                     $privateKey = PrivateKey::where('uuid', $uuid)->first();
                     $sublabel = $privateKey?->name;
@@ -185,10 +180,10 @@ class TrackRecentPages
 
         // Destination show route
         if ($routeName === 'destination.show') {
-            $uuid = $request->route('destination_uuid');
+            $uuid = $routeParams['destination_uuid'] ?? null;
             if ($uuid) {
-                $destination = \App\Models\StandaloneDocker::where('uuid', $uuid)->first()
-                    ?? \App\Models\SwarmDocker::where('uuid', $uuid)->first();
+                $destination = StandaloneDocker::where('uuid', $uuid)->first()
+                    ?? SwarmDocker::where('uuid', $uuid)->first();
                 $label = 'Destinations';
                 $sublabel = $destination?->name;
             }
@@ -198,9 +193,9 @@ class TrackRecentPages
 
         // GitHub source routes
         if ($routeName === 'source.github.show') {
-            $uuid = $request->route('github_app_uuid');
+            $uuid = $routeParams['github_app_uuid'] ?? null;
             if ($uuid) {
-                $githubApp = \App\Models\GithubApp::where('uuid', $uuid)->first();
+                $githubApp = GithubApp::where('uuid', $uuid)->first();
                 $label = 'Sources';
                 $sublabel = $githubApp?->name;
             }
@@ -227,7 +222,7 @@ class TrackRecentPages
         // Shared variables sub-routes with project/environment context
         if (str_starts_with($routeName, 'shared-variables.')) {
             $label = 'Shared Variables';
-            $sublabel = $this->deriveSharedVariablesSublabel($routeName, $request);
+            $sublabel = $this->deriveSharedVariablesSublabel($routeName, $routeParams);
 
             return ['label' => $label, 'sublabel' => $sublabel];
         }
@@ -278,15 +273,18 @@ class TrackRecentPages
         return ['label' => $label, 'sublabel' => null];
     }
 
-    protected function deriveSharedVariablesSublabel(string $routeName, Request $request): ?string
+    protected function deriveSharedVariablesSublabel(string $routeName, array $routeParams): ?string
     {
+        $projectUuid = $routeParams['project_uuid'] ?? null;
+        $projectName = $projectUuid ? Project::where('uuid', $projectUuid)->value('name') : null;
+
         return match ($routeName) {
             'shared-variables.index' => null,
             'shared-variables.team.index' => 'Team',
             'shared-variables.project.index' => 'Projects',
-            'shared-variables.project.show' => Project::where('uuid', $request->route('project_uuid'))->first()?->name,
+            'shared-variables.project.show' => $projectName,
             'shared-variables.environment.index' => 'Environments',
-            'shared-variables.environment.show' => Project::where('uuid', $request->route('project_uuid'))->first()?->name,
+            'shared-variables.environment.show' => $projectName,
             default => null,
         };
     }

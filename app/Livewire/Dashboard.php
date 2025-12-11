@@ -59,6 +59,8 @@ class Dashboard extends Component
         // Rate limit: 10 pins per minute per user
         $key = 'toggle-pin:'.$user->id;
         if (RateLimiter::tooManyAttempts($key, 10)) {
+            $this->dispatch('notify', type: 'warning', message: 'Too many pin attempts. Please wait.');
+
             return;
         }
         RateLimiter::hit($key, 60);

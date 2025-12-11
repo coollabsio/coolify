@@ -12,6 +12,8 @@ class RecentsUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public $broadcastQueue = 'default';
+
     public function __construct(
         public int $userId
     ) {}
