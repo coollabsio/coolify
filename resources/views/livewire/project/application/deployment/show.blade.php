@@ -255,7 +255,7 @@
                     </div>
                     <div id="logsContainer"
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
+                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
                         <div id="logs" class="flex flex-col font-mono">
                             <div x-show="searchQuery.trim() && getMatchCount() === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
