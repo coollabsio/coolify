@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class CloudProviderToken extends Model
+class CloudProviderToken extends BaseModel
 {
     protected $guarded = [];
 

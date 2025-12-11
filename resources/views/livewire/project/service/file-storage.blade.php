@@ -65,6 +65,7 @@
                         @endif
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
+                            helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content"
                             readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
                         @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
@@ -79,12 +80,19 @@
                         @endif
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
+                            helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content" disabled></x-forms.textarea>
                     @endcan
                 @endif
             @else
                 {{-- Read-only view --}}
                 @if (!$fileStorage->is_directory)
+                    @can('view', $resource)
+                        <div class="flex gap-2">
+                            <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
+                                server</x-forms.button>
+                        </div>
+                    @endcan
                     @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                         <div class="w-96">
                             <x-forms.checkbox disabled label="Is this based on the Git repository?"
@@ -93,6 +101,7 @@
                     @endif
                     <x-forms.textarea
                         label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
+                        helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                         rows="20" id="content" disabled></x-forms.textarea>
                 @endif
             @endif

@@ -5,9 +5,12 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
+use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Services\HetznerService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -72,6 +75,17 @@ class Show extends Component
     public bool $hetznerServerManuallyStarted = false;
 
     public bool $isValidating = false;
+
+    // Hetzner linking properties
+    public Collection $availableHetznerTokens;
+
+    public ?int $selectedHetznerTokenId = null;
+
+    public ?array $matchedHetznerServer = null;
+
+    public ?string $hetznerSearchError = null;
+
+    public bool $hetznerNoMatchFound = false;
 
     public function getListeners()
     {
@@ -149,6 +163,9 @@ class Show extends Component
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
             $this->isValidating = $this->server->is_validating ?? false;
+
+            // Load Hetzner tokens for linking
+            $this->loadHetznerTokens();
 
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -460,6 +477,98 @@ class Show extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Server settings updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function loadHetznerTokens(): void
+    {
+        $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'hetzner')
+            ->get();
+    }
+
+    public function searchHetznerServer(): void
+    {
+        $this->hetznerSearchError = null;
+        $this->hetznerNoMatchFound = false;
+        $this->matchedHetznerServer = null;
+
+        if (! $this->selectedHetznerTokenId) {
+            $this->hetznerSearchError = 'Please select a Hetzner token.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
+            if (! $token) {
+                $this->hetznerSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $hetznerService = new HetznerService($token->token);
+            $matched = $hetznerService->findServerByIp($this->server->ip);
+
+            if ($matched) {
+                $this->matchedHetznerServer = $matched;
+            } else {
+                $this->hetznerNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->hetznerSearchError = 'Failed to search Hetzner servers: '.$e->getMessage();
+        }
+    }
+
+    public function linkToHetzner()
+    {
+        if (! $this->matchedHetznerServer) {
+            $this->dispatch('error', 'No Hetzner server selected.');
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
+            if (! $token) {
+                $this->dispatch('error', 'Invalid token selected.');
+
+                return;
+            }
+
+            // Verify the server exists and is accessible with the token
+            $hetznerService = new HetznerService($token->token);
+            $serverData = $hetznerService->getServer($this->matchedHetznerServer['id']);
+
+            if (empty($serverData)) {
+                $this->dispatch('error', 'Could not find Hetzner server with ID: '.$this->matchedHetznerServer['id']);
+
+                return;
+            }
+
+            // Update the server with Hetzner details
+            $this->server->update([
+                'cloud_provider_token_id' => $this->selectedHetznerTokenId,
+                'hetzner_server_id' => $this->matchedHetznerServer['id'],
+                'hetzner_server_status' => $serverData['status'] ?? null,
+            ]);
+
+            $this->hetznerServerStatus = $serverData['status'] ?? null;
+
+            // Clear the linking state
+            $this->matchedHetznerServer = null;
+            $this->selectedHetznerTokenId = null;
+            $this->hetznerNoMatchFound = false;
+            $this->hetznerSearchError = null;
+
+            $this->dispatch('success', 'Server successfully linked to Hetzner Cloud!');
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -131,7 +131,9 @@ class Gitlab extends Controller
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
-                            if ($result['status'] === 'skipped') {
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'status' => $result['status'],
                                     'message' => $result['message'],
@@ -202,7 +204,9 @@ class Gitlab extends Controller
                                 is_webhook: true,
                                 git_type: 'gitlab'
                             );
-                            if ($result['status'] === 'skipped') {
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'application' => $application->name,
                                     'status' => 'skipped',

@@ -14,15 +14,11 @@ use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
-use App\Models\Server;
-use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
-    private $allServers;
-
     private Schedule $scheduleInstance;
 
     private InstanceSettings $settings;
@@ -34,8 +30,6 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $this->scheduleInstance = $schedule;
-        $this->allServers = Server::where('ip', '!=', '1.2.3.4');
-
         $this->settings = instanceSettings();
         $this->updateCheckFrequency = $this->settings->update_check_frequency ?: '0 * * * *';
 
@@ -95,14 +89,6 @@ class Kernel extends ConsoleKernel
 
     private function pullImages(): void
     {
-        if (isCloud()) {
-            $servers = $this->allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
-            $own = Team::find(0)->servers;
-            $servers = $servers->merge($own);
-        } else {
-            $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
-        }
-        // Sentinel update checks are now handled by ServerManagerJob
         $this->scheduleInstance->job(new CheckHelperImageJob)
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
