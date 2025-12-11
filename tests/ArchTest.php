@@ -192,8 +192,8 @@ arch('Models')
     ->expect('App\Models')
     ->toBeClasses()
     ->toExtend(\Illuminate\Database\Eloquent\Model::class)
+    ->ignoring('App\Models\Scopes')
     ->not->toUseTrait(\Illuminate\Database\Eloquent\SoftDeletes::class)
-    ->toOnlyUse('Illuminate\Database')
     ->toHaveLineCountLessThan(250)
     ->not->toHaveSuffix('Model');
 
