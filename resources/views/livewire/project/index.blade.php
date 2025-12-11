@@ -25,12 +25,13 @@
                         <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
                             @if ($project->environments->first())
                                 @can('createAnyResource')
-                                                <a class="hover:underline" href="{{ route('project.resource.create', [
-                                        'project_uuid' => $project->uuid,
-                                        'environment_uuid' => $project->environments->first()->uuid,
-                                    ]) }}">
-                                                    + Add Resource
-                                                </a>
+                                    <a class="hover:underline"
+                                        href="{{ route('project.resource.create', [
+                                            'project_uuid' => $project->uuid,
+                                            'environment_uuid' => $project->environments->first()->uuid,
+                                        ]) }}">
+                                        + Add Resource
+                                    </a>
                                 @endcan
                             @endif
                             @can('update', $project)
