@@ -1,17 +1,10 @@
 <div wire:poll.3000ms x-data="{
     expanded: @entangle('expanded'),
-    isDeploymentPage: false,
-    checkPage() {
-        this.isDeploymentPage = window.location.pathname.includes('/deployment');
-    },
-    init() {
-        this.checkPage();
-        document.addEventListener('livewire:navigated', () => this.checkPage());
-    }
+    reduceOpacity: @js($this->shouldReduceOpacity)
 }" class="fixed bottom-0 z-60 mb-4 left-0 lg:left-56 ml-4">
     @if ($this->deploymentCount > 0)
         <div class="relative transition-opacity duration-200"
-            :class="{ 'opacity-100': expanded || !isDeploymentPage, 'opacity-60 hover:opacity-100': isDeploymentPage && !expanded }">
+            :class="{ 'opacity-100': expanded || !reduceOpacity, 'opacity-60 hover:opacity-100': reduceOpacity && !expanded }">
             <!-- Indicator Button -->
             <button @click="expanded = !expanded"
                 class="flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all duration-200 dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 hover:shadow-xl">
