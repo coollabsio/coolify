@@ -1878,6 +1878,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
+                                        onlyPort: $predefinedPort,
                                         is_force_https_enabled: true,
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
@@ -1904,6 +1905,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
+                                onlyPort: $predefinedPort,
                                 is_force_https_enabled: true,
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),

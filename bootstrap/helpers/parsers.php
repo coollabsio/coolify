@@ -1233,6 +1233,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $uuid,
                             domains: $fqdns,
+                            onlyPort: $predefinedPort,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
@@ -1260,6 +1261,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                     uuid: $uuid,
                     domains: $fqdns,
+                    onlyPort: $predefinedPort,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
@@ -2329,6 +2331,7 @@ function serviceParser(Service $resource): Collection
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $uuid,
                             domains: $fqdns,
+                            onlyPort: $predefinedPort,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
@@ -2356,6 +2359,7 @@ function serviceParser(Service $resource): Collection
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                     uuid: $uuid,
                     domains: $fqdns,
+                    onlyPort: $predefinedPort,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
