@@ -56,6 +56,7 @@ class Storage extends Component
         }
 
         $this->refreshStorages();
+        $this->name = $this->generateDefaultVolumeName();
     }
 
     public function refreshStoragesFromEvent()
@@ -202,7 +203,7 @@ class Storage extends Component
 
     public function clearForm()
     {
-        $this->name = '';
+        $this->name = $this->generateDefaultVolumeName();
         $this->mount_path = '';
         $this->host_path = null;
         $this->file_storage_path = '';
@@ -214,6 +215,14 @@ class Storage extends Component
         } else {
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
+    }
+
+    private function generateDefaultVolumeName(): string
+    {
+        return str($this->resource->name ?? 'volume')
+            ->slug()
+            ->append('-data')
+            ->value();
     }
 
     public function render()
