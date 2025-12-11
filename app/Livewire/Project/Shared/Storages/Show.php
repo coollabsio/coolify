@@ -67,7 +67,7 @@ class Show extends Component
     public function mount()
     {
         $this->syncData(false);
-        $this->isReadOnly = $this->storage->isReadOnlyVolume();
+        $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
     }
 
     public function submit()

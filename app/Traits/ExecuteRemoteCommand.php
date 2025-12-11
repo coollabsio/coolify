@@ -140,9 +140,15 @@ trait ExecuteRemoteCommand
             // If we exhausted all retries and still failed
             if (! $commandExecuted && $lastError) {
                 // Now we can set the status to FAILED since all retries have been exhausted
+                // But only if the deployment hasn't already been marked as FINISHED
                 if (isset($this->application_deployment_queue)) {
-                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
-                    $this->application_deployment_queue->save();
+                    // Avoid clobbering a deployment that may have just been marked FINISHED
+                    $this->application_deployment_queue->newQuery()
+                        ->where('id', $this->application_deployment_queue->id)
+                        ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
+                        ->update([
+                            'status' => ApplicationDeploymentStatus::FAILED->value,
+                        ]);
                 }
                 throw $lastError;
             }

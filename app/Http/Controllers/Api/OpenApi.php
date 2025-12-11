@@ -61,6 +61,22 @@ use OpenApi\Attributes as OA;
                     ),
                 ]
             )),
+        new OA\Response(
+            response: 429,
+            description: 'Rate limit exceeded.',
+            headers: [
+                new OA\Header(
+                    header: 'Retry-After',
+                    description: 'Number of seconds to wait before retrying.',
+                    schema: new OA\Schema(type: 'integer', example: 60)
+                ),
+            ],
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Rate limit exceeded. Please try again later.'),
+                ]
+            )),
     ],
 )]
 class OpenApi
