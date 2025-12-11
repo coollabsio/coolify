@@ -10,6 +10,11 @@ class LocalPersistentVolume extends Model
 {
     protected $guarded = [];
 
+    public function resource()
+    {
+        return $this->morphTo('resource');
+    }
+
     public function application()
     {
         return $this->morphTo('resource');
@@ -48,6 +53,54 @@ class LocalPersistentVolume extends Model
                 }
             }
         );
+    }
+
+    // Check if this volume belongs to a service resource
+    public function isServiceResource(): bool
+    {
+        return in_array($this->resource_type, [
+            'App\Models\ServiceApplication',
+            'App\Models\ServiceDatabase',
+        ]);
+    }
+
+    // Check if this volume belongs to a dockercompose application
+    public function isDockerComposeResource(): bool
+    {
+        if ($this->resource_type !== 'App\Models\Application') {
+            return false;
+        }
+
+        // Only access relationship if already eager loaded to avoid N+1
+        if (! $this->relationLoaded('resource')) {
+            return false;
+        }
+
+        $application = $this->resource;
+        if (! $application) {
+            return false;
+        }
+
+        return data_get($application, 'build_pack') === 'dockercompose';
+    }
+
+    // Determine if this volume should be read-only in the UI
+    // Service volumes and dockercompose application volumes are read-only
+    // (users should edit compose file directly)
+    public function shouldBeReadOnlyInUI(): bool
+    {
+        // All service volumes should be read-only in UI
+        if ($this->isServiceResource()) {
+            return true;
+        }
+
+        // All dockercompose application volumes should be read-only in UI
+        if ($this->isDockerComposeResource()) {
+            return true;
+        }
+
+        // Check for explicit :ro flag in compose (existing logic)
+        return $this->isReadOnlyVolume();
     }
 
     // Check if this volume is read-only by parsing the docker-compose content
