@@ -20,6 +20,8 @@ class Show extends Component
 
     public bool $is_debug_enabled = false;
 
+    private bool $deploymentFinishedDispatched = false;
+
     public function getListeners()
     {
         return [
@@ -92,8 +94,9 @@ class Show extends Component
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->isKeepAliveOn();
 
-        // Dispatch event when deployment finishes to stop auto-scroll
-        if (! $this->isKeepAliveOn) {
+        // Dispatch event when deployment finishes to stop auto-scroll (only once)
+        if (! $this->isKeepAliveOn && ! $this->deploymentFinishedDispatched) {
+            $this->deploymentFinishedDispatched = true;
             $this->dispatch('deploymentFinished');
         }
     }
