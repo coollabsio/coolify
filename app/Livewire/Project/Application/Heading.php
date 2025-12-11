@@ -100,6 +100,11 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
+        if ($result['status'] === 'queue_full') {
+            $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+            return;
+        }
         if ($result['status'] === 'skipped') {
             $this->dispatch('error', 'Deployment skipped', $result['message']);
 
@@ -144,6 +149,11 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );
+        if ($result['status'] === 'queue_full') {
+            $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+            return;
+        }
         if ($result['status'] === 'skipped') {
             $this->dispatch('success', 'Deployment skipped', $result['message']);
 

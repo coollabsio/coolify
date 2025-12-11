@@ -364,6 +364,7 @@
                                     },
                                     "autogenerate_domain": {
                                         "type": "boolean",
+                                        "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
@@ -778,6 +779,7 @@
                                     },
                                     "autogenerate_domain": {
                                         "type": "boolean",
+                                        "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
@@ -1192,6 +1194,7 @@
                                     },
                                     "autogenerate_domain": {
                                         "type": "boolean",
+                                        "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
@@ -1535,6 +1538,7 @@
                                     },
                                     "autogenerate_domain": {
                                         "type": "boolean",
+                                        "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
@@ -1861,6 +1865,7 @@
                                     },
                                     "autogenerate_domain": {
                                         "type": "boolean",
+                                        "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
                                     }
                                 },
@@ -6725,10 +6730,20 @@
                 "operationId": "get-hetzner-locations",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -6795,10 +6810,20 @@
                 "operationId": "get-hetzner-server-types",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -6832,7 +6857,38 @@
                                                 "type": "integer"
                                             },
                                             "prices": {
-                                                "type": "array"
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "location": {
+                                                            "type": "string",
+                                                            "description": "Datacenter location name"
+                                                        },
+                                                        "price_hourly": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "net": {
+                                                                    "type": "string"
+                                                                },
+                                                                "gross": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "price_monthly": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "net": {
+                                                                    "type": "string"
+                                                                },
+                                                                "gross": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         },
                                         "type": "object"
@@ -6865,10 +6921,20 @@
                 "operationId": "get-hetzner-images",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -6935,10 +7001,20 @@
                 "operationId": "get-hetzner-ssh-keys",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -7001,17 +7077,22 @@
                         "application\/json": {
                             "schema": {
                                 "required": [
-                                    "cloud_provider_token_id",
                                     "location",
                                     "server_type",
                                     "image",
                                     "private_key_uuid"
                                 ],
                                 "properties": {
+                                    "cloud_provider_token_uuid": {
+                                        "type": "string",
+                                        "example": "abc123",
+                                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided."
+                                    },
                                     "cloud_provider_token_id": {
                                         "type": "string",
                                         "example": "abc123",
-                                        "description": "Cloud provider token UUID"
+                                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                                        "deprecated": true
                                     },
                                     "location": {
                                         "type": "string",
@@ -7107,6 +7188,9 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "$ref": "#\/components\/responses\/429"
                     }
                 },
                 "security": [
@@ -10618,6 +10702,9 @@
                     "concurrent_builds": {
                         "type": "integer"
                     },
+                    "deployment_queue_limit": {
+                        "type": "integer"
+                    },
                     "dynamic_timeout": {
                         "type": "integer"
                     },
@@ -10970,6 +11057,31 @@
                                             "type": "string"
                                         }
                                     }
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "429": {
+                "description": "Rate limit exceeded.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Number of seconds to wait before retrying.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 60
+                        }
+                    }
+                },
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Rate limit exceeded. Please try again later."
                                 }
                             },
                             "type": "object"

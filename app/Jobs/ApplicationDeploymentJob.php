@@ -486,15 +486,38 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function post_deployment()
     {
-        GetContainersStatus::dispatch($this->server);
+        // Mark deployment as complete FIRST, before any other operations
+        // This ensures the deployment status is FINISHED even if subsequent operations fail
         $this->completeDeployment();
+
+        // Then handle side effects - these should not fail the deployment
+        try {
+            GetContainersStatus::dispatch($this->server);
+        } catch (\Exception $e) {
+            \Log::warning('Failed to dispatch GetContainersStatus for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+        }
+
         if ($this->pull_request_id !== 0) {
             if ($this->application->is_github_based()) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                try {
+                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to dispatch PR update for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+                }
             }
         }
-        $this->run_post_deployment_command();
-        $this->application->isConfigurationChanged(true);
+
+        try {
+            $this->run_post_deployment_command();
+        } catch (\Exception $e) {
+            \Log::warning('Post deployment command failed for '.$this->deployment_uuid.': '.$e->getMessage());
+        }
+
+        try {
+            $this->application->isConfigurationChanged(true);
+        } catch (\Exception $e) {
+            \Log::warning('Failed to mark configuration as changed for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+        }
     }
 
     private function deploy_simple_dockerfile()
@@ -3934,12 +3957,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     }
 
     /**
-     * Check if deployment is in a terminal state (FAILED or CANCELLED).
+     * Check if deployment is in a terminal state (FINISHED, FAILED or CANCELLED).
      * Terminal states cannot be changed.
      */
     private function isInTerminalState(): bool
     {
         $this->application_deployment_queue->refresh();
+
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FINISHED->value) {
+            return true;
+        }
 
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
             return true;

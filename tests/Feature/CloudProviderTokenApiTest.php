@@ -14,6 +14,9 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
+    // Set the current team session before creating the token
+    session(['currentTeam' => $this->team]);
+
     // Create an API token for the user
     $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
@@ -225,7 +228,7 @@ describe('POST /api/v1/cloud-tokens', function () {
         ]);
 
         $response->assertStatus(400);
-        $response->assertJson(['message' => 'Invalid Hetzner token. Please check your API token.']);
+        $response->assertJson(['message' => 'Invalid hetzner token. Please check your API token.']);
     });
 
     test('rejects extra fields not in allowed list', function () {

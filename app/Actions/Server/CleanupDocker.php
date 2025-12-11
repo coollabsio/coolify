@@ -37,9 +37,15 @@ class CleanupDocker
         $applicationCleanupLog = $this->cleanupApplicationImages($server, $applications);
         $cleanupLog = array_merge($cleanupLog, $applicationCleanupLog);
 
-        // Build image prune command that excludes application images
-        // This ensures we clean up non-Coolify images while preserving rollback images
-        $imagePruneCmd = $this->buildImagePruneCommand($applicationImageRepos);
+        // Build image prune command that excludes application images and current Coolify infrastructure images
+        // This ensures we clean up non-Coolify images while preserving rollback images and current helper/realtime images
+        // Note: Only the current version is protected; old versions will be cleaned up by explicit commands below
+        // We pass the version strings so all registry variants are protected (ghcr.io, docker.io, no prefix)
+        $imagePruneCmd = $this->buildImagePruneCommand(
+            $applicationImageRepos,
+            $helperImageVersion,
+            $realtimeImageVersion
+        );
 
         $commands = [
             'docker container prune -f --filter "label=coolify.managed=true" --filter "label!=coolify.proxy=true"',
@@ -78,32 +84,50 @@ class CleanupDocker
      * Since docker image prune doesn't support excluding by repository name directly,
      * we use a shell script approach to delete unused images while preserving application images.
      */
-    private function buildImagePruneCommand($applicationImageRepos): string
-    {
+    private function buildImagePruneCommand(
+        $applicationImageRepos,
+        string $helperImageVersion,
+        string $realtimeImageVersion
+    ): string {
         // Step 1: Always prune dangling images (untagged)
         $commands = ['docker image prune -f'];
 
-        if ($applicationImageRepos->isEmpty()) {
-            // No applications, add original prune command for all unused images
-            $commands[] = 'docker image prune -af --filter "label!=coolify.managed=true"';
-        } else {
-            // Build grep pattern to exclude application image repositories
-            $excludePatterns = $applicationImageRepos->map(function ($repo) {
-                // Escape special characters for grep extended regex (ERE)
-                // ERE special chars: . \ + * ? [ ^ ] $ ( ) { } |
-                return preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $repo);
-            })->implode('|');
+        // Build grep pattern to exclude application image repositories (matches repo:tag and repo_service:tag)
+        $appExcludePatterns = $applicationImageRepos->map(function ($repo) {
+            // Escape special characters for grep extended regex (ERE)
+            // ERE special chars: . \ + * ? [ ^ ] $ ( ) { } |
+            return preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $repo);
+        })->implode('|');
 
-            // Delete unused images that:
-            // - Are not application images (don't match app repos)
-            // - Don't have coolify.managed=true label
-            // Images in use by containers will fail silently with docker rmi
-            // Pattern matches both uuid:tag and uuid_servicename:tag (Docker Compose with build)
-            $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
-                "grep -v -E '^({$excludePatterns})[_:].+' | ".
-                "grep -v '<none>' | ".
-                "xargs -r -I {} sh -c 'docker inspect --format \"{{{{index .Config.Labels \\\"coolify.managed\\\"}}}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
+        // Build grep pattern to exclude Coolify infrastructure images (current version only)
+        // This pattern matches the image name regardless of registry prefix:
+        // - ghcr.io/coollabsio/coolify-helper:1.0.12
+        // - docker.io/coollabsio/coolify-helper:1.0.12
+        // - coollabsio/coolify-helper:1.0.12
+        // Pattern: (^|/)coollabsio/coolify-(helper|realtime):VERSION$
+        $escapedHelperVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $helperImageVersion);
+        $escapedRealtimeVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $realtimeImageVersion);
+        $infraExcludePattern = "(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$|(^|/)coollabsio/coolify-realtime:{$escapedRealtimeVersion}$";
+
+        // Delete unused images that:
+        // - Are not application images (don't match app repos)
+        // - Are not current Coolify infrastructure images (any registry)
+        // - Don't have coolify.managed=true label
+        // Images in use by containers will fail silently with docker rmi
+        // Pattern matches both uuid:tag and uuid_servicename:tag (Docker Compose with build)
+        $grepCommands = "grep -v '<none>'";
+
+        // Add application repo exclusion if there are applications
+        if ($applicationImageRepos->isNotEmpty()) {
+            $grepCommands .= " | grep -v -E '^({$appExcludePatterns})[_:].+'";
         }
+
+        // Add infrastructure image exclusion (matches any registry prefix)
+        $grepCommands .= " | grep -v -E '{$infraExcludePattern}'";
+
+        $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
+            $grepCommands.' | '.
+            "xargs -r -I {} sh -c 'docker inspect --format \"{{{{index .Config.Labels \\\"coolify.managed\\\"}}}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
 
         return implode(' && ', $commands);
     }

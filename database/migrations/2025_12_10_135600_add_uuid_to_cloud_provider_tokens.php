@@ -17,13 +17,16 @@ return new class extends Migration
             $table->string('uuid')->nullable()->unique()->after('id');
         });
 
-        // Generate UUIDs for existing records
-        $tokens = DB::table('cloud_provider_tokens')->whereNull('uuid')->get();
-        foreach ($tokens as $token) {
-            DB::table('cloud_provider_tokens')
-                ->where('id', $token->id)
-                ->update(['uuid' => (string) new Cuid2]);
-        }
+        // Generate UUIDs for existing records using chunked processing
+        DB::table('cloud_provider_tokens')
+            ->whereNull('uuid')
+            ->chunkById(500, function ($tokens) {
+                foreach ($tokens as $token) {
+                    DB::table('cloud_provider_tokens')
+                        ->where('id', $token->id)
+                        ->update(['uuid' => (string) new Cuid2]);
+                }
+            });
 
         // Make uuid non-nullable after filling in values
         Schema::table('cloud_provider_tokens', function (Blueprint $table) {
