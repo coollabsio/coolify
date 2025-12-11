@@ -62,7 +62,7 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
 
-        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI();
         $this->syncData();
     }
 
