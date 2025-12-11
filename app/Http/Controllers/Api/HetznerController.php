@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\ProxyTypes;
+use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -16,6 +17,15 @@ use OpenApi\Attributes as OA;
 
 class HetznerController extends Controller
 {
+    /**
+     * Get cloud provider token UUID from request.
+     * Prefers cloud_provider_token_uuid over deprecated cloud_provider_token_id.
+     */
+    private function getCloudProviderTokenUuid(Request $request): ?string
+    {
+        return $request->cloud_provider_token_uuid ?? $request->cloud_provider_token_id;
+    }
+
     #[OA\Get(
         summary: 'Get Hetzner Locations',
         description: 'Get all available Hetzner datacenter locations.',
@@ -27,10 +37,18 @@ class HetznerController extends Controller
         tags: ['Hetzner'],
         parameters: [
             new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
                 name: 'cloud_provider_token_id',
                 in: 'query',
-                required: true,
-                description: 'Cloud provider token UUID',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
                 schema: new OA\Schema(type: 'string')
             ),
         ],
@@ -76,7 +94,8 @@ class HetznerController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'cloud_provider_token_id' => 'required|string',
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
         ]);
 
         if ($validator->fails()) {
@@ -86,8 +105,9 @@ class HetznerController extends Controller
             ], 422);
         }
 
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
         $token = CloudProviderToken::whereTeamId($teamId)
-            ->whereUuid($request->cloud_provider_token_id)
+            ->whereUuid($tokenUuid)
             ->where('provider', 'hetzner')
             ->first();
 
@@ -116,10 +136,18 @@ class HetznerController extends Controller
         tags: ['Hetzner'],
         parameters: [
             new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
                 name: 'cloud_provider_token_id',
                 in: 'query',
-                required: true,
-                description: 'Cloud provider token UUID',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
                 schema: new OA\Schema(type: 'string')
             ),
         ],
@@ -141,7 +169,29 @@ class HetznerController extends Controller
                                     'cores' => ['type' => 'integer'],
                                     'memory' => ['type' => 'number'],
                                     'disk' => ['type' => 'integer'],
-                                    'prices' => ['type' => 'array'],
+                                    'prices' => [
+                                        'type' => 'array',
+                                        'items' => [
+                                            'type' => 'object',
+                                            'properties' => [
+                                                'location' => ['type' => 'string', 'description' => 'Datacenter location name'],
+                                                'price_hourly' => [
+                                                    'type' => 'object',
+                                                    'properties' => [
+                                                        'net' => ['type' => 'string'],
+                                                        'gross' => ['type' => 'string'],
+                                                    ],
+                                                ],
+                                                'price_monthly' => [
+                                                    'type' => 'object',
+                                                    'properties' => [
+                                                        'net' => ['type' => 'string'],
+                                                        'gross' => ['type' => 'string'],
+                                                    ],
+                                                ],
+                                            ],
+                                        ],
+                                    ],
                                 ]
                             )
                         )
@@ -165,7 +215,8 @@ class HetznerController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'cloud_provider_token_id' => 'required|string',
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
         ]);
 
         if ($validator->fails()) {
@@ -175,8 +226,9 @@ class HetznerController extends Controller
             ], 422);
         }
 
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
         $token = CloudProviderToken::whereTeamId($teamId)
-            ->whereUuid($request->cloud_provider_token_id)
+            ->whereUuid($tokenUuid)
             ->where('provider', 'hetzner')
             ->first();
 
@@ -205,10 +257,18 @@ class HetznerController extends Controller
         tags: ['Hetzner'],
         parameters: [
             new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
                 name: 'cloud_provider_token_id',
                 in: 'query',
-                required: true,
-                description: 'Cloud provider token UUID',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
                 schema: new OA\Schema(type: 'string')
             ),
         ],
@@ -254,7 +314,8 @@ class HetznerController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'cloud_provider_token_id' => 'required|string',
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
         ]);
 
         if ($validator->fails()) {
@@ -264,8 +325,9 @@ class HetznerController extends Controller
             ], 422);
         }
 
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
         $token = CloudProviderToken::whereTeamId($teamId)
-            ->whereUuid($request->cloud_provider_token_id)
+            ->whereUuid($tokenUuid)
             ->where('provider', 'hetzner')
             ->first();
 
@@ -307,10 +369,18 @@ class HetznerController extends Controller
         tags: ['Hetzner'],
         parameters: [
             new OA\Parameter(
+                name: 'cloud_provider_token_uuid',
+                in: 'query',
+                required: false,
+                description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
                 name: 'cloud_provider_token_id',
                 in: 'query',
-                required: true,
-                description: 'Cloud provider token UUID',
+                required: false,
+                deprecated: true,
+                description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.',
                 schema: new OA\Schema(type: 'string')
             ),
         ],
@@ -353,7 +423,8 @@ class HetznerController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'cloud_provider_token_id' => 'required|string',
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
         ]);
 
         if ($validator->fails()) {
@@ -363,8 +434,9 @@ class HetznerController extends Controller
             ], 422);
         }
 
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
         $token = CloudProviderToken::whereTeamId($teamId)
-            ->whereUuid($request->cloud_provider_token_id)
+            ->whereUuid($tokenUuid)
             ->where('provider', 'hetzner')
             ->first();
 
@@ -398,9 +470,10 @@ class HetznerController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['cloud_provider_token_id', 'location', 'server_type', 'image', 'private_key_uuid'],
+                    required: ['location', 'server_type', 'image', 'private_key_uuid'],
                     properties: [
-                        'cloud_provider_token_id' => ['type' => 'string', 'example' => 'abc123', 'description' => 'Cloud provider token UUID'],
+                        'cloud_provider_token_uuid' => ['type' => 'string', 'example' => 'abc123', 'description' => 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'],
+                        'cloud_provider_token_id' => ['type' => 'string', 'example' => 'abc123', 'description' => 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.', 'deprecated' => true],
                         'location' => ['type' => 'string', 'example' => 'nbg1', 'description' => 'Hetzner location name'],
                         'server_type' => ['type' => 'string', 'example' => 'cx11', 'description' => 'Hetzner server type name'],
                         'image' => ['type' => 'integer', 'example' => 15512617, 'description' => 'Hetzner image ID'],
@@ -448,11 +521,16 @@ class HetznerController extends Controller
                 response: 422,
                 ref: '#/components/responses/422',
             ),
+            new OA\Response(
+                response: 429,
+                ref: '#/components/responses/429',
+            ),
         ]
     )]
     public function createServer(Request $request)
     {
         $allowedFields = [
+            'cloud_provider_token_uuid',
             'cloud_provider_token_id',
             'location',
             'server_type',
@@ -477,7 +555,8 @@ class HetznerController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'cloud_provider_token_id' => 'required|string',
+            'cloud_provider_token_uuid' => 'required_without:cloud_provider_token_id|string',
+            'cloud_provider_token_id' => 'required_without:cloud_provider_token_uuid|string',
             'location' => 'required|string',
             'server_type' => 'required|string',
             'image' => 'required|integer',
@@ -529,8 +608,9 @@ class HetznerController extends Controller
         }
 
         // Validate cloud provider token
+        $tokenUuid = $this->getCloudProviderTokenUuid($request);
         $token = CloudProviderToken::whereTeamId($teamId)
-            ->whereUuid($request->cloud_provider_token_id)
+            ->whereUuid($tokenUuid)
             ->where('provider', 'hetzner')
             ->first();
 
@@ -620,7 +700,7 @@ class HetznerController extends Controller
 
             // Create server in Coolify database
             $server = Server::create([
-                'name' => $request->name,
+                'name' => $normalizedServerName,
                 'ip' => $ipAddress,
                 'user' => 'root',
                 'port' => 22,
@@ -644,6 +724,13 @@ class HetznerController extends Controller
                 'hetzner_server_id' => $hetznerServer['id'],
                 'ip' => $ipAddress,
             ])->setStatusCode(201);
+        } catch (RateLimitException $e) {
+            $response = response()->json(['message' => $e->getMessage()], 429);
+            if ($e->retryAfter !== null) {
+                $response->header('Retry-After', $e->retryAfter);
+            }
+
+            return $response;
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Failed to create server: '.$e->getMessage()], 500);
         }

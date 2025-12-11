@@ -267,6 +267,7 @@ paths:
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
                 autogenerate_domain:
                   type: boolean
+                  default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
               type: object
       responses:
@@ -536,6 +537,7 @@ paths:
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
                 autogenerate_domain:
                   type: boolean
+                  default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
               type: object
       responses:
@@ -805,6 +807,7 @@ paths:
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
                 autogenerate_domain:
                   type: boolean
+                  default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
               type: object
       responses:
@@ -1021,6 +1024,7 @@ paths:
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
                 autogenerate_domain:
                   type: boolean
+                  default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
               type: object
       responses:
@@ -1228,6 +1232,7 @@ paths:
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
                 autogenerate_domain:
                   type: boolean
+                  default: true
                   description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
               type: object
       responses:
@@ -4406,10 +4411,18 @@ paths:
       operationId: get-hetzner-images
       parameters:
         -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
           name: cloud_provider_token_id
           in: query
-          description: 'Cloud provider token UUID'
-          required: true
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
           schema:
             type: string
       responses:
@@ -4438,10 +4451,18 @@ paths:
       operationId: get-hetzner-ssh-keys
       parameters:
         -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
           name: cloud_provider_token_id
           in: query
-          description: 'Cloud provider token UUID'
-          required: true
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
           schema:
             type: string
       responses:
@@ -4475,16 +4496,20 @@ paths:
           application/json:
             schema:
               required:
-                - cloud_provider_token_id
                 - location
                 - server_type
                 - image
                 - private_key_uuid
               properties:
+                cloud_provider_token_uuid:
+                  type: string
+                  example: abc123
+                  description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
                 cloud_provider_token_id:
                   type: string
                   example: abc123
-                  description: 'Cloud provider token UUID'
+                  description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+                  deprecated: true
                 location:
                   type: string
                   example: nbg1

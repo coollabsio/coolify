@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\RateLimitException;
 use Illuminate\Support\Facades\Http;
 
 class HetznerService
@@ -46,6 +47,19 @@ class HetznerService
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
+            if ($response->status() === 429) {
+                $retryAfter = $response->header('Retry-After');
+                if ($retryAfter === null) {
+                    $resetTime = $response->header('RateLimit-Reset');
+                    $retryAfter = $resetTime ? max(0, (int) $resetTime - time()) : null;
+                }
+
+                throw new RateLimitException(
+                    'Rate limit exceeded. Please try again later.',
+                    $retryAfter !== null ? (int) $retryAfter : null
+                );
+            }
+
             throw new \Exception('Hetzner API error: '.$response->json('error.message', 'Unknown error'));
         }
 
