@@ -89,6 +89,11 @@ class Destination extends Component
                 only_this_server: true,
                 no_questions_asked: true,
             );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
             if ($result['status'] === 'skipped') {
                 $this->dispatch('success', 'Deployment skipped', $result['message']);
 

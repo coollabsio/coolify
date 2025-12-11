@@ -249,6 +249,11 @@ class Previews extends Component
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
             );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
             if ($result['status'] === 'skipped') {
                 $this->dispatch('success', 'Deployment skipped', $result['message']);
 

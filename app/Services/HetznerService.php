@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\RateLimitException;
 use Illuminate\Support\Facades\Http;
 
 class HetznerService
@@ -46,6 +47,19 @@ class HetznerService
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
+            if ($response->status() === 429) {
+                $retryAfter = $response->header('Retry-After');
+                if ($retryAfter === null) {
+                    $resetTime = $response->header('RateLimit-Reset');
+                    $retryAfter = $resetTime ? max(0, (int) $resetTime - time()) : null;
+                }
+
+                throw new RateLimitException(
+                    'Rate limit exceeded. Please try again later.',
+                    $retryAfter !== null ? (int) $retryAfter : null
+                );
+            }
+
             throw new \Exception('Hetzner API error: '.$response->json('error.message', 'Unknown error'));
         }
 
@@ -146,5 +160,31 @@ class HetznerService
     public function deleteServer(int $serverId): void
     {
         $this->request('delete', "/servers/{$serverId}");
+    }
+
+    public function getServers(): array
+    {
+        return $this->requestPaginated('get', '/servers', 'servers');
+    }
+
+    public function findServerByIp(string $ip): ?array
+    {
+        $servers = $this->getServers();
+
+        foreach ($servers as $server) {
+            // Check IPv4
+            $ipv4 = data_get($server, 'public_net.ipv4.ip');
+            if ($ipv4 === $ip) {
+                return $server;
+            }
+
+            // Check IPv6 (Hetzner returns the full /64 block)
+            $ipv6 = data_get($server, 'public_net.ipv6.ip');
+            if ($ipv6 && str_starts_with($ip, rtrim($ipv6, '/'))) {
+                return $server;
+            }
+        }
+
+        return null;
     }
 }

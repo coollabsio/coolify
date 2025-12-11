@@ -6,9 +6,9 @@
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
+        scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
-        renderTrigger: 0,
         containerName: '{{ $container ?? "logs" }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
@@ -35,15 +35,22 @@
             }
         },
         handleScroll(event) {
+            // Skip if follow logs is disabled or this is a programmatic scroll
             if (!this.alwaysScroll || this.isScrolling) return;
-            const el = event.target;
-            // Check if user scrolled away from the bottom
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-            if (distanceFromBottom > 50) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-            }
+
+            // Debounce scroll handling to avoid false positives from DOM mutations
+            // when Livewire re-renders and adds new log lines
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                const el = event.target;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                // Use larger threshold (100px) to avoid accidental disables
+                if (distanceFromBottom > 100) {
+                    this.alwaysScroll = false;
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
+            }, 150);
         },
         toggleColorLogs() {
             this.colorLogs = !this.colorLogs;
@@ -157,20 +164,14 @@
         },
         init() {
             if (this.expanded) {
-                this.$wire.getLogs();
+                this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
-            // Re-render logs after Livewire updates
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    this.$nextTick(() => { this.renderTrigger++; });
-                });
-            });
         }
     }">
         @if ($collapsible)
             <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
-                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
+                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
                 <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
@@ -191,9 +192,10 @@
             </div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
-            :class="fullscreen ? 'fullscreen flex flex-col' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'">
-            <div class="flex flex-col bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300 border-neutral-200"
-                :class="fullscreen ? 'h-full' : 'border border-solid rounded-sm'">
+            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"
+            :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
+            <div class="flex flex-col dark:text-white dark:border-coolgray-300 border-neutral-200"
+                :class="fullscreen ? 'h-full w-full bg-white dark:bg-coolgray-100' : 'bg-white dark:bg-coolgray-100 border border-solid rounded-sm'">
                 <div
                     class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                     <div class="flex items-center gap-2">
@@ -215,7 +217,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
-                            <input type="text" x-model="searchQuery" placeholder="Find in logs"
+                            <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                 class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-300" />
                             <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -307,18 +309,26 @@
                     class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
+                        @php
+                            // Limit rendered lines to prevent memory exhaustion
+                            $maxDisplayLines = 2000;
+                            $allLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
+                            $totalLines = $allLines->count();
+                            $hasMoreLines = $totalLines > $maxDisplayLines;
+                            $displayLines = $hasMoreLines ? $allLines->slice(-$maxDisplayLines)->values() : $allLines;
+                        @endphp
                         <div id="logs" class="font-mono max-w-full cursor-default">
+                            @if ($hasMoreLines)
+                                <div class="text-center py-2 text-gray-500 dark:text-gray-400 text-sm border-b dark:border-coolgray-300 mb-2">
+                                    Showing last {{ number_format($maxDisplayLines) }} of {{ number_format($totalLines) }} lines
+                                </div>
+                            @endif
                             <div x-show="searchQuery.trim() && getMatchCount() === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
-                            @foreach (explode("\n", $outputs) as $line)
+                            @foreach ($displayLines as $line)
                                 @php
-                                    // Skip empty lines
-                                    if (trim($line) === '') {
-                                        continue;
-                                    }
-
                                     // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
                                     $timestamp = '';
                                     $logContent = $line;
@@ -352,14 +362,14 @@
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
                                     <span data-line-text="{{ $logContent }}"
-                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
+                                        x-effect="searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
                                         class="whitespace-pre-wrap break-all"></span>
                                 </div>
                             @endforeach
                         </div>
                     @else
                         <pre id="logs"
-                            class="font-mono whitespace-pre-wrap break-all max-w-full">Refresh to get the logs...</pre>
+                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
                     @endif
                 </div>
             </div>

@@ -1399,6 +1399,23 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "garage": {
+        "documentation": "https://garagehq.deuxfleurs.fr/documentation/?utm_source=coolify.io",
+        "slogan": "Garage is an S3-compatible distributed object storage service designed for self-hosting.",
+        "compose": "c2VydmljZXM6CiAgZ2FyYWdlOgogICAgaW1hZ2U6ICdkeGZscnMvZ2FyYWdlOnYyLjEuMCcKICAgIGVudmlyb25tZW50OgogICAgICAtIEdBUkFHRV9TM19BUElfVVJMPSRHQVJBR0VfUzNfQVBJX1VSTAogICAgICAtIEdBUkFHRV9XRUJfVVJMPSRHQVJBR0VfV0VCX1VSTAogICAgICAtIEdBUkFHRV9BRE1JTl9VUkw9JEdBUkFHRV9BRE1JTl9VUkwKICAgICAgLSAnR0FSQUdFX1JQQ19TRUNSRVQ9JHtTRVJWSUNFX0hFWF8zMl9SUENTRUNSRVR9JwogICAgICAtIEdBUkFHRV9BRE1JTl9UT0tFTj0kU0VSVklDRV9QQVNTV09SRF9HQVJBR0UKICAgICAgLSBHQVJBR0VfTUVUUklDU19UT0tFTj0kU0VSVklDRV9QQVNTV09SRF9HQVJBR0VNRVRSSUNTCiAgICAgIC0gR0FSQUdFX0FMTE9XX1dPUkxEX1JFQURBQkxFX1NFQ1JFVFM9dHJ1ZQogICAgICAtICdSVVNUX0xPRz0ke1JVU1RfTE9HOi1nYXJhZ2U9aW5mb30nCiAgICB2b2x1bWVzOgogICAgICAtICdnYXJhZ2UtbWV0YTovdmFyL2xpYi9nYXJhZ2UvbWV0YScKICAgICAgLSAnZ2FyYWdlLWRhdGE6L3Zhci9saWIvZ2FyYWdlL2RhdGEnCiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL2dhcmFnZS50b21sCiAgICAgICAgdGFyZ2V0OiAvZXRjL2dhcmFnZS50b21sCiAgICAgICAgY29udGVudDogIm1ldGFkYXRhX2RpciA9IFwiL3Zhci9saWIvZ2FyYWdlL21ldGFcIlxuZGF0YV9kaXIgPSBcIi92YXIvbGliL2dhcmFnZS9kYXRhXCJcbmRiX2VuZ2luZSA9IFwibG1kYlwiXG5cbnJlcGxpY2F0aW9uX2ZhY3RvciA9IDFcbmNvbnNpc3RlbmN5X21vZGUgPSBcImNvbnNpc3RlbnRcIlxuXG5jb21wcmVzc2lvbl9sZXZlbCA9IDFcbmJsb2NrX3NpemUgPSBcIjFNXCJcblxucnBjX2JpbmRfYWRkciA9IFwiWzo6XTozOTAxXCJcbnJwY19zZWNyZXRfZmlsZSA9IFwiZW52OkdBUkFHRV9SUENfU0VDUkVUXCJcbmJvb3RzdHJhcF9wZWVycyA9IFtdXG5cbltzM19hcGldXG5zM19yZWdpb24gPSBcImdhcmFnZVwiXG5hcGlfYmluZF9hZGRyID0gXCJbOjpdOjM5MDBcIlxucm9vdF9kb21haW4gPSBcIi5zMy5nYXJhZ2UubG9jYWxob3N0XCJcblxuW3MzX3dlYl1cbmJpbmRfYWRkciA9IFwiWzo6XTozOTAyXCJcbnJvb3RfZG9tYWluID0gXCIud2ViLmdhcmFnZS5sb2NhbGhvc3RcIlxuXG5bYWRtaW5dXG5hcGlfYmluZF9hZGRyID0gXCJbOjpdOjM5MDNcIlxuYWRtaW5fdG9rZW5fZmlsZSA9IFwiZW52OkdBUkFHRV9BRE1JTl9UT0tFTlwiXG5tZXRyaWNzX3Rva2VuX2ZpbGUgPSBcImVudjpHQVJBR0VfTUVUUklDU19UT0tFTlwiIgogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIC9nYXJhZ2UKICAgICAgICAtIHN0YXRzCiAgICAgICAgLSAnLWEnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQo=",
+        "tags": [
+            "object",
+            "storage",
+            "server",
+            "s3",
+            "api",
+            "distributed"
+        ],
+        "category": "storage",
+        "logo": "svgs/garage.svg",
+        "minversion": "0.0.0",
+        "port": "3900"
+    },
     "getoutline": {
         "documentation": "https://docs.getoutline.com/s/hosting/doc/hosting-outline-nipGaCRBDu?utm_source=coolify.io",
         "slogan": "Your team\u2019s knowledge base",
