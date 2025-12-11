@@ -7,7 +7,6 @@
         alwaysScroll: false,
         intervalId: null,
         scrollDebounce: null,
-        searchTimeout: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
         containerName: '{{ $container ?? "logs" }}',
@@ -80,12 +79,6 @@
         matchesSearch(line) {
             if (!this.searchQuery.trim()) return true;
             return line.toLowerCase().includes(this.searchQuery.toLowerCase());
-        },
-        debouncedSearch(query) {
-            clearTimeout(this.searchTimeout);
-            this.searchTimeout = setTimeout(() => {
-                this.searchQuery = query;
-            }, 300);
         },
         decodeHtml(text) {
             // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
@@ -224,7 +217,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
-                            <input type="text" x-on:input="debouncedSearch($event.target.value)" :value="searchQuery" placeholder="Find in logs"
+                            <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                 class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-300" />
                             <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
