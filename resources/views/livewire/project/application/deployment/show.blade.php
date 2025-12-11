@@ -15,35 +15,17 @@
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
-            if (this.fullscreen === false) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-            }
         },
-        isScrolling: false,
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
                 this.intervalId = setInterval(() => {
                     const logsContainer = document.getElementById('logsContainer');
                     if (logsContainer) {
-                        this.isScrolling = true;
                         logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
                     }
                 }, 100);
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-            }
-        },
-        handleScroll(event) {
-            if (!this.alwaysScroll || this.isScrolling) return;
-            const el = event.target;
-            // Check if user scrolled away from the bottom
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-            if (distanceFromBottom > 50) {
-                this.alwaysScroll = false;
                 clearInterval(this.intervalId);
                 this.intervalId = null;
             }
@@ -134,6 +116,18 @@
             a.click();
             URL.revokeObjectURL(url);
         },
+        stopScroll() {
+            // Scroll to the end one final time before disabling
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            this.alwaysScroll = false;
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+            }
+        },
         init() {
             // Re-render logs after Livewire updates
             document.addEventListener('livewire:navigated', () => {
@@ -144,14 +138,19 @@
                     this.$nextTick(() => { this.renderTrigger++; });
                 });
             });
+            // Stop auto-scroll when deployment finishes
+            Livewire.on('deploymentFinished', () => {
+                // Wait for DOM to update with final logs before scrolling to end
+                setTimeout(() => {
+                    this.stopScroll();
+                }, 500);
+            });
             // Start auto-scroll if deployment is in progress
             if (this.alwaysScroll) {
                 this.intervalId = setInterval(() => {
                     const logsContainer = document.getElementById('logsContainer');
                     if (logsContainer) {
-                        this.isScrolling = true;
                         logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
                     }
                 }, 100);
             }
@@ -254,7 +253,7 @@
                             </button>
                         </div>
                     </div>
-                    <div id="logsContainer" @scroll="handleScroll"
+                    <div id="logsContainer"
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
                         :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                         <div id="logs" class="flex flex-col font-mono">

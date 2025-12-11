@@ -22,10 +22,7 @@ class Show extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             'refreshQueue',
         ];
     }
@@ -91,10 +88,14 @@ class Show extends Component
 
     public function polling()
     {
-        $this->dispatch('deploymentFinished');
         $this->application_deployment_queue->refresh();
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->isKeepAliveOn();
+
+        // Dispatch event when deployment finishes to stop auto-scroll
+        if (! $this->isKeepAliveOn) {
+            $this->dispatch('deploymentFinished');
+        }
     }
 
     public function getLogLinesProperty()
