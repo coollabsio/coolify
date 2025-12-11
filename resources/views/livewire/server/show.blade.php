@@ -320,6 +320,64 @@
                     </div>
                 </div>
             </form>
+            @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
+                <div class="pt-6">
+                    <h3>Link to Hetzner Cloud</h3>
+                    <p class="pb-4 text-sm dark:text-neutral-400">
+                        Link this server to a Hetzner Cloud instance to enable power controls and status monitoring.
+                    </p>
+
+                    <div class="flex flex-wrap gap-4 items-end">
+                        <div class="w-72">
+                            <x-forms.select wire:model="selectedHetznerTokenId" label="Hetzner Token"
+                                canGate="update" :canResource="$server">
+                                <option value="">Select a token...</option>
+                                @foreach ($availableHetznerTokens as $token)
+                                    <option value="{{ $token->id }}">{{ $token->name }}</option>
+                                @endforeach
+                            </x-forms.select>
+                        </div>
+                        <x-forms.button wire:click="searchHetznerServer"
+                            wire:loading.attr="disabled"
+                            canGate="update" :canResource="$server">
+                            <span wire:loading.remove wire:target="searchHetznerServer">Search by IP</span>
+                            <span wire:loading wire:target="searchHetznerServer">Searching...</span>
+                        </x-forms.button>
+                    </div>
+
+                    @if ($hetznerSearchError)
+                        <div class="mt-4 p-4 border border-red-500 rounded-md bg-red-50 dark:bg-red-900/20">
+                            <p class="text-red-600 dark:text-red-400">{{ $hetznerSearchError }}</p>
+                        </div>
+                    @endif
+
+                    @if ($hetznerNoMatchFound)
+                        <div class="mt-4 p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
+                            <p class="text-yellow-600 dark:text-yellow-400">
+                                No Hetzner server found matching IP: {{ $server->ip }}
+                            </p>
+                            <p class="text-sm dark:text-neutral-400 mt-1">
+                                Try a different token or verify the server IP is correct.
+                            </p>
+                        </div>
+                    @endif
+
+                    @if ($matchedHetznerServer)
+                        <div class="mt-4 p-4 border border-green-500 rounded-md bg-green-50 dark:bg-green-900/20">
+                            <h4 class="font-semibold text-green-700 dark:text-green-400 mb-2">Match Found!</h4>
+                            <div class="grid grid-cols-2 gap-2 text-sm mb-4">
+                                <div><span class="font-medium">Name:</span> {{ $matchedHetznerServer['name'] }}</div>
+                                <div><span class="font-medium">ID:</span> {{ $matchedHetznerServer['id'] }}</div>
+                                <div><span class="font-medium">Status:</span> {{ ucfirst($matchedHetznerServer['status']) }}</div>
+                                <div><span class="font-medium">Type:</span> {{ data_get($matchedHetznerServer, 'server_type.name', 'Unknown') }}</div>
+                            </div>
+                            <x-forms.button wire:click="linkToHetzner" isHighlighted canGate="update" :canResource="$server">
+                                Link This Server
+                            </x-forms.button>
+                        </div>
+                    @endif
+                </div>
+            @endif
             @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
                 <form wire:submit.prevent='submit'>
                     <div class="flex gap-2 items-center pt-4 pb-2">
