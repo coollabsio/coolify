@@ -182,7 +182,7 @@
                                                         label="Destination Path" required
                                                         helper="File location inside the container" />
                                                     <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
-                                                        id="file_storage_content"></x-forms.textarea>
+                                                        id="file_storage_content" useMonacoEditor></x-forms.textarea>
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
                                                         Add
                                                     </x-forms.button>
