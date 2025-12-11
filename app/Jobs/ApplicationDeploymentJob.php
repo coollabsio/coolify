@@ -3232,6 +3232,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         try {
+            // Apply ownership settings to bind mount volumes before starting container
+            $this->apply_volume_ownership_on_host();
+
             // Ensure .env file exists before docker compose tries to load it (defensive programming)
             $this->execute_remote_command(
                 ["touch {$this->configuration_dir}/.env", 'hidden' => true],
@@ -3255,8 +3258,85 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
             $this->application_deployment_queue->addLogEntry('New container started.');
+
+            // Apply ownership settings to Docker named volumes (inside container) after it starts
+            $this->apply_volume_ownership_in_container();
         } catch (Exception $e) {
             throw new DeploymentException("Failed to start container: {$e->getMessage()}", $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Apply ownership (chown/chmod) settings to bind mount volumes on the host server.
+     * This runs BEFORE the container starts.
+     */
+    private function apply_volume_ownership_on_host(): void
+    {
+        $storages = $this->application->persistentStorages()
+            ->whereNotNull('host_path')
+            ->where('apply_ownership', true)
+            ->where(function ($query) {
+                $query->whereNotNull('chown')->orWhereNotNull('chmod');
+            })
+            ->get();
+
+        if ($storages->isEmpty()) {
+            return;
+        }
+
+        foreach ($storages as $storage) {
+            try {
+                $storage->applyOwnershipOnServer($this->server);
+                $this->application_deployment_queue->addLogEntry("Applied ownership settings to volume: {$storage->host_path}");
+            } catch (\Throwable $e) {
+                $this->application_deployment_queue->addLogEntry("Warning: Failed to apply ownership to {$storage->host_path}: {$e->getMessage()}", type: 'warning');
+            }
+        }
+    }
+
+    /**
+     * Apply ownership (chown/chmod) settings to Docker named volumes inside the container.
+     * This runs AFTER the container starts.
+     */
+    private function apply_volume_ownership_in_container(): void
+    {
+        $storages = $this->application->persistentStorages()
+            ->whereNull('host_path')
+            ->where('apply_ownership', true)
+            ->where(function ($query) {
+                $query->whereNotNull('chown')->orWhereNotNull('chmod');
+            })
+            ->get();
+
+        if ($storages->isEmpty()) {
+            return;
+        }
+
+        $containerName = generateApplicationContainerName($this->application, $this->pull_request_id);
+
+        foreach ($storages as $storage) {
+            try {
+                $mountPath = escapeshellarg($storage->mount_path);
+                $recursiveFlag = $storage->recursive ? '-R ' : '';
+
+                if ($storage->chown) {
+                    $escapedChown = escapeshellarg($storage->chown);
+                    $this->execute_remote_command(
+                        ["docker exec {$containerName} chown {$recursiveFlag}{$escapedChown} {$mountPath}", 'hidden' => true],
+                    );
+                }
+
+                if ($storage->chmod) {
+                    $escapedChmod = escapeshellarg($storage->chmod);
+                    $this->execute_remote_command(
+                        ["docker exec {$containerName} chmod {$recursiveFlag}{$escapedChmod} {$mountPath}", 'hidden' => true],
+                    );
+                }
+
+                $this->application_deployment_queue->addLogEntry("Applied ownership settings to volume: {$storage->mount_path}");
+            } catch (\Throwable $e) {
+                $this->application_deployment_queue->addLogEntry("Warning: Failed to apply ownership to {$storage->mount_path}: {$e->getMessage()}", type: 'warning');
+            }
         }
     }
 

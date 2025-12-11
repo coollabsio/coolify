@@ -10,6 +10,11 @@ class LocalPersistentVolume extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'recursive' => 'boolean',
+        'apply_ownership' => 'boolean',
+    ];
+
     public function resource()
     {
         return $this->morphTo('resource');
@@ -180,5 +185,54 @@ class LocalPersistentVolume extends Model
 
             return false;
         }
+    }
+
+    /**
+     * Apply ownership (chown/chmod) to the volume directory on the host server.
+     * Only works for bind mounts (where host_path is specified).
+     * For Docker named volumes, use applyOwnershipInContainer() instead.
+     */
+    public function applyOwnershipOnServer(Server $server): void
+    {
+        if (! $this->host_path || ! $this->apply_ownership) {
+            return;
+        }
+
+        if (! $this->chown && ! $this->chmod) {
+            return;
+        }
+
+        $commands = collect([]);
+
+        // Validate and escape path to prevent command injection
+        validateShellSafePath($this->host_path, 'storage path');
+        $escapedPath = escapeshellarg($this->host_path);
+
+        // Create directory if it doesn't exist
+        $commands->push("mkdir -p {$escapedPath}");
+
+        if ($this->chown) {
+            $recursiveFlag = $this->recursive ? '-R ' : '';
+            $escapedChown = escapeshellarg($this->chown);
+            $commands->push("chown {$recursiveFlag}{$escapedChown} {$escapedPath}");
+        }
+
+        if ($this->chmod) {
+            $recursiveFlag = $this->recursive ? '-R ' : '';
+            $escapedChmod = escapeshellarg($this->chmod);
+            $commands->push("chmod {$recursiveFlag}{$escapedChmod} {$escapedPath}");
+        }
+
+        if ($commands->count() > 0) {
+            instant_remote_process($commands, $server);
+        }
+    }
+
+    /**
+     * Check if this volume has ownership settings configured.
+     */
+    public function hasOwnershipSettings(): bool
+    {
+        return $this->apply_ownership && ($this->chown || $this->chmod);
     }
 }

@@ -10,11 +10,41 @@
             </div>
         @endif
         <div class="flex flex-col justify-center text-sm select-text">
-            <div class="flex gap-2  md:flex-row flex-col">
+            <div class="flex gap-2 md:flex-row flex-col">
                 <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
+
+        {{-- Advanced Options - Ownership Settings --}}
+        @if (!$isReadOnly)
+            @can('update', $resource)
+                <div x-data="{ showAdvanced: @js($chown || $chmod) }" class="w-full">
+                    <button type="button" @click="showAdvanced = !showAdvanced"
+                        class="flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-300">
+                        <span x-text="showAdvanced ? 'Hide' : 'Show'"></span> Advanced Options
+                        <svg x-show="!showAdvanced" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <svg x-show="showAdvanced" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="showAdvanced" x-collapse class="mt-4">
+                        <div class="flex gap-2 md:flex-row flex-col">
+                            <x-forms.input id="chown" label="Owner (user:group)"
+                                placeholder="1000:1000 or www-data:www-data"
+                                helper="Set ownership for this file/directory on the host." />
+                            <x-forms.input id="chmod" label="Permissions" placeholder="755"
+                                helper="Set permissions (e.g., 644, 755). Applied when saving." />
+                        </div>
+                    </div>
+                </div>
+            @endcan
+        @endif
         <form wire:submit='submit' class="flex flex-col gap-2">
             @if (!$isReadOnly)
                 @can('update', $resource)

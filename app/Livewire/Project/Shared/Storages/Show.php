@@ -32,16 +32,31 @@ class Show extends Component
 
     public ?string $hostPath = null;
 
+    // Ownership properties
+    public ?string $chown = null;
+
+    public ?string $chmod = null;
+
+    public bool $recursive = false;
+
+    public bool $applyOwnership = true;
+
     protected $rules = [
         'name' => 'required|string',
         'mountPath' => 'required|string',
         'hostPath' => 'string|nullable',
+        'chown' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+$/'],
+        'chmod' => ['nullable', 'string', 'regex:/^[0-7]{3,4}$/'],
+        'recursive' => 'boolean',
+        'applyOwnership' => 'boolean',
     ];
 
     protected $validationAttributes = [
         'name' => 'name',
         'mountPath' => 'mount',
         'hostPath' => 'host',
+        'chown' => 'owner',
+        'chmod' => 'permissions',
     ];
 
     /**
@@ -56,11 +71,19 @@ class Show extends Component
             $this->storage->name = $this->name;
             $this->storage->mount_path = $this->mountPath;
             $this->storage->host_path = $this->hostPath;
+            $this->storage->chown = $this->chown;
+            $this->storage->chmod = $this->chmod;
+            $this->storage->recursive = $this->recursive;
+            $this->storage->apply_ownership = $this->applyOwnership;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->storage->name;
             $this->mountPath = $this->storage->mount_path;
             $this->hostPath = $this->storage->host_path;
+            $this->chown = $this->storage->chown;
+            $this->chmod = $this->storage->chmod;
+            $this->recursive = $this->storage->recursive ?? false;
+            $this->applyOwnership = $this->storage->apply_ownership ?? true;
         }
     }
 

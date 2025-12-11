@@ -262,6 +262,10 @@ class StartMongodb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
+
+        // Apply custom ownership settings to bind mount volumes before starting
+        $this->apply_volume_ownership();
+
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, 'chown mongodb:mongodb /etc/mongo/certs/server.pem');
@@ -344,5 +348,36 @@ class StartMongodb
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js > /dev/null";
+    }
+
+    /**
+     * Apply custom ownership (chown/chmod) settings to bind mount volumes.
+     */
+    private function apply_volume_ownership(): void
+    {
+        $storages = $this->database->persistentStorages()
+            ->whereNotNull('host_path')
+            ->where('apply_ownership', true)
+            ->where(function ($query) {
+                $query->whereNotNull('chown')->orWhereNotNull('chmod');
+            })
+            ->get();
+
+        foreach ($storages as $storage) {
+            $escapedPath = escapeshellarg($storage->host_path);
+            $this->commands[] = "mkdir -p {$escapedPath}";
+
+            if ($storage->chown) {
+                $recursiveFlag = $storage->recursive ? '-R ' : '';
+                $escapedChown = escapeshellarg($storage->chown);
+                $this->commands[] = "chown {$recursiveFlag}{$escapedChown} {$escapedPath} || echo 'Warning: Failed to set ownership for {$storage->host_path}'";
+            }
+
+            if ($storage->chmod) {
+                $recursiveFlag = $storage->recursive ? '-R ' : '';
+                $escapedChmod = escapeshellarg($storage->chmod);
+                $this->commands[] = "chmod {$recursiveFlag}{$escapedChmod} {$escapedPath} || echo 'Warning: Failed to set permissions for {$storage->host_path}'";
+            }
+        }
     }
 }

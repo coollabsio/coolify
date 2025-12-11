@@ -54,6 +54,39 @@
                         <x-forms.input id="mountPath" required />
                     </div>
                 @endif
+
+                {{-- Advanced Options - Ownership Settings --}}
+                <div x-data="{ showAdvanced: @js($chown || $chmod) }" class="w-full">
+                    <button type="button" @click="showAdvanced = !showAdvanced"
+                        class="flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-300">
+                        <span x-text="showAdvanced ? 'Hide' : 'Show'"></span> Advanced Options
+                        <svg x-show="!showAdvanced" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <svg x-show="showAdvanced" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                        </svg>
+                    </button>
+
+                    <div x-show="showAdvanced" x-collapse class="mt-4 space-y-4">
+                        <div class="flex gap-2 md:flex-row flex-col">
+                            <x-forms.input id="chown" label="Owner (user:group)"
+                                placeholder="1000:1000 or www-data:www-data"
+                                helper="Set ownership for the volume directory. Leave empty to use defaults." />
+                            <x-forms.input id="chmod" label="Permissions" placeholder="755"
+                                helper="Set permissions (e.g., 755, 777). Leave empty to use defaults." />
+                        </div>
+                        <div class="flex gap-4 flex-wrap">
+                            <x-forms.checkbox id="recursive" label="Apply recursively"
+                                helper="Apply ownership/permissions to all files inside the directory. Use with caution on existing data." />
+                            <x-forms.checkbox id="applyOwnership" label="Apply ownership on deploy"
+                                helper="When enabled, ownership/permissions are applied on every deployment. Disable to prevent overwriting manual changes." />
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex gap-2">
                     <x-forms.button type="submit">
                         Update

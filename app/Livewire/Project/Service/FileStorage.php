@@ -43,12 +43,20 @@ class FileStorage extends Component
     #[Validate(['required', 'boolean'])]
     public bool $isBasedOnGit = false;
 
+    #[Validate(['nullable', 'string', 'regex:/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+$/'])]
+    public ?string $chown = null;
+
+    #[Validate(['nullable', 'string', 'regex:/^[0-7]{3,4}$/'])]
+    public ?string $chmod = null;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
         'content' => 'nullable',
         'isBasedOnGit' => 'required|boolean',
+        'chown' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+$/'],
+        'chmod' => ['nullable', 'string', 'regex:/^[0-7]{3,4}$/'],
     ];
 
     public function mount()
@@ -74,12 +82,16 @@ class FileStorage extends Component
             // Sync to model
             $this->fileStorage->content = $this->content;
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+            $this->fileStorage->chown = $this->chown;
+            $this->fileStorage->chmod = $this->chmod;
 
             $this->fileStorage->save();
         } else {
             // Sync from model
             $this->content = $this->fileStorage->content;
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
+            $this->chown = $this->fileStorage->chown;
+            $this->chmod = $this->fileStorage->chmod;
         }
     }
 
@@ -180,6 +192,8 @@ class FileStorage extends Component
             // Sync component properties to model
             $this->fileStorage->content = $this->content;
             $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+            $this->fileStorage->chown = $this->chown;
+            $this->fileStorage->chmod = $this->chmod;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
