@@ -100,7 +100,7 @@ class Gitea extends Controller
                                 is_webhook: true,
                             );
                             if ($result['status'] === 'queue_full') {
-                                return response($result['message'], 429);
+                                return response($result['message'], 429)->header('Retry-After', 60);
                             } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -172,7 +172,7 @@ class Gitea extends Controller
                                 git_type: 'gitea'
                             );
                             if ($result['status'] === 'queue_full') {
-                                return response($result['message'], 429);
+                                return response($result['message'], 429)->header('Retry-After', 60);
                             } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'application' => $application->name,
