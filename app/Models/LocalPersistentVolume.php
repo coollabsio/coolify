@@ -85,6 +85,7 @@ class LocalPersistentVolume extends Model
             $volumes = $compose['services'][$serviceName]['volumes'];
 
             // Check each volume to find a match
+            // Note: We match on mount_path (container path) only, since host paths get transformed
             foreach ($volumes as $volume) {
                 // Volume can be string like "host:container:ro" or "host:container"
                 if (is_string($volume)) {
@@ -103,6 +104,19 @@ class LocalPersistentVolume extends Model
                         if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
                             return $options === 'ro';
                         }
+                    }
+                } elseif (is_array($volume)) {
+                    // Long-form syntax: { type: bind/volume, source: ..., target: ..., read_only: true }
+                    $containerPath = data_get($volume, 'target');
+                    $readOnly = data_get($volume, 'read_only', false);
+
+                    // Match based on mount_path
+                    // Remove leading slash from mount_path if present for comparison
+                    $mountPath = str($this->mount_path)->ltrim('/')->toString();
+                    $containerPathClean = str($containerPath)->ltrim('/')->toString();
+
+                    if ($mountPath === $containerPathClean || $this->mount_path === $containerPath) {
+                        return $readOnly === true;
                     }
                 }
             }
