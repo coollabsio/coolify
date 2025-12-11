@@ -6725,10 +6725,20 @@
                 "operationId": "get-hetzner-locations",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -6795,10 +6805,20 @@
                 "operationId": "get-hetzner-server-types",
                 "parameters": [
                     {
+                        "name": "cloud_provider_token_uuid",
+                        "in": "query",
+                        "description": "Cloud provider token UUID. Required if cloud_provider_token_id is not provided.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "cloud_provider_token_id",
                         "in": "query",
-                        "description": "Cloud provider token UUID",
-                        "required": true,
+                        "description": "Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.",
+                        "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "string"
                         }
@@ -6832,7 +6852,38 @@
                                                 "type": "integer"
                                             },
                                             "prices": {
-                                                "type": "array"
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "location": {
+                                                            "type": "string",
+                                                            "description": "Datacenter location name"
+                                                        },
+                                                        "price_hourly": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "net": {
+                                                                    "type": "string"
+                                                                },
+                                                                "gross": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "price_monthly": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "net": {
+                                                                    "type": "string"
+                                                                },
+                                                                "gross": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         },
                                         "type": "object"
@@ -7107,6 +7158,9 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "$ref": "#\/components\/responses\/429"
                     }
                 },
                 "security": [
@@ -10973,6 +11027,31 @@
                                             "type": "string"
                                         }
                                     }
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "429": {
+                "description": "Rate limit exceeded.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Number of seconds to wait before retrying.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 60
+                        }
+                    }
+                },
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Rate limit exceeded. Please try again later."
                                 }
                             },
                             "type": "object"
