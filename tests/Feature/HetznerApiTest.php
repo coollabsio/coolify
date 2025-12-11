@@ -16,7 +16,8 @@ beforeEach(function () {
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
     // Create an API token for the user
-    $this->token = $this->user->createToken('test-token', ['*'], $this->team->id);
+    session(['currentTeam' => $this->team]);
+    $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
 
     // Create a Hetzner cloud provider token
