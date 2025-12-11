@@ -195,10 +195,10 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $repoVolume = $this->database->pgbackrestRepoVolume();
         if ($repoVolume) {
             $repoMount = $repoVolume->host_path ?: $repoVolume->name;
-            $mounts[] = "-v {$repoMount}:/var/lib/pgbackrest";
+            $mounts[] = '-v '.escapeshellarg($repoMount.':/var/lib/pgbackrest');
         }
 
-        $mounts[] = "-v {$configDir}:/etc/pgbackrest:ro";
+        $mounts[] = '-v '.escapeshellarg($configDir.':/etc/pgbackrest:ro');
 
         $s3EnvVars = PgBackrestService::buildS3EnvVars($backup);
         foreach ($s3EnvVars as $key => $value) {
@@ -209,13 +209,13 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $sidecarName = 'pgbackrest-info-'.$this->database->uuid.'-'.time();
 
         $cmd = sprintf(
-            'docker run --rm --name %s --network %s %s %s %s sh -c \'%s\' 2>&1',
-            $sidecarName,
-            $network,
+            'docker run --rm --name %s --network %s %s %s %s sh -c %s 2>&1',
+            escapeshellarg($sidecarName),
+            escapeshellarg($network),
             implode(' ', $envPieces),
             implode(' ', $mounts),
-            $this->getSidecarImage(),
-            $this->getInstallAndRunCommand($infoCmd)
+            escapeshellarg($this->getSidecarImage()),
+            escapeshellarg($this->getInstallAndRunCommand($infoCmd))
         );
 
         $output = instant_remote_process([$cmd], $server, false, false, 120, disableMultiplexing: true);
@@ -249,7 +249,8 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $volumeName = $pgdataVolume->host_path ?: $pgdataVolume->name;
         $backupVolumeName = "{$pgdataVolume->name}_backup_{$timestamp}";
 
-        $checkCmd = "docker run --rm -v {$volumeName}:/data alpine sh -c 'test -n \"$(ls -A /data 2>/dev/null)\" && echo OK || echo EMPTY'";
+        $sourceMount = escapeshellarg($volumeName.':/data');
+        $checkCmd = 'docker run --rm -v '.$sourceMount." alpine sh -c 'test -n \"\$(ls -A /data 2>/dev/null)\" && echo OK || echo EMPTY'";
         $checkResult = instant_remote_process([$checkCmd], $server, false, false, 30, disableMultiplexing: true);
 
         if (trim($checkResult) === 'EMPTY') {
@@ -258,12 +259,14 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             return null;
         }
 
-        instant_remote_process(["docker volume create {$backupVolumeName}"], $server, false, false, 30, disableMultiplexing: true);
+        instant_remote_process(['docker volume create '.escapeshellarg($backupVolumeName)], $server, false, false, 30, disableMultiplexing: true);
 
-        $copyCmd = "docker run --rm -v {$volumeName}:/source:ro -v {$backupVolumeName}:/backup alpine sh -c 'cp -a /source/. /backup/'";
-        instant_remote_process([$copyCmd], $server, true, false, 300, disableMultiplexing: true);
+        $sourceReadOnlyMount = escapeshellarg($volumeName.':/source:ro');
+        $backupMount = escapeshellarg($backupVolumeName.':/backup');
+        $copyCmd = 'docker run --rm -v '.$sourceReadOnlyMount.' -v '.$backupMount." alpine sh -c 'cp -a /source/. /backup/'";
+        instant_remote_process([$copyCmd], $server, true, false, $this->timeout, disableMultiplexing: true);
 
-        $verifyCmd = "docker run --rm -v {$backupVolumeName}:/backup alpine sh -c 'test -n \"$(ls -A /backup 2>/dev/null)\" && echo OK'";
+        $verifyCmd = 'docker run --rm -v '.$backupMount." alpine sh -c 'test -n \"\$(ls -A /backup 2>/dev/null)\" && echo OK'";
         $result = instant_remote_process([$verifyCmd], $server, false, false, 30, disableMultiplexing: true);
 
         if (trim($result) !== 'OK') {
@@ -291,11 +294,13 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->restore->appendLog('Recovering PGDATA from backup...');
 
-            $clearCmd = "docker run --rm -v {$volumeName}:/data alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true'";
+            $dataMount = escapeshellarg($volumeName.':/data');
+            $clearCmd = 'docker run --rm -v '.$dataMount." alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true'";
             instant_remote_process([$clearCmd], $server, false, false, 60, disableMultiplexing: true);
 
-            $copyCmd = "docker run --rm -v {$backupVolumeName}:/source:ro -v {$volumeName}:/data alpine sh -c 'cp -a /source/. /data/'";
-            instant_remote_process([$copyCmd], $server, true, false, 300, disableMultiplexing: true);
+            $sourceMount = escapeshellarg($backupVolumeName.':/source:ro');
+            $copyCmd = 'docker run --rm -v '.$sourceMount.' -v '.$dataMount." alpine sh -c 'cp -a /source/. /data/'";
+            instant_remote_process([$copyCmd], $server, true, false, $this->timeout, disableMultiplexing: true);
 
             $this->restore->appendLog('PGDATA recovered from backup.');
         } catch (Throwable $e) {
@@ -308,7 +313,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $server = $this->database->destination->server;
 
-            instant_remote_process(["docker volume rm {$backupVolumeName} 2>/dev/null || true"], $server, false, false, 60, disableMultiplexing: true);
+            instant_remote_process(['docker volume rm '.escapeshellarg($backupVolumeName).' 2>/dev/null || true'], $server, false, false, 60, disableMultiplexing: true);
 
             $this->restore->appendLog('Temporary backup volume removed.');
         } catch (Throwable $e) {
@@ -327,8 +332,9 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
 
-        $rmCmd = "docker run --rm -v {$mount}:/data alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true'";
-        instant_remote_process([$rmCmd], $server, false, false, 300, disableMultiplexing: true);
+        $dataMount = escapeshellarg($mount.':/data');
+        $rmCmd = 'docker run --rm -v '.$dataMount." alpine sh -c 'rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true'";
+        instant_remote_process([$rmCmd], $server, false, false, $this->timeout, disableMultiplexing: true);
 
         $this->restore->appendLog('PGDATA directory cleared.');
     }
@@ -344,8 +350,8 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             $server = $this->database->destination->server;
             $mount = $pgdataVolume->host_path ?: $pgdataVolume->name;
 
-            // Verify PG_VERSION exists in restored data
-            $checkCmd = "docker run --rm -v {$mount}:/data alpine test -f /data/PG_VERSION && echo 'OK' || echo 'FAIL'";
+            $dataMount = escapeshellarg($mount.':/data');
+            $checkCmd = 'docker run --rm -v '.$dataMount." alpine test -f /data/PG_VERSION && echo 'OK' || echo 'FAIL'";
             $result = instant_remote_process([$checkCmd], $server, false, false, 30, disableMultiplexing: true);
 
             if (trim($result) !== 'OK') {
@@ -375,16 +381,16 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $pgdataMount = $pgdataVolume->host_path ?: $pgdataVolume->name;
 
         $mounts = [];
-        $mounts[] = "-v {$pgdataMount}:".PgBackrestService::PGDATA_PATH;
+        $mounts[] = '-v '.escapeshellarg($pgdataMount.':'.PgBackrestService::PGDATA_PATH);
 
         if ($repoVolume) {
             $repoMount = $repoVolume->host_path ?: $repoVolume->name;
-            $mounts[] = "-v {$repoMount}:/var/lib/pgbackrest";
+            $mounts[] = '-v '.escapeshellarg($repoMount.':/var/lib/pgbackrest');
         }
 
-        $mounts[] = "-v {$configDir}:/etc/pgbackrest:ro";
+        $mounts[] = '-v '.escapeshellarg($configDir.':/etc/pgbackrest:ro');
 
-        $envPieces = ['-e PGBACKREST_PG1_PATH='.PgBackrestService::PGDATA_PATH];
+        $envPieces = ['-e PGBACKREST_PG1_PATH='.escapeshellarg(PgBackrestService::PGDATA_PATH)];
 
         $s3EnvVars = PgBackrestService::buildS3EnvVars($backup);
         foreach ($s3EnvVars as $key => $value) {
@@ -403,13 +409,13 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $fullRestoreScript = $this->getInstallAndRunCommand($restoreCmd);
 
         $cmd = sprintf(
-            'docker run --rm --name %s --network %s %s %s %s sh -c \'%s\' 2>&1',
-            $sidecarName,
-            $network,
+            'docker run --rm --name %s --network %s %s %s %s sh -c %s 2>&1',
+            escapeshellarg($sidecarName),
+            escapeshellarg($network),
             implode(' ', $envPieces),
             implode(' ', $mounts),
-            $this->getSidecarImage(),
-            $fullRestoreScript
+            escapeshellarg($this->getSidecarImage()),
+            escapeshellarg($fullRestoreScript)
         );
 
         $output = instant_remote_process([$cmd], $server, true, false, $this->timeout, disableMultiplexing: true);
