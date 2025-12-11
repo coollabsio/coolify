@@ -3924,6 +3924,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function handleSuccessfulDeployment(): void
     {
+        // Reset restart count after successful deployment
+        // This is done here (not in Livewire) to avoid race conditions
+        // with GetContainersStatus reading old container restart counts
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
+
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
         if (! $this->only_this_server) {
