@@ -636,31 +636,38 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $fullImageName = $this->getFullImageName();
+            $escapedNetwork = escapeshellarg($network);
+            $escapedContainerName = escapeshellarg("backup-of-{$this->backup_log_uuid}");
+            $escapedImageName = escapeshellarg($fullImageName);
 
             $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
             if (filled($containerExists)) {
-                instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
+                instant_remote_process(["docker rm -f {$escapedContainerName}"], $this->server, false, false, null, disableMultiplexing: true);
             }
 
             if (isDev()) {
                 if ($this->database->name === 'coolify-db') {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
-                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                    $escapedVolumeMount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+                    $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
                 } else {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
-                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                    $escapedVolumeMount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+                    $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
                 }
             } else {
-                $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
+                $escapedVolumeMount = escapeshellarg($this->backup_location.':'.$this->backup_location.':ro');
+                $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
             }
 
-            // Escape S3 credentials to prevent command injection
             $escapedEndpoint = escapeshellarg($endpoint);
             $escapedKey = escapeshellarg($key);
             $escapedSecret = escapeshellarg($secret);
+            $escapedBucketPath = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
+            $escapedBackupLocation = escapeshellarg($this->backup_location);
 
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+            $commands[] = "docker exec {$escapedContainerName} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+            $commands[] = "docker exec {$escapedContainerName} mc cp {$escapedBackupLocation} {$escapedBucketPath}";
             instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
@@ -669,7 +676,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
-            $command = "docker rm -f backup-of-{$this->backup_log_uuid}";
+            $escapedContainerNameForCleanup = escapeshellarg("backup-of-{$this->backup_log_uuid}");
+            $command = "docker rm -f {$escapedContainerNameForCleanup}";
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
     }
@@ -709,9 +717,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
             $dockerEnvArgs = PgBackrestService::buildDockerEnvArgs($s3EnvVars);
             $fixPermsCmd = 'chown -R postgres:postgres /var/lib/pgbackrest /tmp/pgbackrest /var/log/pgbackrest 2>/dev/null || true';
-            $escapedBackupCmd = escapeshellarg($backupCmdWithWait);
+            $escapedInnerCmd = str_replace("'", "'\"'\"'", $backupCmdWithWait);
+            $fullScript = "{$fixPermsCmd}; su postgres -c '{$escapedInnerCmd}' 2>&1; echo \"EXIT_CODE:\$?\"";
+            $escapedScript = escapeshellarg($fullScript);
             $containerName = escapeshellarg($this->container_name);
-            $backupFullCmd = "docker exec{$dockerEnvArgs} {$containerName} sh -c '{$fixPermsCmd}; su postgres -c {$escapedBackupCmd} 2>&1; echo \"EXIT_CODE:\$?\"'";
+            $backupFullCmd = "docker exec{$dockerEnvArgs} {$containerName} sh -c {$escapedScript}";
 
             $rawOutput = instant_remote_process([$backupFullCmd], $this->server, false, false, $this->timeout, disableMultiplexing: true);
             $rawOutput = trim($rawOutput) ?: '';

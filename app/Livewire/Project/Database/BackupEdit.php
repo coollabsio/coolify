@@ -168,7 +168,9 @@ class BackupEdit extends Component
             if ($this->engine === 'pgbackrest') {
                 DB::transaction(function () {
                     $this->backup->save_s3 = $this->saveS3;
-                    $this->backup->disable_local_backup = $this->saveS3 && $this->disableLocalBackup;
+                    $computedDisableLocal = $this->saveS3 && $this->disableLocalBackup;
+                    $this->disableLocalBackup = $computedDisableLocal;
+                    $this->backup->disable_local_backup = $computedDisableLocal;
 
                     $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
                     $this->backup->pgbackrest_compress_type = $this->pgbackrestCompressType;
