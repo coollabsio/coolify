@@ -17,24 +17,20 @@
                         <x-forms.input id="name" label="Volume Name" required readonly
                             helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
                     @endif
-                    @if ($isService || $startedAt)
+                    @if ($hostPath)
                         <x-forms.input id="hostPath" readonly helper="Directory on the host system."
                             label="Source Path"
                             helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required readonly />
-                    @else
-                        <x-forms.input id="hostPath" readonly helper="Directory on the host system."
-                            label="Source Path"
-                            helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required readonly />
                     @endif
+                    <x-forms.input id="mountPath" label="Destination Path"
+                        helper="Directory inside the container." required readonly />
                 </div>
             @else
                 <div class="flex gap-2 items-end w-full">
                     <x-forms.input id="name" required readonly />
-                    <x-forms.input id="hostPath" readonly />
+                    @if ($hostPath)
+                        <x-forms.input id="hostPath" readonly />
+                    @endif
                     <x-forms.input id="mountPath" required readonly />
                 </div>
             @endif
@@ -43,14 +39,18 @@
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
                         <x-forms.input id="name" label="Volume Name" required />
-                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path" />
+                        @if ($hostPath)
+                            <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path" />
+                        @endif
                         <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
                         <x-forms.input id="name" required />
-                        <x-forms.input id="hostPath" />
+                        @if ($hostPath)
+                            <x-forms.input id="hostPath" />
+                        @endif
                         <x-forms.input id="mountPath" required />
                     </div>
                 @endif
@@ -58,6 +58,13 @@
                     <x-forms.button type="submit">
                         Update
                     </x-forms.button>
+                    @if ($hostPath)
+                        <x-modal-confirmation title="Remove Source Path?" isErrorButton buttonTitle="Remove"
+                            submitAction="clearHostPath" :actions="[
+                                'Are you sure you want to remove the source path?',
+                                'If you need to mount a host directory, use Directory Mount instead of Volume Mount.',
+                            ]" />
+                    @endif
                     <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="[
                             'The selected persistent storage/volume will be permanently deleted.',
@@ -70,15 +77,19 @@
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
                         <x-forms.input id="name" label="Volume Name" required disabled />
-                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path"
-                            disabled />
+                        @if ($hostPath)
+                            <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path"
+                                disabled />
+                        @endif
                         <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required disabled />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
                         <x-forms.input id="name" required disabled />
-                        <x-forms.input id="hostPath" disabled />
+                        @if ($hostPath)
+                            <x-forms.input id="hostPath" disabled />
+                        @endif
                         <x-forms.input id="mountPath" required disabled />
                     </div>
                 @endif
