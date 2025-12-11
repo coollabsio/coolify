@@ -620,7 +620,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
-            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
+            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
@@ -3980,6 +3980,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function handleSuccessfulDeployment(): void
     {
+        // Reset restart count after successful deployment
+        // This is done here (not in Livewire) to avoid race conditions
+        // with GetContainersStatus reading old container restart counts
+        $this->application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
+
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
         if (! $this->only_this_server) {

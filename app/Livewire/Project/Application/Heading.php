@@ -106,13 +106,6 @@ class Heading extends Component
             return;
         }
 
-        // Reset restart count on successful deployment
-        $this->application->update([
-            'restart_count' => 0,
-            'last_restart_at' => null,
-            'last_restart_type' => null,
-        ]);
-
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
@@ -156,13 +149,6 @@ class Heading extends Component
 
             return;
         }
-
-        // Reset restart count on manual restart
-        $this->application->update([
-            'restart_count' => 0,
-            'last_restart_at' => now(),
-            'last_restart_type' => 'manual',
-        ]);
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],

@@ -243,6 +243,59 @@ Server::chunk(100, function ($servers) {
 - **Composite indexes** for common queries
 - **Unique constraints** for business rules
 
+### Request-Level Caching with ownedByCurrentTeamCached()
+
+Many models have both `ownedByCurrentTeam()` (returns query builder) and `ownedByCurrentTeamCached()` (returns cached collection). **Always prefer the cached version** to avoid duplicate database queries within the same request.
+
+**Models with cached methods available:**
+- `Server`, `PrivateKey`, `Project`
+- `Application`
+- `StandalonePostgresql`, `StandaloneMysql`, `StandaloneRedis`, `StandaloneMariadb`, `StandaloneMongodb`, `StandaloneKeydb`, `StandaloneDragonfly`, `StandaloneClickhouse`
+- `Service`, `ServiceApplication`, `ServiceDatabase`
+
+**Usage patterns:**
+```php
+// ✅ CORRECT - Uses request-level cache (via Laravel's once() helper)
+$servers = Server::ownedByCurrentTeamCached();
+
+// ❌ AVOID - Makes a new database query each time
+$servers = Server::ownedByCurrentTeam()->get();
+
+// ✅ CORRECT - Filter cached collection in memory
+$activeServers = Server::ownedByCurrentTeamCached()->where('is_active', true);
+$server = Server::ownedByCurrentTeamCached()->firstWhere('id', $serverId);
+$serverIds = Server::ownedByCurrentTeamCached()->pluck('id');
+
+// ❌ AVOID - Making filtered database queries when data is already cached
+$activeServers = Server::ownedByCurrentTeam()->where('is_active', true)->get();
+```
+
+**When to use which:**
+- `ownedByCurrentTeamCached()` - **Default choice** for reading team data
+- `ownedByCurrentTeam()` - Only when you need to chain query builder methods that can't be done on collections (like `with()` for eager loading), or when you explicitly need a fresh database query
+
+**Implementation pattern for new models:**
+```php
+/**
+ * Get query builder for resources owned by current team.
+ * If you need all resources without further query chaining, use ownedByCurrentTeamCached() instead.
+ */
+public static function ownedByCurrentTeam()
+{
+    return self::whereTeamId(currentTeam()->id);
+}
+
+/**
+ * Get all resources owned by current team (cached for request duration).
+ */
+public static function ownedByCurrentTeamCached()
+{
+    return once(function () {
+        return self::ownedByCurrentTeam()->get();
+    });
+}
+```
+
 ## Data Consistency Patterns
 
 ### Database Transactions

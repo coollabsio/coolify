@@ -312,6 +312,36 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
                 $LOGTO_ADMIN_ENDPOINT->value.':3002',
             ]);
             break;
+        case $type?->contains('garage'):
+            $GARAGE_S3_API_URL = $variables->where('key', 'GARAGE_S3_API_URL')->first();
+            $GARAGE_WEB_URL = $variables->where('key', 'GARAGE_WEB_URL')->first();
+            $GARAGE_ADMIN_URL = $variables->where('key', 'GARAGE_ADMIN_URL')->first();
+
+            if (is_null($GARAGE_S3_API_URL) || is_null($GARAGE_WEB_URL) || is_null($GARAGE_ADMIN_URL)) {
+                return collect([]);
+            }
+
+            if (str($GARAGE_S3_API_URL->value ?? '')->isEmpty()) {
+                $GARAGE_S3_API_URL->update([
+                    'value' => generateUrl(server: $server, random: 's3-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_WEB_URL->value ?? '')->isEmpty()) {
+                $GARAGE_WEB_URL->update([
+                    'value' => generateUrl(server: $server, random: 'web-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_ADMIN_URL->value ?? '')->isEmpty()) {
+                $GARAGE_ADMIN_URL->update([
+                    'value' => generateUrl(server: $server, random: 'admin-'.$uuid, forceHttps: true),
+                ]);
+            }
+            $payload = collect([
+                $GARAGE_S3_API_URL->value.':3900',
+                $GARAGE_WEB_URL->value.':3902',
+                $GARAGE_ADMIN_URL->value.':3903',
+            ]);
+            break;
     }
 
     return $payload;

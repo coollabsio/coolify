@@ -77,5 +77,21 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ',
         ]);
+        Application::create([
+            'name' => 'Crash Loop Example',
+            'git_repository' => 'coollabsio/coolify',
+            'git_branch' => 'v4.x',
+            'git_commit_sha' => 'HEAD',
+            'build_pack' => 'dockerfile',
+            'ports_exposes' => '80',
+            'environment_id' => 1,
+            'destination_id' => 0,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => 0,
+            'source_type' => GithubApp::class,
+            'dockerfile' => 'FROM alpine
+CMD ["sh", "-c", "echo Crashing in 5 seconds... && sleep 5 && exit 1"]
+',
+        ]);
     }
 }
