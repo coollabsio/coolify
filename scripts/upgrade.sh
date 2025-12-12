@@ -7,6 +7,7 @@ LATEST_HELPER_VERSION=${2:-latest}
 REGISTRY_URL=${3:-ghcr.io}
 SKIP_BACKUP=${4:-false}
 ENV_FILE="/data/coolify/source/.env"
+STATUS_FILE="/data/coolify/source/.upgrade-status"
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
@@ -22,6 +23,13 @@ log_section() {
     echo "============================================================" >>"$LOGFILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >>"$LOGFILE"
     echo "============================================================" >>"$LOGFILE"
+}
+
+# Helper function to write upgrade status for API polling
+write_status() {
+    local step="$1"
+    local message="$2"
+    echo "${step}|${message}|$(date -Iseconds)" > "$STATUS_FILE"
 }
 
 echo ""
@@ -40,6 +48,7 @@ echo "Registry URL: ${REGISTRY_URL}" >>"$LOGFILE"
 echo "============================================================" >>"$LOGFILE"
 
 log_section "Step 1/6: Downloading configuration files"
+write_status "1" "Downloading configuration files"
 echo "1/6 Downloading latest configuration files..."
 log "Downloading docker-compose.yml from ${CDN}/docker-compose.yml"
 curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
@@ -63,6 +72,7 @@ if [ "$SKIP_BACKUP" != "true" ]; then
 fi
 
 log_section "Step 2/6: Updating environment configuration"
+write_status "2" "Updating environment configuration"
 echo ""
 echo "2/6 Updating environment configuration..."
 log "Merging .env.production values into .env"
@@ -115,6 +125,7 @@ if [ -f /root/.docker/config.json ]; then
 fi
 
 log_section "Step 3/6: Pulling Docker images"
+write_status "3" "Pulling Docker images"
 echo ""
 echo "3/6 Pulling Docker images..."
 echo "     This may take a few minutes depending on your connection."
@@ -125,6 +136,7 @@ if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE}" >>"
     log "Successfully pulled Coolify image"
 else
     log "ERROR: Failed to pull Coolify image"
+    write_status "error" "Failed to pull Coolify image"
     echo "     ERROR: Failed to pull Coolify image. Aborting upgrade."
     exit 1
 fi
@@ -135,6 +147,7 @@ if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELP
     log "Successfully pulled Coolify helper image"
 else
     log "ERROR: Failed to pull Coolify helper image"
+    write_status "error" "Failed to pull Coolify helper image"
     echo "     ERROR: Failed to pull helper image. Aborting upgrade."
     exit 1
 fi
@@ -145,6 +158,7 @@ if docker pull postgres:15-alpine >>"$LOGFILE" 2>&1; then
     log "Successfully pulled PostgreSQL image"
 else
     log "ERROR: Failed to pull PostgreSQL image"
+    write_status "error" "Failed to pull PostgreSQL image"
     echo "     ERROR: Failed to pull PostgreSQL image. Aborting upgrade."
     exit 1
 fi
@@ -155,6 +169,7 @@ if docker pull redis:7-alpine >>"$LOGFILE" 2>&1; then
     log "Successfully pulled Redis image"
 else
     log "ERROR: Failed to pull Redis image"
+    write_status "error" "Failed to pull Redis image"
     echo "     ERROR: Failed to pull Redis image. Aborting upgrade."
     exit 1
 fi
@@ -165,6 +180,7 @@ if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.10" >>"
     log "Successfully pulled Coolify realtime image"
 else
     log "ERROR: Failed to pull Coolify realtime image"
+    write_status "error" "Failed to pull Coolify realtime image"
     echo "     ERROR: Failed to pull realtime image. Aborting upgrade."
     exit 1
 fi
@@ -173,6 +189,7 @@ log "All images pulled successfully"
 echo "     All images pulled successfully."
 
 log_section "Step 4/6: Stopping and restarting containers"
+write_status "4" "Stopping containers"
 echo ""
 echo "4/6 Stopping containers and starting new ones..."
 echo "     This step will restart all Coolify containers."
@@ -185,6 +202,7 @@ log "Starting container restart sequence (detached)..."
 
 nohup bash -c "
     LOGFILE='$LOGFILE'
+    STATUS_FILE='$STATUS_FILE'
     DOCKER_CONFIG_MOUNT='$DOCKER_CONFIG_MOUNT'
     REGISTRY_URL='$REGISTRY_URL'
     LATEST_HELPER_VERSION='$LATEST_HELPER_VERSION'
@@ -192,6 +210,10 @@ nohup bash -c "
 
     log() {
         echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] \$1\" >>\"\$LOGFILE\"
+    }
+
+    write_status() {
+        echo \"\$1|\$2|\$(date -Iseconds)\" > \"\$STATUS_FILE\"
     }
 
     # Stop and remove containers
@@ -213,6 +235,7 @@ nohup bash -c "
     echo '============================================================' >>\"\$LOGFILE\"
     log 'Step 5/6: Starting new containers'
     echo '============================================================' >>\"\$LOGFILE\"
+    write_status '5' 'Starting new containers'
 
     if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
         log 'Using custom docker-compose.yml'
@@ -230,6 +253,7 @@ nohup bash -c "
     echo '============================================================' >>\"\$LOGFILE\"
     log 'Step 6/6: Upgrade complete'
     echo '============================================================' >>\"\$LOGFILE\"
+    write_status '6' 'Upgrade complete'
     log 'Coolify upgrade completed successfully'
     log \"Version: \${LATEST_IMAGE}\"
     echo '' >>\"\$LOGFILE\"

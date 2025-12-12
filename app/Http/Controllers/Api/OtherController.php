@@ -186,4 +186,82 @@ class OtherController extends Controller
     {
         return 'OK';
     }
+
+    #[OA\Get(
+        summary: 'Upgrade Status',
+        description: 'Get the current upgrade status. Returns the step and message from the upgrade process.',
+        path: '/upgrade-status',
+        operationId: 'upgrade-status',
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Returns upgrade status.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'status', type: 'string', example: 'in_progress'),
+                        new OA\Property(property: 'step', type: 'integer', example: 3),
+                        new OA\Property(property: 'message', type: 'string', example: 'Pulling Docker images'),
+                        new OA\Property(property: 'timestamp', type: 'string', example: '2024-01-15T10:30:45+00:00'),
+                    ]
+                )),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function upgradeStatus(Request $request)
+    {
+        $statusFile = '/data/coolify/source/.upgrade-status';
+
+        if (! file_exists($statusFile)) {
+            return response()->json(['status' => 'none']);
+        }
+
+        $content = trim(file_get_contents($statusFile));
+        if (empty($content)) {
+            return response()->json(['status' => 'none']);
+        }
+
+        $parts = explode('|', $content);
+        if (count($parts) < 3) {
+            return response()->json(['status' => 'none']);
+        }
+
+        [$step, $message, $timestamp] = $parts;
+
+        // Check if status is stale (older than 30 minutes)
+        try {
+            $statusTime = new \DateTime($timestamp);
+            $now = new \DateTime;
+            $diffMinutes = ($now->getTimestamp() - $statusTime->getTimestamp()) / 60;
+
+            if ($diffMinutes > 30) {
+                return response()->json(['status' => 'none']);
+            }
+        } catch (\Exception $e) {
+            // If timestamp parsing fails, continue with the status
+        }
+
+        // Determine status based on step
+        if ($step === 'error') {
+            return response()->json([
+                'status' => 'error',
+                'step' => 0,
+                'message' => $message,
+                'timestamp' => $timestamp,
+            ]);
+        }
+
+        $stepInt = (int) $step;
+        $status = $stepInt >= 6 ? 'complete' : 'in_progress';
+
+        return response()->json([
+            'status' => $status,
+            'step' => $stepInt,
+            'message' => $message,
+            'timestamp' => $timestamp,
+        ]);
+    }
 }

@@ -161,7 +161,7 @@
             showProgress: false,
             currentStatus: '',
             checkHealthInterval: null,
-            checkIfIamDeadInterval: null,
+            checkUpgradeStatusInterval: null,
             elapsedInterval: null,
             healthCheckAttempts: 0,
             startTime: null,
@@ -171,10 +171,12 @@
             successCountdown: 3,
             currentVersion: config.currentVersion || '',
             latestVersion: config.latestVersion || '',
+            serviceDown: false,
 
             confirmed() {
                 this.showProgress = true;
                 this.currentStep = 1;
+                this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
                 this.$wire.$call('upgrade');
                 this.upgrade();
@@ -197,14 +199,14 @@
                 return `${minutes}:${seconds.toString().padStart(2, '0')}`;
             },
 
-            getStepMessage(step) {
-                const messages = {
-                    1: 'Preparing upgrade...',
-                    2: 'Pulling helper image...',
-                    3: 'Pulling Coolify image...',
-                    4: 'Restarting Coolify...'
-                };
-                return messages[step] || 'Processing...';
+            mapStepToUI(apiStep) {
+                // Map backend steps (1-6) to UI steps (1-4)
+                // Backend: 1=config, 2=env, 3=pull, 4=stop, 5=start, 6=complete
+                // UI: 1=prepare, 2=pull images, 3=pull coolify, 4=restart
+                if (apiStep <= 2) return 1;
+                if (apiStep === 3) return 2;
+                if (apiStep <= 5) return 3;
+                return 4;
             },
 
             getReviveStatusMessage(elapsedMinutes, attempts) {
@@ -249,6 +251,10 @@
                     clearInterval(this.checkHealthInterval);
                     this.checkHealthInterval = null;
                 }
+                if (this.checkUpgradeStatusInterval) {
+                    clearInterval(this.checkUpgradeStatusInterval);
+                    this.checkUpgradeStatusInterval = null;
+                }
                 if (this.elapsedInterval) {
                     clearInterval(this.elapsedInterval);
                     this.elapsedInterval = null;
@@ -273,52 +279,43 @@
             },
 
             upgrade() {
-                if (this.checkIfIamDeadInterval) return true;
+                if (this.checkUpgradeStatusInterval) return true;
                 this.currentStep = 1;
-                this.currentStatus = this.getStepMessage(1);
+                this.currentStatus = 'Starting upgrade...';
+                this.serviceDown = false;
 
-                // Simulate step progression (since we can't get real-time feedback from Docker pulls)
-                let stepTime = 0;
-                const stepInterval = setInterval(() => {
-                    stepTime++;
-                    // Progress through steps based on elapsed time
-                    if (stepTime >= 3 && this.currentStep === 1) {
-                        this.currentStep = 2;
-                        this.currentStatus = this.getStepMessage(2);
-                    } else if (stepTime >= 8 && this.currentStep === 2) {
-                        this.currentStep = 3;
-                        this.currentStatus = this.getStepMessage(3);
-                    }
-                }, 1000);
-
-                this.checkIfIamDeadInterval = setInterval(() => {
-                    fetch('/api/health')
+                // Poll upgrade status API for real progress
+                this.checkUpgradeStatusInterval = setInterval(() => {
+                    fetch('/api/upgrade-status')
                         .then(response => {
                             if (response.ok) {
-                                // Still running, update status based on current step
-                                this.currentStatus = this.getStepMessage(this.currentStep);
-                            } else {
-                                // Service is down, now waiting to revive
-                                clearInterval(stepInterval);
-                                this.currentStep = 4;
-                                this.currentStatus = 'Coolify is restarting with the new version...';
-                                if (this.checkIfIamDeadInterval) {
-                                    clearInterval(this.checkIfIamDeadInterval);
-                                    this.checkIfIamDeadInterval = null;
-                                }
-                                this.revive();
+                                return response.json();
+                            }
+                            throw new Error('Service unavailable');
+                        })
+                        .then(data => {
+                            if (data.status === 'in_progress') {
+                                this.currentStep = this.mapStepToUI(data.step);
+                                this.currentStatus = data.message;
+                            } else if (data.status === 'complete') {
+                                this.showSuccess();
+                            } else if (data.status === 'error') {
+                                this.currentStatus = `Error: ${data.message}`;
                             }
                         })
                         .catch(error => {
-                            console.error('Health check failed:', error);
-                            clearInterval(stepInterval);
-                            this.currentStep = 4;
-                            this.currentStatus = 'Coolify is restarting with the new version...';
-                            if (this.checkIfIamDeadInterval) {
-                                clearInterval(this.checkIfIamDeadInterval);
-                                this.checkIfIamDeadInterval = null;
+                            // Service is down - switch to health check mode
+                            console.log('Upgrade status API unavailable, switching to health check mode');
+                            if (!this.serviceDown) {
+                                this.serviceDown = true;
+                                this.currentStep = 4;
+                                this.currentStatus = 'Coolify is restarting with the new version...';
+                                if (this.checkUpgradeStatusInterval) {
+                                    clearInterval(this.checkUpgradeStatusInterval);
+                                    this.checkUpgradeStatusInterval = null;
+                                }
+                                this.revive();
                             }
-                            this.revive();
                         });
                 }, 2000);
             }

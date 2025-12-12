@@ -19,10 +19,12 @@ use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
+Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
 Route::group([
     'prefix' => 'v1',
 ], function () {
     Route::get('/health', [OtherController::class, 'healthcheck']);
+    Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
 });
 
 Route::post('/feedback', [OtherController::class, 'feedback']);
