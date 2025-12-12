@@ -3322,14 +3322,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if ($storage->chown) {
                     $escapedChown = escapeshellarg($storage->chown);
                     $this->execute_remote_command(
-                        ["docker exec {$containerName} chown {$recursiveFlag}{$escapedChown} {$mountPath}", 'hidden' => true],
+                        ["docker exec --user root {$containerName} chown {$recursiveFlag}{$escapedChown} {$mountPath}", 'hidden' => true],
                     );
                 }
 
                 if ($storage->chmod) {
                     $escapedChmod = escapeshellarg($storage->chmod);
                     $this->execute_remote_command(
-                        ["docker exec {$containerName} chmod {$recursiveFlag}{$escapedChmod} {$mountPath}", 'hidden' => true],
+                        ["docker exec --user root {$containerName} chmod {$recursiveFlag}{$escapedChmod} {$mountPath}", 'hidden' => true],
                     );
                 }
 
