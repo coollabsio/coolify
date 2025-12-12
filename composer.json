@@ -9,6 +9,7 @@
     "require": {
         "php": "^8.5",
         "laravel/framework": "^12.40.2",
+        "laravel/horizon": "^5.40",
         "laravel/tinker": "^2.10.2"
     },
     "require-dev": {
