@@ -13,6 +13,7 @@ Coolify implements **defense-in-depth security** with multiple layers of protect
 
 ### OAuth Integration
 - **[OauthSetting.php](mdc:app/Models/OauthSetting.php)** - OAuth provider configurations
+- **[OpenIDConnect Provider](mdc:app/Socialite/OpenIDConnect/Provider.php)** - Generic OIDC provider implementation
 - **Supported Providers**:
   - Google OAuth
   - Microsoft Azure AD
@@ -21,6 +22,30 @@ Coolify implements **defense-in-depth security** with multiple layers of protect
   - Discord
   - GitHub (via GitHub Apps)
   - GitLab
+  - Bitbucket
+  - Infomaniak
+  - Zitadel
+  - **OpenID Connect** (Generic OIDC - works with Keycloak, Auth0, Okta, etc.)
+
+### Custom Login Button Labels
+All OAuth providers support custom login button labels via:
+1. **Database**: Set `custom_label` in OAuth settings UI (Settings > OAuth)
+2. **Environment Variables**: e.g., `OPENID_LOGIN_LABEL="Login with Platform Shape"`
+
+**Priority**: Database > Environment Variable > Default Translation
+
+**Available Environment Variables**:
+- `AZURE_LOGIN_LABEL`
+- `AUTHENTIK_LOGIN_LABEL`
+- `BITBUCKET_LOGIN_LABEL`
+- `CLERK_LOGIN_LABEL`
+- `DISCORD_LOGIN_LABEL`
+- `GITHUB_LOGIN_LABEL`
+- `GITLAB_LOGIN_LABEL`
+- `GOOGLE_LOGIN_LABEL`
+- `INFOMANIAK_LOGIN_LABEL`
+- `OPENID_LOGIN_LABEL`
+- `ZITADEL_LOGIN_LABEL`
 
 ### Authentication Models
 ```php

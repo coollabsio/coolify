@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- Add generic OpenID Connect (OIDC) authentication provider supporting Keycloak, Auth0, Okta, and other OIDC-compliant identity providers
+- Add custom login button labels for all OAuth providers via database settings or environment variables (e.g., `OPENID_LOGIN_LABEL="Login with Platform Shape"`)
+
 ### 🐛 Bug Fixes
 
 - Update syncData method to use data_get for safer property access
