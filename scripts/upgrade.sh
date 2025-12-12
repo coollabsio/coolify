@@ -172,56 +172,83 @@ fi
 log "All images pulled successfully"
 echo "     All images pulled successfully."
 
-log_section "Step 4/6: Stopping existing containers"
+log_section "Step 4/6: Stopping and restarting containers"
 echo ""
-echo "4/6 Stopping existing containers..."
-for container in coolify coolify-db coolify-redis coolify-realtime; do
-    if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-        echo "     - Stopping ${container}..."
-        log "Stopping container: ${container}"
-        docker stop "$container" >>"$LOGFILE" 2>&1 || true
-        log "Removing container: ${container}"
-        docker rm "$container" >>"$LOGFILE" 2>&1 || true
-        log "Container ${container} stopped and removed"
+echo "4/6 Stopping containers and starting new ones..."
+echo "     This step will restart all Coolify containers."
+echo "     Check the log file for details: ${LOGFILE}"
+
+# From this point forward, we need to ensure the script continues even if
+# the SSH connection is lost (which happens when coolify container stops)
+# We use a subshell with nohup to ensure completion
+log "Starting container restart sequence (detached)..."
+
+nohup bash -c "
+    LOGFILE='$LOGFILE'
+    DOCKER_CONFIG_MOUNT='$DOCKER_CONFIG_MOUNT'
+    REGISTRY_URL='$REGISTRY_URL'
+    LATEST_HELPER_VERSION='$LATEST_HELPER_VERSION'
+    LATEST_IMAGE='$LATEST_IMAGE'
+
+    log() {
+        echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] \$1\" >>\"\$LOGFILE\"
+    }
+
+    # Stop and remove containers
+    for container in coolify coolify-db coolify-redis coolify-realtime; do
+        if docker ps -a --format '{{.Names}}' | grep -q \"^\${container}\$\"; then
+            log \"Stopping container: \${container}\"
+            docker stop \"\$container\" >>\"\$LOGFILE\" 2>&1 || true
+            log \"Removing container: \${container}\"
+            docker rm \"\$container\" >>\"\$LOGFILE\" 2>&1 || true
+            log \"Container \${container} stopped and removed\"
+        else
+            log \"Container \${container} not found (skipping)\"
+        fi
+    done
+    log \"Container cleanup complete\"
+
+    # Start new containers
+    echo '' >>\"\$LOGFILE\"
+    echo '============================================================' >>\"\$LOGFILE\"
+    log 'Step 5/6: Starting new containers'
+    echo '============================================================' >>\"\$LOGFILE\"
+
+    if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
+        log 'Using custom docker-compose.yml'
+        log 'Running docker compose up with custom configuration...'
+        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
     else
-        log "Container ${container} not found (skipping)"
+        log 'Using standard docker-compose configuration'
+        log 'Running docker compose up...'
+        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
     fi
-done
-log "Container cleanup complete"
-echo "     Done."
+    log 'Docker compose up completed'
 
-log_section "Step 5/6: Starting new containers"
+    # Final log entry
+    echo '' >>\"\$LOGFILE\"
+    echo '============================================================' >>\"\$LOGFILE\"
+    log 'Step 6/6: Upgrade complete'
+    echo '============================================================' >>\"\$LOGFILE\"
+    log 'Coolify upgrade completed successfully'
+    log 'Version: \${LATEST_IMAGE}'
+    echo '' >>\"\$LOGFILE\"
+    echo '============================================================' >>\"\$LOGFILE\"
+    echo \"Upgrade completed: \$(date '+%Y-%m-%d %H:%M:%S')\" >>\"\$LOGFILE\"
+    echo '============================================================' >>\"\$LOGFILE\"
+" >>"$LOGFILE" 2>&1 &
+
+# Give the background process a moment to start
+sleep 2
+log "Container restart sequence started in background (PID: $!)"
 echo ""
-echo "5/6 Starting new containers..."
-if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
-    echo "     Custom docker-compose.yml detected."
-    log "Using custom docker-compose.yml"
-    log "Running docker compose up with custom configuration..."
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
-else
-    log "Using standard docker-compose configuration"
-    log "Running docker compose up..."
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
-fi
-log "Docker compose up completed"
-echo "     Done."
-
-log_section "Step 6/6: Upgrade complete"
-log "Coolify upgrade completed successfully"
-log "Version: ${LATEST_IMAGE}"
-
-echo ""
-echo "6/6 Upgrade complete!"
+echo "5/6 Containers are being restarted in the background..."
+echo "6/6 Upgrade process initiated!"
 echo ""
 echo "=========================================="
-echo "   Coolify has been upgraded to ${LATEST_IMAGE}"
+echo "   Coolify upgrade to ${LATEST_IMAGE} in progress"
 echo "=========================================="
 echo ""
+echo "   The upgrade will continue in the background."
+echo "   Coolify will be available again shortly."
 echo "   Log file: ${LOGFILE}"
-echo ""
-
-# Final log entry
-echo "" >>"$LOGFILE"
-echo "============================================================" >>"$LOGFILE"
-echo "Upgrade completed: $(date '+%Y-%m-%d %H:%M:%S')" >>"$LOGFILE"
-echo "============================================================" >>"$LOGFILE"

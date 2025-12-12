@@ -77,18 +77,32 @@ echo "All images pulled successfully." >>"$LOGFILE"
 
 # Stop and remove existing Coolify containers to prevent conflicts
 # This handles both old installations (project "source") and new ones (project "coolify")
-echo "Stopping existing Coolify containers..." >>"$LOGFILE"
-for container in coolify coolify-db coolify-redis coolify-realtime; do
-    if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-        docker stop "$container" >>"$LOGFILE" 2>&1 || true
-        docker rm "$container" >>"$LOGFILE" 2>&1 || true
-        echo " - Removed container: $container" >>"$LOGFILE"
-    fi
-done
+# Use nohup to ensure the script continues even if SSH connection is lost
+echo "Starting container restart sequence (detached)..." >>"$LOGFILE"
 
-if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
-    echo "docker-compose.custom.yml detected." >>"$LOGFILE"
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
-else
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
-fi
+nohup bash -c "
+    LOGFILE='$LOGFILE'
+    DOCKER_CONFIG_MOUNT='$DOCKER_CONFIG_MOUNT'
+    REGISTRY_URL='$REGISTRY_URL'
+    LATEST_HELPER_VERSION='$LATEST_HELPER_VERSION'
+    LATEST_IMAGE='$LATEST_IMAGE'
+
+    # Stop and remove containers
+    echo 'Stopping existing Coolify containers...' >>\"\$LOGFILE\"
+    for container in coolify coolify-db coolify-redis coolify-realtime; do
+        if docker ps -a --format '{{.Names}}' | grep -q \"^\${container}\$\"; then
+            docker stop \"\$container\" >>\"\$LOGFILE\" 2>&1 || true
+            docker rm \"\$container\" >>\"\$LOGFILE\" 2>&1 || true
+            echo \" - Removed container: \$container\" >>\"\$LOGFILE\"
+        fi
+    done
+
+    # Start new containers
+    if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
+        echo 'docker-compose.custom.yml detected.' >>\"\$LOGFILE\"
+        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
+    else
+        docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --project-name coolify --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
+    fi
+    echo 'Upgrade completed.' >>\"\$LOGFILE\"
+" >>"$LOGFILE" 2>&1 &
