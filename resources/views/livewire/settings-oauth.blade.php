@@ -47,7 +47,7 @@
                                 label="Base URL" />
                         @endif
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.custom_label"
-                            helper="Override the default login button text (e.g., 'Login with Platform Shape')"
+                            helper="Override the default login button text (e.g., 'Login with SSO')"
                             placeholder="{{ __('auth.login.' . $oauth_setting['provider']) }}"
                             label="Custom Button Label" />
                     </div>

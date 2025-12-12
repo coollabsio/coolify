@@ -30,7 +30,7 @@ Coolify implements **defense-in-depth security** with multiple layers of protect
 ### Custom Login Button Labels
 All OAuth providers support custom login button labels via:
 1. **Database**: Set `custom_label` in OAuth settings UI (Settings > OAuth)
-2. **Environment Variables**: e.g., `OPENID_LOGIN_LABEL="Login with Platform Shape"`
+2. **Environment Variables**: e.g., `OPENID_LOGIN_LABEL="Login with SSO"`
 
 **Priority**: Database > Environment Variable > Default Translation
 
