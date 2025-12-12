@@ -64,6 +64,17 @@ if [ -f /root/.docker/config.json ]; then
     DOCKER_CONFIG_MOUNT="-v /root/.docker/config.json:/root/.docker/config.json"
 fi
 
+# Pull all required images before stopping containers
+# This ensures we don't take down the system if image pull fails (rate limits, network issues, etc.)
+echo "Pulling required Docker images..." >>"$LOGFILE"
+docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE}" >>"$LOGFILE" 2>&1 || { echo "Failed to pull Coolify image. Aborting upgrade." >>"$LOGFILE"; exit 1; }
+docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}" >>"$LOGFILE" 2>&1 || { echo "Failed to pull Coolify helper image. Aborting upgrade." >>"$LOGFILE"; exit 1; }
+docker pull postgres:15-alpine >>"$LOGFILE" 2>&1 || { echo "Failed to pull PostgreSQL image. Aborting upgrade." >>"$LOGFILE"; exit 1; }
+docker pull redis:7-alpine >>"$LOGFILE" 2>&1 || { echo "Failed to pull Redis image. Aborting upgrade." >>"$LOGFILE"; exit 1; }
+# Pull realtime image - version is hardcoded in docker-compose.prod.yml, extract it or use a known version
+docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.10" >>"$LOGFILE" 2>&1 || { echo "Failed to pull Coolify realtime image. Aborting upgrade." >>"$LOGFILE"; exit 1; }
+echo "All images pulled successfully." >>"$LOGFILE"
+
 # Stop and remove existing Coolify containers to prevent conflicts
 # This handles both old installations (project "source") and new ones (project "coolify")
 echo "Stopping existing Coolify containers..." >>"$LOGFILE"
