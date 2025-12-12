@@ -13,6 +13,7 @@ use OpenApi\Attributes as OA;
     properties: [
         'id' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
+        'deployment_queue_limit' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],

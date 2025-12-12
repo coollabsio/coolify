@@ -153,9 +153,23 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    /**
+     * Get query builder for services owned by current team.
+     * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all services owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Service::ownedByCurrentTeam()->get();
+        });
     }
 
     public function deleteConfigurations()

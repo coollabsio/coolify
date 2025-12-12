@@ -62,7 +62,7 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
 
-        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI();
         $this->syncData();
     }
 
@@ -104,7 +104,8 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
-            $this->authorize('update', $this->resource);
+            // Loading content is a read operation, so we use 'view' permission
+            $this->authorize('view', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
             $this->syncData();

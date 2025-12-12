@@ -150,14 +150,17 @@ class InstallDocker
 
     private function getArchDockerInstallCommand(): string
     {
-        return 'pacman -Syyy --noconfirm && '.
-            'pacman -S docker docker-compose --noconfirm && '.
-            'systemctl start docker && '.
-            'systemctl enable docker';
+        // Use -Syu to perform full system upgrade before installing Docker
+        // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
+        // as they can lead to broken dependencies and system instability
+        // Use --needed to skip reinstalling packages that are already up-to-date (idempotent)
+        return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
+            'systemctl enable docker.service && '.
+            'systemctl start docker.service';
     }
 
     private function getGenericDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
+        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
     }
 }

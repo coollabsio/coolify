@@ -80,12 +80,26 @@ class PrivateKey extends BaseModel
         return self::extractPublicKeyFromPrivate($this->private_key) ?? 'Error loading private key';
     }
 
+    /**
+     * Get query builder for private keys owned by current team.
+     * If you need all private keys without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
 
         return self::whereTeamId($teamId)->select($selectArray->all());
+    }
+
+    /**
+     * Get all private keys owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return PrivateKey::ownedByCurrentTeam()->get();
+        });
     }
 
     public static function ownedAndOnlySShKeys(array $select = ['*'])
