@@ -16,7 +16,7 @@ services:
       - RAILS_LOG_TO_STDOUT=true
       - RAILS_SERVE_STATIC_FILES=true
       - DATABASE_ADAPTER=sqlite
-      - SOLID_QUEUE_CONNECTS_TO=false
+      - SOLID_QUEUE_IN_PUMA=true
       - VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
       - VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
     volumes:
