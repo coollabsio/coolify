@@ -175,7 +175,8 @@ echo "     All images pulled successfully."
 log_section "Step 4/6: Stopping existing containers"
 echo ""
 echo "4/6 Stopping existing containers..."
-for container in coolify coolify-db coolify-redis coolify-realtime; do
+# Stop coolify last to allow upgrade process to complete gracefully
+for container in coolify-db coolify-redis coolify-realtime coolify; do
     if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
         echo "     - Stopping ${container}..."
         log "Stopping container: ${container}"

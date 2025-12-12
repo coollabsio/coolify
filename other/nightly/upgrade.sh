@@ -77,8 +77,9 @@ echo "All images pulled successfully." >>"$LOGFILE"
 
 # Stop and remove existing Coolify containers to prevent conflicts
 # This handles both old installations (project "source") and new ones (project "coolify")
+# Stop coolify last to allow upgrade process to complete gracefully
 echo "Stopping existing Coolify containers..." >>"$LOGFILE"
-for container in coolify coolify-db coolify-redis coolify-realtime; do
+for container in coolify-db coolify-redis coolify-realtime coolify; do
     if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
         docker stop "$container" >>"$LOGFILE" 2>&1 || true
         docker rm "$container" >>"$LOGFILE" 2>&1 || true
