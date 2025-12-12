@@ -25,16 +25,9 @@ Route::group([
     Route::get('/health', [OtherController::class, 'healthcheck']);
 });
 
-Route::group([
-    'middleware' => ['web', 'auth'],
-], function () {
+Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
-});
-Route::group([
-    'middleware' => ['web', 'auth'],
-    'prefix' => 'v1',
-], function () {
-    Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
+    Route::get('/v1/upgrade-status', [OtherController::class, 'upgradeStatus']);
 });
 
 Route::post('/feedback', [OtherController::class, 'feedback']);
