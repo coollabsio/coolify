@@ -189,9 +189,12 @@ class OtherController extends Controller
 
     #[OA\Get(
         summary: 'Upgrade Status',
-        description: 'Get the current upgrade status. Returns the step and message from the upgrade process.',
+        description: 'Get the current upgrade status. Returns the step and message from the upgrade process. Only available to root team members.',
         path: '/upgrade-status',
         operationId: 'upgrade-status',
+        security: [
+            ['bearerAuth' => []],
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -205,6 +208,19 @@ class OtherController extends Controller
                     ]
                 )),
             new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'You are not allowed to view upgrade status.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to view upgrade status.'),
+                    ]
+                )),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -212,6 +228,12 @@ class OtherController extends Controller
     )]
     public function upgradeStatus(Request $request)
     {
+        // Only root team members can view upgrade status
+        $user = auth()->user();
+        if (! $user || $user->currentTeam()->id !== 0) {
+            return response()->json(['message' => 'You are not allowed to view upgrade status.'], 403);
+        }
+
         $statusFile = '/data/coolify/source/.upgrade-status';
 
         if (! file_exists($statusFile)) {

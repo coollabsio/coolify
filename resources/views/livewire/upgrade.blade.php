@@ -286,11 +286,17 @@
 
                 // Poll upgrade status API for real progress
                 this.checkUpgradeStatusInterval = setInterval(() => {
-                    fetch('/api/upgrade-status')
+                    fetch('/api/upgrade-status', {
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                        }
+                    })
                         .then(response => {
                             if (response.ok) {
                                 return response.json();
                             }
+                            // Auth errors (401/403) or service down - switch to health check
                             throw new Error('Service unavailable');
                         })
                         .then(data => {
