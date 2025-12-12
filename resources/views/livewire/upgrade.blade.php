@@ -8,17 +8,15 @@
             <button class="menu-item" @click="modalOpen=true" x-show="showProgress">
                 <svg xmlns="http://www.w3.org/2000/svg"
                     class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300 lds-heart" viewBox="0 0 24 24"
-                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                    stroke-linejoin="round">
+                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
                 </svg>
                 In progress
             </button>
             <button class="menu-item cursor-pointer" @click="modalOpen=true" x-show="!showProgress">
-                <svg xmlns="http://www.w3.org/2000/svg"
-                    class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300" viewBox="0 0 24 24"
-                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300"
+                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path
@@ -31,10 +29,9 @@
             <template x-teleport="body">
                 <div x-show="modalOpen"
                     class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
-                    <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
-                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
-                        x-transition:leave-end="opacity-0"
+                    <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
+                        x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                         class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                     <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                         x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -47,15 +44,17 @@
                         {{-- Header --}}
                         <div class="flex items-center justify-between pb-3">
                             <div>
-                                <h3 class="text-lg font-semibold" x-text="upgradeComplete ? 'Upgrade Complete!' : (showProgress ? 'Upgrading...' : 'Upgrade Available')"></h3>
+                                <h3 class="text-lg font-semibold"
+                                    x-text="upgradeComplete ? 'Upgrade Complete!' : (showProgress ? 'Upgrading...' : 'Upgrade Available')">
+                                </h3>
                                 <div class="text-sm text-neutral-500 dark:text-neutral-400">
                                     {{ $currentVersion }} <span class="mx-1">&rarr;</span> {{ $latestVersion }}
                                 </div>
                             </div>
                             <button x-show="!showProgress" @click="modalOpen=false"
                                 class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 text-gray-600 rounded-full hover:text-gray-800 hover:bg-gray-50 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-coolgray-300">
-                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -81,14 +80,21 @@
                                     <div class="p-4 rounded-lg bg-neutral-200 dark:bg-coolgray-200">
                                         <div class="flex items-center gap-3">
                                             <template x-if="!upgradeComplete">
-                                                <svg class="w-5 h-5 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                <svg class="w-5 h-5 text-warning animate-spin"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                        stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
                                                 </svg>
                                             </template>
                                             <template x-if="upgradeComplete">
-                                                <svg class="w-5 h-5 text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                <svg class="w-5 h-5 text-success" xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd"
+                                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                        clip-rule="evenodd" />
                                                 </svg>
                                             </template>
                                             <span x-text="currentStatus" class="text-sm"></span>
@@ -99,7 +105,8 @@
                                     <template x-if="upgradeComplete">
                                         <div class="flex flex-col items-center gap-4">
                                             <p class="text-sm text-neutral-500 dark:text-neutral-400">
-                                                Reloading in <span x-text="successCountdown" class="font-bold text-warning"></span> seconds...
+                                                Reloading in <span x-text="successCountdown"
+                                                    class="font-bold text-warning"></span> seconds...
                                             </p>
                                             <x-forms.button @click="reloadNow()" type="button">
                                                 Reload Now
@@ -112,46 +119,10 @@
                             {{-- Confirmation View --}}
                             <template x-if="!showProgress">
                                 <div class="space-y-4">
-                                    {{-- Changelog Preview --}}
-                                    @if (count($changelogEntries) > 0)
-                                        <div x-data="{ showChangelog: false }">
-                                            <button @click="showChangelog = !showChangelog"
-                                                type="button"
-                                                class="flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-800 dark:hover:text-white">
-                                                <svg class="w-4 h-4 transition-transform duration-200" :class="showChangelog ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                                                </svg>
-                                                What's new in {{ $latestVersion }}
-                                            </button>
-
-                                            <div x-show="showChangelog" x-collapse class="mt-3">
-                                                <div class="max-h-48 overflow-y-auto space-y-2 scrollbar">
-                                                    @foreach ($changelogEntries as $entry)
-                                                        <div class="p-3 text-sm rounded-lg bg-neutral-200 dark:bg-coolgray-200">
-                                                            <div class="font-semibold text-neutral-700 dark:text-neutral-200">{{ $entry['title'] }}</div>
-                                                            <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2">
-                                                                {!! Str::limit(strip_tags($entry['content_html']), 150) !!}
-                                                            </div>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                                <a href="https://github.com/coollabsio/coolify/releases"
-                                                    target="_blank"
-                                                    class="inline-flex items-center gap-1 mt-2 text-xs text-blue-500 hover:text-blue-400 hover:underline">
-                                                    View full changelog
-                                                    <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" />
-                                                        <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" />
-                                                    </svg>
-                                                </a>
-                                            </div>
-                                        </div>
-                                    @endif
-
                                     {{-- Warning --}}
                                     <x-callout type="warning" title="Caution">
                                         <p>Any deployments running during the update process will
-                                            fail. Please ensure no deployments are in progress on any server before continuing.
+                                            fail.
                                         </p>
                                     </x-callout>
 
@@ -159,8 +130,8 @@
                                     <p class="text-sm text-neutral-600 dark:text-neutral-400">
                                         If something goes wrong, check the
                                         <a class="font-medium underline dark:text-white hover:text-neutral-800 dark:hover:text-neutral-300"
-                                            href="https://coolify.io/docs/upgrade"
-                                            target="_blank">upgrade guide</a>.
+                                            href="https://coolify.io/docs/upgrade" target="_blank">upgrade guide</a> or the
+                                        logs on the server at /data/coolify/source/upgrade*.
                                     </p>
                                 </div>
                             </template>
