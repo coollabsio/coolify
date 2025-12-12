@@ -202,7 +202,6 @@ class OtherController extends Controller
                         new OA\Property(property: 'status', type: 'string', example: 'in_progress'),
                         new OA\Property(property: 'step', type: 'integer', example: 3),
                         new OA\Property(property: 'message', type: 'string', example: 'Pulling Docker images'),
-                        new OA\Property(property: 'timestamp', type: 'string', example: '2024-01-15T10:30:45+00:00'),
                     ]
                 )),
             new OA\Response(
@@ -231,17 +230,18 @@ class OtherController extends Controller
 
         [$step, $message, $timestamp] = $parts;
 
-        // Check if status is stale (older than 30 minutes)
+        // Check if status is stale (older than 10 minutes) - upgrades shouldn't take longer
         try {
             $statusTime = new \DateTime($timestamp);
             $now = new \DateTime;
             $diffMinutes = ($now->getTimestamp() - $statusTime->getTimestamp()) / 60;
 
-            if ($diffMinutes > 30) {
+            if ($diffMinutes > 10) {
                 return response()->json(['status' => 'none']);
             }
         } catch (\Exception $e) {
-            // If timestamp parsing fails, continue with the status
+            // If timestamp parsing fails, treat as stale for security
+            return response()->json(['status' => 'none']);
         }
 
         // Determine status based on step
@@ -250,7 +250,6 @@ class OtherController extends Controller
                 'status' => 'error',
                 'step' => 0,
                 'message' => $message,
-                'timestamp' => $timestamp,
             ]);
         }
 
@@ -261,7 +260,6 @@ class OtherController extends Controller
             'status' => $status,
             'step' => $stepInt,
             'message' => $message,
-            'timestamp' => $timestamp,
         ]);
     }
 }

@@ -260,6 +260,11 @@ nohup bash -c "
     echo '============================================================' >>\"\$LOGFILE\"
     echo \"Upgrade completed: \$(date '+%Y-%m-%d %H:%M:%S')\" >>\"\$LOGFILE\"
     echo '============================================================' >>\"\$LOGFILE\"
+
+    # Clean up status file after a short delay to allow frontend to read completion
+    sleep 10
+    rm -f \"\$STATUS_FILE\"
+    log 'Status file cleaned up'
 " >>"$LOGFILE" 2>&1 &
 
 # Give the background process a moment to start
