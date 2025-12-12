@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <nav class="flex flex-col flex-1 px-2 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base"
     x-data="{
         switchWidth() {
@@ -146,6 +147,22 @@
                                 <path d="M20 15l-2 3h3l-2 3" />
                             </svg>
                             Servers
+                        </a>
+                    </li>
+                    <li>
+                        <a title="Deployments"
+                            class="{{ request()->is('deployments*') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                            href="{{ route('deployment.index') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M7 8l-4 4l4 4" />
+                                <path d="M17 8l4 4l-4 4" />
+                                <path d="M3 12a18 18 0 0 1 18 -6" />
+                                <path d="M21 12a18 18 0 0 1 -18 6" />
+                            </svg>
+                            Deployments
                         </a>
                     </li>
 
