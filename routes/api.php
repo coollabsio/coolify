@@ -26,12 +26,12 @@ Route::group([
 });
 
 Route::group([
-    'middleware' => ['auth:sanctum'],
+    'middleware' => ['web', 'auth'],
 ], function () {
     Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
 });
 Route::group([
-    'middleware' => ['auth:sanctum'],
+    'middleware' => ['web', 'auth'],
     'prefix' => 'v1',
 ], function () {
     Route::get('/upgrade-status', [OtherController::class, 'upgradeStatus']);
