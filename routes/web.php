@@ -248,10 +248,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
     
-    // Global deployments page - shows all deployments across all projects
+    // Route::get('/server/new', ServerCreate::class)->name('server.create');
+    
     Route::get('/deployments', GlobalDeploymentIndex::class)->name('deployment.index');
     
-    Route::get('/server/new', ServerCreate::class)->name('server.create');
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');

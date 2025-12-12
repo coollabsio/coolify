@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <nav class="flex flex-col flex-1 px-2 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base"
     x-data="{
         switchWidth() {
