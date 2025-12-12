@@ -11,7 +11,7 @@ class OauthSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled'];
+    protected $fillable = ['provider', 'client_id', 'client_secret', 'redirect_uri', 'tenant', 'base_url', 'enabled', 'custom_label'];
 
     protected function clientSecret(): Attribute
     {
@@ -28,9 +28,28 @@ class OauthSetting extends Model
                 return filled($this->client_id) && filled($this->client_secret) && filled($this->tenant);
             case 'authentik':
             case 'clerk':
+            case 'openid':
                 return filled($this->client_id) && filled($this->client_secret) && filled($this->base_url);
             default:
                 return filled($this->client_id) && filled($this->client_secret);
         }
+    }
+
+    /**
+     * Get the display label for the login button.
+     * Priority: database custom_label > env custom_label > translation
+     */
+    public function getLoginLabel(): string
+    {
+        if (filled($this->custom_label)) {
+            return $this->custom_label;
+        }
+
+        $envLabel = config("services.{$this->provider}.custom_label");
+        if (filled($envLabel)) {
+            return $envLabel;
+        }
+
+        return __("auth.login.{$this->provider}");
     }
 }

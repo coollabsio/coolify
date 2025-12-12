@@ -56,6 +56,17 @@ function get_socialite_provider(string $provider)
             ->with(['hd' => $oauth_setting->tenant]);
     }
 
+    if ($provider == 'openid') {
+        $openid_config = new \SocialiteProviders\Manager\Config(
+            $oauth_setting->client_id,
+            $oauth_setting->client_secret,
+            $oauth_setting->redirect_uri,
+            ['base_url' => $oauth_setting->base_url],
+        );
+
+        return Socialite::driver('openid')->setConfig($openid_config);
+    }
+
     $config = [
         'client_id' => $oauth_setting->client_id,
         'client_secret' => $oauth_setting->client_secret,

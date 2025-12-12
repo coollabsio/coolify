@@ -7,6 +7,7 @@
     "auth.login.discord": "Login with Discord",
     "auth.login.github": "Login with GitHub",
     "auth.login.gitlab": "Login with Gitlab",
+    "auth.login.openid": "Login with OpenID",
     "auth.login.google": "Login with Google",
     "auth.login.infomaniak": "Login with Infomaniak",
     "auth.login.zitadel": "Login with Zitadel",

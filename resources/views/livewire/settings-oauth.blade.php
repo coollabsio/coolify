@@ -41,10 +41,15 @@
                             $oauth_setting['provider'] == 'authentik' ||
                                 $oauth_setting['provider'] == 'clerk' ||
                                 $oauth_setting['provider'] == 'zitadel' ||
+                                $oauth_setting['provider'] == 'openid' ||
                                 $oauth_setting['provider'] == 'gitlab')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.base_url"
                                 label="Base URL" />
                         @endif
+                        <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.custom_label"
+                            helper="Override the default login button text (e.g., 'Login with Platform Shape')"
+                            placeholder="{{ __('auth.login.' . $oauth_setting['provider']) }}"
+                            label="Custom Button Label" />
                     </div>
                 </div>
             @endforeach

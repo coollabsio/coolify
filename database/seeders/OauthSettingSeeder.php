@@ -22,6 +22,7 @@ class OauthSettingSeeder extends Seeder
                 'github',
                 'gitlab',
                 'google',
+                'openid',
                 'authentik',
                 'infomaniak',
                 'zitadel',
@@ -61,7 +62,6 @@ class OauthSettingSeeder extends Seeder
                     'provider' => $provider,
                 ]);
             }
-
         } catch (\Exception $e) {
             Log::error($e->getMessage());
         }
