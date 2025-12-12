@@ -1,0 +1,93 @@
+# documentation: https://github.com/seaweedfs/seaweedfs
+# slogan: SeaweedFS is a simple and highly scalable distributed file system. Compatible with S3, with an admin web interface.
+# category: storage
+# tags: object, storage, server, s3, api
+# logo: svgs/garage.svg
+# port: 8333
+
+services:
+  seaweedfs-master:
+    image: "chrislusf/seaweedfs:4.02"
+    environment:
+      - SERVICE_URL_S3_8333
+      - AWS_ACCESS_KEY_ID=$SERVICE_USER_S3
+      - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_S3
+    volumes:
+      - "seaweed-s3-data:/data"
+      - type: bind
+        source: ./base-config.json
+        target: /base-config.json
+        content: |
+          {
+            "identities": [
+              {
+                "name": "anonymous",
+                "actions": [
+                  "Read"
+                ]
+              },
+              {
+                "name": "admin",
+                "credentials": [
+                  {
+                    "accessKey": "env:AWS_ACCESS_KEY_ID",
+                    "secretKey": "env:AWS_SECRET_ACCESS_KEY"
+                  }
+                ],
+                "actions": [
+                  "Admin",
+                  "Read",
+                  "ReadAcp",
+                  "List",
+                  "Tagging",
+                  "Write",
+                  "WriteAcp"
+                ]
+              }
+            ]
+          }
+    entrypoint: |
+      sh -c '\
+      sed "s/env:AWS_ACCESS_KEY_ID/$AWS_ACCESS_KEY_ID/g" /base-config.json > /base1-config.json; \
+      sed "s/env:AWS_SECRET_ACCESS_KEY/$AWS_SECRET_ACCESS_KEY/g" /base1-config.json > /config.json; \
+      weed server -dir=/data -master.port=9333 -s3 -s3.port=8333 -s3.config=/config.json\
+      '
+    expose:
+      - "8333"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider -q http://0.0.0.0:8333; [ $$? -le 8 ]"
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+  seaweedfs-admin:
+    image: "chrislusf/seaweedfs:4.02"
+    depends_on:
+      seaweedfs-master:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_ADMIN_23646
+      - SEAWEED_USER_ADMIN=$SERVICE_USER_ADMIN
+      - SEAWEED_PASSWORD_ADMIN=$SERVICE_PASSWORD_ADMIN
+    command:
+      - admin
+      - "-master=seaweedfs-master:9333"
+      - "-adminUser=$SEAWEED_USER_ADMIN"
+      - "-adminPassword=$SEAWEED_PASSWORD_ADMIN"
+      - "-port=23646"
+      - "-dataDir=/data"
+    expose:
+      - "23646"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider -q http://0.0.0.0:23646; [ $$? -le 8 ]"
+
+    volumes:
+      - "seaweed-admin-meta:/data"
+volumes:
+  seaweed-s3-data: null
+  seaweed-admin-meta: null
