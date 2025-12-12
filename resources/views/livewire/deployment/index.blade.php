@@ -56,6 +56,26 @@
             </x-dropdown>
         @endif
 
+        @if ($shouldShowApplicationFilter)
+            <x-dropdown>
+                <x-slot:title>
+                    {{ $selectedApplicationId ? ($filterOptions['applications'][$selectedApplicationId] ?? 'All Applications') : 'All Applications' }}
+                </x-slot:title>
+                <div class="flex flex-col">
+                    <button wire:click="$set('selectedApplicationId', null)" 
+                            class="dropdown-item {{ !$selectedApplicationId ? 'bg-neutral-100 dark:bg-coolgray-100' : '' }}">
+                        All Applications
+                    </button>
+                    @foreach ($filterOptions['applications'] as $uuid => $name)
+                        <button wire:click="$set('selectedApplicationId', '{{ $uuid }}')" 
+                                class="dropdown-item {{ $selectedApplicationId === $uuid ? 'bg-neutral-100 dark:bg-coolgray-100' : '' }}">
+                            {{ $name }}
+                        </button>
+                    @endforeach
+                </div>
+            </x-dropdown>
+        @endif
+
         @if ($shouldShowSourceFilter)
             <x-dropdown>
                 <x-slot:title>
@@ -94,7 +114,7 @@
             </div>
         </x-dropdown>
 
-        @if ($selectedProjectId || $selectedServerId || $selectedSourceId || $selectedStatus)
+        @if ($selectedProjectId || $selectedServerId || $selectedApplicationId || $selectedSourceId || $selectedStatus)
             <button wire:click="clearFilters" 
                     class="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                 Clear filters
@@ -107,11 +127,10 @@
         {{-- Table Header --}}
         <div class="flex items-center gap-4 px-4 py-2 border-b border-neutral-300 dark:border-coolgray-200 bg-neutral-50 dark:bg-coolgray-200 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
             <div class="w-20 flex-shrink-0">ID</div>
-            <div class="w-32 flex-shrink-0">Environment</div>
             <div class="w-40 flex-shrink-0">Status</div>
-            <div class="flex-1 min-w-0">Application</div>
             <div class="min-w-0 flex-1">Commit</div>
-            <div class="w-48 flex-shrink-0 text-right">Created</div>
+            <div class="flex-1 min-w-0">Application</div>
+            <div class="w-32 flex-shrink-0">Environment</div>
         </div>
         
         @forelse ($deployments as $deployment)
@@ -124,8 +143,6 @@
                 // Format deployment ID for display (first 9 characters)
                 $shortId = substr($deployment->deployment_uuid, 0, 9);
                 $status = $deployment->status;
-                $statusUpdatedAt = $deployment->updated_at;
-                $statusTimeAgo = $statusUpdatedAt->diffForHumans(['short' => true]);
                 
                 // Determine if deployment is actively running (needs polling/logs)
                 $isActive = in_array($status, ['in_progress', 'queued']);
@@ -173,26 +190,6 @@
                         @endif
                     </div>
                     
-                    {{-- Environment Badge -- Clickable to environment page --}}
-                    <div class="flex items-center gap-2 w-32 flex-shrink-0 whitespace-nowrap">
-                        @if ($environment && $project)
-                            <a href="{{ route('project.resource.index', [
-                                'project_uuid' => $project->uuid,
-                                'environment_uuid' => $environment->uuid
-                            ]) }}"
-                               class="px-2 py-0.5 text-xs font-medium rounded bg-neutral-100 dark:bg-coolgray-100 text-gray-700 dark:text-gray-300 whitespace-nowrap hover:bg-neutral-200 dark:hover:bg-coolgray-200 transition-colors">
-                                {{ ucfirst($environment->name) }}
-                            </a>
-                            @if ($isCurrent)
-                                <span class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" title="Current deployment"></span>
-                            @endif
-                        @elseif ($environment)
-                            <span class="px-2 py-0.5 text-xs font-medium rounded bg-neutral-100 dark:bg-coolgray-100 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                {{ ucfirst($environment->name) }}
-                            </span>
-                        @endif
-                    </div>
-                    
                     {{-- Status -- Not clickable --}}
                     <div class="flex items-center gap-2 w-40 flex-shrink-0 whitespace-nowrap">
                         @if ($isActive)
@@ -203,27 +200,6 @@
                         <span class="text-sm font-medium {{ $statusConfig['textColor'] }} whitespace-nowrap">
                             {{ $statusConfig['text'] }}
                         </span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {{ $statusTimeAgo }}
-                        </span>
-                    </div>
-                    
-                    {{-- Application Info -- Clickable to application configuration page --}}
-                    <div class="flex items-center gap-2 flex-1 min-w-0">
-                        @if ($project && $environment && $application)
-                            <a href="{{ route('project.application.configuration', [
-                                'project_uuid' => $project->uuid,
-                                'environment_uuid' => $environment->uuid,
-                                'application_uuid' => $application->uuid
-                            ]) }}"
-                               class="font-medium text-sm dark:text-white truncate hover:text-gray-900 dark:hover:text-gray-200 hover:underline">
-                                {{ $application->name }}
-                            </a>
-                        @else
-                            <span class="font-medium text-sm dark:text-white truncate">
-                                {{ $application->name }}
-                            </span>
-                        @endif
                     </div>
                     
                     {{-- Commit Info -- Clickable to GitHub commit page --}}
@@ -249,9 +225,42 @@
                         @endif
                     </div>
                     
-                    {{-- Metadata -- Not clickable --}}
-                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 w-48 flex-shrink-0 justify-end whitespace-nowrap">
-                        <span class="whitespace-nowrap">{{ $deployment->created_at->diffForHumans(['short' => true]) }}</span>
+                    {{-- Application Info -- Clickable to application configuration page --}}
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        @if ($project && $environment && $application)
+                            <a href="{{ route('project.application.configuration', [
+                                'project_uuid' => $project->uuid,
+                                'environment_uuid' => $environment->uuid,
+                                'application_uuid' => $application->uuid
+                            ]) }}"
+                               class="font-medium text-sm dark:text-white truncate hover:text-gray-900 dark:hover:text-gray-200 hover:underline">
+                                {{ $application->name }}
+                            </a>
+                        @else
+                            <span class="font-medium text-sm dark:text-white truncate">
+                                {{ $application->name }}
+                            </span>
+                        @endif
+                    </div>
+                    
+                    {{-- Environment Badge -- Clickable to environment page --}}
+                    <div class="flex items-center gap-2 w-32 flex-shrink-0 whitespace-nowrap">
+                        @if ($environment && $project)
+                            <a href="{{ route('project.resource.index', [
+                                'project_uuid' => $project->uuid,
+                                'environment_uuid' => $environment->uuid
+                            ]) }}"
+                               class="px-2 py-0.5 text-xs font-medium rounded bg-neutral-100 dark:bg-coolgray-100 text-gray-700 dark:text-gray-300 whitespace-nowrap hover:bg-neutral-200 dark:hover:bg-coolgray-200 transition-colors">
+                                {{ ucfirst($environment->name) }}
+                            </a>
+                            @if ($isCurrent)
+                                <span class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" title="Current deployment"></span>
+                            @endif
+                        @elseif ($environment)
+                            <span class="px-2 py-0.5 text-xs font-medium rounded bg-neutral-100 dark:bg-coolgray-100 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                {{ ucfirst($environment->name) }}
+                            </span>
+                        @endif
                     </div>
                     
                     {{-- Expand/Collapse Button for Logs --}}

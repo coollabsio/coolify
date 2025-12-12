@@ -3,6 +3,7 @@
 namespace App\Livewire\Deployment;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -22,6 +23,8 @@ class Index extends Component
 
     public ?int $selectedServerId = null;
 
+    public ?string $selectedApplicationId = null;
+
     public ?int $selectedSourceId = null;
 
     public ?string $selectedSourceType = null;
@@ -33,6 +36,7 @@ class Index extends Component
     protected $queryString = [
         'selectedProjectId' => ['except' => ''],
         'selectedServerId' => ['except' => ''],
+        'selectedApplicationId' => ['except' => ''],
         'selectedSourceId' => ['except' => ''],
         'selectedSourceType' => ['except' => ''],
         'selectedStatus' => ['except' => ''],
@@ -70,6 +74,11 @@ class Index extends Component
             $query->where('application_deployment_queues.server_id', $this->selectedServerId);
         }
 
+        // Filter by application
+        if ($this->selectedApplicationId) {
+            $query->where('applications.uuid', $this->selectedApplicationId);
+        }
+
         // Filter by source
         if ($this->selectedSourceId && $this->selectedSourceType) {
             $query->where('applications.source_id', $this->selectedSourceId)
@@ -99,6 +108,11 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedSelectedApplicationId()
+    {
+        $this->resetPage();
+    }
+
     public function updatedSelectedSourceId()
     {
         $this->resetPage();
@@ -113,6 +127,7 @@ class Index extends Component
     {
         $this->selectedProjectId = null;
         $this->selectedServerId = null;
+        $this->selectedApplicationId = null;
         $this->selectedSourceId = null;
         $this->selectedSourceType = null;
         $this->selectedStatus = null;
@@ -147,6 +162,27 @@ class Index extends Component
         if (! empty($serverIds)) {
             $servers = Server::whereIn('id', $serverIds)
                 ->pluck('name', 'id')
+                ->toArray();
+        }
+
+        // Get applications that have deployments (only show applications with actual deployments)
+        // Uses same join pattern as loadDeployments() to avoid type mismatch
+        $applicationUuids = ApplicationDeploymentQueue::query()
+            ->join('applications', function ($join) {
+                $join->on(DB::raw('CAST(application_deployment_queues.application_id AS INTEGER)'), '=', 'applications.id');
+            })
+            ->join('environments', 'applications.environment_id', '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->where('projects.team_id', $teamId)
+            ->whereNull('applications.deleted_at')
+            ->distinct('applications.uuid')
+            ->pluck('applications.uuid')
+            ->toArray();
+
+        $applications = [];
+        if (! empty($applicationUuids)) {
+            $applications = Application::whereIn('uuid', $applicationUuids)
+                ->pluck('name', 'uuid')
                 ->toArray();
         }
 
@@ -224,6 +260,7 @@ class Index extends Component
         return [
             'projects' => $projects,
             'servers' => $servers,
+            'applications' => $applications,
             'sources' => $sources,
             'statuses' => $statuses,
         ];
@@ -237,6 +274,11 @@ class Index extends Component
     public function getShouldShowServerFilterProperty(): bool
     {
         return count($this->getFilterOptionsProperty()['servers']) > 1;
+    }
+
+    public function getShouldShowApplicationFilterProperty(): bool
+    {
+        return count($this->getFilterOptionsProperty()['applications']) > 1;
     }
 
     public function getShouldShowSourceFilterProperty(): bool
@@ -327,6 +369,7 @@ class Index extends Component
             'isPolling' => $this->isPolling,
             'shouldShowProjectFilter' => $this->shouldShowProjectFilter,
             'shouldShowServerFilter' => $this->shouldShowServerFilter,
+            'shouldShowApplicationFilter' => $this->shouldShowApplicationFilter,
             'shouldShowSourceFilter' => $this->shouldShowSourceFilter,
         ]);
     }
