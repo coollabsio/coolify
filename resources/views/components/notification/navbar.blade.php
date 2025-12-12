@@ -27,6 +27,10 @@
                 href="{{ route('notifications.webhook') }}">
                 <button>Webhook</button>
             </a>
+            <a class="{{ request()->routeIs('notification.history') ? 'dark:text-white' : '' }}"
+                href="{{ route('notification.history') }}">
+                <button>History</button>
+            </a>
         </nav>
     </div>
 </div>

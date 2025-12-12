@@ -2,9 +2,10 @@
     <x-slot:title>
         Notifications | Coolify
     </x-slot>
+    <x-notification.navbar />
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h1>Notifications</h1>
+            <h2>History</h2>
             <div class="subtitle">All notifications from {{ currentTeam()->name }}</div>
         </div>
     </div>

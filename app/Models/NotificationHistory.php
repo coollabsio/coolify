@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NotificationHistory extends Model
 {
+    protected $table = 'notification_history';
+
     protected $fillable = [
         'team_id',
         'notification_type',
