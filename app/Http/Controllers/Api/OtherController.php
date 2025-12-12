@@ -237,7 +237,7 @@ class OtherController extends Controller
 
         $server = Server::find(0);
         if (! $server) {
-            return response()->json(['status' => 'none']);
+            return response()->json(['status' => 'none', 'debug' => 'no_server']);
         }
 
         $statusFile = '/data/coolify/source/.upgrade-status';
@@ -251,16 +251,16 @@ class OtherController extends Controller
             );
             $content = trim($content ?? '');
         } catch (\Exception $e) {
-            return response()->json(['status' => 'none']);
+            return response()->json(['status' => 'none', 'debug' => 'ssh_exception', 'error' => $e->getMessage()]);
         }
 
         if (empty($content)) {
-            return response()->json(['status' => 'none']);
+            return response()->json(['status' => 'none', 'debug' => 'empty_content']);
         }
 
         $parts = explode('|', $content);
         if (count($parts) < 3) {
-            return response()->json(['status' => 'none']);
+            return response()->json(['status' => 'none', 'debug' => 'invalid_parts', 'content' => $content]);
         }
 
         [$step, $message, $timestamp] = $parts;
@@ -272,11 +272,11 @@ class OtherController extends Controller
             $diffMinutes = ($now->getTimestamp() - $statusTime->getTimestamp()) / 60;
 
             if ($diffMinutes > 10) {
-                return response()->json(['status' => 'none']);
+                return response()->json(['status' => 'none', 'debug' => 'stale', 'minutes' => $diffMinutes]);
             }
         } catch (\Exception $e) {
             // If timestamp parsing fails, treat as stale for security
-            return response()->json(['status' => 'none']);
+            return response()->json(['status' => 'none', 'debug' => 'timestamp_error', 'timestamp' => $timestamp]);
         }
 
         // Determine status based on step
