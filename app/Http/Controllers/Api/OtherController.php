@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Server;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
@@ -234,13 +235,25 @@ class OtherController extends Controller
             return response()->json(['message' => 'You are not allowed to view upgrade status.'], 403);
         }
 
-        $statusFile = '/data/coolify/source/.upgrade-status';
-
-        if (! file_exists($statusFile)) {
+        $server = Server::find(0);
+        if (! $server) {
             return response()->json(['status' => 'none']);
         }
 
-        $content = trim(file_get_contents($statusFile));
+        $statusFile = '/data/coolify/source/.upgrade-status';
+
+        // Read status file from localhost via SSH
+        try {
+            $content = instant_remote_process(
+                ["cat {$statusFile} 2>/dev/null || echo ''"],
+                $server,
+                false
+            );
+            $content = trim($content ?? '');
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'none']);
+        }
+
         if (empty($content)) {
             return response()->json(['status' => 'none']);
         }
