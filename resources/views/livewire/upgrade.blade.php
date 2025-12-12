@@ -284,45 +284,32 @@
                 this.currentStatus = 'Starting upgrade...';
                 this.serviceDown = false;
 
-                // Poll upgrade status API for real progress
-                this.checkUpgradeStatusInterval = setInterval(() => {
-                    fetch('/api/upgrade-status', {
-                        credentials: 'same-origin',
-                        headers: {
-                            'Accept': 'application/json',
+                // Poll upgrade status via Livewire
+                this.checkUpgradeStatusInterval = setInterval(async () => {
+                    try {
+                        const data = await this.$wire.getUpgradeStatus();
+                        if (data.status === 'in_progress') {
+                            this.currentStep = this.mapStepToUI(data.step);
+                            this.currentStatus = data.message;
+                        } else if (data.status === 'complete') {
+                            this.showSuccess();
+                        } else if (data.status === 'error') {
+                            this.currentStatus = `Error: ${data.message}`;
                         }
-                    })
-                        .then(response => {
-                            if (response.ok) {
-                                return response.json();
+                    } catch (error) {
+                        // Service is down - switch to health check mode
+                        console.log('Livewire unavailable, switching to health check mode');
+                        if (!this.serviceDown) {
+                            this.serviceDown = true;
+                            this.currentStep = 4;
+                            this.currentStatus = 'Coolify is restarting with the new version...';
+                            if (this.checkUpgradeStatusInterval) {
+                                clearInterval(this.checkUpgradeStatusInterval);
+                                this.checkUpgradeStatusInterval = null;
                             }
-                            // Auth errors (401/403) or service down - switch to health check
-                            throw new Error('Service unavailable');
-                        })
-                        .then(data => {
-                            if (data.status === 'in_progress') {
-                                this.currentStep = this.mapStepToUI(data.step);
-                                this.currentStatus = data.message;
-                            } else if (data.status === 'complete') {
-                                this.showSuccess();
-                            } else if (data.status === 'error') {
-                                this.currentStatus = `Error: ${data.message}`;
-                            }
-                        })
-                        .catch(error => {
-                            // Service is down - switch to health check mode
-                            console.log('Upgrade status API unavailable, switching to health check mode');
-                            if (!this.serviceDown) {
-                                this.serviceDown = true;
-                                this.currentStep = 4;
-                                this.currentStatus = 'Coolify is restarting with the new version...';
-                                if (this.checkUpgradeStatusInterval) {
-                                    clearInterval(this.checkUpgradeStatusInterval);
-                                    this.checkUpgradeStatusInterval = null;
-                                }
-                                this.revive();
-                            }
-                        });
+                            this.revive();
+                        }
+                    }
                 }, 2000);
             }
         }))

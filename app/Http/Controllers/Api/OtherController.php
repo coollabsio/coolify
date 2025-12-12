@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Server;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
@@ -186,115 +185,5 @@ class OtherController extends Controller
     public function healthcheck(Request $request)
     {
         return 'OK';
-    }
-
-    #[OA\Get(
-        summary: 'Upgrade Status',
-        description: 'Get the current upgrade status. Returns the step and message from the upgrade process. Only available to root team members.',
-        path: '/upgrade-status',
-        operationId: 'upgrade-status',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Returns upgrade status.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'status', type: 'string', example: 'in_progress'),
-                        new OA\Property(property: 'step', type: 'integer', example: 3),
-                        new OA\Property(property: 'message', type: 'string', example: 'Pulling Docker images'),
-                    ]
-                )),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 403,
-                description: 'You are not allowed to view upgrade status.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to view upgrade status.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function upgradeStatus(Request $request)
-    {
-        // Only root team members can view upgrade status
-        $user = auth()->user();
-        if (! $user || $user->currentTeam()->id !== 0) {
-            return response()->json(['message' => 'You are not allowed to view upgrade status.'], 403);
-        }
-
-        $server = Server::find(0);
-        if (! $server) {
-            return response()->json(['status' => 'none', 'debug' => 'no_server']);
-        }
-
-        $statusFile = '/data/coolify/source/.upgrade-status';
-
-        // Read status file from localhost via SSH
-        try {
-            $content = instant_remote_process(
-                ["cat {$statusFile} 2>/dev/null || echo ''"],
-                $server,
-                false
-            );
-            $content = trim($content ?? '');
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'none', 'debug' => 'ssh_exception', 'error' => $e->getMessage()]);
-        }
-
-        if (empty($content)) {
-            return response()->json(['status' => 'none', 'debug' => 'empty_content']);
-        }
-
-        $parts = explode('|', $content);
-        if (count($parts) < 3) {
-            return response()->json(['status' => 'none', 'debug' => 'invalid_parts', 'content' => $content]);
-        }
-
-        [$step, $message, $timestamp] = $parts;
-
-        // Check if status is stale (older than 10 minutes) - upgrades shouldn't take longer
-        try {
-            $statusTime = new \DateTime($timestamp);
-            $now = new \DateTime;
-            $diffMinutes = ($now->getTimestamp() - $statusTime->getTimestamp()) / 60;
-
-            if ($diffMinutes > 10) {
-                return response()->json(['status' => 'none', 'debug' => 'stale', 'minutes' => $diffMinutes]);
-            }
-        } catch (\Exception $e) {
-            // If timestamp parsing fails, treat as stale for security
-            return response()->json(['status' => 'none', 'debug' => 'timestamp_error', 'timestamp' => $timestamp]);
-        }
-
-        // Determine status based on step
-        if ($step === 'error') {
-            return response()->json([
-                'status' => 'error',
-                'step' => 0,
-                'message' => $message,
-            ]);
-        }
-
-        $stepInt = (int) $step;
-        $status = $stepInt >= 6 ? 'complete' : 'in_progress';
-
-        return response()->json([
-            'status' => $status,
-            'step' => $stepInt,
-            'message' => $message,
-        ]);
     }
 }
