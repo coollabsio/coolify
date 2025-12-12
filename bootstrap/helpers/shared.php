@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
@@ -3154,49 +3155,6 @@ function generateDockerComposeServiceName(mixed $services, int $pullRequestId = 
     return $collection;
 }
 
-/**
- * Transform colon-delimited status format to human-readable parentheses format.
- *
- * Handles Docker container status formats with optional health check status and exclusion modifiers.
- *
- * Examples:
- * - running:healthy → Running (healthy)
- * - running:unhealthy:excluded → Running (unhealthy, excluded)
- * - exited:excluded → Exited (excluded)
- * - Proxy:running → Proxy:running (preserved as-is for headline formatting)
- * - running → Running
- *
- * @param  string  $status  The status string to format
- * @return string The formatted status string
- */
-function formatContainerStatus(string $status): string
-{
-    // Preserve Proxy statuses as-is (they follow different format)
-    if (str($status)->startsWith('Proxy')) {
-        return str($status)->headline()->value();
-    }
-
-    // Check for :excluded suffix
-    $isExcluded = str($status)->endsWith(':excluded');
-    $parts = explode(':', $status);
-
-    if ($isExcluded) {
-        if (count($parts) === 3) {
-            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
-            return str($parts[0])->headline().' ('.$parts[1].', excluded)';
-        } else {
-            // No health status: exited:excluded → Exited (excluded)
-            return str($parts[0])->headline().' (excluded)';
-        }
-    } elseif (count($parts) >= 2) {
-        // Regular colon format: running:healthy → Running (healthy)
-        return str($parts[0])->headline().' ('.$parts[1].')';
-    } else {
-        // Simple status: running → Running
-        return str($status)->headline()->value();
-    }
-}
-
 function formatBytes(?int $bytes, int $precision = 2): string
 {
     if ($bytes === null || $bytes === 0) {
@@ -3209,12 +3167,13 @@ function formatBytes(?int $bytes, int $precision = 2): string
     }
 
     $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
+    $base = 1024;
+    $exponent = floor(log($bytes) / log($base));
+    $exponent = min($exponent, count($units) - 1);
 
-    $bytes /= (1024 ** $pow);
+    $value = $bytes / pow($base, $exponent);
 
-    return round($bytes, $precision).' '.$units[$pow];
+    return round($value, $precision).' '.$units[$exponent];
 }
 
 /**
@@ -3303,6 +3262,103 @@ function isSafeTmpPath(?string $path): bool
         if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
             return false;
         }
+    }
+
+    return true;
+}
+
+/**
+ * Transform colon-delimited status format to human-readable parentheses format.
+ *
+ * Handles Docker container status formats with optional health check status and exclusion modifiers.
+ *
+ * Examples:
+ * - running:healthy → Running (healthy)
+ * - running:unhealthy:excluded → Running (unhealthy, excluded)
+ * - exited:excluded → Exited (excluded)
+ * - Proxy:running → Proxy:running (preserved as-is for headline formatting)
+ * - running → Running
+ *
+ * @param  string  $status  The status string to format
+ * @return string The formatted status string
+ */
+function formatContainerStatus(string $status): string
+{
+    // Preserve Proxy statuses as-is (they follow different format)
+    if (str($status)->startsWith('Proxy')) {
+        return str($status)->headline()->value();
+    }
+
+    // Check for :excluded suffix
+    $isExcluded = str($status)->endsWith(':excluded');
+    $parts = explode(':', $status);
+
+    if ($isExcluded) {
+        if (count($parts) === 3) {
+            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+            return str($parts[0])->headline().' ('.$parts[1].', excluded)';
+        } else {
+            // No health status: exited:excluded → Exited (excluded)
+            return str($parts[0])->headline().' (excluded)';
+        }
+    } elseif (count($parts) >= 2) {
+        // Regular colon format: running:healthy → Running (healthy)
+        return str($parts[0])->headline().' ('.$parts[1].')';
+    } else {
+        // Simple status: running → Running
+        return str($status)->headline()->value();
+    }
+}
+
+/**
+ * Check if password confirmation should be skipped.
+ * Returns true if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ *
+ * @return bool True if password confirmation should be skipped
+ */
+function shouldSkipPasswordConfirmation(): bool
+{
+    // Skip if two-step confirmation is globally disabled
+    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+        return true;
+    }
+
+    // Skip if user has no password (OAuth users)
+    if (! Auth::user()?->hasPassword()) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Verify password for two-step confirmation.
+ * Skips verification if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
+ * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
+ * @return bool True if verification passed (or skipped), false if password is incorrect
+ */
+function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
+{
+    // Skip if password confirmation should be skipped
+    if (shouldSkipPasswordConfirmation()) {
+        return true;
+    }
+
+    // Verify the password
+    if (! Hash::check($password, Auth::user()->password)) {
+        if ($component) {
+            $component->addError('password', 'The provided password is incorrect.');
+        }
+
+        return false;
     }
 
     return true;

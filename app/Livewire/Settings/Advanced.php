@@ -5,8 +5,6 @@ namespace App\Livewire\Settings;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Rules\ValidIpOrCidr;
-use Auth;
-use Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -157,9 +155,7 @@ class Advanced extends Component
 
     public function toggleTwoStepConfirmation($password): bool
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
-
+        if (! verifyPasswordConfirmation($password, $this)) {
             return false;
         }
 
