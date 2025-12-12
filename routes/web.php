@@ -15,6 +15,7 @@ use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
+use App\Livewire\Notification\History as NotificationHistory;
 use App\Livewire\Profile\Index as ProfileIndex;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
@@ -123,6 +124,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{tagName?}', TagsShow::class)->name('tags.show');
     });
 
+    // Notification history page - shows all notifications across all channels
+    Route::get('/notifications', NotificationHistory::class)->name('notification.history');
+    
     Route::prefix('notifications')->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');

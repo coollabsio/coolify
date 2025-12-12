@@ -24,6 +24,9 @@ class EventServiceProvider extends ServiceProvider
             InfomaniakExtendSocialite::class.'@handle',
             ZitadelExtendSocialite::class.'@handle',
         ],
+        \Illuminate\Notifications\Events\NotificationSent::class => [
+            \App\Listeners\StoreNotificationHistory::class,
+        ],
     ];
 
     public function boot(): void
