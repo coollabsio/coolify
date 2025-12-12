@@ -49,4 +49,19 @@
                 instantSave="instantSaveLogDrain" id="isLogDrainEnabled" label="Drain Logs" />
         </div>
     </form>
+    
+    @php
+        $dbType = $database->databaseType();
+        $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
+        $isSupported = collect($supportedTypes)->contains(fn($type) => str_contains($dbType, $type));
+    @endphp
+    
+    @if ($isSupported)
+        @can('update', $database)
+            <div class="pt-6">
+                <h3 class="pb-4">Import Backup</h3>
+                <livewire:project.database.import :resource="$database" />
+            </div>
+        @endcan
+    @endif
 </div>
