@@ -1,5 +1,14 @@
 @props(['step' => 0])
 
+{{--
+    Step Mapping (Backend → UI):
+    Backend steps 1-2 (config download, env update) → UI Step 1: Preparing
+    Backend step 3 (pulling images) → UI Step 2: Helper + UI Step 3: Image
+    Backend steps 4-5 (stop/start containers) → UI Step 4: Restart
+    Backend step 6 (complete) → mapped in JS mapStepToUI() in upgrade.blade.php
+
+    The currentStep variable is inherited from parent Alpine component (upgradeModal).
+--}}
 <div class="w-full max-w-md mx-auto" x-data="{ activeStep: {{ $step }} }" x-effect="activeStep = $el.closest('[x-data]')?.__x?.$data?.currentStep ?? {{ $step }}">
     <div class="flex items-center justify-between">
         {{-- Step 1: Preparing --}}

@@ -51,7 +51,7 @@
                                     {{ $currentVersion }} <span class="mx-1">&rarr;</span> {{ $latestVersion }}
                                 </div>
                             </div>
-                            <button x-show="!showProgress" @click="modalOpen=false"
+                            <button x-show="!showProgress || upgradeError" @click="upgradeError ? closeErrorModal() : modalOpen=false"
                                 class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 text-gray-600 rounded-full hover:text-gray-800 hover:bg-gray-50 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-coolgray-300">
                                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor">
@@ -79,7 +79,7 @@
                                     {{-- Current Status Message --}}
                                     <div class="p-4 rounded-lg bg-neutral-200 dark:bg-coolgray-200">
                                         <div class="flex items-center gap-3">
-                                            <template x-if="!upgradeComplete">
+                                            <template x-if="!upgradeComplete && !upgradeError">
                                                 <svg class="w-5 h-5 text-warning animate-spin"
                                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
@@ -97,6 +97,14 @@
                                                         clip-rule="evenodd" />
                                                 </svg>
                                             </template>
+                                            <template x-if="upgradeError">
+                                                <svg class="w-5 h-5 text-error" xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd"
+                                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                        clip-rule="evenodd" />
+                                                </svg>
+                                            </template>
                                             <span x-text="currentStatus" class="text-sm"></span>
                                         </div>
                                     </div>
@@ -110,6 +118,18 @@
                                             </p>
                                             <x-forms.button @click="reloadNow()" type="button">
                                                 Reload Now
+                                            </x-forms.button>
+                                        </div>
+                                    </template>
+
+                                    {{-- Error State with Close Button --}}
+                                    <template x-if="upgradeError">
+                                        <div class="flex flex-col items-center gap-4">
+                                            <p class="text-sm text-neutral-600 dark:text-neutral-400">
+                                                Check the logs on the server at /data/coolify/source/upgrade*.
+                                            </p>
+                                            <x-forms.button @click="closeErrorModal()" type="button">
+                                                Close
                                             </x-forms.button>
                                         </div>
                                     </template>
@@ -168,6 +188,7 @@
             elapsedTime: 0,
             currentStep: 0,
             upgradeComplete: false,
+            upgradeError: false,
             successCountdown: 3,
             currentVersion: config.currentVersion || '',
             latestVersion: config.latestVersion || '',
@@ -178,12 +199,16 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
+                // Trigger server-side upgrade script via Livewire
                 this.$wire.$call('upgrade');
+                // Start client-side status polling
                 this.upgrade();
-                window.addEventListener('beforeunload', (event) => {
+                // Prevent accidental navigation during upgrade
+                this.beforeUnloadHandler = (event) => {
                     event.preventDefault();
                     event.returnValue = '';
-                });
+                };
+                window.addEventListener('beforeunload', this.beforeUnloadHandler);
             },
 
             startTimer() {
@@ -259,6 +284,11 @@
                     clearInterval(this.elapsedInterval);
                     this.elapsedInterval = null;
                 }
+                // Remove beforeunload handler now that upgrade is complete
+                if (this.beforeUnloadHandler) {
+                    window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+                    this.beforeUnloadHandler = null;
+                }
 
                 this.upgradeComplete = true;
                 this.currentStep = 5;
@@ -278,6 +308,38 @@
                 window.location.reload();
             },
 
+            showError(message) {
+                // Stop all intervals
+                if (this.checkHealthInterval) {
+                    clearInterval(this.checkHealthInterval);
+                    this.checkHealthInterval = null;
+                }
+                if (this.checkUpgradeStatusInterval) {
+                    clearInterval(this.checkUpgradeStatusInterval);
+                    this.checkUpgradeStatusInterval = null;
+                }
+                if (this.elapsedInterval) {
+                    clearInterval(this.elapsedInterval);
+                    this.elapsedInterval = null;
+                }
+                // Remove beforeunload handler so user can close modal
+                if (this.beforeUnloadHandler) {
+                    window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+                    this.beforeUnloadHandler = null;
+                }
+
+                this.upgradeError = true;
+                this.currentStatus = `Error: ${message}`;
+            },
+
+            closeErrorModal() {
+                this.modalOpen = false;
+                this.showProgress = false;
+                this.upgradeError = false;
+                this.currentStatus = '';
+                this.currentStep = 0;
+            },
+
             upgrade() {
                 if (this.checkUpgradeStatusInterval) return true;
                 this.currentStep = 1;
@@ -294,7 +356,7 @@
                         } else if (data.status === 'complete') {
                             this.showSuccess();
                         } else if (data.status === 'error') {
-                            this.currentStatus = `Error: ${data.message}`;
+                            this.showError(data.message);
                         }
                     } catch (error) {
                         // Service is down - switch to health check mode

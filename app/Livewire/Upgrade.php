@@ -55,7 +55,7 @@ class Upgrade extends Component
     public function getUpgradeStatus(): array
     {
         // Only root team members can view upgrade status
-        if (auth()->user()?->currentTeam()->id !== 0) {
+        if (auth()->user()?->currentTeam()?->id !== 0) {
             return ['status' => 'none'];
         }
 
