@@ -18,8 +18,6 @@ class Upgrade extends Component
 
     public string $currentVersion = '';
 
-    public array $changelogEntries = [];
-
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
@@ -36,34 +34,8 @@ class Upgrade extends Component
             if (isDev()) {
                 $this->isUpgradeAvailable = true;
             }
-            $this->loadChangelog();
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        }
-    }
-
-    public function loadChangelog()
-    {
-        try {
-            $service = app(ChangelogService::class);
-            $currentVersion = str_replace('v', '', $this->currentVersion);
-
-            $this->changelogEntries = $service->getEntries(1)
-                ->filter(function ($entry) use ($currentVersion) {
-                    $entryVersion = str_replace('v', '', $entry->tag_name);
-
-                    return version_compare($entryVersion, $currentVersion, '>');
-                })
-                ->take(3)
-                ->map(fn ($entry) => [
-                    'tag_name' => $entry->tag_name,
-                    'title' => $entry->title,
-                    'content_html' => $entry->content_html,
-                ])
-                ->values()
-                ->toArray();
-        } catch (\Throwable $e) {
-            $this->changelogEntries = [];
         }
     }
 
