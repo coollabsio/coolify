@@ -12,7 +12,7 @@ class ComplexStatusCheck
     use AsAction;
     use CalculatesExcludedStatus;
 
-    public function handle(Application $application)
+    public function handle(Application $application, array &$dockerInspectCache = [])
     {
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
@@ -29,8 +29,20 @@ class ComplexStatusCheck
                     continue;
                 }
             }
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q --filter 'label=coolify.applicationId={$application->id}' --filter 'label=coolify.pullRequestId=0') --format '{{json .}}'"], $server, false);
-            $containers = format_docker_command_output_to_json($containers);
+
+            if (!isset($dockerInspectCache[$server->id])) {
+                $allContainers = instant_remote_process(["docker container inspect $(docker ps -aq  --filter 'label=coolify.pullRequestId=0') --format 'json'"], $server, false);
+                $allContainers = format_docker_command_output_to_json($allContainers);
+                $dockerInspectCache[$server->id] = $allContainers;
+            }
+            $allContainers = $dockerInspectCache[$server->id];
+
+            $containers = collect($allContainers)->filter(function ($container) use ($application) {
+                $labels = data_get($container, 'Config.Labels', []);
+                $appId = data_get($labels, 'coolify.applicationId');
+
+                return $appId && intval($appId) === $application->id;
+            });
 
             if ($containers->count() > 0) {
                 $statusToSet = $this->aggregateContainerStatuses($application, $containers);

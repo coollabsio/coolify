@@ -46,10 +46,11 @@ class GetContainersStatus
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
+        $dockerInspectCache = [];
         foreach ($this->applications as $application) {
             if ($application->additional_servers->count() > 0) {
                 $skip_these_applications->push($application);
-                ComplexStatusCheck::run($application);
+                ComplexStatusCheck::run($application, $dockerInspectCache);
                 $this->applications = $this->applications->filter(function ($value, $key) use ($application) {
                     return $value->id !== $application->id;
                 });

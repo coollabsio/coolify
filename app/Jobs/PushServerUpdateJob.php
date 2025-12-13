@@ -580,8 +580,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function updateAdditionalServersStatus()
     {
+        $dockerInspectCache = [];
         $this->allApplicationsWithAdditionalServers->each(function ($application) {
-            ComplexStatusCheck::run($application);
+            ComplexStatusCheck::run($application, $dockerInspectCache);
         });
     }
 
