@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use App\Models\Server;
-use App\Services\ChangelogService;
 use Livewire\Component;
 
 class Upgrade extends Component
