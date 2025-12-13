@@ -59,6 +59,30 @@ curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production
 log "Configuration files downloaded successfully"
 echo "     Done."
 
+# Extract all images from docker-compose configuration
+log "Extracting all images from docker-compose configuration..."
+COMPOSE_FILES="-f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml"
+
+# Check if custom compose file exists
+if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f /data/coolify/source/docker-compose.custom.yml"
+    log "Including custom docker-compose.yml in image extraction"
+fi
+
+# Get all unique images from docker compose config
+# LATEST_IMAGE env var is needed for image substitution in compose files
+IMAGES=$(LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file "$ENV_FILE" $COMPOSE_FILES config --images 2>/dev/null | sort -u)
+
+if [ -z "$IMAGES" ]; then
+    log "ERROR: Failed to extract images from docker-compose files"
+    write_status "error" "Failed to parse docker-compose configuration"
+    echo "     ERROR: Failed to parse docker-compose configuration. Aborting upgrade."
+    exit 1
+fi
+
+log "Images to pull:"
+echo "$IMAGES" | while read img; do log "  - $img"; done
+
 # Backup existing .env file before making any changes
 if [ "$SKIP_BACKUP" != "true" ]; then
     if [ -f "$ENV_FILE" ]; then
@@ -130,60 +154,35 @@ echo ""
 echo "3/6 Pulling Docker images..."
 echo "     This may take a few minutes depending on your connection."
 
-echo "     - Pulling Coolify image..."
-log "Pulling image: ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE}"
-if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE}" >>"$LOGFILE" 2>&1; then
-    log "Successfully pulled Coolify image"
+# Also pull the helper image (not in compose files but needed for upgrade)
+HELPER_IMAGE="${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}"
+echo "     - Pulling $HELPER_IMAGE..."
+log "Pulling image: $HELPER_IMAGE"
+if docker pull "$HELPER_IMAGE" >>"$LOGFILE" 2>&1; then
+    log "Successfully pulled $HELPER_IMAGE"
 else
-    log "ERROR: Failed to pull Coolify image"
-    write_status "error" "Failed to pull Coolify image"
-    echo "     ERROR: Failed to pull Coolify image. Aborting upgrade."
+    log "ERROR: Failed to pull $HELPER_IMAGE"
+    write_status "error" "Failed to pull $HELPER_IMAGE"
+    echo "     ERROR: Failed to pull $HELPER_IMAGE. Aborting upgrade."
     exit 1
 fi
 
-echo "     - Pulling Coolify helper image..."
-log "Pulling image: ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}"
-if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION}" >>"$LOGFILE" 2>&1; then
-    log "Successfully pulled Coolify helper image"
-else
-    log "ERROR: Failed to pull Coolify helper image"
-    write_status "error" "Failed to pull Coolify helper image"
-    echo "     ERROR: Failed to pull helper image. Aborting upgrade."
-    exit 1
-fi
-
-echo "     - Pulling PostgreSQL image..."
-log "Pulling image: postgres:15-alpine"
-if docker pull postgres:15-alpine >>"$LOGFILE" 2>&1; then
-    log "Successfully pulled PostgreSQL image"
-else
-    log "ERROR: Failed to pull PostgreSQL image"
-    write_status "error" "Failed to pull PostgreSQL image"
-    echo "     ERROR: Failed to pull PostgreSQL image. Aborting upgrade."
-    exit 1
-fi
-
-echo "     - Pulling Redis image..."
-log "Pulling image: redis:7-alpine"
-if docker pull redis:7-alpine >>"$LOGFILE" 2>&1; then
-    log "Successfully pulled Redis image"
-else
-    log "ERROR: Failed to pull Redis image"
-    write_status "error" "Failed to pull Redis image"
-    echo "     ERROR: Failed to pull Redis image. Aborting upgrade."
-    exit 1
-fi
-
-echo "     - Pulling Coolify realtime image..."
-log "Pulling image: ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.10"
-if docker pull "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.10" >>"$LOGFILE" 2>&1; then
-    log "Successfully pulled Coolify realtime image"
-else
-    log "ERROR: Failed to pull Coolify realtime image"
-    write_status "error" "Failed to pull Coolify realtime image"
-    echo "     ERROR: Failed to pull realtime image. Aborting upgrade."
-    exit 1
-fi
+# Pull all images from compose config
+# Using a for loop to avoid subshell issues with exit
+for IMAGE in $IMAGES; do
+    if [ -n "$IMAGE" ]; then
+        echo "     - Pulling $IMAGE..."
+        log "Pulling image: $IMAGE"
+        if docker pull "$IMAGE" >>"$LOGFILE" 2>&1; then
+            log "Successfully pulled $IMAGE"
+        else
+            log "ERROR: Failed to pull $IMAGE"
+            write_status "error" "Failed to pull $IMAGE"
+            echo "     ERROR: Failed to pull $IMAGE. Aborting upgrade."
+            exit 1
+        fi
+    fi
+done
 
 log "All images pulled successfully"
 echo "     All images pulled successfully."
