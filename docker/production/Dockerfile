@@ -38,10 +38,24 @@ USER www-data
 FROM node:24-alpine AS static-assets
 
 WORKDIR /app
-COPY package*.json vite.config.js postcss.config.cjs ./
+
+# Layer 1: Package dependencies (rarely changes)
+COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
-COPY . .
+
+# Layer 2: Build config (rarely changes)
+COPY vite.config.js postcss.config.cjs ./
+
+# Layer 3: Frontend source files
+COPY resources/css/ ./resources/css/
+COPY resources/js/ ./resources/js/
+COPY resources/fonts/ ./resources/fonts/
+
+# Layer 4: Blade templates for Tailwind class detection
+COPY resources/views/ ./resources/views/
+
+# Build frontend assets
 RUN npm run build
 
 # =================================================================
