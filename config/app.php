@@ -1,5 +1,7 @@
 <?php
 
+// Build cache test - backend change should not invalidate frontend cache
+
 use Illuminate\Support\Facades\Facade;
 
 return [
