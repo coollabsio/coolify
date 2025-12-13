@@ -8,6 +8,7 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Actions\Shared\DockerInspectCache;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\ServiceApplication;
@@ -580,7 +581,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function updateAdditionalServersStatus()
     {
-        $dockerInspectCache = [];
+        $dockerInspectCache = new DockerInspectCache();
         $this->allApplicationsWithAdditionalServers->each(function ($application) {
             ComplexStatusCheck::run($application, $dockerInspectCache);
         });

@@ -4,6 +4,7 @@ namespace App\Actions\Docker;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Actions\Shared\DockerInspectCache;
 use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -46,7 +47,7 @@ class GetContainersStatus
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
-        $dockerInspectCache = [];
+        $dockerInspectCache = new DockerInspectCache();
         foreach ($this->applications as $application) {
             if ($application->additional_servers->count() > 0) {
                 $skip_these_applications->push($application);

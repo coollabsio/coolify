@@ -5,15 +5,22 @@ namespace App\Actions\Shared;
 use App\Models\Application;
 use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
+use App\Actions\Shared\DockerInspectCache;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Illuminate\Support\Facades\Log;
 
 class ComplexStatusCheck
 {
     use AsAction;
     use CalculatesExcludedStatus;
 
-    public function handle(Application $application, array &$dockerInspectCache = [])
+    public function handle(Application $application, DockerInspectCache $dockerInspectCache = new DockerInspectCache())
     {
+        Log::info('Docker inspect cache size', [
+            'entries' => count($dockerInspectCache->data),
+        ]);
+        dump('Cache entries b4:', count($dockerInspectCache->data));
+
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
         foreach ($servers as $server) {
@@ -30,12 +37,12 @@ class ComplexStatusCheck
                 }
             }
 
-            if (!isset($dockerInspectCache[$server->id])) {
+            if (!isset($dockerInspectCache->data[$server->id])) {
                 $allContainers = instant_remote_process(["docker container inspect $(docker ps -aq  --filter 'label=coolify.pullRequestId=0') --format 'json'"], $server, false);
                 $allContainers = format_docker_command_output_to_json($allContainers);
-                $dockerInspectCache[$server->id] = $allContainers;
+                $dockerInspectCache->data[$server->id] = $allContainers;
             }
-            $allContainers = $dockerInspectCache[$server->id];
+            $allContainers = $dockerInspectCache->data[$server->id];
 
             $containers = collect($allContainers)->filter(function ($container) use ($application) {
                 $labels = data_get($container, 'Config.Labels', []);
@@ -71,6 +78,8 @@ class ComplexStatusCheck
                 }
             }
         }
+
+        dump('Cache entries after:', count($dockerInspectCache->data));
     }
 
     private function aggregateContainerStatuses($application, $containers)
