@@ -1,22 +1,28 @@
 <div class="{{ $collapsible ? 'my-4 border dark:border-coolgray-200 border-neutral-200' : '' }}">
-    <div id="screen" x-data="{
-        collapsible: {{ $collapsible ? 'true' : 'false' }},
-        expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
-        logsLoaded: false,
-        fullscreen: false,
-        alwaysScroll: false,
-        intervalId: null,
-        scrollDebounce: null,
-        colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
-        searchQuery: '',
-        containerName: '{{ $container ?? "logs" }}',
-        makeFullscreen() {
-            this.fullscreen = !this.fullscreen;
-            if (this.fullscreen === false) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-            }
-        },
+<div id="screen" x-data="{
+    collapsible: {{ $collapsible ? 'true' : 'false' }},
+    expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
+    logsLoaded: false,
+    fullscreen: false,
+    alwaysScroll: false,
+    intervalId: null,
+    scrollDebounce: null,
+    colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
+    searchQuery: '',
+    containerName: '{{ $container ?? "logs" }}',
+    makeFullscreen() {
+        this.fullscreen = !this.fullscreen;
+        if (this.fullscreen === false) {
+            this.alwaysScroll = false;
+            clearInterval(this.intervalId);
+        }
+    },
+    handleKeyDown(event) {
+        if (event.key === 'Escape' && this.fullscreen) {
+            this.makeFullscreen();
+        }
+    },
+} @keydown.window="handleKeyDown($event)">
         isScrolling: false,
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
