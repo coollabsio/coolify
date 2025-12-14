@@ -18,6 +18,17 @@ class ComplexStatusCheck
     {
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
+
+        $serversToInspect = $servers->filter(fn($server) => !isset($dockerInspectCache->data[$server->id]));
+        
+        if ($serversToInspect->isNotEmpty()) {
+            $results = instant_remote_process(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $serversToInspect, false);
+
+            foreach ($results as $serverId => $result) {
+                $dockerInspectCache->data[$serverId] = format_docker_command_output_to_json($result);
+            }
+        }
+
         foreach ($servers as $server) {
             $is_main_server = $application->destination->server->id === $server->id;
             if (! $server->isFunctional()) {
@@ -31,19 +42,14 @@ class ComplexStatusCheck
                     continue;
                 }
             }
-
-            if (!isset($dockerInspectCache->data[$server->id])) {
-                $allContainers = instant_remote_process(["docker container inspect $(docker ps -aq  --filter 'label=coolify.pullRequestId=0') --format 'json'"], $server, false);
-                $allContainers = format_docker_command_output_to_json($allContainers);
-                $dockerInspectCache->data[$server->id] = $allContainers;
-            }
             $allContainers = $dockerInspectCache->data[$server->id];
 
             $containers = collect($allContainers)->filter(function ($container) use ($application) {
                 $labels = data_get($container, 'Config.Labels', []);
-                $appId = data_get($labels, 'coolify.applicationId');
+                $appId = $labels['coolify.applicationId'] ?? null;
+                $pullRequestId = $labels['coolify.pullRequestId'] ?? null;
 
-                return $appId && intval($appId) === $application->id;
+                return $appId !== null && intval($appId) === $application->id && $pullRequestId !== null && intval($pullRequestId) === 0;
             });
 
             if ($containers->count() > 0) {
