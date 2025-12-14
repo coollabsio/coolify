@@ -120,14 +120,15 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 
 function instant_remote_process(
     Collection|array $command,
-    Server|Collection|array $servers,
+    Server|Collection|array $server,
     bool $throwError = true,
     bool $no_sudo = false,
     ?int $timeout = null,
     bool $disableMultiplexing = false
 ): string|array|null {
     $command = $command instanceof Collection ? $command->toArray() : $command;
-    $servers = $servers instanceof Collection ? $servers : collect(is_array($servers) ? $servers : [$servers]);
+    // Use the variable server instead of servers for backward compatibility
+    $servers = $server instanceof Collection ? $server : collect(is_array($server) ? $server : [$server]);
 
     return \App\Helpers\SshRetryHandler::retry(
         function () use ($servers, $command, $no_sudo, $timeout, $disableMultiplexing) {
