@@ -16,11 +16,6 @@ class ComplexStatusCheck
 
     public function handle(Application $application, DockerInspectCache $dockerInspectCache = new DockerInspectCache())
     {
-        Log::info('Docker inspect cache size', [
-            'entries' => count($dockerInspectCache->data),
-        ]);
-        dump('Cache entries b4:', count($dockerInspectCache->data));
-
         $servers = $application->additional_servers;
         $servers->push($application->destination->server);
         foreach ($servers as $server) {
@@ -78,8 +73,6 @@ class ComplexStatusCheck
                 }
             }
         }
-
-        dump('Cache entries after:', count($dockerInspectCache->data));
     }
 
     private function aggregateContainerStatuses($application, $containers)
