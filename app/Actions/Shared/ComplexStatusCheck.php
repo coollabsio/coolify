@@ -7,7 +7,6 @@ use App\Services\ContainerStatusAggregator;
 use App\Traits\CalculatesExcludedStatus;
 use App\Actions\Shared\DockerInspectCache;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Illuminate\Support\Facades\Log;
 
 class ComplexStatusCheck
 {
