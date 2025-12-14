@@ -61,7 +61,12 @@ class GetContainersStatus
             return ! $skip_these_applications->pluck('id')->contains($value->id);
         });
         if ($this->containers === null) {
-            ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
+            if (isset($dockerInspectCache->data[$this->server->id]) && !$this->server->isSwarm()) {
+                $this->containers = collect($dockerInspectCache->data[$this->server->id]);
+                $this->containerReplicates = collect([]);
+            } else {
+                ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
+            }
         }
 
         if (is_null($this->containers)) {
