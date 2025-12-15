@@ -654,6 +654,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
 
+            // Remove introduced whitespace
+            $endpoint = preg_replace('/\s+/', '', $endpoint);                                                                                                                                                   
+            $key = preg_replace('/\s+/', '', $key);                                                                                                                                                             
+            $secret = preg_replace('/\s+/', '', $secret);
+
             // Escape S3 credentials to prevent command injection
             $escapedEndpoint = escapeshellarg($endpoint);
             $escapedKey = escapeshellarg($key);
