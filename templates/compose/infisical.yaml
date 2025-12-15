@@ -8,7 +8,7 @@
 
 services:
   backend:
-    image: "infisical/infisical:latest"
+    image: "infisical/infisical:v0.154.6"
     environment:
       - SERVICE_URL_BACKEND_8080
       - SITE_URL=${SERVICE_URL_BACKEND_8080}
