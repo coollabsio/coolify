@@ -147,6 +147,12 @@
             }
         },
         init() {
+            // Prevent Livewire from morphing logs container when text is selected
+            Livewire.hook('morph.updating', ({ el, component, toEl, skip }) => {
+                if (el.id === 'logs' && this.hasActiveLogSelection()) {
+                    skip();
+                }
+            });
             // Re-render logs after Livewire updates
             document.addEventListener('livewire:navigated', () => {
                 this.$nextTick(() => { this.renderTrigger++; });
