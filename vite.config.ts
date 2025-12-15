@@ -1,14 +1,26 @@
 import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
 import laravel from 'laravel-vite-plugin';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
     plugins: [
-        tailwindcss(),
         laravel({
             input: ['resources/js/app.js', 'resources/css/app.css'],
             refresh: true,
         }),
+        svelte({
+            configFile: 'svelte.config.ts',
+            // TODO: Remove once Inertia v3 https://github.com/inertiajs/inertia/tree/3.x is released and runes=true is set in svelte.config.ts
+            dynamicCompileOptions({ filename, compileOptions }) {
+                // Enforce runes mode for all files not in node_modules
+                if (!/[\\/]node_modules[\\/]/.test(filename) && !compileOptions.runes) {
+                    return { runes: true };
+                }
+                return undefined;
+            }
+        }),
+        tailwindcss(),
     ],
     server: {
         watch: {
