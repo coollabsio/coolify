@@ -1,28 +1,23 @@
 <div class="{{ $collapsible ? 'my-4 border dark:border-coolgray-200 border-neutral-200' : '' }}">
-<div id="screen" x-data="{
-    collapsible: {{ $collapsible ? 'true' : 'false' }},
-    expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
-    logsLoaded: false,
-    fullscreen: false,
-    alwaysScroll: false,
-    intervalId: null,
-    scrollDebounce: null,
-    colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
-    searchQuery: '',
-    containerName: '{{ $container ?? "logs" }}',
-    makeFullscreen() {
-        this.fullscreen = !this.fullscreen;
-        if (this.fullscreen === false) {
-            this.alwaysScroll = false;
-            clearInterval(this.intervalId);
-        }
-    },
-    handleKeyDown(event) {
-        if (event.key === 'Escape' && this.fullscreen) {
-            this.makeFullscreen();
-        }
-    },
-} @keydown.window="handleKeyDown($event)">
+    <div id="screen" x-data="{
+        collapsible: {{ $collapsible ? 'true' : 'false' }},
+        expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
+        logsLoaded: false,
+        fullscreen: false,
+        alwaysScroll: false,
+        intervalId: null,
+        scrollDebounce: null,
+        colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
+        searchQuery: '',
+        renderTrigger: 0,
+        containerName: '{{ $container ?? "logs" }}',
+        makeFullscreen() {
+            this.fullscreen = !this.fullscreen;
+            if (this.fullscreen === false) {
+                this.alwaysScroll = false;
+                clearInterval(this.intervalId);
+            }
+        },
         isScrolling: false,
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
@@ -86,6 +81,18 @@
             if (!this.searchQuery.trim()) return true;
             return line.toLowerCase().includes(this.searchQuery.toLowerCase());
         },
+        hasActiveLogSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                return false;
+            }
+            const logsContainer = document.getElementById('logs');
+            if (!logsContainer) return false;
+
+            // Check if selection is within the logs container
+            const range = selection.getRangeAt(0);
+            return logsContainer.contains(range.commonAncestorContainer);
+        },
         decodeHtml(text) {
             // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
             let decoded = text;
@@ -102,6 +109,12 @@
             return decoded;
         },
         renderHighlightedLog(el, text) {
+            // Skip re-render if user has text selected in logs (preserves copy ability)
+            // But always render if the element is empty (initial render)
+            if (el.textContent && this.hasActiveLogSelection()) {
+                return;
+            }
+
             const decoded = this.decodeHtml(text);
             el.textContent = '';
 
@@ -173,6 +186,12 @@
                 this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
+            // Re-render logs after Livewire updates
+            Livewire.hook('commit', ({ succeed }) => {
+                succeed(() => {
+                    this.$nextTick(() => { this.renderTrigger++; });
+                });
+            });
         }
     }">
         @if ($collapsible)
@@ -356,8 +375,8 @@
 
                                 @endphp
                                 <div data-log-line data-log-content="{{ $line }}"
+                                    x-effect="renderTrigger; searchQuery; $el.classList.toggle('hidden', !matchesSearch($el.dataset.logContent))"
                                     x-bind:class="{
-                                        'hidden': !matchesSearch($el.dataset.logContent),
                                         'bg-red-500/10 dark:bg-red-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'error',
                                         'bg-yellow-500/10 dark:bg-yellow-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'warning',
                                         'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
@@ -368,7 +387,7 @@
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
                                     <span data-line-text="{{ $logContent }}"
-                                        x-effect="searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
+                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
                                         class="whitespace-pre-wrap break-all"></span>
                                 </div>
                             @endforeach
