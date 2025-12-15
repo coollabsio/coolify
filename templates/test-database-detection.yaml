@@ -233,7 +233,7 @@ services:
 
   # Infisical - secret management with postgres variant
   application-infisical-postgres:
-    image: infisical/infisical:latest-postgres
+    image: infisical/infisical:latest
     depends_on:
       database-postgres-main:
         condition: service_healthy
