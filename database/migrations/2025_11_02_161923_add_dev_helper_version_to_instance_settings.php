@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('instance_settings', function (Blueprint $table) {
-            $table->string('dev_helper_version')->nullable();
-        });
+        if (! Schema::hasColumn('instance_settings', 'dev_helper_version')) {
+            Schema::table('instance_settings', function (Blueprint $table) {
+                $table->string('dev_helper_version')->nullable();
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('instance_settings', function (Blueprint $table) {
-            $table->dropColumn('dev_helper_version');
-        });
+        if (Schema::hasColumn('instance_settings', 'dev_helper_version')) {
+            Schema::table('instance_settings', function (Blueprint $table) {
+                $table->dropColumn('dev_helper_version');
+            });
+        }
     }
 };

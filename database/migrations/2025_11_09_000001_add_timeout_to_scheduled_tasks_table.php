@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('scheduled_tasks', function (Blueprint $table) {
-            $table->integer('timeout')->default(300)->after('frequency');
-        });
+        if (! Schema::hasColumn('scheduled_tasks', 'timeout')) {
+            Schema::table('scheduled_tasks', function (Blueprint $table) {
+                $table->integer('timeout')->default(300)->after('frequency');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('scheduled_tasks', function (Blueprint $table) {
-            $table->dropColumn('timeout');
-        });
+        if (Schema::hasColumn('scheduled_tasks', 'timeout')) {
+            Schema::table('scheduled_tasks', function (Blueprint $table) {
+                $table->dropColumn('timeout');
+            });
+        }
     }
 };

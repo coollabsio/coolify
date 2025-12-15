@@ -67,7 +67,7 @@ class Storage extends Component
     public function refreshStorages()
     {
         $this->fileStorage = $this->resource->fileStorages()->get();
-        $this->resource->refresh();
+        $this->resource->load('persistentStorages.resource');
     }
 
     public function getFilesProperty()

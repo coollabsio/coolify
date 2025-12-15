@@ -5,7 +5,7 @@
         helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." id="frequency"
         label="Frequency" />
     <x-forms.input type="number" placeholder="300" id="timeout"
-        helper="Maximum execution time in seconds (60-3600). Default is 300 seconds (5 minutes)."
+        helper="Maximum execution time in seconds (60-36000). Default is 300 seconds (5 minutes)."
         label="Timeout (seconds)" />
     @if ($type === 'application')
         @if ($containerNames->count() > 1)

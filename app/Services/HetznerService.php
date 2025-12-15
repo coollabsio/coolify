@@ -161,4 +161,30 @@ class HetznerService
     {
         $this->request('delete', "/servers/{$serverId}");
     }
+
+    public function getServers(): array
+    {
+        return $this->requestPaginated('get', '/servers', 'servers');
+    }
+
+    public function findServerByIp(string $ip): ?array
+    {
+        $servers = $this->getServers();
+
+        foreach ($servers as $server) {
+            // Check IPv4
+            $ipv4 = data_get($server, 'public_net.ipv4.ip');
+            if ($ipv4 === $ip) {
+                return $server;
+            }
+
+            // Check IPv6 (Hetzner returns the full /64 block)
+            $ipv6 = data_get($server, 'public_net.ipv6.ip');
+            if ($ipv6 && str_starts_with($ip, rtrim($ipv6, '/'))) {
+                return $server;
+            }
+        }
+
+        return null;
+    }
 }
