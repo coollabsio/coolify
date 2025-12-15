@@ -6,7 +6,7 @@
         <livewire:project.shared.configuration-checker :resource="$application" />
         <livewire:project.application.heading :application="$application" />
         <div x-data="{
-        fullscreen: false,
+        fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         intervalId: null,
         showTimestamps: true,
@@ -34,6 +34,18 @@
             if (!this.searchQuery.trim()) return true;
             return text.toLowerCase().includes(this.searchQuery.toLowerCase());
         },
+        hasActiveLogSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                return false;
+            }
+            const logsContainer = document.getElementById('logs');
+            if (!logsContainer) return false;
+
+            // Check if selection is within the logs container
+            const range = selection.getRangeAt(0);
+            return logsContainer.contains(range.commonAncestorContainer);
+        },
         decodeHtml(text) {
             // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
             let decoded = text;
@@ -50,6 +62,11 @@
             return decoded;
         },
         renderHighlightedLog(el, text) {
+            // Skip re-render if user has text selected in logs (preserves copy ability)
+            if (this.hasActiveLogSelection()) {
+                return;
+            }
+
             const decoded = this.decodeHtml(text);
             el.textContent = '';
 
@@ -158,28 +175,28 @@
     }">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            @if (data_get($application_deployment_queue, 'status') === 'in_progress')
-                <div class="flex items-center gap-1 pt-2 ">Deployment is
-                    <div class="dark:text-warning">
-                        {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
-                    </div>
-                    <x-loading class="loading-ring" />
-                </div>
-                {{-- <div class="">Logs will be updated automatically.</div> --}}
-            @else
-                <div class="pt-2 ">Deployment is <span
-                        class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
-                </div>
-            @endif
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'mt-4 border border-dotted rounded-sm'">
+                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
                     <div
                         class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
-                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
-                            class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                        <span x-show="!searchQuery.trim()"></span>
+                        <div class="flex items-center gap-3">
+                            @if (data_get($application_deployment_queue, 'status') === 'in_progress')
+                                <div class="flex items-center gap-1">
+                                    <span>Deployment is</span>
+                                    <span class="dark:text-warning">In Progress</span>
+                                    <x-loading class="loading-ring loading-xs" />
+                                </div>
+                            @else
+                                <div class="flex items-center gap-1">
+                                    <span>Deployment is</span>
+                                    <span class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>
+                                </div>
+                            @endif
+                            <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                                class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
+                        </div>
                         <div class="flex items-center gap-2">
                             <div class="relative">
                                 <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -267,7 +284,7 @@
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
                                 <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
-                                    x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }" @class([
+                                    x-effect="renderTrigger; searchQuery; $el.classList.toggle('hidden', !matchesSearch($el.dataset.logContent))" @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
                                         'flex gap-2',
                                     ])>

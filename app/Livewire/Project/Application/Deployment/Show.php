@@ -20,6 +20,8 @@ class Show extends Component
 
     public bool $is_debug_enabled = false;
 
+    public bool $fullscreen = false;
+
     private bool $deploymentFinishedDispatched = false;
 
     public function getListeners()
