@@ -63,7 +63,8 @@
         },
         renderHighlightedLog(el, text) {
             // Skip re-render if user has text selected in logs (preserves copy ability)
-            if (this.hasActiveLogSelection()) {
+            // But always render if the element is empty (initial render)
+            if (el.textContent && this.hasActiveLogSelection()) {
                 return;
             }
 
