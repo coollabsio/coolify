@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('email_notification_settings', function (Blueprint $table) {
-            $table->boolean('traefik_outdated_email_notifications')->default(true);
-        });
+        if (! Schema::hasColumn('email_notification_settings', 'traefik_outdated_email_notifications')) {
+            Schema::table('email_notification_settings', function (Blueprint $table) {
+                $table->boolean('traefik_outdated_email_notifications')->default(true);
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('email_notification_settings', function (Blueprint $table) {
-            $table->dropColumn('traefik_outdated_email_notifications');
-        });
+        if (Schema::hasColumn('email_notification_settings', 'traefik_outdated_email_notifications')) {
+            Schema::table('email_notification_settings', function (Blueprint $table) {
+                $table->dropColumn('traefik_outdated_email_notifications');
+            });
+        }
     }
 };
