@@ -186,6 +186,30 @@
             a.click();
             URL.revokeObjectURL(url);
         },
+        copyLogs() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const visibleLines = logs.querySelectorAll('[data-log-line]:not(.hidden)');
+            let content = '';
+            visibleLines.forEach(line => {
+                const text = line.textContent.replace(/\s+/g, ' ').trim();
+                if (text) {
+                    content += text + String.fromCharCode(10);
+                }
+            });
+            if (content) {
+                navigator.clipboard.writeText(content).then(() => {
+                    // Show a temporary notification or feedback
+                    const originalTitle = document.title;
+                    document.title = 'Logs copied to clipboard!';
+                    setTimeout(() => {
+                        document.title = originalTitle;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy logs: ', err);
+                });
+            }
+        },
         init() {
             if (this.expanded) {
                 this.$wire.getLogs(true);
@@ -294,6 +318,14 @@
                                 stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                        </button>
+                        <button x-on:click="copyLogs()" title="Copy Logs to Clipboard"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.631l-.332 1.548M15.666 3.888l.332-1.548c.264-1.045.996-1.74 2.166-1.74h3c1.17 0 2.166.695 2.166 1.74l-.332 1.548M15.666 3.888l.332-1.548c.264-1.045.996-1.74 2.166-1.74h3c1.17 0 2.166.695 2.166 1.74l-.332 1.548M9.5 16.5l.5-7.5m0 0a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25l.5 7.5m0 0a2.25 2.25 0 0 0 2.25 2.25h2.5a2.25 2.25 0 0 0 2.25-2.25Z" />
                             </svg>
                         </button>
                         <button wire:click="toggleTimestamps" title="Toggle Timestamps"
