@@ -3,6 +3,7 @@
     "private": true,
     "type": "module",
     "dependencies": {
+        "@inertiajs/svelte": "^2.3.15",
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "svelte": "^5.53.7"
     },

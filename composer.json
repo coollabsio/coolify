@@ -8,6 +8,7 @@
     "license": "AGPL-3.0",
     "require": {
         "php": "^8.5",
+        "inertiajs/inertia-laravel": "^2.0.20",
         "laravel/framework": "^12.53.0",
         "laravel/horizon": "^5.45",
         "laravel/tinker": "^2.11.1"
