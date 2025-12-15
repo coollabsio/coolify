@@ -9,6 +9,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -134,29 +135,29 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($this->containers->isEmpty()) {
             return;
         }
+
         $this->applications = $this->server->applications();
         $this->databases = $this->server->databases();
         $this->previews = $this->server->previews();
-        $this->services = $this->server->services()->get();
+        // Eager load service applications and databases to avoid N+1 queries
+        $this->services = $this->server->services()
+            ->with(['applications:id,service_id', 'databases:id,service_id'])
+            ->get();
+
         $this->allApplicationIds = $this->applications->filter(function ($application) {
-            return $application->additional_servers->count() === 0;
+            return $application->additional_servers_count === 0;
         })->pluck('id');
         $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
-            return $application->additional_servers->count() > 0;
+            return $application->additional_servers_count > 0;
         });
         $this->allApplicationPreviewsIds = $this->previews->map(function ($preview) {
             return $preview->application_id.':'.$preview->pull_request_id;
         });
         $this->allDatabaseUuids = $this->databases->pluck('uuid');
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
-        $this->services->each(function ($service) {
-            $service->applications()->pluck('id')->each(function ($applicationId) {
-                $this->allServiceApplicationIds->push($applicationId);
-            });
-            $service->databases()->pluck('id')->each(function ($databaseId) {
-                $this->allServiceDatabaseIds->push($databaseId);
-            });
-        });
+        // Use eager-loaded relationships instead of querying in loop
+        $this->allServiceApplicationIds = $this->services->flatMap(fn ($service) => $service->applications->pluck('id'));
+        $this->allServiceDatabaseIds = $this->services->flatMap(fn ($service) => $service->databases->pluck('id'));
 
         foreach ($this->containers as $container) {
             $containerStatus = data_get($container, 'state', 'exited');
@@ -402,66 +403,59 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateNotFoundApplicationStatus()
     {
         $notFoundApplicationIds = $this->allApplicationIds->diff($this->foundApplicationIds);
-        if ($notFoundApplicationIds->isNotEmpty()) {
-            $notFoundApplicationIds->each(function ($applicationId) {
-                $application = Application::find($applicationId);
-                if ($application) {
-                    // Don't mark as exited if already exited
-                    if (str($application->status)->startsWith('exited')) {
-                        return;
-                    }
-
-                    // Only protection: Verify we received any container data at all
-                    // If containers collection is completely empty, Sentinel might have failed
-                    if ($this->containers->isEmpty()) {
-                        return;
-                    }
-
-                    if ($application->status !== 'exited') {
-                        $application->status = 'exited';
-                        $application->save();
-                    }
-                }
-            });
+        if ($notFoundApplicationIds->isEmpty()) {
+            return;
         }
+
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
+        }
+
+        // Batch update: mark all not-found applications as exited (excluding already exited ones)
+        Application::whereIn('id', $notFoundApplicationIds)
+            ->where('status', 'not like', 'exited%')
+            ->update(['status' => 'exited']);
     }
 
     private function updateNotFoundApplicationPreviewStatus()
     {
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
-        if ($notFoundApplicationPreviewsIds->isNotEmpty()) {
-            $notFoundApplicationPreviewsIds->each(function ($previewKey) {
-                // Parse the previewKey format "application_id:pull_request_id"
-                $parts = explode(':', $previewKey);
-                if (count($parts) !== 2) {
-                    return;
-                }
+        if ($notFoundApplicationPreviewsIds->isEmpty()) {
+            return;
+        }
 
-                $applicationId = $parts[0];
-                $pullRequestId = $parts[1];
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
+        }
 
-                $applicationPreview = $this->previews->where('application_id', $applicationId)
-                    ->where('pull_request_id', $pullRequestId)
-                    ->first();
+        // Collect IDs of previews that need to be marked as exited
+        $previewIdsToUpdate = collect();
+        foreach ($notFoundApplicationPreviewsIds as $previewKey) {
+            // Parse the previewKey format "application_id:pull_request_id"
+            $parts = explode(':', $previewKey);
+            if (count($parts) !== 2) {
+                continue;
+            }
 
-                if ($applicationPreview) {
-                    // Don't mark as exited if already exited
-                    if (str($applicationPreview->status)->startsWith('exited')) {
-                        return;
-                    }
+            $applicationId = $parts[0];
+            $pullRequestId = $parts[1];
 
-                    // Only protection: Verify we received any container data at all
-                    // If containers collection is completely empty, Sentinel might have failed
-                    if ($this->containers->isEmpty()) {
+            $applicationPreview = $this->previews->where('application_id', $applicationId)
+                ->where('pull_request_id', $pullRequestId)
+                ->first();
 
-                        return;
-                    }
-                    if ($applicationPreview->status !== 'exited') {
-                        $applicationPreview->status = 'exited';
-                        $applicationPreview->save();
-                    }
-                }
-            });
+            if ($applicationPreview && ! str($applicationPreview->status)->startsWith('exited')) {
+                $previewIdsToUpdate->push($applicationPreview->id);
+            }
+        }
+
+        // Batch update all collected preview IDs
+        if ($previewIdsToUpdate->isNotEmpty()) {
+            ApplicationPreview::whereIn('id', $previewIdsToUpdate)->update(['status' => 'exited']);
         }
     }
 
@@ -478,8 +472,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 } catch (\Throwable $e) {
                 }
             } else {
-                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+                // Connect proxy to networks asynchronously to avoid blocking the status update
+                ConnectProxyToNetworksJob::dispatch($this->server);
             }
         }
     }
@@ -554,27 +548,19 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     {
         $notFoundServiceApplicationIds = $this->allServiceApplicationIds->diff($this->foundServiceApplicationIds);
         $notFoundServiceDatabaseIds = $this->allServiceDatabaseIds->diff($this->foundServiceDatabaseIds);
+
+        // Batch update service applications
         if ($notFoundServiceApplicationIds->isNotEmpty()) {
-            $notFoundServiceApplicationIds->each(function ($serviceApplicationId) {
-                $application = ServiceApplication::find($serviceApplicationId);
-                if ($application) {
-                    if ($application->status !== 'exited') {
-                        $application->status = 'exited';
-                        $application->save();
-                    }
-                }
-            });
+            ServiceApplication::whereIn('id', $notFoundServiceApplicationIds)
+                ->where('status', '!=', 'exited')
+                ->update(['status' => 'exited']);
         }
+
+        // Batch update service databases
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
-            $notFoundServiceDatabaseIds->each(function ($serviceDatabaseId) {
-                $database = ServiceDatabase::find($serviceDatabaseId);
-                if ($database) {
-                    if ($database->status !== 'exited') {
-                        $database->status = 'exited';
-                        $database->save();
-                    }
-                }
-            });
+            ServiceDatabase::whereIn('id', $notFoundServiceDatabaseIds)
+                ->where('status', '!=', 'exited')
+                ->update(['status' => 'exited']);
         }
     }
 
