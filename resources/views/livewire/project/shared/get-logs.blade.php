@@ -266,6 +266,23 @@
                                     d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                             </svg>
                         </button>
+                        <button wire:click="toggleStreamLogs"
+                            title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
+                            @if ($streamLogs)
+                                {{-- Pause icon --}}
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                                    fill="currentColor">
+                                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                                </svg>
+                            @else
+                                {{-- Play icon --}}
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                                    fill="currentColor">
+                                    <path d="M8 5v14l11-7L8 5z" />
+                                </svg>
+                            @endif
+                        </button>
                         <button x-on:click="downloadLogs()" title="Download Logs"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -290,23 +307,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                             </svg>
-                        </button>
-                        <button wire:click="toggleStreamLogs"
-                            title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
-                            @if ($streamLogs)
-                                {{-- Pause icon --}}
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                                    fill="currentColor">
-                                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                                </svg>
-                            @else
-                                {{-- Play icon --}}
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                                    fill="currentColor">
-                                    <path d="M8 5v14l11-7L8 5z" />
-                                </svg>
-                            @endif
                         </button>
                         <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
                             x-on:click="toggleScroll"
