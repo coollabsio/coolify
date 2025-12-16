@@ -20,19 +20,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Horizon Domain
-    |--------------------------------------------------------------------------
-    |
-    | This is the subdomain where Horizon will be accessible from. If this
-    | setting is null, Horizon will reside under the same domain as the
-    | application. Otherwise, this value will serve as the subdomain.
-    |
-    */
-
-    'domain' => env('HORIZON_DOMAIN'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Horizon Path
     |--------------------------------------------------------------------------
     |
@@ -55,7 +42,7 @@ return [
     |
     */
 
-    'use' => 'default',
+    'use' => 'jobs',
 
     /*
     |--------------------------------------------------------------------------
@@ -70,7 +57,7 @@ return [
 
     'prefix' => env(
         'HORIZON_PREFIX',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_horizon:',
+        Str::slug((string) env('APP_NAME', 'coolify'), '_').'_horizon:',
     ),
 
     /*
@@ -98,7 +85,14 @@ return [
     */
 
     'waits' => [
-        'redis:default' => 60,
+        'redis:high' => 10,
+        'redis:default' => 20,
+        'redis:production-deployment' => 10,
+        'redis:standard-deployment' => 20,
+        'redis:worker-high' => 10,
+        'redis:worker-default' => 20,
+        'redis:worker-production-deployment' => 10,
+        'redis:worker-standard-deployment' => 20,
     ],
 
     /*
@@ -198,34 +192,94 @@ return [
     */
 
     'defaults' => [
-        'supervisor-1' => [
-            'connection' => 'redis',
-            'queue' => ['default'],
-            'balance' => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses' => 1,
-            'maxTime' => 0,
-            'maxJobs' => 0,
-            'memory' => 128,
-            'tries' => 1,
-            'timeout' => 60,
-            'nice' => 0,
-        ],
+        ...((bool) env('IS_WORKER_SERVER', false) ? [] : [
+            'jobs' => [
+                'connection' => 'redis',
+                'queue' => ['high', 'default'],
+                'balance' => false,
+                'autoScalingStrategy' => 'time',
+                'maxTime' => 3600,
+                'maxJobs' => 500,
+                'memory' => 128,
+                'tries' => 1,
+                'timeout' => 60,
+                'sleep' => 3,
+                'workers-name' => 'jobs',
+            ],
+            'deployments' => [
+                'connection' => 'redis',
+                'queue' => ['production-deployment', 'standard-deployment'],
+                'balance' => false,
+                'autoScalingStrategy' => 'time',
+                'maxTime' => 3600,
+                'maxJobs' => 300,
+                'memory' => 128,
+                'tries' => 1,
+                'timeout' => 300,
+                'sleep' => 3,
+                'workers-name' => 'deployments',
+            ],
+        ]),
+        ...((bool) env('IS_WORKER_SERVER', false) ? [
+            'worker-jobs' => [
+                'connection' => 'redis',
+                'queue' => ['worker-high', 'worker-default'],
+                'balance' => false,
+                'autoScalingStrategy' => 'time',
+                'maxTime' => 3600,
+                'maxJobs' => 500,
+                'memory' => 128,
+                'tries' => 1,
+                'timeout' => 60,
+                'sleep' => 3,
+                'workers-name' => 'worker-jobs',
+            ],
+            'worker-deployments' => [
+                'connection' => 'redis',
+                'queue' => ['worker-production-deployment', 'worker-standard-deployment'],
+                'balance' => false,
+                'autoScalingStrategy' => 'time',
+                'maxTime' => 3600,
+                'maxJobs' => 300,
+                'memory' => 128,
+                'tries' => 1,
+                'timeout' => 300,
+                'sleep' => 3,
+                'workers-name' => 'worker-deployments',
+            ],
+        ] : []),
     ],
 
     'environments' => [
-        'production' => [
-            'supervisor-1' => [
-                'maxProcesses' => 10,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
-        ],
-
-        'local' => [
-            'supervisor-1' => [
-                'maxProcesses' => 3,
-            ],
+        '*' => [
+            ...((bool) env('IS_WORKER_SERVER', false) ? [] : [
+                'jobs' => [
+                    'minProcesses' => env('HORIZON_JOBS_MIN_PROCESSES', 1),
+                    'maxProcesses' => env('HORIZON_JOBS_MAX_PROCESSES', 4),
+                    'balanceMaxShift' => env('HORIZON_JOBS_BALANCE_MAX_SHIFT', 1),
+                    'balanceCooldown' => env('HORIZON_JOBS_BALANCE_COOLDOWN', 2),
+                ],
+                'deployments' => [
+                    'minProcesses' => env('HORIZON_DEPLOYMENTS_MIN_PROCESSES', 1),
+                    'maxProcesses' => env('HORIZON_DEPLOYMENTS_MAX_PROCESSES', 2),
+                    'balanceMaxShift' => env('HORIZON_DEPLOYMENTS_BALANCE_MAX_SHIFT', 1),
+                    'balanceCooldown' => env('HORIZON_DEPLOYMENTS_BALANCE_COOLDOWN', 2),
+                ],
+            ]),
+            ...((bool) env('IS_WORKER_SERVER', false) ? [
+                'worker-jobs' => [
+                    'minProcesses' => env('HORIZON_JOBS_MIN_PROCESSES', 1),
+                    'maxProcesses' => env('HORIZON_JOBS_MAX_PROCESSES', 6),
+                    'balanceMaxShift' => env('HORIZON_JOBS_BALANCE_MAX_SHIFT', 2),
+                    'balanceCooldown' => env('HORIZON_JOBS_BALANCE_COOLDOWN', 1),
+                ],
+                'worker-deployments' => [
+                    'minProcesses' => env('HORIZON_DEPLOYMENTS_MIN_PROCESSES', 1),
+                    'maxProcesses' => env('HORIZON_DEPLOYMENTS_MAX_PROCESSES', 4),
+                    'balanceMaxShift' => env('HORIZON_DEPLOYMENTS_BALANCE_MAX_SHIFT', 2),
+                    'balanceCooldown' => env('HORIZON_DEPLOYMENTS_BALANCE_COOLDOWN', 1),
+                ],
+            ] : []),
         ],
     ],
 ];
