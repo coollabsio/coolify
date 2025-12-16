@@ -91,7 +91,7 @@
                                         ),
                                     );
                             @endphp
-                            <div @mouseenter="openEnv('{{ $environment->uuid }}'); envPositions['{{ $environment->uuid }}'] = $el.offsetTop"
+                            <div @mouseenter="openEnv('{{ $environment->uuid }}'); envPositions['{{ $environment->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                 @mouseleave="closeEnv()">
                                 <a href="{{ route('project.resource.index', [
                                     'environment_uuid' => $environment->uuid,
@@ -176,7 +176,7 @@
                                             $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') && $res->additional_servers()->count() > 0;
                                             $resServerName = $resHasMultipleServers ? null : data_get($res, 'destination.server.name');
                                         @endphp
-                                        <div @mouseenter="openRes('{{ $environment->uuid }}-{{ $res->uuid }}'); resPositions['{{ $environment->uuid }}-{{ $res->uuid }}'] = $el.offsetTop"
+                                        <div @mouseenter="openRes('{{ $environment->uuid }}-{{ $res->uuid }}'); resPositions['{{ $environment->uuid }}-{{ $res->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                             @mouseleave="closeRes()">
                                             <a href="{{ $resRoute }}"
                                                 class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $isCurrentResource ? 'dark:text-warning font-semibold' : '' }}"
@@ -221,7 +221,7 @@
                                         <div
                                             class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200">
                                             @if ($resType === 'application')
-                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop"
+                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
                                                     <a href="{{ route('project.application.configuration', $resParams) }}"
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
@@ -242,7 +242,7 @@
                                                         class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
                                                 @endcan
                                             @elseif ($resType === 'service')
-                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop"
+                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
                                                     <a href="{{ route('project.service.configuration', $resParams) }}"
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
@@ -261,7 +261,7 @@
                                                         class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
                                                 @endcan
                                             @else
-                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop"
+                                                <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
                                                     <a href="{{ route('project.database.configuration', $resParams) }}"
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
