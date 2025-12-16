@@ -64,7 +64,7 @@
                 @php
                     $allEnvironments = $project->environments()->with(['applications', 'services'])->get();
                 @endphp
-                <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, activeRes: null, activeMenuEnv: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }, open() { this.envOpen = true }, close() { this.envOpen = false; this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }">
+                <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false; this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout); clearTimeout(this.envTimeout); this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openRes(id) { clearTimeout(this.envTimeout); clearTimeout(this.resTimeout); this.activeRes = id }, closeRes() { this.resTimeout = setTimeout(() => { this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openMenu(id) { clearTimeout(this.resTimeout); clearTimeout(this.menuTimeout); this.activeMenuEnv = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenuEnv = null; }, 100) } }">
                     <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
                         <a class="text-xs truncate lg:text-sm hover:text-warning"
                             href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $environment->uuid]) }}">
@@ -82,9 +82,9 @@
                             x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                             x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100"
                             x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute z-20 top-full mt-1 flex flex-col sm:flex-row items-start left-0 sm:left-auto max-w-[calc(100vw-1rem)]" x-init="$nextTick(() => { const rect = $el.getBoundingClientRect(); if (rect.right > window.innerWidth) { $el.style.left = 'auto'; $el.style.right = '0'; } })">
+                            class="absolute z-20 top-full mt-1 left-0 sm:left-auto max-w-[calc(100vw-1rem)]" x-init="$nextTick(() => { const rect = $el.getBoundingClientRect(); if (rect.right > window.innerWidth) { $el.style.left = 'auto'; $el.style.right = '0'; } })">
                             <!-- Environment List -->
-                            <div class="w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                            <div class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                 @foreach ($allEnvironments as $env)
                                     @php
                                         $envResources = collect()
@@ -92,7 +92,7 @@
                                             ->merge($env->databases()->map(fn($db) => ['type' => 'database', 'resource' => $db]))
                                             ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]));
                                     @endphp
-                                    <div @mouseenter="activeEnv = '{{ $env->uuid }}'; activeRes = null" @mouseleave="activeEnv = null">
+                                    <div @mouseenter="openEnv('{{ $env->uuid }}'); envPositions['{{ $env->uuid }}'] = $el.offsetTop" @mouseleave="closeEnv()">
                                         <a href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $env->uuid]) }}"
                                             class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $env->uuid === $environment->uuid ? 'dark:text-warning font-semibold' : '' }}"
                                             title="{{ $env->name }}">
@@ -127,13 +127,13 @@
                                         ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]));
                                 @endphp
                                 @if ($envResources->count() > 0)
-                                    <div x-show="activeEnv === '{{ $env->uuid }}'"
+                                    <div x-show="activeEnv === '{{ $env->uuid }}'" x-cloak
                                         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0"
-                                        x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100"
-                                        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                        @mouseenter="activeEnv = '{{ $env->uuid }}'" @mouseleave="activeEnv = null; activeRes = null"
-                                        class="mt-1 sm:mt-0 sm:ml-1 flex flex-col sm:flex-row items-start">
-                                        <div class="w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                                        x-transition:enter-end="opacity-100"
+                                        @mouseenter="openEnv('{{ $env->uuid }}')" @mouseleave="closeEnv()"
+                                        :style="'position: absolute; left: 100%; top: ' + (envPositions['{{ $env->uuid }}'] || 0) + 'px; z-index: 30;'"
+                                        class="flex flex-col sm:flex-row items-start pl-1">
+                                        <div class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                             @foreach ($envResources as $envResource)
                                                 @php
                                                     $resType = $envResource['type'];
@@ -158,7 +158,7 @@
                                                     $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') && $res->additional_servers()->count() > 0;
                                                     $resServerName = $resHasMultipleServers ? null : data_get($res, 'destination.server.name');
                                                 @endphp
-                                                <div @mouseenter="activeRes = '{{ $env->uuid }}-{{ $res->uuid }}'" @mouseleave="activeRes = null">
+                                                <div @mouseenter="openRes('{{ $env->uuid }}-{{ $res->uuid }}'); resPositions['{{ $env->uuid }}-{{ $res->uuid }}'] = $el.offsetTop" @mouseleave="closeRes()">
                                                     <a href="{{ $resRoute }}"
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200"
                                                         title="{{ $res->name }}{{ $resServerName ? ' ('.$resServerName.')' : '' }}">
@@ -189,16 +189,16 @@
                                                 }
                                                 $resKey = $env->uuid . '-' . $res->uuid;
                                             @endphp
-                                            <div x-show="activeRes === '{{ $resKey }}'"
+                                            <div x-show="activeRes === '{{ $resKey }}'" x-cloak
                                                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0"
-                                                x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100"
-                                                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                                @mouseenter="activeRes = '{{ $resKey }}'" @mouseleave="activeRes = null; activeMenuEnv = null"
-                                                class="mt-1 sm:mt-0 sm:ml-1 flex flex-col sm:flex-row items-start">
+                                                x-transition:enter-end="opacity-100"
+                                                @mouseenter="openRes('{{ $resKey }}')" @mouseleave="closeRes()"
+                                                :style="'position: absolute; left: 100%; top: ' + (resPositions['{{ $resKey }}'] || 0) + 'px; z-index: 40;'"
+                                                class="flex flex-col sm:flex-row items-start pl-1">
                                                 <!-- Main Menu List -->
-                                                <div class="w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200">
+                                                <div class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200">
                                                     @if ($resType === 'application')
-                                                        <div @mouseenter="activeMenuEnv = '{{ $resKey }}-config'" @mouseleave="activeMenuEnv = null">
+                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop" @mouseleave="closeMenu()">
                                                             <a href="{{ route('project.application.configuration', $resParams) }}"
                                                                 class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                                 <span>Configuration</span>
@@ -213,7 +213,7 @@
                                                             <a href="{{ route('project.application.command', $resParams) }}" class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
                                                         @endcan
                                                     @elseif ($resType === 'service')
-                                                        <div @mouseenter="activeMenuEnv = '{{ $resKey }}-config'" @mouseleave="activeMenuEnv = null">
+                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop" @mouseleave="closeMenu()">
                                                             <a href="{{ route('project.service.configuration', $resParams) }}"
                                                                 class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                                 <span>Configuration</span>
@@ -227,7 +227,7 @@
                                                             <a href="{{ route('project.service.command', $resParams) }}" class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Terminal</a>
                                                         @endcan
                                                     @else
-                                                        <div @mouseenter="activeMenuEnv = '{{ $resKey }}-config'" @mouseleave="activeMenuEnv = null">
+                                                        <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop" @mouseleave="closeMenu()">
                                                             <a href="{{ route('project.database.configuration', $resParams) }}"
                                                                 class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                                 <span>Configuration</span>
@@ -251,12 +251,13 @@
                                                 </div>
 
                                                 <!-- Configuration Sub-menu (4th level) -->
-                                                <div x-show="activeMenuEnv === '{{ $resKey }}-config'"
+                                                <div x-show="activeMenuEnv === '{{ $resKey }}-config'" x-cloak
                                                     x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0"
-                                                    x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100"
-                                                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                                    @mouseenter="activeMenuEnv = '{{ $resKey }}-config'" @mouseleave="activeMenuEnv = null"
-                                                    class="mt-1 sm:mt-0 sm:ml-1 w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                                                    x-transition:enter-end="opacity-100"
+                                                    @mouseenter="openMenu('{{ $resKey }}-config')" @mouseleave="closeMenu()"
+                                                    :style="'position: absolute; left: 100%; top: ' + (menuPositions['{{ $resKey }}-config'] || 0) + 'px; z-index: 50;'"
+                                                    class="pl-1">
+                                                    <div class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                                     @if ($resType === 'application')
                                                         <a href="{{ route('project.application.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
                                                         <a href="{{ route('project.application.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment Variables</a>
@@ -295,6 +296,7 @@
                                                         <a href="{{ route('project.database.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
                                                         <a href="{{ route('project.database.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger Zone</a>
                                                     @endif
+                                                    </div>
                                                 </div>
                                             </div>
                                         @endforeach
