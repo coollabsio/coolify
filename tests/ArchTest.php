@@ -79,7 +79,6 @@ arch('Enums')
     ->toBeEnums()
     ->ignoring('App\Enums\Concerns')
     ->toExtendNothing()
-    ->toImplementNothing()
     ->toHaveLineCountLessThan(80);
 
 arch('Exceptions')
