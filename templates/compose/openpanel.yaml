@@ -130,6 +130,8 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.10.2.65
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
     volumes:
       - openpanel_clickhouse_data:/var/lib/clickhouse
       - openpanel_clickhouse_logs:/var/log/clickhouse-server
