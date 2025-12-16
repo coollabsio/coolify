@@ -179,6 +179,11 @@ class GetLogs extends Component
         }
     }
 
+    public function copyLogs(): string
+    {
+        return sanitizeLogsForExport($this->outputs);
+    }
+
     public function render()
     {
         return view('livewire.project.shared.get-logs');
