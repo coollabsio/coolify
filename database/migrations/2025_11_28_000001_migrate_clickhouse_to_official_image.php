@@ -28,7 +28,7 @@ return new class extends Migration
 
         // Change the default value for the 'image' column to the official image
         Schema::table('standalone_clickhouses', function (Blueprint $table) {
-            $table->string('image')->default('clickhouse/clickhouse-server:latest')->change();
+            $table->string('image')->default('clickhouse/clickhouse-server:25.11')->change();
         });
 
         // Update existing ClickHouse instances from Bitnami images to official image
@@ -37,7 +37,7 @@ return new class extends Migration
                 ->orWhere('image', 'like', '%bitnamilegacy/clickhouse%');
         })
             ->update([
-                'image' => 'clickhouse/clickhouse-server:latest',
+                'image' => 'clickhouse/clickhouse-server:25.11',
                 'clickhouse_db' => DB::raw("COALESCE(clickhouse_db, 'default')"),
             ]);
 
@@ -58,7 +58,7 @@ return new class extends Migration
         });
 
         // Revert existing ClickHouse instances back to Bitnami image
-        StandaloneClickhouse::where('image', 'clickhouse/clickhouse-server:latest')
+        StandaloneClickhouse::where('image', 'clickhouse/clickhouse-server:25.11')
             ->update(['image' => 'bitnamilegacy/clickhouse']);
 
         // Revert volume mount paths
