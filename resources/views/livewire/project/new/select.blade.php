@@ -449,6 +449,10 @@
             <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select
                 PostgreSQL
                 17 (default).</div>
+            <div class="mt-4">
+                <x-forms.checkbox id="postgresql_wal_enabled" label="Enable WAL Mode"
+                    helper="Enables Write-Ahead Logging for streaming replication and point-in-time recovery. Adds: wal_level=replica, max_wal_senders=3, max_replication_slots=3, wal_keep_size=128MB" />
+            </div>
             <div class="flex flex-col gap-6 pt-8">
                 <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"

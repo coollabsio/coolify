@@ -49,6 +49,8 @@ class Select extends Component
 
     public string $postgresql_type = 'postgres:16-alpine';
 
+    public bool $postgresql_wal_enabled = false;
+
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
@@ -359,6 +361,7 @@ class Select extends Component
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
             'database_image' => $this->postgresql_type,
+            'wal_enabled' => $this->postgresql_wal_enabled ? '1' : '0',
         ]);
     }
 

@@ -42,9 +42,24 @@ class Create extends Component
 
                         return;
                     }
+                    $wal_enabled = request()->query('wal_enabled') === '1';
+                    $otherData = null;
+                    if ($wal_enabled) {
+                        $walConfig = <<<'EOF'
+listen_addresses = '*'
+wal_level = replica
+max_wal_senders = 3
+max_replication_slots = 3
+wal_keep_size = 128MB
+EOF;
+                        $otherData = [
+                            'postgres_conf' => $walConfig,
+                        ];
+                    }
                     $database = create_standalone_postgresql(
                         environmentId: $environment->id,
                         destinationUuid: $destination_uuid,
+                        otherData: $otherData,
                         databaseImage: $database_image
                     );
                 } elseif ($type->value() === 'redis') {
