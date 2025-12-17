@@ -674,26 +674,8 @@ function removeAnsiColors($text)
 
 function sanitizeLogsForExport(string $text): string
 {
-    // Use existing helper for tokens and ANSI codes
-    $text = remove_iip($text);
-
-    // Database URLs with passwords - must run before email regex to prevent false matches
-    // (postgres://user:password@host → postgres://user:<REDACTED>@host)
-    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
-
-    // Email addresses
-    $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
-
-    // Bearer/JWT tokens
-    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
-
-    // API keys (common patterns)
-    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
-
-    // Private key blocks
-    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
-
-    return $text;
+    // All sanitization is now handled by remove_iip()
+    return remove_iip($text);
 }
 
 function getTopLevelNetworks(Service|Application $resource)

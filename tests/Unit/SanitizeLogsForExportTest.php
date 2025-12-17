@@ -101,3 +101,70 @@ it('handles multiple sensitive items in same string', function () {
     expect($result)->not->toContain('12345678901234567890');
     expect($result)->toContain(REDACTED);
 });
+
+it('removes GitHub tokens', function () {
+    $testCases = [
+        'ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghp_ personal access token',
+        'gho_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'gho_ OAuth token',
+        'ghu_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghu_ user-to-server token',
+        'ghs_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghs_ server-to-server token',
+        'ghr_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghr_ refresh token',
+    ];
+
+    foreach ($testCases as $token => $description) {
+        $input = "Token: {$token}";
+        $result = sanitizeLogsForExport($input);
+        expect($result)->not->toContain($token, "Failed to redact {$description}");
+        expect($result)->toContain(REDACTED);
+    }
+});
+
+it('removes GitLab tokens', function () {
+    $testCases = [
+        'glpat-aBcDeFgHiJkLmNoPqRsTu' => 'glpat- personal access token',
+        'glcbt-aBcDeFgHiJkLmNoPqRsTu' => 'glcbt- CI build token',
+        'glrt-aBcDeFgHiJkLmNoPqRsTuV' => 'glrt- runner token',
+    ];
+
+    foreach ($testCases as $token => $description) {
+        $input = "Token: {$token}";
+        $result = sanitizeLogsForExport($input);
+        expect($result)->not->toContain($token, "Failed to redact {$description}");
+        expect($result)->toContain(REDACTED);
+    }
+});
+
+it('removes AWS credentials', function () {
+    // AWS Access Key ID (starts with AKIA, ABIA, ACCA, or ASIA)
+    $accessKeyId = 'AKIAIOSFODNN7EXAMPLE';
+    $input = "AWS_ACCESS_KEY_ID={$accessKeyId}";
+    $result = sanitizeLogsForExport($input);
+
+    expect($result)->not->toContain($accessKeyId);
+    expect($result)->toContain(REDACTED);
+});
+
+it('removes AWS secret access key', function () {
+    $secretKey = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+    $input = "aws_secret_access_key={$secretKey}";
+    $result = sanitizeLogsForExport($input);
+
+    expect($result)->not->toContain($secretKey);
+    expect($result)->toContain('aws_secret_access_key='.REDACTED);
+});
+
+it('removes generic URL passwords', function () {
+    $testCases = [
+        'ftp://user:ftppass@ftp.example.com/path' => 'ftp://user:'.REDACTED.'@ftp.example.com/path',
+        'sftp://deploy:secret123@sftp.example.com' => 'sftp://deploy:'.REDACTED.'@sftp.example.com',
+        'ssh://git:sshpass@git.example.com/repo' => 'ssh://git:'.REDACTED.'@git.example.com/repo',
+        'amqp://rabbit:bunny123@rabbitmq:5672' => 'amqp://rabbit:'.REDACTED.'@rabbitmq:5672',
+        'ldap://admin:ldappass@ldap.example.com' => 'ldap://admin:'.REDACTED.'@ldap.example.com',
+        's3://access:secretkey@bucket.s3.amazonaws.com' => 's3://access:'.REDACTED.'@bucket.s3.amazonaws.com',
+    ];
+
+    foreach ($testCases as $input => $expected) {
+        $result = sanitizeLogsForExport($input);
+        expect($result)->toBe($expected);
+    }
+});
