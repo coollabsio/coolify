@@ -1,6 +1,11 @@
 <div>
     <h1>Import from coolify.json</h1>
     <div class="pb-4">Paste a coolify.json configuration to quickly create and configure an application.</div>
+
+    <x-callout type="warning" title="Beta Feature" class="mb-4">
+        This feature is in beta and may change. Configuration format and behavior are subject to change in future releases.
+    </x-callout>
+
     <form wire:submit="submit">
         <div class="flex gap-2 pb-1">
             <h2>coolify.json</h2>

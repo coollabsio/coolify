@@ -190,8 +190,8 @@ class Select extends Component
         ];
         $coolifyJsonImport = [
             'id' => 'coolify-json',
-            'name' => 'Import from coolify.json',
-            'description' => 'Paste a coolify.json configuration to quickly create and configure an application.',
+            'name' => 'Import from coolify.json (Beta)',
+            'description' => 'Paste a coolify.json configuration to quickly create and configure an application. This feature is in beta and may change.',
             'logo' => asset('svgs/coolify-logo.svg'),
         ];
         $databases = [

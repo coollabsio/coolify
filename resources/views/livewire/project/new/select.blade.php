@@ -124,7 +124,10 @@
                     <div x-on:click="setType(coolifyJsonImport.id)"
                         :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                         <x-resource-view>
-                            <x-slot:title><span x-text="coolifyJsonImport.name"></span></x-slot>
+                            <x-slot:title>
+                                <span x-text="coolifyJsonImport.name"></span>
+                                <span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded bg-warning/20 text-warning-600 dark:text-warning">Beta</span>
+                            </x-slot>
                             <x-slot:description><span x-text="coolifyJsonImport.description"></span></x-slot>
                             <x-slot:logo>
                                 <img class="w-full h-full p-2 transition-all duration-200 dark:bg-white/10 bg-black/10 object-contain"
