@@ -68,7 +68,7 @@
                                                             {{ data_get($resource, 'environment.name') }}
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap hover:underline">
-                                                            <a class=""
+                                                            <a class="" {{ wireNavigate() }}
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>

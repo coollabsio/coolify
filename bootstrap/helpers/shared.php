@@ -2916,6 +2916,18 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function wireNavigate(): string
+{
+    try {
+        $settings = instanceSettings();
+
+        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+    } catch (\Exception $e) {
+        return 'wire:navigate.hover';
+    }
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();

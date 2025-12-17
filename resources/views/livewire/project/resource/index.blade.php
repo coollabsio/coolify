@@ -7,19 +7,19 @@
             <h1>Resources</h1>
             @if ($environment->isEmpty())
                 @can('createAnyResource')
-                    <a class="button"
+                    <a class="button" {{ wireNavigate() }}
                         href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                         Clone
                     </a>
                 @endcan
             @else
                 @can('createAnyResource')
-                    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
+                    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" {{ wireNavigate() }}
                         class="button">+
                         New</a>
                 @endcan
                 @can('createAnyResource')
-                    <a class="button"
+                    <a class="button" {{ wireNavigate() }}
                         href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                         Clone
                     </a>
@@ -36,7 +36,7 @@
             <ol class="flex items-center">
                 <li class="inline-flex items-center" x-data="{ projectOpen: false, toggle() { this.projectOpen = !this.projectOpen }, open() { this.projectOpen = true }, close() { this.projectOpen = false } }">
                     <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                        <a class="text-xs truncate lg:text-sm hover:text-warning"
+                        <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                             href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
                             {{ $project->name }}</a>
                         <button type="button" @click.stop="toggle()" class="px-1 text-warning">
@@ -66,7 +66,7 @@
                 @endphp
                 <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false; this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout); clearTimeout(this.envTimeout); this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openRes(id) { clearTimeout(this.envTimeout); clearTimeout(this.resTimeout); this.activeRes = id }, closeRes() { this.resTimeout = setTimeout(() => { this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openMenu(id) { clearTimeout(this.resTimeout); clearTimeout(this.menuTimeout); this.activeMenuEnv = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenuEnv = null; }, 100) } }">
                     <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                        <a class="text-xs truncate lg:text-sm hover:text-warning"
+                        <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                             href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $environment->uuid]) }}">
                             {{ $environment->name }}
                         </a>
@@ -106,7 +106,7 @@
                                     </div>
                                 @endforeach
                                 <div class="border-t border-neutral-200 dark:border-coolgray-200 mt-1 pt-1">
-                                    <a href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}"
+                                    <a href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}" {{ wireNavigate() }}
                                         class="flex items-center gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -311,7 +311,7 @@
     </div>
     @if ($environment->isEmpty())
         @can('createAnyResource')
-            <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
+            <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" {{ wireNavigate() }}
                 class="items-center justify-center coolbox">+ Add Resource</a>
         @else
             <div

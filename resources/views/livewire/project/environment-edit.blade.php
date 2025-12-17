@@ -14,14 +14,14 @@
             <ol class="flex flex-wrap items-center gap-y-1">
                 <li class="inline-flex items-center">
                     <div class="flex items-center">
-                        <a class="text-xs truncate lg:text-sm"
+                        <a class="text-xs truncate lg:text-sm" {{ wireNavigate() }}
                             href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}">
                             {{ $project->name }}</a>
                     </div>
                 </li>
                 <li>
                     <div class="flex items-center">
-                        <a class="text-xs truncate lg:text-sm"
+                        <a class="text-xs truncate lg:text-sm" {{ wireNavigate() }}
                             href="{{ route('project.resource.index', ['environment_uuid' => $environment->uuid, 'project_uuid' => $project->uuid]) }}">
                             {{ $environment->name }}
                         </a>

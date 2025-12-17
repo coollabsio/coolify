@@ -18,7 +18,7 @@
         <!-- Project Level -->
         <li class="inline-flex items-center" x-data="{ projectOpen: false, closeTimeout: null, toggle() { this.projectOpen = !this.projectOpen }, open() { clearTimeout(this.closeTimeout); this.projectOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.projectOpen = false }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ route('project.show', ['project_uuid' => $currentProjectUuid]) }}">
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}
                 </a>
@@ -50,7 +50,7 @@
         <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false; this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout); clearTimeout(this.envTimeout); this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openRes(id) { clearTimeout(this.envTimeout); clearTimeout(this.resTimeout); this.activeRes = id }, closeRes() { this.resTimeout = setTimeout(() => { this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openMenu(id) { clearTimeout(this.resTimeout); clearTimeout(this.menuTimeout); this.activeMenuEnv = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenuEnv = null; }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()"
                 @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ route('project.resource.index', [
                         'environment_uuid' => $currentEnvironmentUuid,
                         'project_uuid' => $currentProjectUuid,
@@ -422,7 +422,7 @@
         <li class="inline-flex items-center" x-data="{ resourceOpen: false, activeMenu: null, menuPosition: 0, closeTimeout: null, menuTimeout: null, toggle() { this.resourceOpen = !this.resourceOpen; if (!this.resourceOpen) { this.activeMenu = null; } }, open() { clearTimeout(this.closeTimeout); this.resourceOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.resourceOpen = false; this.activeMenu = null; }, 100) }, openMenu(id) { clearTimeout(this.closeTimeout); clearTimeout(this.menuTimeout); this.activeMenu = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenu = null; }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()"
                 @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ $isApplication
                         ? route('project.application.configuration', $routeParams)
                         : ($isService
