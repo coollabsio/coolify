@@ -7,7 +7,7 @@
 
 services:
   superset:
-    image: amancevice/superset:latest
+    image: amancevice/superset:5.0.0
     environment:
       - SERVICE_URL_SUPERSET_8088
       - SECRET_KEY=${SERVICE_BASE64_64_SUPERSETSECRETKEY}
@@ -63,13 +63,13 @@ services:
       retries: 10
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-superset-db}
     volumes:
-      - superset_postgres_data:/var/lib/postgresql/data
+      - superset_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -77,7 +77,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:8-alpine
+    image: redis:8
     volumes:
       - superset_redis_data:/data
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
