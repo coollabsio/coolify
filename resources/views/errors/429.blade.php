@@ -8,7 +8,7 @@
             seconds before trying again.
         </p>
         <div class="flex items-center mt-10 gap-x-2">
-            <a href="{{ url()->previous() }}" {{ wireNavigate() }}>
+            <a href="{{ url()->previous() }}">
                 <x-forms.button>Go back</x-forms.button>
             </a>
             <a href="{{ route('dashboard') }}" {{ wireNavigate() }}>

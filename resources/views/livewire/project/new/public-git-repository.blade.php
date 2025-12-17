@@ -13,7 +13,7 @@
                 </x-forms.button>
             </div>
             <div>
-                For example application deployments, checkout <a class="underline dark:text-white" {{ wireNavigate() }}
+                For example application deployments, checkout <a class="underline dark:text-white"
                     href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
                     Examples</a>.
             </div>
