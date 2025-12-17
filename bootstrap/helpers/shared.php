@@ -3028,7 +3028,28 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
         }
 
         // Warn about unknown top-level fields
-        $knownFields = ['version', 'name', 'description', 'build', 'domains', 'environment_variables', 'health_check', 'limits', 'settings'];
+        $knownFields = [
+            'version',
+            'name',
+            'description',
+            'source',
+            'build',
+            'domains',
+            'network_aliases',
+            'http_basic_auth',
+            'health_check',
+            'limits',
+            'settings',
+            'deployment_commands',
+            'preview',
+            'swarm',
+            'docker_registry',
+            'persistent_storages',
+            'file_mounts',
+            'directory_mounts',
+            'scheduled_tasks',
+            'environment_variables',
+        ];
         $unknownFields = array_diff(array_keys($config), $knownFields);
 
         return $config;

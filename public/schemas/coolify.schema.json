@@ -602,8 +602,8 @@
         },
         "value": {
           "type": "string",
-          "description": "Environment variable value. Supports magic variables like $SERVICE_PASSWORD_32, $SERVICE_FQDN_APP, $SERVICE_URL_API",
-          "examples": ["production", "$SERVICE_PASSWORD_32", "$SERVICE_FQDN_API"]
+          "description": "Environment variable value. Supports magic variables like SERVICE_PASSWORD_32, SERVICE_USER, SERVICE_UUID",
+          "examples": ["production", "SERVICE_PASSWORD_32", "SERVICE_USER"]
         },
         "is_multiline": {
           "type": "boolean",
@@ -655,7 +655,7 @@
           },
           {
             "key": "DATABASE_PASSWORD",
-            "value": "$SERVICE_PASSWORD_32"
+            "value": "SERVICE_PASSWORD_32"
           }
         ]
       }

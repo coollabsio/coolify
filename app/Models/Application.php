@@ -2423,7 +2423,7 @@ class Application extends BaseModel
                         'enabled' => data_get($task, 'enabled', true),
                         'timeout' => data_get($task, 'timeout', 300),
                         'application_id' => $this->id,
-                        'team_id' => $this->team()->id,
+                        'team_id' => $this->team_id,
                     ]);
                 }
             }
@@ -2468,9 +2468,9 @@ class Application extends BaseModel
         $value = $this->resolveMagicEnvironmentVariable($value);
 
         // Check if variable already exists
-        $existingVar = $this->environment_variables()
+        // Use correct relationship based on preview flag (environment_variables() already filters is_preview=false)
+        $existingVar = ($isPreview ? $this->environment_variables_preview() : $this->environment_variables())
             ->where('key', $key)
-            ->where('is_preview', $isPreview)
             ->first();
 
         if ($existingVar) {

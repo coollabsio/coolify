@@ -133,7 +133,28 @@ it('detects unknown fields in coolify.json', function () {
         'another_unknown' => 'value',
     ];
 
-    $knownFields = ['version', 'name', 'description', 'build', 'domains', 'environment_variables', 'health_check', 'limits', 'settings'];
+    $knownFields = [
+        'version',
+        'name',
+        'description',
+        'source',
+        'build',
+        'domains',
+        'network_aliases',
+        'http_basic_auth',
+        'health_check',
+        'limits',
+        'settings',
+        'deployment_commands',
+        'preview',
+        'swarm',
+        'docker_registry',
+        'persistent_storages',
+        'file_mounts',
+        'directory_mounts',
+        'scheduled_tasks',
+        'environment_variables',
+    ];
     $unknownFields = array_values(array_diff(array_keys($config), $knownFields));
 
     expect($unknownFields)->toBe(['unknown_field', 'another_unknown']);
