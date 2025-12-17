@@ -17,11 +17,14 @@ class Upgrade extends Component
 
     public string $currentVersion = '';
 
+    public bool $devMode = false;
+
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
     {
         $this->currentVersion = config('constants.coolify.version');
+        $this->devMode = isDev();
     }
 
     public function checkUpdate()

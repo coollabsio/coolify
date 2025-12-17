@@ -1,7 +1,8 @@
 <div @if ($isUpgradeAvailable) title="New version available" @else title="No upgrade available" @endif
     x-init="$wire.checkUpdate" x-data="upgradeModal({
         currentVersion: @js($currentVersion),
-        latestVersion: @js($latestVersion)
+        latestVersion: @js($latestVersion),
+        devMode: @js($devMode)
     })">
     @if ($isUpgradeAvailable)
         <div :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
@@ -39,7 +40,7 @@
                         x-transition:leave="ease-in duration-100"
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                        class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-fit bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+                        class="relative w-[48rem] max-w-[calc(100vw-2rem)] py-6 border rounded-sm bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
 
                         {{-- Header --}}
                         <div class="flex items-center justify-between pb-3">
@@ -163,6 +164,12 @@
                                 class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">Cancel
                             </x-forms.button>
                             <div class="flex-1"></div>
+                            <template x-if="devMode">
+                                <x-forms.button @click="simulateUpgrade" type="button"
+                                    class="dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                    Simulate
+                                </x-forms.button>
+                            </template>
                             <x-forms.button @click="confirmed" class="w-32" isHighlighted type="button">
                                 Upgrade Now
                             </x-forms.button>
@@ -193,6 +200,39 @@
             currentVersion: config.currentVersion || '',
             latestVersion: config.latestVersion || '',
             serviceDown: false,
+            devMode: config.devMode || false,
+            simulationInterval: null,
+
+            simulateUpgrade() {
+                if (!this.devMode) return;
+
+                this.showProgress = true;
+                this.currentStep = 1;
+                this.currentStatus = '[DEV] Starting simulated upgrade...';
+                this.startTimer();
+                this.upgradeComplete = false;
+                this.upgradeError = false;
+
+                const steps = [
+                    { step: 1, status: '[DEV] Preparing upgrade environment...' },
+                    { step: 2, status: '[DEV] Pulling helper image...' },
+                    { step: 3, status: '[DEV] Pulling Coolify image...' },
+                    { step: 4, status: '[DEV] Restarting services...' },
+                ];
+
+                let stepIndex = 0;
+                this.simulationInterval = setInterval(() => {
+                    if (stepIndex < steps.length) {
+                        this.currentStep = steps[stepIndex].step;
+                        this.currentStatus = steps[stepIndex].status;
+                        stepIndex++;
+                    } else {
+                        clearInterval(this.simulationInterval);
+                        this.simulationInterval = null;
+                        this.showSuccess();
+                    }
+                }, 2000);
+            },
 
             confirmed() {
                 this.showProgress = true;

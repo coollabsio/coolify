@@ -9,7 +9,7 @@
 
     The currentStep variable is inherited from parent Alpine component (upgradeModal).
 --}}
-<div class="w-full max-w-md mx-auto" x-data="{ activeStep: {{ $step }} }" x-effect="activeStep = $el.closest('[x-data]')?.__x?.$data?.currentStep ?? {{ $step }}">
+<div class="w-full" x-data="{ activeStep: {{ $step }} }" x-effect="activeStep = $el.closest('[x-data]')?.__x?.$data?.currentStep ?? {{ $step }}">
     <div class="flex items-center justify-between">
         {{-- Step 1: Preparing --}}
         <div class="flex items-center flex-1">
