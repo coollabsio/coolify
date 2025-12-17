@@ -10,7 +10,7 @@
                 href="{{ route('project.application.deployment.index', $parameters) }}">
                 Deployments
             </a>
-            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
                 <div class="flex items-center gap-1">
                     Logs

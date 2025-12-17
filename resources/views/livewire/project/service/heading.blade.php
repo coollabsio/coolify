@@ -14,7 +14,7 @@
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
-            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.logs', $parameters) }}">
                 <button>Logs</button>
             </a>

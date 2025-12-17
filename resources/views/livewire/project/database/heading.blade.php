@@ -16,7 +16,7 @@
                 Configuration
             </a>
 
-            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
                 Logs
             </a>
