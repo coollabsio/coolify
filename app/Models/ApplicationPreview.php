@@ -77,21 +77,21 @@ class ApplicationPreview extends BaseModel
         if ($this->application->fqdn) {
             if (str($this->application->fqdn)->contains(',')) {
                 $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
-                $preview_fqdn = getFqdnWithoutPort(str($this->application->fqdn)->explode(',')[0]);
             } else {
                 $url = Url::fromString($this->application->fqdn);
-                if ($this->fqdn) {
-                    $preview_fqdn = getFqdnWithoutPort($this->fqdn);
-                }
             }
             $template = $this->application->preview_url_template;
             $host = $url->getHost();
             $schema = $url->getScheme();
+            $portInt = $url->getPort();
+            $port = $portInt !== null ? ':'.$portInt : '';
+            $urlPath = $url->getPath();
+            $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
             $random = new Cuid2;
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn";
+            $preview_fqdn = "$schema://$preview_fqdn{$port}{$path}";
             $this->fqdn = $preview_fqdn;
             $this->save();
         }
@@ -147,11 +147,13 @@ class ApplicationPreview extends BaseModel
                 $schema = $url->getScheme();
                 $portInt = $url->getPort();
                 $port = $portInt !== null ? ':'.$portInt : '';
+                $urlPath = $url->getPath();
+                $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
                 $random = new Cuid2;
                 $preview_fqdn = str_replace('{{random}}', $random, $template);
                 $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                 $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-                $preview_fqdn = "$schema://$preview_fqdn{$port}";
+                $preview_fqdn = "$schema://$preview_fqdn{$port}{$path}";
                 $preview_domains[] = $preview_fqdn;
             }
 
