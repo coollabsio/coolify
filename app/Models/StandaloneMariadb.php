@@ -19,6 +19,8 @@ class StandaloneMariadb extends BaseModel
 
     protected $casts = [
         'mariadb_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
     ];
 
     protected static function booted()

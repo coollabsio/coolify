@@ -18,6 +18,8 @@ class StandaloneDragonfly extends BaseModel
 
     protected $casts = [
         'dragonfly_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
     ];
 
     protected static function booted()

@@ -18,6 +18,8 @@ class StandaloneClickhouse extends BaseModel
 
     protected $casts = [
         'clickhouse_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -247,6 +249,7 @@ class StandaloneClickhouse extends BaseModel
                 $encodedUser = rawurlencode($this->clickhouse_admin_user);
                 $encodedPass = rawurlencode($this->clickhouse_admin_password);
                 $database = $this->clickhouse_db ?? 'default';
+
                 return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$database}";
             },
         );
@@ -264,6 +267,7 @@ class StandaloneClickhouse extends BaseModel
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
                     $database = $this->clickhouse_db ?? 'default';
+
                     return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
                 }
 

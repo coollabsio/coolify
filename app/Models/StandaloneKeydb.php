@@ -18,6 +18,8 @@ class StandaloneKeydb extends BaseModel
 
     protected $casts = [
         'keydb_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
     ];
 
     protected static function booted()
