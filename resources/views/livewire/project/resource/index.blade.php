@@ -352,7 +352,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -402,7 +402,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -452,7 +452,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink">
+                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
