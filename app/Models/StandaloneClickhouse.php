@@ -20,6 +20,7 @@ class StandaloneClickhouse extends BaseModel
         'clickhouse_password' => 'encrypted',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()

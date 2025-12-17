@@ -206,27 +206,18 @@ class GetContainersStatus
 
                             if ($statusFromDb !== $containerStatus) {
                                 $updateData = ['status' => $containerStatus];
-
-                                // Update restart tracking if restart count increased
-                                if ($restartCount > $previousRestartCount) {
-                                    $updateData['restart_count'] = $restartCount;
-                                    $updateData['last_restart_at'] = now();
-                                    $updateData['last_restart_type'] = 'crash';
-                                }
-
-                                $database->update($updateData);
                             } else {
                                 $updateData = ['last_online_at' => now()];
-
-                                // Update restart tracking even if status unchanged
-                                if ($restartCount > $previousRestartCount) {
-                                    $updateData['restart_count'] = $restartCount;
-                                    $updateData['last_restart_at'] = now();
-                                    $updateData['last_restart_type'] = 'crash';
-                                }
-
-                                $database->update($updateData);
                             }
+
+                            // Update restart tracking if restart count increased
+                            if ($restartCount > $previousRestartCount) {
+                                $updateData['restart_count'] = $restartCount;
+                                $updateData['last_restart_at'] = now();
+                                $updateData['last_restart_type'] = 'crash';
+                            }
+
+                            $database->update($updateData);
 
                             if ($isPublic) {
                                 $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
