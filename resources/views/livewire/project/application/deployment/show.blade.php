@@ -11,13 +11,8 @@
         rafId: null,
         showTimestamps: true,
         searchQuery: '',
-        renderTrigger: 0,
+        matchCount: 0,
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
-        // Cache for decoded HTML to avoid repeated DOMParser calls
-        decodeCache: new Map(),
-        // Cache for match count to avoid repeated DOM queries
-        matchCountCache: null,
-        lastSearchQuery: '',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
         },
@@ -31,7 +26,6 @@
             if (!this.alwaysScroll) return;
             this.rafId = requestAnimationFrame(() => {
                 this.scrollToBottom();
-                // Schedule next scroll after a reasonable delay (250ms instead of 100ms)
                 if (this.alwaysScroll) {
                     setTimeout(() => this.scheduleScroll(), 250);
                 }
@@ -48,10 +42,6 @@
                 }
             }
         },
-        matchesSearch(text) {
-            if (!this.searchQuery.trim()) return true;
-            return text.toLowerCase().includes(this.searchQuery.toLowerCase());
-        },
         hasActiveLogSelection() {
             const selection = window.getSelection();
             if (!selection || selection.isCollapsed || !selection.toString().trim()) {
@@ -63,86 +53,59 @@
             return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Return cached result if available
-            if (this.decodeCache.has(text)) {
-                return this.decodeCache.get(text);
-            }
-            // Decode HTML entities with max iteration limit
-            let decoded = text;
-            let prev = '';
-            let iterations = 0;
-            const maxIterations = 3;
-
-            while (decoded !== prev && iterations < maxIterations) {
-                prev = decoded;
-                const doc = new DOMParser().parseFromString(decoded, 'text/html');
-                decoded = doc.documentElement.textContent;
-                iterations++;
-            }
-            // Cache the result (limit cache size to prevent memory bloat)
-            if (this.decodeCache.size > 5000) {
-                // Clear oldest entries when cache gets too large
-                const firstKey = this.decodeCache.keys().next().value;
-                this.decodeCache.delete(firstKey);
-            }
-            this.decodeCache.set(text, decoded);
-            return decoded;
+            const doc = new DOMParser().parseFromString(text, 'text/html');
+            return doc.documentElement.textContent;
         },
-        renderHighlightedLog(el, text) {
-            // Skip re-render if user has text selected in logs
-            if (el.textContent && this.hasActiveLogSelection()) {
-                return;
-            }
+        highlightText(el, text, query) {
+            if (this.hasActiveLogSelection()) return;
 
-            const decoded = this.decodeHtml(text);
             el.textContent = '';
-
-            if (!this.searchQuery.trim()) {
-                el.textContent = decoded;
-                return;
-            }
-
-            const query = this.searchQuery.toLowerCase();
-            const lowerText = decoded.toLowerCase();
+            const lowerText = text.toLowerCase();
             let lastIndex = 0;
-
             let index = lowerText.indexOf(query, lastIndex);
+
             while (index !== -1) {
                 if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
                 }
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
-                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                mark.textContent = text.substring(index, index + query.length);
                 el.appendChild(mark);
-
-                lastIndex = index + this.searchQuery.length;
+                lastIndex = index + query.length;
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            if (lastIndex < decoded.length) {
-                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            if (lastIndex < text.length) {
+                el.appendChild(document.createTextNode(text.substring(lastIndex)));
             }
         },
-        getMatchCount() {
-            if (!this.searchQuery.trim()) return 0;
-            // Return cached count if search query hasn't changed
-            if (this.lastSearchQuery === this.searchQuery && this.matchCountCache !== null) {
-                return this.matchCountCache;
-            }
+        applySearch() {
             const logs = document.getElementById('logs');
-            if (!logs) return 0;
+            if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
+            const query = this.searchQuery.trim().toLowerCase();
             let count = 0;
-            const query = this.searchQuery.toLowerCase();
+
             lines.forEach(line => {
-                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(query)) {
-                    count++;
+                const content = (line.dataset.logContent || '').toLowerCase();
+                const textSpan = line.querySelector('[data-line-text]');
+                const matches = !query || content.includes(query);
+
+                line.classList.toggle('hidden', !matches);
+                if (matches && query) count++;
+
+                if (textSpan) {
+                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    if (!query) {
+                        textSpan.textContent = originalText;
+                    } else if (matches) {
+                        this.highlightText(textSpan, originalText, query);
+                    }
                 }
             });
-            this.matchCountCache = count;
-            this.lastSearchQuery = this.searchQuery;
-            return count;
+
+            this.matchCount = query ? count : 0;
         },
         downloadLogs() {
             const logs = document.getElementById('logs');
@@ -179,29 +142,31 @@
                     skip();
                 }
             });
-            // Re-render logs after Livewire updates (debounced)
-            let renderTimeout = null;
-            const debouncedRender = () => {
-                clearTimeout(renderTimeout);
-                renderTimeout = setTimeout(() => {
-                    this.matchCountCache = null; // Invalidate match cache on new content
-                    this.renderTrigger++;
-                }, 100);
-            };
-            document.addEventListener('livewire:navigated', () => {
-                this.$nextTick(debouncedRender);
+
+            // Watch search query changes
+            this.$watch('searchQuery', () => {
+                this.applySearch();
             });
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    this.$nextTick(debouncedRender);
-                });
+
+            // Apply search after Livewire updates
+            Livewire.hook('morph.updated', ({ el }) => {
+                if (el.id === 'logs') {
+                    this.$nextTick(() => {
+                        this.applySearch();
+                        if (this.alwaysScroll) {
+                            this.scrollToBottom();
+                        }
+                    });
+                }
             });
+
             // Stop auto-scroll when deployment finishes
             Livewire.on('deploymentFinished', () => {
                 setTimeout(() => {
                     this.stopScroll();
                 }, 500);
             });
+
             // Start auto-scroll if deployment is in progress
             if (this.alwaysScroll) {
                 this.scheduleScroll();
@@ -229,7 +194,7 @@
                                     <span class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>
                                 </div>
                             @endif
-                            <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                            <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                                 class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                         </div>
                         <div class="flex items-center gap-2">
@@ -324,7 +289,7 @@
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
                         :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
                         <div id="logs" class="flex flex-col font-mono">
-                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
@@ -334,19 +299,19 @@
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
                                 <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
-                                    x-effect="renderTrigger; searchQuery; $el.classList.toggle('hidden', !matchesSearch($el.dataset.logContent))" @class([
+                                    @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
                                         'flex gap-2 log-line',
                                     ])>
                                     <span x-show="showTimestamps"
                                         class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
-                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}" @class([
-                                        'text-success dark:text-warning' => $line['hidden'],
-                                        'text-red-500' => $line['stderr'],
-                                        'font-bold' => isset($line['command']) && $line['command'],
-                                        'whitespace-pre-wrap',
-                                    ])
-                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"></span>
+                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}"
+                                        @class([
+                                            'text-success dark:text-warning' => $line['hidden'],
+                                            'text-red-500' => $line['stderr'],
+                                            'font-bold' => isset($line['command']) && $line['command'],
+                                            'whitespace-pre-wrap',
+                                        ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
                                 <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
