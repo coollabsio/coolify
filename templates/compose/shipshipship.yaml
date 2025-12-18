@@ -1,0 +1,20 @@
+# documentation: https://github.com/GauthierNelkinsky/ShipShipShip
+# slogan: Bridging project management and communication.
+# tags: project management,changelog,roadmap
+# logo: svgs/shipshipship.svg
+# port: 8080
+
+services:
+  shipshipship:
+    image: nelkinsky/shipshipship:latest
+    environment:
+      - ADMIN_USERNAME=${SERVICE_USER_ADMIN}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - SERVICE_URL_SHIPSHIPSHIP_8080
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - BASE_URL=${SERVICE_FQDN_SHIPSHIPSHIP_8080}
+      - PORT=8080
+      - GIN_MODE=release
+      - DB_PATH=/app/data/changelog.db
+    volumes:
+      - shipshipship_data:/app/data
