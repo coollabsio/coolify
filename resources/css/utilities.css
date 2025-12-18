@@ -301,5 +301,22 @@
 
 /* Search highlight styling for logs */
 @utility log-highlight {
-    @apply bg-warning/40 dark:bg-warning/30 rounded-sm px-0.5;
+    @apply bg-warning/40 dark:bg-warning/30;
+}
+
+/* Log level color classes */
+@utility log-error {
+    @apply bg-red-500/10 dark:bg-red-500/15;
+}
+
+@utility log-warning {
+    @apply bg-yellow-500/10 dark:bg-yellow-500/15;
+}
+
+@utility log-debug {
+    @apply bg-purple-500/10 dark:bg-purple-500/15;
+}
+
+@utility log-info {
+    @apply bg-blue-500/10 dark:bg-blue-500/15;
 }

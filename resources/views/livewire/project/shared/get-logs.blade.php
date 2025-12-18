@@ -9,13 +9,8 @@
         scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
-        renderTrigger: 0,
+        matchCount: 0,
         containerName: '{{ $container ?? "logs" }}',
-        // Cache for decoded HTML to avoid repeated DOMParser calls
-        decodeCache: new Map(),
-        // Cache for match count to avoid repeated DOM queries
-        matchCountCache: null,
-        lastSearchQuery: '',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
@@ -39,7 +34,6 @@
             if (!this.alwaysScroll) return;
             this.rafId = requestAnimationFrame(() => {
                 this.scrollToBottom();
-                // Schedule next scroll after a reasonable delay (250ms instead of 100ms)
                 if (this.alwaysScroll) {
                     setTimeout(() => this.scheduleScroll(), 250);
                 }
@@ -57,15 +51,11 @@
             }
         },
         handleScroll(event) {
-            // Skip if follow logs is disabled or this is a programmatic scroll
             if (!this.alwaysScroll || this.isScrolling) return;
-
-            // Debounce scroll handling to avoid false positives from DOM mutations
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                // Use larger threshold (100px) to avoid accidental disables
                 if (distanceFromBottom > 100) {
                     this.alwaysScroll = false;
                     if (this.rafId) {
@@ -78,30 +68,26 @@
         toggleColorLogs() {
             this.colorLogs = !this.colorLogs;
             localStorage.setItem('coolify-color-logs', this.colorLogs);
+            this.applyColorLogs();
         },
-        getLogLevel(text) {
-            const lowerText = text.toLowerCase();
-            // Error detection (highest priority)
-            if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(lowerText)) {
-                return 'error';
-            }
-            // Warning detection
-            if (/\b(warn|warning|wrn|caution)\b/.test(lowerText)) {
-                return 'warning';
-            }
-            // Debug detection
-            if (/\b(debug|dbg|trace|verbose)\b/.test(lowerText)) {
-                return 'debug';
-            }
-            // Info detection
-            if (/\b(info|inf|notice)\b/.test(lowerText)) {
-                return 'info';
-            }
-            return null;
-        },
-        matchesSearch(line) {
-            if (!this.searchQuery.trim()) return true;
-            return line.toLowerCase().includes(this.searchQuery.toLowerCase());
+        applyColorLogs() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                line.classList.remove('log-error', 'log-warning', 'log-debug', 'log-info');
+                if (!this.colorLogs) return;
+                if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) {
+                    line.classList.add('log-error');
+                } else if (/\b(warn|warning|wrn|caution)\b/.test(content)) {
+                    line.classList.add('log-warning');
+                } else if (/\b(debug|dbg|trace|verbose)\b/.test(content)) {
+                    line.classList.add('log-debug');
+                } else if (/\b(info|inf|notice)\b/.test(content)) {
+                    line.classList.add('log-info');
+                }
+            });
         },
         hasActiveLogSelection() {
             const selection = window.getSelection();
@@ -113,86 +99,58 @@
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
-        decodeHtml(text) {
-            // Return cached result if available
-            if (this.decodeCache.has(text)) {
-                return this.decodeCache.get(text);
-            }
-            // Decode HTML entities with max iteration limit
-            let decoded = text;
-            let prev = '';
-            let iterations = 0;
-            const maxIterations = 3;
+        applySearch() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            const query = this.searchQuery.trim().toLowerCase();
+            let count = 0;
 
-            while (decoded !== prev && iterations < maxIterations) {
-                prev = decoded;
-                const doc = new DOMParser().parseFromString(decoded, 'text/html');
-                decoded = doc.documentElement.textContent;
-                iterations++;
-            }
-            // Cache the result (limit cache size to prevent memory bloat)
-            if (this.decodeCache.size > 5000) {
-                const firstKey = this.decodeCache.keys().next().value;
-                this.decodeCache.delete(firstKey);
-            }
-            this.decodeCache.set(text, decoded);
-            return decoded;
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                const textSpan = line.querySelector('[data-line-text]');
+                const matches = !query || content.includes(query);
+
+                line.classList.toggle('hidden', !matches);
+                if (matches && query) count++;
+
+                // Update highlighting
+                if (textSpan) {
+                    const originalText = textSpan.dataset.lineText || '';
+                    if (!query) {
+                        textSpan.textContent = originalText;
+                    } else if (matches) {
+                        this.highlightText(textSpan, originalText, query);
+                    }
+                }
+            });
+
+            this.matchCount = query ? count : 0;
         },
-        renderHighlightedLog(el, text) {
-            // Skip re-render if user has text selected in logs
-            if (el.textContent && this.hasActiveLogSelection()) {
-                return;
-            }
+        highlightText(el, text, query) {
+            // Skip if user has selection
+            if (this.hasActiveLogSelection()) return;
 
-            const decoded = this.decodeHtml(text);
             el.textContent = '';
-
-            if (!this.searchQuery.trim()) {
-                el.textContent = decoded;
-                return;
-            }
-
-            const query = this.searchQuery.toLowerCase();
-            const lowerText = decoded.toLowerCase();
+            const lowerText = text.toLowerCase();
             let lastIndex = 0;
-
             let index = lowerText.indexOf(query, lastIndex);
+
             while (index !== -1) {
                 if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
                 }
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
-                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                mark.textContent = text.substring(index, index + query.length);
                 el.appendChild(mark);
-
-                lastIndex = index + this.searchQuery.length;
+                lastIndex = index + query.length;
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            if (lastIndex < decoded.length) {
-                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            if (lastIndex < text.length) {
+                el.appendChild(document.createTextNode(text.substring(lastIndex)));
             }
-        },
-        getMatchCount() {
-            if (!this.searchQuery.trim()) return 0;
-            // Return cached count if search query hasn't changed
-            if (this.lastSearchQuery === this.searchQuery && this.matchCountCache !== null) {
-                return this.matchCountCache;
-            }
-            const logs = document.getElementById('logs');
-            if (!logs) return 0;
-            const lines = logs.querySelectorAll('[data-log-line]');
-            let count = 0;
-            const query = this.searchQuery.toLowerCase();
-            lines.forEach(line => {
-                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(query)) {
-                    count++;
-                }
-            });
-            this.matchCountCache = count;
-            this.lastSearchQuery = this.searchQuery;
-            return count;
         },
         downloadLogs() {
             const logs = document.getElementById('logs');
@@ -219,25 +177,23 @@
                 this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
-            // Prevent Livewire from morphing logs container when text is selected
-            Livewire.hook('morph.updating', ({ el, component, toEl, skip }) => {
-                if (el.id === 'logs' && this.hasActiveLogSelection()) {
-                    skip();
-                }
+
+            // Watch search query changes
+            this.$watch('searchQuery', () => {
+                this.applySearch();
             });
-            // Re-render logs after Livewire updates (debounced)
-            let renderTimeout = null;
-            const debouncedRender = () => {
-                clearTimeout(renderTimeout);
-                renderTimeout = setTimeout(() => {
-                    this.matchCountCache = null; // Invalidate match cache on new content
-                    this.renderTrigger++;
-                }, 100);
-            };
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    this.$nextTick(debouncedRender);
-                });
+
+            // Apply colors after Livewire updates
+            Livewire.hook('morph.updated', ({ el }) => {
+                if (el.id === 'logs') {
+                    this.$nextTick(() => {
+                        this.applyColorLogs();
+                        this.applySearch();
+                        if (this.alwaysScroll) {
+                            this.scrollToBottom();
+                        }
+                    });
+                }
             });
         }
     }">
@@ -278,7 +234,7 @@
                                 title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
                                 class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
-                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                        <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -410,7 +366,7 @@
                                     Showing last {{ number_format($maxDisplayLines) }} of {{ number_format($totalLines) }} lines
                                 </div>
                             @endif
-                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
@@ -434,23 +390,12 @@
                                         // Format: 2025-Dec-04 09:44:58.198879
                                         $timestamp = "{$year}-{$monthName}-{$day} {$time}.{$microseconds}";
                                     }
-
                                 @endphp
-                                <div data-log-line data-log-content="{{ $line }}"
-                                    x-effect="renderTrigger; searchQuery; $el.classList.toggle('hidden', !matchesSearch($el.dataset.logContent))"
-                                    x-bind:class="{
-                                        'bg-red-500/10 dark:bg-red-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'error',
-                                        'bg-yellow-500/10 dark:bg-yellow-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'warning',
-                                        'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
-                                        'bg-blue-500/10 dark:bg-blue-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'info',
-                                    }"
-                                    class="flex gap-2 log-line">
+                                <div data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
-                                    <span data-line-text="{{ $logContent }}"
-                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
-                                        class="whitespace-pre-wrap break-all"></span>
+                                    <span data-line-text="{{ $logContent }}" class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
                                 </div>
                             @endforeach
                         </div>
