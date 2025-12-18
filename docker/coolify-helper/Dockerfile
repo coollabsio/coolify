@@ -11,6 +11,8 @@ ARG DOCKER_BUILDX_VERSION=0.25.0
 ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.41.0
+# https://github.com/coollabsio/coolpack/releases
+ARG COOLPACK_VERSION=latest
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 
@@ -36,6 +38,7 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
     (curl -sSL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker) && \
     (curl -sSL https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux.tgz | tar -C /usr/local/bin/ --no-same-owner -xzv pack) && \
     curl -sSL https://nixpacks.com/install.sh | bash && \
+    curl -fsSL https://raw.githubusercontent.com/coollabsio/coolpack/main/install.sh | bash && \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
@@ -45,6 +48,7 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     (curl -sSL https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker) && \
     (curl -sSL https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux-arm64.tgz | tar -C /usr/local/bin/ --no-same-owner -xzv pack) && \
     curl -sSL https://nixpacks.com/install.sh | bash && \
+    curl -fsSL https://raw.githubusercontent.com/coollabsio/coolpack/main/install.sh | bash && \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 

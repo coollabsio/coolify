@@ -32,6 +32,7 @@
                         <x-forms.select x-bind:disabled="shouldDisable()" wire:model.live="buildPack" label="Build Pack"
                             required>
                             <option value="nixpacks">Nixpacks</option>
+                            <option value="coolpack">Coolpack (Beta)</option>
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockercompose">Docker Compose</option>
@@ -230,6 +231,18 @@
                                 automatically.
                                 <a class="underline" href="https://coolify.io/docs/applications/">Framework
                                     Specific Docs</a>
+                            </div>
+                        @endif
+                        @if ($application->build_pack === 'coolpack')
+                            <div class="flex flex-col gap-2 xl:flex-row">
+                                <x-forms.input id="installCommand" label="Install Command"
+                                    x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="buildCommand" label="Build Command" x-bind:disabled="!canUpdate" />
+                                <x-forms.input id="startCommand" label="Start Command" x-bind:disabled="!canUpdate" />
+                            </div>
+                            <div class="pt-1 text-xs">
+                                <span class="text-warning">Beta:</span> Coolpack is in beta and only supports NodeJS.
+                                <a class="underline" href="https://github.com/coollabsio/coolpack">Report issues</a>
                             </div>
                         @endif
 

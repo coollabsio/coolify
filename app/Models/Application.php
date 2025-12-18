@@ -231,6 +231,21 @@ class Application extends BaseModel
                     'resourceable_id' => $application->id,
                 ]);
             }
+
+            // Add default COOLPACK_NODE_VERSION environment variable for Coolpack applications
+            if ($application->build_pack === 'coolpack') {
+                EnvironmentVariable::create([
+                    'key' => 'COOLPACK_NODE_VERSION',
+                    'value' => '24',
+                    'is_multiline' => false,
+                    'is_literal' => false,
+                    'is_buildtime' => true,
+                    'is_runtime' => false,
+                    'is_preview' => false,
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $application->id,
+                ]);
+            }
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
@@ -859,7 +874,8 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->where('key', 'not like', 'NIXPACKS_%');
+            ->where('key', 'not like', 'NIXPACKS_%')
+            ->where('key', 'not like', 'COOLPACK_%');
     }
 
     public function nixpacks_environment_variables()
@@ -867,6 +883,13 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
             ->where('key', 'like', 'NIXPACKS_%');
+    }
+
+    public function coolpack_environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'like', 'COOLPACK_%');
     }
 
     public function environment_variables_preview()
@@ -887,7 +910,8 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->where('key', 'not like', 'NIXPACKS_%');
+            ->where('key', 'not like', 'NIXPACKS_%')
+            ->where('key', 'not like', 'COOLPACK_%');
     }
 
     public function nixpacks_environment_variables_preview()
@@ -895,6 +919,13 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
             ->where('key', 'like', 'NIXPACKS_%');
+    }
+
+    public function coolpack_environment_variables_preview()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'like', 'COOLPACK_%');
     }
 
     public function scheduled_tasks(): HasMany

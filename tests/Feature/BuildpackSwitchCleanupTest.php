@@ -131,4 +131,59 @@ describe('Buildpack Switching Cleanup', function () {
         expect($application->dockerfile_location)->toBeNull();
         expect($application->custom_healthcheck_found)->toBeFalse();
     });
+
+    test('clears dockerfile fields when switching from dockerfile to coolpack', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'build_pack' => 'dockerfile',
+            'dockerfile' => 'FROM node:24',
+            'dockerfile_location' => '/Dockerfile',
+            'dockerfile_target_build' => 'production',
+            'custom_healthcheck_found' => true,
+        ]);
+
+        Livewire::test(General::class, ['application' => $application])
+            ->assertSuccessful()
+            ->set('buildPack', 'coolpack')
+            ->call('updatedBuildPack');
+
+        $application->refresh();
+        expect($application->build_pack)->toBe('coolpack');
+        expect($application->dockerfile)->toBeNull();
+        expect($application->dockerfile_location)->toBeNull();
+        expect($application->dockerfile_target_build)->toBeNull();
+        expect($application->custom_healthcheck_found)->toBeFalse();
+    });
+
+    test('can switch between nixpacks and coolpack buildpacks', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'build_pack' => 'nixpacks',
+            'dockerfile' => null,
+        ]);
+
+        Livewire::test(General::class, ['application' => $application])
+            ->assertSuccessful()
+            ->set('buildPack', 'coolpack')
+            ->call('updatedBuildPack');
+
+        $application->refresh();
+        expect($application->build_pack)->toBe('coolpack');
+    });
+
+    test('can switch from coolpack to nixpacks', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'build_pack' => 'coolpack',
+            'dockerfile' => null,
+        ]);
+
+        Livewire::test(General::class, ['application' => $application])
+            ->assertSuccessful()
+            ->set('buildPack', 'nixpacks')
+            ->call('updatedBuildPack');
+
+        $application->refresh();
+        expect($application->build_pack)->toBe('nixpacks');
+    });
 });

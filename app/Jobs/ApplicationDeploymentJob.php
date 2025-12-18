@@ -47,6 +47,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private const NIXPACKS_PLAN_PATH = '/artifacts/thegameplan.json';
 
+    private const COOLPACK_PLAN_PATH = '/artifacts/coolpack.json';
+
     public $tries = 1;
 
     public $timeout = 3600;
@@ -124,6 +126,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_nixpacks_args;
 
+    private $env_coolpack_args;
+
     private $docker_compose;
 
     private $docker_compose_base64;
@@ -133,6 +137,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private Collection $nixpacks_plan_json;
 
     private ?string $nixpacks_type = null;
+
+    private ?string $coolpack_plan = null;
+
+    private Collection $coolpack_plan_json;
+
+    private ?string $coolpack_type = null;
 
     private string $dockerfile_location = '/Dockerfile';
 
@@ -190,6 +200,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
         $this->nixpacks_plan_json = collect([]);
+        $this->coolpack_plan_json = collect([]);
 
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -478,6 +489,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->deploy_dockerfile_buildpack();
         } elseif ($this->application->build_pack === 'static') {
             $this->deploy_static_buildpack();
+        } elseif ($this->application->build_pack === 'coolpack') {
+            $this->deploy_coolpack_buildpack();
         } else {
             $this->deploy_nixpacks_buildpack();
         }
@@ -929,6 +942,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
 
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    private function deploy_coolpack_buildpack()
+    {
+        if ($this->use_build_server) {
+            $this->server = $this->build_server;
+        }
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+        $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
+        $this->generate_image_names();
+        if (! $this->force_rebuild) {
+            $this->check_image_locally_or_remotely();
+            if ($this->should_skip_build()) {
+                return;
+            }
+        }
+        $this->clone_repository();
+        $this->cleanup_git();
+        $this->generate_coolpack_confs();
+        $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build for Coolpack
+        $this->save_buildtime_environment_variables();
+
+        $this->generate_build_env_variables();
+        $this->build_coolpack_image();
+
+        // For Coolpack, save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -2328,6 +2374,87 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
     }
 
+    private function generate_coolpack_confs()
+    {
+        $coolpack_command = $this->coolpack_build_cmd();
+        $this->application_deployment_queue->addLogEntry("Generating coolpack configuration with: $coolpack_command");
+
+        $this->execute_remote_command(
+            [executeInDocker($this->deployment_uuid, $coolpack_command), 'save' => 'coolpack_plan', 'hidden' => true],
+        );
+
+        if ($this->saved_outputs->get('coolpack_plan')) {
+            $this->coolpack_plan = $this->saved_outputs->get('coolpack_plan');
+            if ($this->coolpack_plan) {
+                $parsed = json_decode($this->coolpack_plan, true);
+                $this->coolpack_type = data_get($parsed, 'provider', 'unknown');
+
+                if (str($this->coolpack_type)->isEmpty() || $this->coolpack_type === 'unknown') {
+                    throw new DeploymentException('Coolpack failed to detect the application type. Please check the Coolpack documentation: https://github.com/coollabsio/coolpack');
+                }
+
+                $this->application_deployment_queue->addLogEntry("Found application type: {$this->coolpack_type}.");
+
+                // TODO: Add framework fine-tuning when Coolpack supports more than NodeJS
+                // Currently only NodeJS is supported
+
+                // Generate env variables
+                $this->generate_env_variables();
+
+                $this->coolpack_plan_json = collect($parsed);
+                $this->application_deployment_queue->addLogEntry("Final Coolpack plan: {$this->coolpack_plan}", hidden: true);
+            }
+        }
+    }
+
+    private function coolpack_build_cmd()
+    {
+        $this->generate_coolpack_env_variables();
+        $coolpack_command = "coolpack plan --json {$this->env_coolpack_args}";
+
+        if ($this->application->build_command) {
+            $coolpack_command .= " --build-cmd \"{$this->application->build_command}\"";
+        }
+        if ($this->application->start_command) {
+            $coolpack_command .= " --start-cmd \"{$this->application->start_command}\"";
+        }
+        if ($this->application->install_command) {
+            $coolpack_command .= " --install-cmd \"{$this->application->install_command}\"";
+        }
+        $coolpack_command .= " {$this->workdir}";
+
+        return $coolpack_command;
+    }
+
+    private function generate_coolpack_env_variables()
+    {
+        $this->env_coolpack_args = collect([]);
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->coolpack_environment_variables as $env) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
+                    $this->env_coolpack_args->push("--build-env {$env->key}={$env->real_value}");
+                }
+            }
+        } else {
+            foreach ($this->application->coolpack_environment_variables_preview as $env) {
+                if (! is_null($env->real_value) && $env->real_value !== '') {
+                    $this->env_coolpack_args->push("--build-env {$env->key}={$env->real_value}");
+                }
+            }
+        }
+
+        // Add COOLIFY_* environment variables to Coolpack build context
+        $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
+        $coolify_envs->each(function ($value, $key) {
+            // Only add environment variables with non-null and non-empty values
+            if (! is_null($value) && $value !== '') {
+                $this->env_coolpack_args->push("--build-env {$key}={$value}");
+            }
+        });
+
+        $this->env_coolpack_args = $this->env_coolpack_args->implode(' ');
+    }
+
     private function generate_coolify_env_variables(bool $forBuildTime = false): Collection
     {
         $coolify_envs = collect([]);
@@ -3169,6 +3296,48 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
+    }
+
+    private function build_coolpack_image()
+    {
+        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        if ($this->disableBuildCache) {
+            $this->application_deployment_queue->addLogEntry('Docker build cache is disabled. It will not be used during the build process.');
+        }
+        $this->application_deployment_queue->addLogEntry('Building docker image with Coolpack started.');
+        $this->application_deployment_queue->addLogEntry('To check the current progress, click on Show Debug Logs.');
+
+        // Write plan to file
+        $coolpack_plan_base64 = base64_encode($this->coolpack_plan);
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "echo '{$coolpack_plan_base64}' | base64 -d | tee ".self::COOLPACK_PLAN_PATH.' > /dev/null'),
+            'hidden' => true,
+        ]);
+
+        // Build with coolpack
+        $cache_flag = $this->force_rebuild ? '--no-cache' : '';
+        $coolpack_build_command = 'coolpack build --plan '.self::COOLPACK_PLAN_PATH." {$cache_flag} -n {$this->production_image_name} {$this->workdir}";
+
+        $this->application_deployment_queue->addLogEntry("Running coolpack build: {$coolpack_build_command}", hidden: true);
+
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, $coolpack_build_command),
+            'hidden' => true,
+        ]);
+
+        // Show generated Dockerfile for debugging
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.coolpack/Dockerfile 2>/dev/null || echo 'No Dockerfile generated'"),
+            'hidden' => true,
+        ]);
+
+        // Cleanup plan file
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'rm -f '.self::COOLPACK_PLAN_PATH),
+            'hidden' => true,
+        ]);
+
+        $this->application_deployment_queue->addLogEntry('Building docker image with Coolpack completed.');
     }
 
     private function graceful_shutdown_container(string $containerName)
