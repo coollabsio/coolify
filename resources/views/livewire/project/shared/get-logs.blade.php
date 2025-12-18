@@ -186,7 +186,7 @@
             let count = 0;
             const query = this.searchQuery.toLowerCase();
             lines.forEach(line => {
-                if (line.textContent.toLowerCase().includes(query)) {
+                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(query)) {
                     count++;
                 }
             });
