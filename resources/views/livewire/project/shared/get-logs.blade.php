@@ -187,16 +187,28 @@
                 this.applySearch();
             });
 
-            // Apply colors after Livewire updates
+            // Handler for applying colors and search after DOM changes
+            const applyAfterUpdate = () => {
+                this.$nextTick(() => {
+                    this.applyColorLogs();
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
+                });
+            };
+
+            // Apply colors after Livewire updates (existing content)
             Livewire.hook('morph.updated', ({ el }) => {
                 if (el.id === 'logs') {
-                    this.$nextTick(() => {
-                        this.applyColorLogs();
-                        this.applySearch();
-                        if (this.alwaysScroll) {
-                            this.scrollToBottom();
-                        }
-                    });
+                    applyAfterUpdate();
+                }
+            });
+
+            // Apply colors after Livewire adds new content (initial load)
+            Livewire.hook('morph.added', ({ el }) => {
+                if (el.id === 'logs') {
+                    applyAfterUpdate();
                 }
             });
         }
