@@ -2974,7 +2974,11 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     }
 
     $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b {$branch} {$repository} .";
+
+    // Escape shell arguments for safety to prevent command injection
+    $escapedBranch = escapeshellarg($branch);
+    $escapedRepository = escapeshellarg($repository);
+    $cloneCommand = "git clone --no-checkout -b {$escapedBranch} {$escapedRepository} .";
     $workdir = rtrim($base_directory, '/');
 
     // Build paths to check: base_directory/coolify.json first, then repo root
@@ -2984,8 +2988,8 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     }
     $pathsToCheck[] = 'coolify.json';
 
-    // Build sparse-checkout file list
-    $fileList = collect($pathsToCheck)->map(fn ($path) => "./{$path}")->implode(' ');
+    // Build sparse-checkout file list (escaped for shell safety)
+    $fileList = collect($pathsToCheck)->map(fn ($path) => escapeshellarg("./{$path}"))->implode(' ');
 
     $commands = collect([
         "rm -rf /tmp/{$uuid}",
@@ -2998,8 +3002,8 @@ function loadConfigFromGit(string $repository, string $branch, string $base_dire
     ]);
 
     // Add cat commands for each path, trying base_directory first
-    // Use subshell to capture output before cleanup
-    $catCommands = collect($pathsToCheck)->map(fn ($path) => "cat ./{$path} 2>/dev/null")->implode(' || ');
+    // Use subshell to capture output before cleanup (paths escaped for shell safety)
+    $catCommands = collect($pathsToCheck)->map(fn ($path) => 'cat '.escapeshellarg("./{$path}").' 2>/dev/null')->implode(' || ');
     $commands->push("({$catCommands}) || true");
     $commands->push("cd / && rm -rf /tmp/{$uuid}");
 
