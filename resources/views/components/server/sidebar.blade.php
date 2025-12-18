@@ -6,6 +6,16 @@
             href="{{ route('server.advanced', ['server_uuid' => $server->uuid]) }}">Advanced
         </a>
     @endif
+    @if (!$server->isBuildServer() && !$server->settings->is_cloudflare_tunnel)
+        <a class="menu-item {{ $activeMenu === 'swarm' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+            href="{{ route('server.swarm', ['server_uuid' => $server->uuid]) }}">Swarm
+        </a>
+    @endif
+    @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
+        <a class="menu-item {{ $activeMenu === 'sentinel' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+            href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}">Sentinel
+        </a>
+    @endif
     <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
     </a>

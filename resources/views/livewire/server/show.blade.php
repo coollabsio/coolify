@@ -285,37 +285,6 @@
                                 @endif
                             </div>
 
-                            @if (!$server->isBuildServer() && !$server->settings->is_cloudflare_tunnel)
-                                <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span>
-                                </h3>
-                                <div class="pb-4">Read the docs <a class='underline dark:text-white'
-                                        href='https://coolify.io/docs/knowledge-base/docker/swarm'
-                                        target='_blank'>here</a>.
-                                </div>
-                                <div class="w-96">
-                                    @if ($server->settings->is_swarm_worker)
-                                        <x-forms.checkbox disabled instantSave type="checkbox" id="isSwarmManager"
-                                            helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                            label="Is it a Swarm Manager?" />
-                                    @else
-                                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                            type="checkbox" id="isSwarmManager"
-                                            helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                            label="Is it a Swarm Manager?" :disabled="$isValidating" />
-                                    @endif
-
-                                    @if ($server->settings->is_swarm_manager)
-                                        <x-forms.checkbox disabled instantSave type="checkbox" id="isSwarmWorker"
-                                            helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                            label="Is it a Swarm Worker?" />
-                                    @else
-                                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                            type="checkbox" id="isSwarmWorker"
-                                            helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                                            label="Is it a Swarm Worker?" :disabled="$isValidating" />
-                                    @endif
-                                </div>
-                            @endif
                         @endif
                     </div>
                 </div>
@@ -337,6 +306,20 @@
                                 @endforeach
                             </x-forms.select>
                         </div>
+                        <div class="w-48">
+                            <x-forms.input wire:model="manualHetznerServerId"
+                                label="Server ID"
+                                placeholder="e.g., 12345678"
+                                helper="Enter the Hetzner Server ID from your Hetzner Cloud console"
+                                canGate="update" :canResource="$server" />
+                        </div>
+                        <x-forms.button wire:click="searchHetznerServerById"
+                            wire:loading.attr="disabled"
+                            canGate="update" :canResource="$server">
+                            <span wire:loading.remove wire:target="searchHetznerServerById">Search by ID</span>
+                            <span wire:loading wire:target="searchHetznerServerById">Searching...</span>
+                        </x-forms.button>
+                        <div class="self-end pb-2 text-sm dark:text-neutral-500">OR</div>
                         <x-forms.button wire:click="searchHetznerServer"
                             wire:loading.attr="disabled"
                             canGate="update" :canResource="$server">
@@ -354,10 +337,14 @@
                     @if ($hetznerNoMatchFound)
                         <div class="mt-4 p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
                             <p class="text-yellow-600 dark:text-yellow-400">
-                                No Hetzner server found matching IP: {{ $server->ip }}
+                                @if ($manualHetznerServerId)
+                                    No Hetzner server found with ID: {{ $manualHetznerServerId }}
+                                @else
+                                    No Hetzner server found matching IP: {{ $server->ip }}
+                                @endif
                             </p>
                             <p class="text-sm dark:text-neutral-400 mt-1">
-                                Try a different token or verify the server IP is correct.
+                                Try a different token, enter the Server ID manually, or verify the details are correct.
                             </p>
                         </div>
                     @endif
@@ -377,116 +364,6 @@
                         </div>
                     @endif
                 </div>
-            @endif
-            @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
-                <form wire:submit.prevent='submit'>
-                    <div class="flex gap-2 items-center pt-4 pb-2">
-                        <h3>Sentinel</h3>
-                        <x-helper helper="Sentinel reports your server's & container's health and collects metrics." />
-                        @if ($server->isSentinelEnabled())
-                            <div class="flex gap-2 items-center">
-                                @if ($server->isSentinelLive())
-                                    <x-status.running status="In sync" noLoading title="{{ $sentinelUpdatedAt }}" />
-                                    <x-forms.button type="submit" canGate="update" :canResource="$server"
-                                        :disabled="$isValidating">Save</x-forms.button>
-                                    <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server"
-                                        :disabled="$isValidating">Restart</x-forms.button>
-                                    <x-slide-over fullScreen>
-                                        <x-slot:title>Sentinel Logs</x-slot:title>
-                                        <x-slot:content>
-                                            <livewire:project.shared.get-logs :server="$server"
-                                                container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
-                                                lazy />
-                                        </x-slot:content>
-                                        <x-forms.button @click="slideOverOpen=true"
-                                            :disabled="$isValidating">Logs</x-forms.button>
-                                    </x-slide-over>
-                                @else
-                                    <x-status.stopped status="Out of sync" noLoading
-                                        title="{{ $sentinelUpdatedAt }}" />
-                                    <x-forms.button type="submit" canGate="update" :canResource="$server"
-                                        :disabled="$isValidating">Save</x-forms.button>
-                                    <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server"
-                                        :disabled="$isValidating">Sync</x-forms.button>
-                                    <x-slide-over fullScreen>
-                                        <x-slot:title>Sentinel Logs</x-slot:title>
-                                        <x-slot:content>
-                                            <livewire:project.shared.get-logs :server="$server"
-                                                container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
-                                                lazy />
-                                        </x-slot:content>
-                                        <x-forms.button @click="slideOverOpen=true"
-                                            :disabled="$isValidating">Logs</x-forms.button>
-                                    </x-slide-over>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <div class="w-96">
-                            <x-forms.checkbox canGate="update" :canResource="$server" wire:model.live="isSentinelEnabled"
-                                label="Enable Sentinel" :disabled="$isValidating" />
-                            @if ($server->isSentinelEnabled())
-                                @if (isDev())
-                                    <x-forms.checkbox canGate="update" :canResource="$server" id="isSentinelDebugEnabled"
-                                        label="Enable Sentinel (with debug)" instantSave :disabled="$isValidating" />
-                                @endif
-                                <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                    id="isMetricsEnabled" label="Enable Metrics" :disabled="$isValidating" />
-                            @else
-                                @if (isDev())
-                                    <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel (with debug)"
-                                        disabled instantSave />
-                                @endif
-                                <x-forms.checkbox instantSave disabled id="isMetricsEnabled"
-                                    label="Enable Metrics (enable Sentinel first)" />
-                            @endif
-                        </div>
-                        @if (isDev() && $server->isSentinelEnabled())
-                            <div class="pt-4" x-data="{
-                                customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
-                                saveCustomImage() {
-                                    localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                                    $wire.set('sentinelCustomDockerImage', this.customImage);
-                                }
-                            }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
-                                <x-forms.input x-model="customImage" @input.debounce.500ms="saveCustomImage()"
-                                    placeholder="e.g., sentinel:latest or myregistry/sentinel:dev"
-                                    label="Custom Sentinel Docker Image (Dev Only)"
-                                    helper="Override the default Sentinel Docker image for testing. Leave empty to use the default." />
-                            </div>
-                        @endif
-                        @if ($server->isSentinelEnabled())
-                            <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
-                                <x-forms.input canGate="update" :canResource="$server" type="password" id="sentinelToken"
-                                    label="Sentinel token" required helper="Token for Sentinel." :disabled="$isValidating" />
-                                <x-forms.button canGate="update" :canResource="$server"
-                                    wire:click="regenerateSentinelToken" :disabled="$isValidating">Regenerate</x-forms.button>
-                            </div>
-
-                            <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl" required
-                                label="Coolify URL"
-                                helper="URL to your Coolify instance. If it is empty that means you do not have a FQDN set for your Coolify instance."
-                                :disabled="$isValidating" />
-
-                            <div class="flex flex-col gap-2">
-                                <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                                    <x-forms.input canGate="update" :canResource="$server"
-                                        id="sentinelMetricsRefreshRateSeconds" label="Metrics rate (seconds)" required
-                                        helper="Interval used for gathering metrics. Lower values result in more disk space usage."
-                                        :disabled="$isValidating" />
-                                    <x-forms.input canGate="update" :canResource="$server" id="sentinelMetricsHistoryDays"
-                                        label="Metrics history (days)" required
-                                        helper="Number of days to retain metrics data for." :disabled="$isValidating" />
-                                    <x-forms.input canGate="update" :canResource="$server"
-                                        id="sentinelPushIntervalSeconds" label="Push interval (seconds)" required
-                                        helper="Interval at which metrics data is sent to the collector."
-                                        :disabled="$isValidating" />
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                </form>
             @endif
         </div>
     </div>
