@@ -48,6 +48,8 @@ const DATABASE_DOCKER_IMAGES = [
     'influxdb',
     'clickhouse/clickhouse-server',
     'timescaledb/timescaledb',
+    'timescaledb',  // Matches timescale/timescaledb
+    'timescaledb-ha',  // Matches timescale/timescaledb-ha
     'pgvector/pgvector',
 ];
 const SPECIFIC_SERVICES = [
@@ -56,6 +58,7 @@ const SPECIFIC_SERVICES = [
     'ghcr.io/coollabsio/minio',
     'coollabsio/minio',
     'svhd/logto',
+    'dxflrs/garage',
 ];
 
 // Based on /etc/os-release
@@ -70,6 +73,7 @@ const SUPPORTED_OS = [
 const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
     'pgadmin',
     'postgresus',
+    'redis-insight',
 ];
 const NEEDS_TO_DISABLE_GZIP = [
     'beszel' => ['beszel'],

@@ -19,6 +19,9 @@ class StandaloneMysql extends BaseModel
     protected $casts = [
         'mysql_password' => 'encrypted',
         'mysql_root_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()
@@ -45,9 +48,23 @@ class StandaloneMysql extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for MySQL databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneMysql::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all MySQL databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneMysql::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute

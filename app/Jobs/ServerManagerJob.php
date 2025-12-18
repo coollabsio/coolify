@@ -111,32 +111,46 @@ class ServerManagerJob implements ShouldQueue
 
     private function processServerTasks(Server $server): void
     {
+        // Get server timezone (used for all scheduled tasks)
+        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+        if (validate_timezone($serverTimezone) === false) {
+            $serverTimezone = config('app.timezone');
+        }
+
         // Check if we should run sentinel-based checks
         $lastSentinelUpdate = $server->sentinel_updated_at;
         $waitTime = $server->waitBeforeDoingSshCheck();
-        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->subSeconds($waitTime));
+        $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
         if ($sentinelOutOfSync) {
-            // Dispatch jobs if Sentinel is out of sync
-            if ($this->shouldRunNow($this->checkFrequency)) {
+            // Dispatch ServerCheckJob if Sentinel is out of sync
+            if ($this->shouldRunNow($this->checkFrequency, $serverTimezone)) {
                 ServerCheckJob::dispatch($server);
             }
+        }
 
-            // Dispatch ServerStorageCheckJob if due
-            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 * * * *');
+        $isSentinelEnabled = $server->isSentinelEnabled();
+        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
+        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
+
+        if ($shouldRestartSentinel) {
+            dispatch(function () use ($server) {
+                $server->restartContainer('coolify-sentinel');
+            });
+        }
+
+        // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
+        // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
+        if ($sentinelOutOfSync) {
+            $serverDiskUsageCheckFrequency = data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *');
             if (isset(VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency])) {
                 $serverDiskUsageCheckFrequency = VALID_CRON_STRINGS[$serverDiskUsageCheckFrequency];
             }
-            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency);
+            $shouldRunStorageCheck = $this->shouldRunNow($serverDiskUsageCheckFrequency, $serverTimezone);
 
             if ($shouldRunStorageCheck) {
                 ServerStorageCheckJob::dispatch($server);
             }
-        }
-
-        $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
-        if (validate_timezone($serverTimezone) === false) {
-            $serverTimezone = config('app.timezone');
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
@@ -146,14 +160,10 @@ class ServerManagerJob implements ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
-        $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && $this->shouldRunNow('0 0 * * *', $serverTimezone);
-
-        if ($shouldRestartSentinel) {
-            dispatch(function () use ($server) {
-                $server->restartContainer('coolify-sentinel');
-            });
+        // Sentinel update checks (hourly) - check for updates to Sentinel version
+        // No timezone needed for hourly - runs at top of every hour
+        if ($isSentinelEnabled && $this->shouldRunNow('0 * * * *')) {
+            CheckAndStartSentinelJob::dispatch($server);
         }
     }
 

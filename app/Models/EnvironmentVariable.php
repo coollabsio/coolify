@@ -65,6 +65,8 @@ class EnvironmentVariable extends BaseModel
                             'value' => $environment_variable->value,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
+                            'is_runtime' => $environment_variable->is_runtime ?? false,
+                            'is_buildtime' => $environment_variable->is_buildtime ?? false,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,

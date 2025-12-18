@@ -18,6 +18,9 @@ class StandaloneClickhouse extends BaseModel
 
     protected $casts = [
         'clickhouse_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()
@@ -25,7 +28,7 @@ class StandaloneClickhouse extends BaseModel
         static::created(function ($database) {
             LocalPersistentVolume::create([
                 'name' => 'clickhouse-data-'.$database->uuid,
-                'mount_path' => '/bitnami/clickhouse',
+                'mount_path' => '/var/lib/clickhouse',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
@@ -44,9 +47,23 @@ class StandaloneClickhouse extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for ClickHouse databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneClickhouse::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all ClickHouse databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneClickhouse::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute
@@ -232,8 +249,9 @@ class StandaloneClickhouse extends BaseModel
             get: function () {
                 $encodedUser = rawurlencode($this->clickhouse_admin_user);
                 $encodedPass = rawurlencode($this->clickhouse_admin_password);
+                $database = $this->clickhouse_db ?? 'default';
 
-                return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$this->clickhouse_db}";
+                return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$database}";
             },
         );
     }
@@ -249,8 +267,9 @@ class StandaloneClickhouse extends BaseModel
                     }
                     $encodedUser = rawurlencode($this->clickhouse_admin_user);
                     $encodedPass = rawurlencode($this->clickhouse_admin_password);
+                    $database = $this->clickhouse_db ?? 'default';
 
-                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->clickhouse_db}";
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$database}";
                 }
 
                 return null;

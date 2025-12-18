@@ -32,7 +32,7 @@
                             $backup->latest_log &&
                             data_get($backup->latest_log, 'status') === 'success',
                         'border-gray-200 dark:border-coolgray-300' => !$backup->latest_log,
-                    ])
+                    ]) {{ wireNavigate() }}
                         href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                         @if ($backup->latest_log && data_get($backup->latest_log, 'status') === 'running')
                             <div class="absolute top-2 right-2">

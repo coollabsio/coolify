@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->foreignId('cloud_provider_token_id')->nullable()->after('private_key_id')->constrained()->onDelete('set null');
-        });
+        if (! Schema::hasColumn('servers', 'cloud_provider_token_id')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->foreignId('cloud_provider_token_id')->nullable()->after('private_key_id')->constrained()->onDelete('set null');
+            });
+        }
     }
 
     /**
@@ -21,9 +23,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->dropForeign(['cloud_provider_token_id']);
-            $table->dropColumn('cloud_provider_token_id');
-        });
+        if (Schema::hasColumn('servers', 'cloud_provider_token_id')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->dropForeign(['cloud_provider_token_id']);
+                $table->dropColumn('cloud_provider_token_id');
+            });
+        }
     }
 };

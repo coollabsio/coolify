@@ -443,4 +443,13 @@ class User extends Authenticatable implements SendsEmail
             && $this->email_change_code_expires_at
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
+
+    /**
+     * Check if the user has a password set.
+     * OAuth users are created without passwords.
+     */
+    public function hasPassword(): bool
+    {
+        return ! empty($this->password);
+    }
 }
