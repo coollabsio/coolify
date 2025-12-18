@@ -76,6 +76,22 @@ function database_proxy_dir($uuid): string
 {
     return base_configuration_dir()."/databases/$uuid/proxy";
 }
+
+function deployment_configuration_dir(string $application_uuid, string $deployment_uuid): string
+{
+    return application_configuration_dir()."/{$application_uuid}/deployments/{$deployment_uuid}";
+}
+
+function deployments_base_dir(string $application_uuid): string
+{
+    return application_configuration_dir()."/{$application_uuid}/deployments";
+}
+
+function current_deployment_symlink(string $application_uuid): string
+{
+    return application_configuration_dir()."/{$application_uuid}/current";
+}
+
 function backup_dir(): string
 {
     return base_configuration_dir().'/backups';

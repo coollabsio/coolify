@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\CleanupOldDeployments;
+use App\Actions\Application\SaveDeploymentSnapshot;
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
@@ -988,6 +990,70 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             }
+        }
+
+        // Save versioned deployment snapshot for rollback functionality
+        $this->save_deployment_snapshot();
+    }
+
+    private function save_deployment_snapshot()
+    {
+        try {
+            // Only save snapshots for successful deployments (non-PR)
+            if ($this->pull_request_id !== 0) {
+                return;
+            }
+
+            // Skip if deployment failed or is not finished
+            if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::FINISHED->value) {
+                return;
+            }
+
+            $serverForSnapshot = $this->use_build_server ? $this->original_server : $this->server;
+
+            // Get docker-compose content
+            $dockerComposeContent = '';
+            if (isset($this->docker_compose_base64)) {
+                $dockerComposeContent = base64_decode($this->docker_compose_base64);
+            } elseif (isset($this->docker_compose)) {
+                $dockerComposeContent = $this->docker_compose;
+            }
+
+            // Get environment variables content
+            $envContent = '';
+            $envVariables = $this->generate_runtime_environment_variables();
+            if ($envVariables->isNotEmpty()) {
+                $envContent = $envVariables->implode("\n");
+            }
+
+            // Get Dockerfile content if applicable
+            $dockerfileContent = null;
+            if ($this->build_pack === 'dockerfile' && $this->application->dockerfile) {
+                $dockerfileContent = $this->application->dockerfile;
+            }
+
+            // Save the deployment snapshot using the Action
+            SaveDeploymentSnapshot::run(
+                $this->application,
+                $this->application_deployment_queue,
+                $serverForSnapshot,
+                $dockerComposeContent,
+                $envContent,
+                $dockerfileContent
+            );
+
+            // Cleanup old deployments to maintain retention policy (keep last 5)
+            CleanupOldDeployments::run(
+                $this->application,
+                $serverForSnapshot,
+                CleanupOldDeployments::DEFAULT_RETENTION
+            );
+
+            $this->application_deployment_queue->addLogEntry('Deployment snapshot saved for rollback.', hidden: true);
+        } catch (Exception $e) {
+            // Log but don't fail the deployment if snapshot saving fails
+            $this->application_deployment_queue->addLogEntry('Warning: Failed to save deployment snapshot: '.$e->getMessage(), 'stderr', hidden: true);
+            \Log::warning('Failed to save deployment snapshot for '.$this->deployment_uuid.': '.$e->getMessage());
         }
     }
 
