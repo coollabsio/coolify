@@ -3176,8 +3176,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         try {
             $timeout = isDev() ? 1 : 30;
             $this->execute_remote_command(
-                ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
-                ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+                ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true]
             );
         } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');

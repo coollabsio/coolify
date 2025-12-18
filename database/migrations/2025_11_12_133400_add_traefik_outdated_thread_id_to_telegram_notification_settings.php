@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('telegram_notification_settings', function (Blueprint $table) {
-            $table->text('telegram_notifications_traefik_outdated_thread_id')->nullable();
-        });
+        if (! Schema::hasColumn('telegram_notification_settings', 'telegram_notifications_traefik_outdated_thread_id')) {
+            Schema::table('telegram_notification_settings', function (Blueprint $table) {
+                $table->text('telegram_notifications_traefik_outdated_thread_id')->nullable();
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('telegram_notification_settings', function (Blueprint $table) {
-            $table->dropColumn('telegram_notifications_traefik_outdated_thread_id');
-        });
+        if (Schema::hasColumn('telegram_notification_settings', 'telegram_notifications_traefik_outdated_thread_id')) {
+            Schema::table('telegram_notification_settings', function (Blueprint $table) {
+                $table->dropColumn('telegram_notifications_traefik_outdated_thread_id');
+            });
+        }
     }
 };

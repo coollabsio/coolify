@@ -16,6 +16,12 @@ class StandaloneMongodb extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    protected $casts = [
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
+    ];
+
     protected static function booted()
     {
         static::created(function ($database) {

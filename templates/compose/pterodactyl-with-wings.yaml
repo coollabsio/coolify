@@ -111,6 +111,8 @@ services:
   wings:
     image: 'ghcr.io/pterodactyl/wings:v1.11.13'
     restart: unless-stopped
+    ports:
+      - "2022:2022"
     environment:
       - SERVICE_URL_WINGS_8443
       - 'TZ=${TIMEZONE:-UTC}'

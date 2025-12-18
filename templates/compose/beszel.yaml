@@ -9,21 +9,21 @@
 # Add the public Key in "Key" env variable and token in the "Token" variable below (These are obtained from Beszel UI)
 services:
   beszel:
-    image: 'henrygd/beszel:0.15.2' # Released on October 30 2025
+    image: 'henrygd/beszel:0.16.1' # Released on 14 Nov 2025
     environment:
       - SERVICE_URL_BESZEL_8090
     volumes:
       - 'beszel_data:/beszel_data'
       - 'beszel_socket:/beszel_socket'
   beszel-agent:
-    image: 'henrygd/beszel-agent:0.15.2' # Released on October 30 2025
-    volumes:
-      - beszel_agent_data:/var/lib/beszel-agent
-      - beszel_socket:/beszel_socket
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+    image: 'henrygd/beszel-agent:0.16.1' # Released on 14 Nov 2025
     environment:
       - LISTEN=/beszel_socket/beszel.sock
       - HUB_URL=http://beszel:8090
       - 'TOKEN=${TOKEN}'
       - 'KEY=${KEY}'
+    volumes:
+      - beszel_agent_data:/var/lib/beszel-agent
+      - beszel_socket:/beszel_socket
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
 

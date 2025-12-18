@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->boolean('is_validating')->default(false)->after('hetzner_server_status');
-        });
+        if (! Schema::hasColumn('servers', 'is_validating')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->boolean('is_validating')->default(false)->after('hetzner_server_status');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn('is_validating');
-        });
+        if (Schema::hasColumn('servers', 'is_validating')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->dropColumn('is_validating');
+            });
+        }
     }
 };
