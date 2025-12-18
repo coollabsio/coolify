@@ -68,7 +68,7 @@
                                 @elseif (data_get($deployment, 'can_instant_rollback'))
                                     <x-forms.button
                                         wire:click="rollbackToDeployment('{{ data_get($deployment, 'deployment_uuid') }}')"
-                                        class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600">
+                                        isHighlighted>
                                         Instant Rollback
                                     </x-forms.button>
                                 @elseif (data_get($deployment, 'can_rebuild_rollback'))

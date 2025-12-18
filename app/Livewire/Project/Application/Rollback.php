@@ -83,15 +83,24 @@ class Rollback extends Component
             ], $server, throwError: false);
             $this->currentDeploymentUuid = trim($currentDeploymentOutput) ?: null;
 
-            $this->deployments = $dbDeployments->map(function ($deployment) use ($existingDirsList, $server) {
+            $this->deployments = $dbDeployments->map(function ($deployment) use ($existingDirsList, $server, $deploymentsBaseDir) {
                 $hasConfig = $existingDirsList->contains($deployment->deployment_uuid);
 
-                // Check if image exists
+                // Check if image exists by reading from metadata
                 $imageExists = false;
+                $imageName = null;
                 if ($hasConfig) {
-                    $imageName = $this->application->docker_registry_image_name
+                    // Read image name from metadata (includes config hash for proper rollback)
+                    $deploymentDir = "{$deploymentsBaseDir}/{$deployment->deployment_uuid}";
+                    $metadataJson = instant_remote_process([
+                        "cat {$deploymentDir}/metadata.json 2>/dev/null || echo '{}'",
+                    ], $server, throwError: false);
+                    $metadata = json_decode($metadataJson, true) ?? [];
+
+                    // Use stored image name (with config hash) or fall back to commit-based name
+                    $imageName = $metadata['image_name'] ?? ($this->application->docker_registry_image_name
                         ? "{$this->application->docker_registry_image_name}:{$deployment->commit}"
-                        : "{$this->application->uuid}:{$deployment->commit}";
+                        : "{$this->application->uuid}:{$deployment->commit}");
 
                     $check = instant_remote_process([
                         "docker images -q {$imageName} 2>/dev/null | head -1",
@@ -175,9 +184,11 @@ class Rollback extends Component
             ], $server);
 
             // Stop current containers and start from saved configuration
+            // Use --force-recreate to ensure container picks up the .env file from this deployment
+            // This is critical for rollbacks where only env vars changed (same image, different config)
             instant_remote_process([
                 "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} down --remove-orphans 2>/dev/null || true",
-                "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} up -d",
+                "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} up -d --force-recreate",
             ], $server);
 
             $this->application->update(['status' => 'running']);

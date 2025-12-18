@@ -1039,7 +1039,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $serverForSnapshot,
                 $dockerComposeContent,
                 $envContent,
-                $dockerfileContent
+                $dockerfileContent,
+                $this->production_image_name
             );
 
             // Cleanup old deployments to maintain retention policy (keep last 5)
@@ -1142,7 +1143,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
             }
         } else {
-            $this->dockerImageTag = str($this->commit)->substr(0, 128);
+            // Include config hash in image tag to differentiate builds with same commit but different build args
+            // This ensures rollback works correctly when only build-time env vars changed
+            $configHash = substr($this->application->config_hash ?? '', 0, 8);
+            $this->dockerImageTag = str($this->commit)->substr(0, 119).'-'.$configHash;
             // if ($this->application->docker_registry_image_tag) {
             //     $this->dockerImageTag = $this->application->docker_registry_image_tag;
             // }

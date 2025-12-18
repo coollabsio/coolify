@@ -17,7 +17,8 @@ class SaveDeploymentSnapshot
         Server $server,
         string $dockerComposeContent,
         string $envContent,
-        ?string $dockerfileContent = null
+        ?string $dockerfileContent = null,
+        ?string $productionImageName = null
     ): bool {
         $deploymentDir = deployment_configuration_dir($application->uuid, $deployment->deployment_uuid);
         $deploymentsBaseDir = deployments_base_dir($application->uuid);
@@ -50,7 +51,7 @@ class SaveDeploymentSnapshot
         }
 
         // Generate and save metadata
-        $metadata = $this->generateMetadata($application, $deployment);
+        $metadata = $this->generateMetadata($application, $deployment, $productionImageName);
         $metadataJson = json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $metadataBase64 = base64_encode($metadataJson);
         instant_remote_process([
@@ -72,11 +73,13 @@ class SaveDeploymentSnapshot
         return true;
     }
 
-    private function generateMetadata(Application $application, ApplicationDeploymentQueue $deployment): array
+    private function generateMetadata(Application $application, ApplicationDeploymentQueue $deployment, ?string $productionImageName = null): array
     {
-        $imageName = $application->docker_registry_image_name
+        // Use the actual production image name if provided (includes config hash for rollback support)
+        // Fall back to commit-based name for backward compatibility with older deployments
+        $imageName = $productionImageName ?? ($application->docker_registry_image_name
             ? "{$application->docker_registry_image_name}:{$deployment->commit}"
-            : "{$application->uuid}:{$deployment->commit}";
+            : "{$application->uuid}:{$deployment->commit}");
 
         return [
             'version' => '1.0',
