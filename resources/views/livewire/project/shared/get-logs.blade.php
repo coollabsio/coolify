@@ -99,6 +99,10 @@
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
+        decodeHtml(text) {
+            const doc = new DOMParser().parseFromString(text, 'text/html');
+            return doc.documentElement.textContent;
+        },
         applySearch() {
             const logs = document.getElementById('logs');
             if (!logs) return;
@@ -116,7 +120,7 @@
 
                 // Update highlighting
                 if (textSpan) {
-                    const originalText = textSpan.dataset.lineText || '';
+                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
                     if (!query) {
                         textSpan.textContent = originalText;
                     } else if (matches) {
