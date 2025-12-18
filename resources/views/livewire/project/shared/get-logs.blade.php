@@ -403,13 +403,13 @@
                                         $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                                         $monthName = $monthNames[(int)$month - 1] ?? $month;
 
-                                        // Format: 2025-Dec-04 09:44:58.198879
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}.{$microseconds}";
+                                        // Format for display: 2025-Dec-04 09:44:58
+                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        // Include microseconds in key for uniqueness
+                                        $lineKey = "{$timestamp}.{$microseconds}";
                                     }
-                                    // Use timestamp for stable key (unique per log line)
-                                    $lineKey = $timestamp ?: 'line-' . $index;
                                 @endphp
-                                <div wire:key="{{ $lineKey }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
+                                <div wire:key="{{ $lineKey ?? 'line-' . $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
