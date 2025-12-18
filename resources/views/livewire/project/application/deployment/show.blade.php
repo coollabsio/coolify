@@ -8,26 +8,44 @@
         <div x-data="{
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
-        intervalId: null,
+        rafId: null,
         showTimestamps: true,
         searchQuery: '',
         renderTrigger: 0,
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
+        // Cache for decoded HTML to avoid repeated DOMParser calls
+        decodeCache: new Map(),
+        // Cache for match count to avoid repeated DOM queries
+        matchCountCache: null,
+        lastSearchQuery: '',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
+        },
+        scrollToBottom() {
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll) return;
+            this.rafId = requestAnimationFrame(() => {
+                this.scrollToBottom();
+                // Schedule next scroll after a reasonable delay (250ms instead of 100ms)
+                if (this.alwaysScroll) {
+                    setTimeout(() => this.scheduleScroll(), 250);
+                }
+            });
         },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                    }
-                }, 100);
+                this.scheduleScroll();
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
         matchesSearch(text) {
@@ -41,17 +59,19 @@
             }
             const logsContainer = document.getElementById('logs');
             if (!logsContainer) return false;
-
-            // Check if selection is within the logs container
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
+            // Return cached result if available
+            if (this.decodeCache.has(text)) {
+                return this.decodeCache.get(text);
+            }
+            // Decode HTML entities with max iteration limit
             let decoded = text;
             let prev = '';
             let iterations = 0;
-            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
+            const maxIterations = 3;
 
             while (decoded !== prev && iterations < maxIterations) {
                 prev = decoded;
@@ -59,11 +79,17 @@
                 decoded = doc.documentElement.textContent;
                 iterations++;
             }
+            // Cache the result (limit cache size to prevent memory bloat)
+            if (this.decodeCache.size > 5000) {
+                // Clear oldest entries when cache gets too large
+                const firstKey = this.decodeCache.keys().next().value;
+                this.decodeCache.delete(firstKey);
+            }
+            this.decodeCache.set(text, decoded);
             return decoded;
         },
         renderHighlightedLog(el, text) {
-            // Skip re-render if user has text selected in logs (preserves copy ability)
-            // But always render if the element is empty (initial render)
+            // Skip re-render if user has text selected in logs
             if (el.textContent && this.hasActiveLogSelection()) {
                 return;
             }
@@ -82,11 +108,9 @@
 
             let index = lowerText.indexOf(query, lastIndex);
             while (index !== -1) {
-                // Add text before match
                 if (index > lastIndex) {
                     el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
                 }
-                // Add highlighted match
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
                 mark.textContent = decoded.substring(index, index + this.searchQuery.length);
@@ -96,22 +120,28 @@
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            // Add remaining text
             if (lastIndex < decoded.length) {
                 el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
             }
         },
         getMatchCount() {
             if (!this.searchQuery.trim()) return 0;
+            // Return cached count if search query hasn't changed
+            if (this.lastSearchQuery === this.searchQuery && this.matchCountCache !== null) {
+                return this.matchCountCache;
+            }
             const logs = document.getElementById('logs');
             if (!logs) return 0;
             const lines = logs.querySelectorAll('[data-log-line]');
             let count = 0;
+            const query = this.searchQuery.toLowerCase();
             lines.forEach(line => {
-                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(this.searchQuery.toLowerCase())) {
+                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(query)) {
                     count++;
                 }
             });
+            this.matchCountCache = count;
+            this.lastSearchQuery = this.searchQuery;
             return count;
         },
         downloadLogs() {
@@ -135,15 +165,11 @@
             URL.revokeObjectURL(url);
         },
         stopScroll() {
-            // Scroll to the end one final time before disabling
-            const logsContainer = document.getElementById('logsContainer');
-            if (logsContainer) {
-                logsContainer.scrollTop = logsContainer.scrollHeight;
-            }
+            this.scrollToBottom();
             this.alwaysScroll = false;
-            if (this.intervalId) {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
             }
         },
         init() {
@@ -153,30 +179,32 @@
                     skip();
                 }
             });
-            // Re-render logs after Livewire updates
+            // Re-render logs after Livewire updates (debounced)
+            let renderTimeout = null;
+            const debouncedRender = () => {
+                clearTimeout(renderTimeout);
+                renderTimeout = setTimeout(() => {
+                    this.matchCountCache = null; // Invalidate match cache on new content
+                    this.renderTrigger++;
+                }, 100);
+            };
             document.addEventListener('livewire:navigated', () => {
-                this.$nextTick(() => { this.renderTrigger++; });
+                this.$nextTick(debouncedRender);
             });
             Livewire.hook('commit', ({ succeed }) => {
                 succeed(() => {
-                    this.$nextTick(() => { this.renderTrigger++; });
+                    this.$nextTick(debouncedRender);
                 });
             });
             // Stop auto-scroll when deployment finishes
             Livewire.on('deploymentFinished', () => {
-                // Wait for DOM to update with final logs before scrolling to end
                 setTimeout(() => {
                     this.stopScroll();
                 }, 500);
             });
             // Start auto-scroll if deployment is in progress
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                    }
-                }, 100);
+                this.scheduleScroll();
             }
         }
     }">
@@ -212,7 +240,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                                 </svg>
-                                <input type="text" x-model="searchQuery" placeholder="Find in logs"
+                                <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                     class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-200" />
                                 <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                     class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -308,7 +336,7 @@
                                 <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
                                     x-effect="renderTrigger; searchQuery; $el.classList.toggle('hidden', !matchesSearch($el.dataset.logContent))" @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
-                                        'flex gap-2',
+                                        'flex gap-2 log-line',
                                     ])>
                                     <span x-show="showTimestamps"
                                         class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>

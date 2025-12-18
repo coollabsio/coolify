@@ -5,34 +5,55 @@
         logsLoaded: false,
         fullscreen: false,
         alwaysScroll: false,
-        intervalId: null,
+        rafId: null,
         scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
         renderTrigger: 0,
         containerName: '{{ $container ?? "logs" }}',
+        // Cache for decoded HTML to avoid repeated DOMParser calls
+        decodeCache: new Map(),
+        // Cache for match count to avoid repeated DOM queries
+        matchCountCache: null,
+        lastSearchQuery: '',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
                 this.alwaysScroll = false;
-                clearInterval(this.intervalId);
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
         isScrolling: false,
+        scrollToBottom() {
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                this.isScrolling = true;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(() => { this.isScrolling = false; }, 50);
+            }
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll) return;
+            this.rafId = requestAnimationFrame(() => {
+                this.scrollToBottom();
+                // Schedule next scroll after a reasonable delay (250ms instead of 100ms)
+                if (this.alwaysScroll) {
+                    setTimeout(() => this.scheduleScroll(), 250);
+                }
+            });
+        },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        this.isScrolling = true;
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
-                    }
-                }, 100);
+                this.scheduleScroll();
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
         handleScroll(event) {
@@ -40,7 +61,6 @@
             if (!this.alwaysScroll || this.isScrolling) return;
 
             // Debounce scroll handling to avoid false positives from DOM mutations
-            // when Livewire re-renders and adds new log lines
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
                 const el = event.target;
@@ -48,8 +68,10 @@
                 // Use larger threshold (100px) to avoid accidental disables
                 if (distanceFromBottom > 100) {
                     this.alwaysScroll = false;
-                    clearInterval(this.intervalId);
-                    this.intervalId = null;
+                    if (this.rafId) {
+                        cancelAnimationFrame(this.rafId);
+                        this.rafId = null;
+                    }
                 }
             }, 150);
         },
@@ -88,17 +110,19 @@
             }
             const logsContainer = document.getElementById('logs');
             if (!logsContainer) return false;
-
-            // Check if selection is within the logs container
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
+            // Return cached result if available
+            if (this.decodeCache.has(text)) {
+                return this.decodeCache.get(text);
+            }
+            // Decode HTML entities with max iteration limit
             let decoded = text;
             let prev = '';
             let iterations = 0;
-            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
+            const maxIterations = 3;
 
             while (decoded !== prev && iterations < maxIterations) {
                 prev = decoded;
@@ -106,11 +130,16 @@
                 decoded = doc.documentElement.textContent;
                 iterations++;
             }
+            // Cache the result (limit cache size to prevent memory bloat)
+            if (this.decodeCache.size > 5000) {
+                const firstKey = this.decodeCache.keys().next().value;
+                this.decodeCache.delete(firstKey);
+            }
+            this.decodeCache.set(text, decoded);
             return decoded;
         },
         renderHighlightedLog(el, text) {
-            // Skip re-render if user has text selected in logs (preserves copy ability)
-            // But always render if the element is empty (initial render)
+            // Skip re-render if user has text selected in logs
             if (el.textContent && this.hasActiveLogSelection()) {
                 return;
             }
@@ -129,11 +158,9 @@
 
             let index = lowerText.indexOf(query, lastIndex);
             while (index !== -1) {
-                // Add text before match
                 if (index > lastIndex) {
                     el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
                 }
-                // Add highlighted match
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
                 mark.textContent = decoded.substring(index, index + this.searchQuery.length);
@@ -143,22 +170,28 @@
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            // Add remaining text
             if (lastIndex < decoded.length) {
                 el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
             }
         },
         getMatchCount() {
             if (!this.searchQuery.trim()) return 0;
+            // Return cached count if search query hasn't changed
+            if (this.lastSearchQuery === this.searchQuery && this.matchCountCache !== null) {
+                return this.matchCountCache;
+            }
             const logs = document.getElementById('logs');
             if (!logs) return 0;
             const lines = logs.querySelectorAll('[data-log-line]');
             let count = 0;
+            const query = this.searchQuery.toLowerCase();
             lines.forEach(line => {
-                if (line.textContent.toLowerCase().includes(this.searchQuery.toLowerCase())) {
+                if (line.textContent.toLowerCase().includes(query)) {
                     count++;
                 }
             });
+            this.matchCountCache = count;
+            this.lastSearchQuery = this.searchQuery;
             return count;
         },
         downloadLogs() {
@@ -192,10 +225,18 @@
                     skip();
                 }
             });
-            // Re-render logs after Livewire updates
+            // Re-render logs after Livewire updates (debounced)
+            let renderTimeout = null;
+            const debouncedRender = () => {
+                clearTimeout(renderTimeout);
+                renderTimeout = setTimeout(() => {
+                    this.matchCountCache = null; // Invalidate match cache on new content
+                    this.renderTrigger++;
+                }, 100);
+            };
             Livewire.hook('commit', ({ succeed }) => {
                 succeed(() => {
-                    this.$nextTick(() => { this.renderTrigger++; });
+                    this.$nextTick(debouncedRender);
                 });
             });
         }
@@ -403,7 +444,7 @@
                                         'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
                                         'bg-blue-500/10 dark:bg-blue-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'info',
                                     }"
-                                    class="flex gap-2">
+                                    class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif

@@ -292,3 +292,14 @@
 @utility xterm {
     @apply p-2;
 }
+
+/* Log line optimization - uses content-visibility for lazy rendering of off-screen log lines */
+@utility log-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.5em;
+}
+
+/* Search highlight styling for logs */
+@utility log-highlight {
+    @apply bg-warning/40 dark:bg-warning/30 rounded-sm px-0.5;
+}
