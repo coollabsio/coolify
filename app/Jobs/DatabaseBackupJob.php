@@ -669,7 +669,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
-            $command = "docker stop backup-of-{$this->backup_log_uuid}";
+            $command = "docker rm -f backup-of-{$this->backup_log_uuid}";
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
     }
