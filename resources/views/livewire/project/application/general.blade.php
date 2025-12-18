@@ -456,6 +456,11 @@
                                 wire:model="customNetworkAliases" x-bind:disabled="!canUpdate" />
                         @endif
                     </div>
+                    <div class="flex xl:flex-row">
+                        <x-forms.input id="testIpallowlist" label="Network allow list (Traefik only)"
+                        helper="A comma separated list of allowed ips you would like to be able to access the Docker service.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>192.168.1.100, 192.168.1.200"
+                        wire:model="testIpallowlist" x-bind:disabled="!canUpdate" />
+                    </div>
 
                     <h3 class="pt-8">HTTP Basic Authentication</h3>
                     <div>
