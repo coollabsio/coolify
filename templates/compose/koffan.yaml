@@ -1,0 +1,23 @@
+# documentation: https://github.com/PanSalut/Koffan
+# slogan: A simple, collaborative shopping list PWA with real-time sync.
+# category: productivity
+# tags: shopping,list,grocery,pwa,collaborative,real-time,go,golang
+# logo: svgs/koffan.png
+# port: 80
+
+services:
+  koffan:
+    image: ghcr.io/pansalut/koffan:latest
+    environment:
+      - SERVICE_URL_KOFFAN_80
+      - APP_ENV=production
+      - APP_PASSWORD=${SERVICE_PASSWORD_KOFFAN}
+      - PORT=80
+      - DB_PATH=/data/shopping.db
+    volumes:
+      - koffan-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/login"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
