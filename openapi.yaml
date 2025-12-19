@@ -4194,7 +4194,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Project'
+                  $ref: '#/components/schemas/ProjectListItem'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -6249,6 +6249,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Environment'
+      type: object
+    ProjectListItem:
+      description: 'Project list item model (used in list endpoints, does not include environments)'
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
       type: object
     Server:
       description: 'Server model'
