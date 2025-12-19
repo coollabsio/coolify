@@ -27,7 +27,7 @@
                                 label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
                         @endcan
                     </div>
-                    <a target="_blank" class="flex hover:no-underline" href="{{ $resource?->gitWebhook }}">
+                    <a target="_blank" class="flex hover:no-underline" href="https://docs.github.com/en/webhooks/using-webhooks/creating-webhooks">
                         <x-forms.button>Webhook Configuration on GitHub
                             <x-external-link />
                         </x-forms.button>
