@@ -115,12 +115,16 @@ class Rollback extends Component
                     'commit' => $deployment->commit,
                     'created_at' => $deployment->created_at,
                     'has_config' => $hasConfig,
+                    'image_name' => $imageName,
                     'image_exists' => $imageExists,
                     'is_current' => $isCurrent,
                     'can_instant_rollback' => $hasConfig && $imageExists && ! $isCurrent,
                     'can_rebuild_rollback' => $hasConfig && ! $imageExists && ! $isCurrent,
                 ];
-            })->toArray();
+            })
+                ->filter(fn ($deployment) => $deployment['has_config']) // Only show deployments with saved config
+                ->values()
+                ->toArray();
 
             $showToast && $this->dispatch('success', 'Deployments loaded.');
         } catch (\Throwable $e) {
@@ -144,10 +148,16 @@ class Rollback extends Component
             $deploymentDir = deployment_configuration_dir($this->application->uuid, $deploymentUuid);
             $currentSymlink = current_deployment_symlink($this->application->uuid);
 
+            \Log::info("[Rollback] Starting rollback to deployment: {$deploymentUuid}");
+            \Log::info("[Rollback] Deployment dir: {$deploymentDir}");
+            \Log::info("[Rollback] Current symlink: {$currentSymlink}");
+
             // Check if deployment directory exists
             $checkDir = instant_remote_process([
                 "test -d {$deploymentDir} && echo 'exists' || echo 'not_found'",
             ], $server, throwError: false);
+
+            \Log::info("[Rollback] Directory check result: {$checkDir}");
 
             if (trim($checkDir) !== 'exists') {
                 $this->dispatch('error', 'Deployment configuration not found. Rebuild required.');
@@ -162,15 +172,22 @@ class Rollback extends Component
             ], $server, throwError: false);
             $metadata = json_decode($metadataJson, true) ?? [];
 
+            \Log::info('[Rollback] Metadata from file: '.json_encode($metadata));
+
             $imageName = $metadata['image_name'] ?? "{$this->application->uuid}:{$metadata['commit']}";
+
+            \Log::info("[Rollback] Image name to use: {$imageName}");
 
             // Check if image exists
             $imageCheck = instant_remote_process([
                 "docker images -q {$imageName} 2>/dev/null | head -1",
             ], $server, throwError: false);
 
+            \Log::info("[Rollback] Image check result: '{$imageCheck}'");
+
             if (empty(trim($imageCheck))) {
                 // Image doesn't exist - need to rebuild
+                \Log::info('[Rollback] Image not found, triggering rebuild');
                 $this->dispatch('info', 'Image not found. Starting rebuild deployment...');
                 $this->triggerRebuildRollback($deploymentUuid, $metadata['commit'] ?? 'HEAD');
 
@@ -178,24 +195,58 @@ class Rollback extends Component
             }
 
             // Image exists - perform instant rollback
+            \Log::info('[Rollback] Image exists, performing instant rollback');
+
+            // Read docker-compose.yaml to see what image it references
+            $composeContent = instant_remote_process([
+                "cat {$deploymentDir}/docker-compose.yaml 2>/dev/null | head -30",
+            ], $server, throwError: false);
+            \Log::info("[Rollback] Docker compose content (first 30 lines):\n{$composeContent}");
+
+            // Fix: Update docker-compose.yaml to use the correct image from metadata
+            // This is needed because older deployments might have docker-compose files with wrong image names
+            // The metadata.json has the correct image name that was actually built
+            $escapedImageName = str_replace('/', '\\/', $imageName);
+            instant_remote_process([
+                "sed -i \"s|image:.*|image: '{$escapedImageName}'|\" {$deploymentDir}/docker-compose.yaml",
+            ], $server, throwError: false);
+            \Log::info("[Rollback] Updated docker-compose.yaml with correct image: {$imageName}");
+
             // Update current symlink
             instant_remote_process([
                 "ln -sfn {$deploymentDir} {$currentSymlink}",
             ], $server);
+            \Log::info('[Rollback] Updated symlink');
 
-            // Stop current containers and start from saved configuration
-            // Use --force-recreate to ensure container picks up the .env file from this deployment
-            // This is critical for rollbacks where only env vars changed (same image, different config)
-            instant_remote_process([
-                "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} down --remove-orphans 2>/dev/null || true",
-                "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} up -d --force-recreate",
-            ], $server);
+            // Stop and remove ALL containers for this application using label-based lookup
+            // This is necessary because container names include timestamps, so docker compose down
+            // from a different deployment directory won't stop containers from other deployments
+            // Use a single command to stop and remove all containers at once to avoid race conditions
+            $stopResult = instant_remote_process([
+                "docker ps -a --filter='label=coolify.applicationId={$this->application->id}' --filter='label=coolify.pullRequestId=0' -q | xargs -r docker stop -t 30",
+                "docker ps -a --filter='label=coolify.applicationId={$this->application->id}' --filter='label=coolify.pullRequestId=0' -q | xargs -r docker rm -f",
+            ], $server, throwError: false);
+            \Log::info("[Rollback] Stop containers result: {$stopResult}");
+
+            // Start the new deployment with force-recreate to ensure container picks up the .env file
+            $upResult = instant_remote_process([
+                "cd {$deploymentDir} && docker compose --project-name {$this->application->uuid} up -d --force-recreate 2>&1",
+            ], $server, throwError: false);
+            \Log::info("[Rollback] Docker compose up result: {$upResult}");
+
+            // Check what container is now running
+            $runningContainer = instant_remote_process([
+                "docker ps --filter='label=coolify.applicationId={$this->application->id}' --format '{{.Names}} {{.Image}}'",
+            ], $server, throwError: false);
+            \Log::info("[Rollback] Running container after rollback: {$runningContainer}");
 
             $this->application->update(['status' => 'running']);
 
             $this->dispatch('success', 'Rollback completed successfully.');
             $this->loadDeployments();
         } catch (\Throwable $e) {
+            \Log::error('[Rollback] Error: '.$e->getMessage());
+
             return handleError($e, $this);
         }
     }

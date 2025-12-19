@@ -17,9 +17,9 @@
     @endif
 
     <div class="pb-4">
-        <form wire:submit="saveSettings" class="flex items-end gap-2 w-96">
-            <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Images to keep for rollback"
-                helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable image retention at the server level, which overrides this setting."
+        <form wire:submit="saveSettings" class="flex items-end gap-2">
+            <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Deployments to keep for rollback"
+                helper="Number of deployments (images and configurations) to keep for rollback. Set to 0 to only keep the currently running deployment. PR deployments are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable retention at the server level, which overrides this setting."
                 canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
             <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">Save</x-forms.button>
         </form>
@@ -40,6 +40,9 @@
                                 <span class="font-mono text-sm">
                                     {{ Str::limit(data_get($deployment, 'commit'), 12) }}
                                 </span>
+                                <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                                    ({{ data_get($deployment, 'deployment_uuid') }})
+                                </span>
                             </div>
                             @php
                                 $date = data_get($deployment, 'created_at');
@@ -48,16 +51,17 @@
                             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 {{ $interval->diffForHumans() }} ({{ $interval->format('Y-m-d H:i:s') }})
                             </div>
+                            @if (data_get($deployment, 'image_name'))
+                                <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
+                                    Image: {{ data_get($deployment, 'image_name') }}
+                                </div>
+                            @endif
                         </div>
                         <div class="flex flex-col items-end gap-2">
-                            @if (data_get($deployment, 'has_config'))
-                                @if (data_get($deployment, 'image_exists'))
-                                    <span class="text-xs text-green-600 dark:text-green-400">Image available</span>
-                                @else
-                                    <span class="text-xs text-yellow-600 dark:text-yellow-400">Rebuild required</span>
-                                @endif
+                            @if (data_get($deployment, 'image_exists'))
+                                <span class="text-xs text-green-600 dark:text-green-400">Image available</span>
                             @else
-                                <span class="text-xs text-red-600 dark:text-red-400">Config not saved</span>
+                                <span class="text-xs text-yellow-600 dark:text-yellow-400">Rebuild required</span>
                             @endif
 
                             @can('deploy', $application)
@@ -76,10 +80,6 @@
                                         wire:click="rollbackToDeployment('{{ data_get($deployment, 'deployment_uuid') }}')"
                                         class="bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600">
                                         Rollback (Rebuild)
-                                    </x-forms.button>
-                                @else
-                                    <x-forms.button disabled tooltip="Configuration not saved for this deployment. Only new deployments will have rollback support.">
-                                        Unavailable
                                     </x-forms.button>
                                 @endif
                             @endcan

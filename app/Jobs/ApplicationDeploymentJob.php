@@ -118,6 +118,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $production_image_name;
 
+    /**
+     * Cached config hash computed once at the start of deployment.
+     * This ensures the same hash is used consistently throughout the deployment
+     * (for image tagging, docker-compose, and metadata).
+     */
+    private ?string $cachedConfigHash = null;
+
     private bool $is_debug_enabled;
 
     private Collection|string $build_args;
@@ -976,9 +983,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $composeFileName = "$mainDir/".addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
                 $this->docker_compose_location = '/'.addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
             }
+            // Remove any existing symlink before writing to prevent overwriting deployment snapshots
+            // When a previous deployment created a symlink, writing through it would corrupt the old deployment's files
             $this->execute_remote_command(
                 [
                     "mkdir -p $mainDir",
+                ],
+                [
+                    "rm -f $composeFileName 2>/dev/null || true",
                 ],
                 [
                     "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
@@ -1019,6 +1031,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $dockerComposeContent = $this->docker_compose;
             }
 
+            // Ensure docker-compose uses the correct production image name
+            // This fixes potential mismatches where the compose file was generated with a different image tag
+            if (! empty($dockerComposeContent) && isset($this->production_image_name)) {
+                $dockerComposeContent = $this->updateComposeImageName($dockerComposeContent, $this->production_image_name);
+            }
+
             // Get environment variables content
             $envContent = '';
             $envVariables = $this->generate_runtime_environment_variables();
@@ -1043,11 +1061,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->production_image_name
             );
 
-            // Cleanup old deployments to maintain retention policy (keep last 5)
+            // Cleanup old deployments to maintain retention policy
+            $deploymentsToKeep = $this->application->settings->docker_images_to_keep ?? CleanupOldDeployments::DEFAULT_RETENTION;
             CleanupOldDeployments::run(
                 $this->application,
                 $serverForSnapshot,
-                CleanupOldDeployments::DEFAULT_RETENTION
+                $deploymentsToKeep
             );
 
             $this->application_deployment_queue->addLogEntry('Deployment snapshot saved for rollback.', hidden: true);
@@ -1055,6 +1074,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Log but don't fail the deployment if snapshot saving fails
             $this->application_deployment_queue->addLogEntry('Warning: Failed to save deployment snapshot: '.$e->getMessage(), 'stderr', hidden: true);
             \Log::warning('Failed to save deployment snapshot for '.$this->deployment_uuid.': '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Update the image name in docker-compose content to ensure consistency.
+     * This handles the case where the compose file might have been generated
+     * with a different image tag than the final production image.
+     */
+    private function updateComposeImageName(string $composeContent, string $imageName): string
+    {
+        try {
+            $compose = Yaml::parse($composeContent);
+
+            if (isset($compose['services'][$this->container_name]['image'])) {
+                $compose['services'][$this->container_name]['image'] = $imageName;
+
+                return Yaml::dump($compose, 10);
+            }
+
+            return $composeContent;
+        } catch (\Exception $e) {
+            // If parsing fails, return original content
+            return $composeContent;
         }
     }
 
@@ -1145,7 +1187,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             // Include config hash in image tag to differentiate builds with same commit but different build args
             // This ensures rollback works correctly when only build-time env vars changed
-            $configHash = substr($this->application->config_hash ?? '', 0, 8);
+            // IMPORTANT: Compute fresh hash from current config, NOT the stored config_hash
+            // The stored config_hash is from the previous deployment and won't reflect new env var changes
+            $configHash = $this->computeCurrentConfigHash();
             $this->dockerImageTag = str($this->commit)->substr(0, 119).'-'.$configHash;
             // if ($this->application->docker_registry_image_tag) {
             //     $this->dockerImageTag = $this->application->docker_registry_image_tag;
@@ -1158,6 +1202,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->production_image_name = "{$this->application->uuid}:{$this->dockerImageTag}";
             }
         }
+    }
+
+    /**
+     * Get config hash for image tagging.
+     * Returns first 8 characters of MD5 hash for readability.
+     *
+     * Uses Application::computeConfigHash() which includes all fields
+     * that could affect the build (fqdn, build commands, env vars, etc.).
+     *
+     * IMPORTANT: This method caches the hash on first computation to ensure
+     * the SAME hash is used throughout deployment for:
+     * - Docker image tag
+     * - docker-compose.yaml image reference
+     * - metadata.json image_name field
+     *
+     * This guarantees rollback can find the correct image for each deployment.
+     */
+    private function computeCurrentConfigHash(): string
+    {
+        if ($this->cachedConfigHash !== null) {
+            return $this->cachedConfigHash;
+        }
+
+        $this->cachedConfigHash = substr($this->application->computeConfigHash(), 0, 8);
+
+        return $this->cachedConfigHash;
     }
 
     private function just_restart()
@@ -1411,9 +1481,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 // Also create in configuration directory
+                // Remove any existing symlink first to prevent overwriting deployment snapshots
                 if ($this->use_build_server) {
                     $this->server = $this->original_server;
                     $this->execute_remote_command(
+                        [
+                            "rm -f $this->configuration_dir/.env 2>/dev/null || true",
+                        ],
                         [
                             "touch $this->configuration_dir/.env",
                         ]
@@ -1421,6 +1495,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->server = $this->build_server;
                 } else {
                     $this->execute_remote_command(
+                        [
+                            "rm -f $this->configuration_dir/.env 2>/dev/null || true",
+                        ],
                         [
                             "touch $this->configuration_dir/.env",
                         ]
@@ -1476,9 +1553,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
 
         // Write .env file to configuration directory
+        // Remove any existing symlink first to prevent overwriting deployment snapshots
         if ($this->use_build_server) {
             $this->server = $this->original_server;
             $this->execute_remote_command(
+                [
+                    "rm -f $this->configuration_dir/.env 2>/dev/null || true",
+                ],
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
@@ -1486,6 +1567,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         } else {
             $this->execute_remote_command(
+                [
+                    "rm -f $this->configuration_dir/.env 2>/dev/null || true",
+                ],
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]

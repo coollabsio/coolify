@@ -143,17 +143,22 @@ class CleanupDocker
         $disableRetention = $server->settings->disable_application_image_retention ?? false;
 
         foreach ($applications as $application) {
-            $imagesToKeep = $disableRetention ? 0 : ($application->settings->docker_images_to_keep ?? 2);
             $imageRepository = $application->docker_registry_image_name ?? $application->uuid;
 
-            // Get the currently running image tag
-            $currentTagCommand = "docker inspect --format='{{.Config.Image}}' {$application->uuid} 2>/dev/null | grep -oP '(?<=:)[^:]+$' || true";
-            $currentTag = instant_remote_process([$currentTagCommand], $server, false);
-            $currentTag = trim($currentTag ?? '');
+            // Get image names to keep from deployment snapshots
+            // This ensures we keep images that have corresponding deployment configurations
+            $protectedImages = $this->getProtectedImagesFromSnapshots($server, $application, $disableRetention);
 
-            // List all images for this application with their creation timestamps
+            // Get the currently running image (always protected)
+            $currentImageCommand = "docker inspect --format='{{.Config.Image}}' {$application->uuid} 2>/dev/null || true";
+            $currentImage = trim(instant_remote_process([$currentImageCommand], $server, false) ?? '');
+            if (! empty($currentImage)) {
+                $protectedImages[] = $currentImage;
+            }
+
+            // List all images for this application
             // Use wildcard to match both uuid:tag and uuid_servicename:tag (Docker Compose with build)
-            $listCommand = "docker images --format '{{.Repository}}:{{.Tag}}#{{.CreatedAt}}' --filter reference='{$imageRepository}*' 2>/dev/null || true";
+            $listCommand = "docker images --format '{{.Repository}}:{{.Tag}}' --filter reference='{$imageRepository}*' 2>/dev/null || true";
             $output = instant_remote_process([$listCommand], $server, false);
 
             if (empty($output)) {
@@ -162,47 +167,17 @@ class CleanupDocker
 
             $images = collect(explode("\n", trim($output)))
                 ->filter()
-                ->map(function ($line) {
-                    $parts = explode('#', $line);
-                    $imageRef = $parts[0] ?? '';
-                    $tagParts = explode(':', $imageRef);
+                ->filter(fn ($imageRef) => ! empty($imageRef) && $imageRef !== '<none>:<none>');
 
-                    return [
-                        'repository' => $tagParts[0] ?? '',
-                        'tag' => $tagParts[1] ?? '',
-                        'created_at' => $parts[1] ?? '',
-                        'image_ref' => $imageRef,
-                    ];
-                })
-                ->filter(fn ($image) => ! empty($image['tag']));
+            foreach ($images as $imageRef) {
+                // Skip protected images (those with deployment snapshots or currently running)
+                if (in_array($imageRef, $protectedImages)) {
+                    continue;
+                }
 
-            // Separate images into categories
-            // PR images (pr-*) and build images (*-build) are excluded from retention
-            // Build images will be cleaned up by docker image prune -af
-            $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
-            $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
-
-            // Always delete all PR images
-            foreach ($prImages as $image) {
-                $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
-                $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
-                $cleanupLog[] = [
-                    'command' => $deleteCommand,
-                    'output' => $deleteOutput ?? 'PR image removed or was in use',
-                ];
-            }
-
-            // Filter out current running image from regular images and sort by creation date
-            $sortedRegularImages = $regularImages
-                ->filter(fn ($image) => $image['tag'] !== $currentTag)
-                ->sortByDesc('created_at')
-                ->values();
-
-            // Keep only N images (imagesToKeep), delete the rest
-            $imagesToDelete = $sortedRegularImages->skip($imagesToKeep);
-
-            foreach ($imagesToDelete as $image) {
-                $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
+                // Always delete PR images (pr-*)
+                // Delete any image not in the protected list
+                $deleteCommand = "docker rmi {$imageRef} 2>/dev/null || true";
                 $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
                 $cleanupLog[] = [
                     'command' => $deleteCommand,
@@ -212,5 +187,42 @@ class CleanupDocker
         }
 
         return $cleanupLog;
+    }
+
+    /**
+     * Get list of image names to protect from cleanup based on deployment snapshots.
+     * Reads metadata.json from each deployment snapshot directory to get the image names.
+     */
+    private function getProtectedImagesFromSnapshots(Server $server, $application, bool $disableRetention): array
+    {
+        if ($disableRetention) {
+            return [];
+        }
+
+        $deploymentsBaseDir = deployments_base_dir($application->uuid);
+        $deploymentsToKeep = $application->settings->docker_images_to_keep ?? 2;
+
+        // List deployment directories sorted by modification time (newest first)
+        $listCommand = "ls -1t {$deploymentsBaseDir} 2>/dev/null | head -n {$deploymentsToKeep}";
+        $output = instant_remote_process([$listCommand], $server, false);
+
+        if (empty(trim($output ?? ''))) {
+            return [];
+        }
+
+        $deploymentDirs = collect(explode("\n", trim($output)))->filter();
+        $protectedImages = [];
+
+        foreach ($deploymentDirs as $deploymentUuid) {
+            $metadataPath = "{$deploymentsBaseDir}/{$deploymentUuid}/metadata.json";
+            $metadataJson = instant_remote_process(["cat {$metadataPath} 2>/dev/null || echo '{}'"], $server, false);
+            $metadata = json_decode($metadataJson ?? '{}', true) ?? [];
+
+            if (! empty($metadata['image_name'])) {
+                $protectedImages[] = $metadata['image_name'];
+            }
+        }
+
+        return $protectedImages;
     }
 }
