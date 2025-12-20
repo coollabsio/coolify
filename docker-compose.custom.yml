@@ -1,0 +1,19 @@
+# ==============================================================================
+# Custom Docker Compose Override for Coolify i18n
+# ==============================================================================
+# Place this file at: /data/coolify/source/docker-compose.custom.yml
+#
+# This file overrides the default Coolify image with your custom i18n version:
+#   docker.io/a3180623/coolify:i18n
+#
+# Usage:
+#   docker compose -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.custom.yml \
+#     up -d
+# ==============================================================================
+
+services:
+  coolify:
+    # Override image to use custom i18n version from Docker Hub
+    image: "docker.io/a3180623/coolify:i18n"
