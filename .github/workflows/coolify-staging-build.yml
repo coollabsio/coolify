@@ -24,7 +24,7 @@ permissions:
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: "coollabsio/coolify"
+  IMAGE_NAME: "a3180623/coolify"
 
 jobs:
   build-push:
