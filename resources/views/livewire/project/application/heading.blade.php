@@ -4,16 +4,16 @@
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.configuration', $parameters) }}">
-                Configuration
+                {{ __('menu.configuration') }}
             </a>
             <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.deployment.index', $parameters) }}">
-                Deployments
+                {{ __('menu.deployments') }}
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
                 <div class="flex items-center gap-1">
-                    Logs
+                    {{ __('menu.logs') }}
                     @if ($application->restart_count > 0 && !str($application->status)->startsWith('exited'))
                         <svg class="w-4 h-4 dark:text-warning" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" title="Container has restarted {{ $application->restart_count }} time{{ $application->restart_count > 1 ? 's' : '' }}">
                             <path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z"/>
@@ -25,7 +25,7 @@
                 @can('canAccessTerminal')
                     <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
                         href="{{ route('project.application.command', $parameters) }}">
-                        Terminal
+                        {{ __('menu.terminal') }}
                     </a>
                 @endcan
             @endif
@@ -33,7 +33,7 @@
         </nav>
         <div class="flex flex-wrap gap-2 items-center">
             @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
-                <div>Please load a Compose file.</div>
+                <div>{{ __('application.please_load_compose') }}</div>
             @else
                 @if (!$application->destination->server->isSwarm())
                     <div>
@@ -43,7 +43,7 @@
                 <div class="flex flex-wrap gap-2">
                     @if (!str($application->status)->startsWith('exited'))
                         @if (!$application->destination->server->isSwarm())
-                            <x-forms.button title="With rolling update if possible" wire:click='deploy'>
+                            <x-forms.button title="{{ __('application.with_rolling_update') }}" wire:click='deploy'>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-orange-400"
                                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
                                     stroke-linecap="round" stroke-linejoin="round">
@@ -53,12 +53,12 @@
                                     </path>
                                     <path d="M7.05 11.038v-3.988"></path>
                                 </svg>
-                                Redeploy
+                                {{ __('application.redeploy') }}
                             </x-forms.button>
                         @endif
                         @if ($application->build_pack !== 'dockercompose')
                             @if ($application->destination->server->isSwarm())
-                                <x-forms.button title="Redeploy Swarm Service (rolling update)" wire:click='deploy'>
+                                <x-forms.button title="{{ __('application.redeploy_swarm_service') }}" wire:click='deploy'>
                                     <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -68,10 +68,10 @@
                                             <path d="M20 4v5h-5" />
                                         </g>
                                     </svg>
-                                    Update Service
+                                    {{ __('application.update_service') }}
                                 </x-forms.button>
                             @else
-                                <x-forms.button title="Restart without rebuilding" wire:click='restart'>
+                                <x-forms.button title="{{ __('application.restart_without_rebuild') }}" wire:click='restart'>
                                     <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <g fill="none" stroke="currentColor" stroke-linecap="round"
@@ -81,14 +81,14 @@
                                             <path d="M20 4v5h-5" />
                                         </g>
                                     </svg>
-                                    Restart
+                                    {{ __('application.restart') }}
                                 </x-forms.button>
                             @endif
                         @endif
-                        <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
+                        <x-modal-confirmation title="{{ __('application.confirm_stop_title') }}" buttonTitle="{{ __('application.stop') }}"
                             submitAction="stop" :checkboxes="$checkboxes" :actions="[
-                                'This application will be stopped.',
-                                'All non-persistent data of this application will be deleted.',
+                                __('application.confirm_stop_action_1'),
+                                __('application.confirm_stop_action_2'),
                             ]" :confirmWithText="false" :confirmWithPassword="false"
                             step1ButtonText="Continue" step2ButtonText="Confirm">
                             <x-slot:button-title>
@@ -103,7 +103,7 @@
                                         d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
                                     </path>
                                 </svg>
-                                Stop
+                                {{ __('application.stop') }}
                             </x-slot:button-title>
                         </x-modal-confirmation>
                     @else
@@ -114,7 +114,7 @@
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
-                            Deploy
+                            {{ __('application.deploy') }}
                         </x-forms.button>
                     @endif
                 </div>

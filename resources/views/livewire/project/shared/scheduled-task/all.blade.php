@@ -1,8 +1,8 @@
 <div>
     <div class="flex gap-2">
-        <h2>Scheduled Tasks</h2>
+        <h2>{{ __('menu.scheduled_tasks') }}</h2>
         @can('update', $resource)
-            <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
+            <x-modal-input buttonTitle="{{ __('scheduled_task.add_button') }}" title="{{ __('scheduled_task.new_task') }}" :closeOutside="false">
                 @if ($resource->type() == 'application')
                     <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
                 @elseif ($resource->type() == 'service')
@@ -23,8 +23,8 @@
                             @endif
                         </span>
 
-                        <span>Frequency: {{ $task->frequency }}</span>
-                        <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
+                        <span>{{ __('scheduled_task.frequency_prefix') }}{{ $task->frequency }}</span>
+                        <span>{{ __('scheduled_task.last_run') }}{{ data_get($task->latest_log, 'status', __('scheduled_task.no_runs_yet')) }}
                         </span>
                     </span>
                 </a>
@@ -37,14 +37,14 @@
                                 <span class="text-xs font-normal">({{ $task->container }})</span>
                             @endif
                         </span>
-                        <span>Frequency: {{ $task->frequency }}</span>
-                        <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
+                        <span>{{ __('scheduled_task.frequency_prefix') }}{{ $task->frequency }}</span>
+                        <span>{{ __('scheduled_task.last_run') }}{{ data_get($task->latest_log, 'status', __('scheduled_task.no_runs_yet')) }}
                         </span>
                     </span>
                 </a>
             @endif
         @empty
-            <div>No scheduled tasks configured.</div>
+            <div>{{ __('scheduled_task.no_tasks') }}</div>
         @endforelse
     </div>
 </div>

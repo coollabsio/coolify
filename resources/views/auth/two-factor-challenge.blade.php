@@ -51,7 +51,7 @@
                         Coolify
                     </h1>
                     <p class="text-lg dark:text-neutral-400">
-                        Two-Factor Authentication
+                        {{ __('auth.two_factor_heading') }}
                     </p>
                 </div>
 
@@ -80,7 +80,7 @@
                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <p class="text-sm dark:text-neutral-400">
-                                Enter the verification code from your authenticator app to continue.
+                                {{ __('auth.two_factor_description') }}
                             </p>
                         </div>
                     </div>
@@ -100,14 +100,14 @@
                             </div>
                             <button type="button" x-on:click="showRecovery = !showRecovery"
                                 class="mt-4 text-sm dark:text-neutral-400 hover:text-black dark:hover:text-white hover:underline transition-colors cursor-pointer">
-                                Use Recovery Code Instead
+                                {{ __('auth.use_recovery_code') }}
                             </button>
                         </div>
                         <div x-show="showRecovery" x-cloak>
                             <x-forms.input name="recovery_code" label="{{ __('input.recovery_code') }}" />
                             <button type="button" x-on:click="showRecovery = !showRecovery"
                                 class="mt-2 text-sm dark:text-neutral-400 hover:text-black dark:hover:text-white hover:underline transition-colors cursor-pointer">
-                                Use Authenticator Code Instead
+                                {{ __('auth.use_authenticator_code') }}
                             </button>
                         </div>
                         <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
@@ -121,14 +121,14 @@
                         </div>
                         <div class="relative flex justify-center text-sm">
                             <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">
-                                Need help?
+                                {{ __('auth.need_help') }}
                             </span>
                         </div>
                     </div>
 
                     <a href="/login"
                         class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
-                        Back to Login
+                        {{ __('auth.back_to_login') }}
                     </a>
                 </div>
             </div>

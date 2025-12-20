@@ -250,12 +250,12 @@
                     <div class="flex items-center gap-2">
                         <form wire:submit="getLogs(true)" class="relative flex items-center">
                             <span
-                                class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
+                                class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{{ __('get_logs.lines_label') }}</span>
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
                                 title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
                                 class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
-                        <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
+                        <span x-show="searchQuery.trim()" x-text="matchCount + ' {{ __('get_logs.matches') }}'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -266,7 +266,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
-                            <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
+                            <input type="text" x-model.debounce.300ms="searchQuery" placeholder="{{ __('get_logs.find_placeholder') }}"
                                 class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-300" />
                             <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -276,7 +276,7 @@
                                 </svg>
                             </button>
                         </div>
-                        <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
+                        <button wire:click="getLogs(true)" title="{{ __('get_logs.refresh_logs') }}" {{ $streamLogs ? 'disabled' : '' }}
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
@@ -285,7 +285,7 @@
                             </svg>
                         </button>
                         <button wire:click="toggleStreamLogs"
-                            title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
+                            title="{{ $streamLogs ? __('get_logs.stop_streaming') : __('get_logs.stream_logs') }}"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
                             @if ($streamLogs)
                                 {{-- Pause icon --}}
@@ -305,10 +305,10 @@
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
                                     navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    Livewire.dispatch('success', ['{{ __('get_logs.logs_copied') }}']);
                                 });
                             "
-                            title="Copy Logs"
+                            title="{{ __('get_logs.copy_logs') }}"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
@@ -316,7 +316,7 @@
                                     d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                             </svg>
                         </button>
-                        <button x-on:click="downloadLogs()" title="Download Logs"
+                        <button x-on:click="downloadLogs()" title="{{ __('get_logs.download_logs') }}"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
@@ -324,7 +324,7 @@
                                     d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                             </svg>
                         </button>
-                        <button wire:click="toggleTimestamps" title="Toggle Timestamps"
+                        <button wire:click="toggleTimestamps" title="{{ __('get_logs.toggle_timestamps') }}"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $showTimeStamps ? '!text-warning' : '' }}">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
                                 stroke="currentColor" stroke-width="2">
@@ -332,7 +332,7 @@
                                     d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                             </svg>
                         </button>
-                        <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
+                        <button title="{{ __('get_logs.toggle_colors') }}" x-on:click="toggleColorLogs"
                             :class="colorLogs ? '!text-warning' : ''"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -341,7 +341,7 @@
                                     d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                             </svg>
                         </button>
-                        <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
+                        <button title="{{ __('get_logs.follow_logs') }}" :class="alwaysScroll ? '!text-warning' : ''"
                             x-on:click="toggleScroll"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -349,7 +349,7 @@
                                     stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                             </svg>
                         </button>
-                        <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
+                        <button title="{{ __('get_logs.fullscreen') }}" x-show="!fullscreen" x-on:click="makeFullscreen"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none">
@@ -360,7 +360,7 @@
                                 </g>
                             </svg>
                         </button>
-                        <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
+                        <button title="{{ __('get_logs.minimize') }}" x-show="fullscreen" x-on:click="makeFullscreen"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -384,12 +384,12 @@
                         <div id="logs" class="font-mono max-w-full cursor-default">
                             @if ($hasMoreLines)
                                 <div class="text-center py-2 text-gray-500 dark:text-gray-400 text-sm border-b dark:border-coolgray-300 mb-2">
-                                    Showing last {{ number_format($maxDisplayLines) }} of {{ number_format($totalLines) }} lines
+                                    {{ __('get_logs.showing_lines_prefix') }} {{ number_format($maxDisplayLines) }} {{ __('get_logs.showing_lines_of') }} {{ number_format($totalLines) }} {{ __('get_logs.showing_lines_suffix') }}
                                 </div>
                             @endif
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
-                                No matches found.
+                                {{ __('get_logs.no_matches') }}
                             </div>
                             @foreach ($displayLines as $index => $line)
                                 @php
@@ -424,7 +424,7 @@
                         </div>
                     @else
                         <pre id="logs"
-                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
+                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">{{ __('get_logs.no_logs') }}</pre>
                     @endif
                 </div>
             </div>

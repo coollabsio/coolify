@@ -2,19 +2,18 @@
     <div class="flex flex-col gap-2">
         @if ($database->is_migrated && blank($database->custom_type))
             <div>
-                <div>Select the type of
-                    database to enable automated backups.</div>
-                <div class="pb-4"> If your database is not listed, automated backups are not supported.</div>
+                <div>{{ __('backup.select_db_type') }}</div>
+                <div class="pb-4">{{ __('backup.db_not_listed') }}</div>
                 <form wire:submit="setCustomType" class="flex gap-2 items-end">
                     <div class="w-96">
-                        <x-forms.select label="Type" id="custom_type">
+                        <x-forms.select label="{{ __('backup.type') }}" id="custom_type">
                             <option selected value="mysql">MySQL</option>
                             <option value="mariadb">MariaDB</option>
                             <option value="postgresql">PostgreSQL</option>
                             <option value="mongodb">MongoDB</option>
                         </x-forms.select>
                     </div>
-                    <x-forms.button type="submit">Set</x-forms.button>
+                    <x-forms.button type="submit">{{ __('backup.set') }}</x-forms.button>
                 </form>
             </div>
         @else
@@ -52,9 +51,9 @@
                                 ])>
                                     @php
                                         $statusText = match (data_get($backup->latest_log, 'status')) {
-                                            'success' => 'Success',
-                                            'running' => 'In Progress',
-                                            'failed' => 'Failed',
+                                            'success' => __('backup.status_success'),
+                                            'running' => __('backup.status_running'),
+                                            'failed' => __('backup.status_failed'),
                                             default => ucfirst(data_get($backup->latest_log, 'status')),
                                         };
                                     @endphp
@@ -63,7 +62,7 @@
                             @else
                                 <span
                                     class="px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-gray-200">
-                                    No executions yet
+                                    {{ __('backup.no_executions') }}
                                 </span>
                             @endif
                             <h3 class="font-semibold">{{ $backup->frequency }}</h3>
@@ -73,7 +72,7 @@
                                 @if (data_get($backup->latest_log, 'status') === 'running')
                                     <span
                                         title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
-                                        Running for
+                                        {{ __('backup.running_for') }}
                                         {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
                                     </span>
                                 @else
@@ -90,16 +89,16 @@
                                         $size = data_get($backup->latest_log, 'size', 0);
                                     @endphp
                                     @if ($size > 0)
-                                        • Size: {{ formatBytes($size) }}
+                                        • {{ __('backup.size') }}: {{ formatBytes($size) }}
                                     @endif
                                 @endif
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • {{ __('backup.s3_enabled') }}
                                 @endif
                             @else
-                                Last Run: Never • Total Executions: 0
+                                {{ __('backup.last_run_never') }} • {{ __('backup.total_executions') }}: 0
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • {{ __('backup.s3_enabled') }}
                                 @endif
                             @endif
                         </div>
@@ -140,9 +139,9 @@
                                 ])>
                                     @php
                                         $statusText = match (data_get($backup->latest_log, 'status')) {
-                                            'success' => 'Success',
-                                            'running' => 'In Progress',
-                                            'failed' => 'Failed',
+                                            'success' => __('backup.status_success'),
+                                            'running' => __('backup.status_running'),
+                                            'failed' => __('backup.status_failed'),
                                             default => ucfirst(data_get($backup->latest_log, 'status')),
                                         };
                                     @endphp
@@ -151,17 +150,17 @@
                             @else
                                 <span
                                     class="px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-gray-200">
-                                    No executions yet
+                                    {{ __('backup.no_executions') }}
                                 </span>
                             @endif
-                            <h3 class="font-semibold">{{ $backup->frequency }} Backup</h3>
+                            <h3 class="font-semibold">{{ $backup->frequency }} {{ __('backup.backup_suffix') }}</h3>
                         </div>
                         <div class="text-gray-600 dark:text-gray-400 text-sm">
                             @if ($backup->latest_log)
                                 @if (data_get($backup->latest_log, 'status') === 'running')
                                     <span
                                         title="Started: {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}">
-                                        Running for
+                                        {{ __('backup.running_for') }}
                                         {{ calculateDuration(data_get($backup->latest_log, 'created_at'), now()) }}
                                     </span>
                                 @else
@@ -178,20 +177,20 @@
                                         $size = data_get($backup->latest_log, 'size', 0);
                                     @endphp
                                     @if ($size > 0)
-                                        • Size: {{ formatBytes($size) }}
+                                        • {{ __('backup.size') }}: {{ formatBytes($size) }}
                                     @endif
                                 @endif
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • {{ __('backup.s3_enabled') }}
                                 @endif
-                                <br>Total Executions: {{ $backup->executions()->count() }}
+                                <br>{{ __('backup.total_executions') }}: {{ $backup->executions()->count() }}
                                 @php
                                     $successCount = $backup->executions()->where('status', 'success')->count();
                                     $totalCount = $backup->executions()->count();
                                     $successRate = $totalCount > 0 ? round(($successCount / $totalCount) * 100) : 0;
                                 @endphp
                                 @if ($totalCount > 0)
-                                    • Success Rate: <span @class([
+                                    • {{ __('backup.success_rate') }}: <span @class([
                                         'font-medium',
                                         'text-green-600' => $successRate >= 80,
                                         'text-warning-600' => $successRate >= 50 && $successRate < 80,
@@ -200,16 +199,16 @@
                                     ({{ $successCount }}/{{ $totalCount }})
                                 @endif
                             @else
-                                Last Run: Never • Total Executions: 0
+                                {{ __('backup.last_run_never') }} • {{ __('backup.total_executions') }}: 0
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • {{ __('backup.s3_enabled') }}
                                 @endif
                             @endif
                         </div>
                     </div>
                 @endif
             @empty
-                <div>No scheduled backups configured.</div>
+                <div>{{ __('backup.no_backups_configured') }}</div>
             @endforelse
         @endif
     </div>

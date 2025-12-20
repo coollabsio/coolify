@@ -10,7 +10,7 @@
                         'cursor-pointer rounded-sm px-2.5 py-1'">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
-                    <span :class="selected === 'monthly' ? 'dark:text-white' : ''">Monthly</span>
+                    <span :class="selected === 'monthly' ? 'dark:text-white' : ''">{{ __('subscription.frequency_monthly') }}</span>
                 </label>
                 <label
                     :class="selected === 'yearly' ?
@@ -18,8 +18,8 @@
                         'cursor-pointer rounded-sm px-2.5 py-1'">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
-                    <span :class="selected === 'yearly' ? 'dark:text-white' : ''">Annually <span
-                            class="text-xs dark:text-warning text-coollabs">(save ~20%)</span></span>
+                    <span :class="selected === 'yearly' ? 'dark:text-white' : ''">{{ __('subscription.frequency_annually') }} <span
+                            class="text-xs dark:text-warning text-coollabs">{{ __('subscription.annual_discount_text') }}</span></span>
                 </label>
             </fieldset>
         </div>
@@ -27,32 +27,32 @@
             <div
                 class="grid grid-cols-1 -mt-16 divide-y divide-neutral-200 dark:divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-1 lg:divide-x lg:divide-y-0 xl:-mx-4">
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-dynamic" class="text-4xl font-semibold leading-7 dark:text-white">Pay-as-you-go</h3>
+                    <h3 id="tier-dynamic" class="text-4xl font-semibold leading-7 dark:text-white">{{ __('subscription.pay_as_you_go') }}</h3>
                     <p class="mt-4 text-sm leading-6 dark:text-neutral-400">
-                        Dynamic pricing based on the number of servers you connect.
+                        {{ __('subscription.dynamic_pricing_desc') }}
                     </p>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">$5</span>
-                            <span class="text-sm font-semibold leading-6 "> base price</span>
+                            <span class="text-sm font-semibold leading-6 "> {{ __('subscription.base_price') }}</span>
                         </span>
 
                         <span x-show="selected === 'yearly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight dark:text-white">$4</span>
-                            <span class="text-sm font-semibold leading-6 "> base price</span>
+                            <span class="text-sm font-semibold leading-6 "> {{ __('subscription.base_price') }}</span>
                         </span>
                     </p>
                     <p class="flex items-baseline mb-4 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-base font-semibold tracking-tight dark:text-white">$3</span>
-                            <span class="text-sm font-semibold leading-6 "> per additional servers <span
-                                    class="font-normal dark:text-white">billed monthly (+VAT)</span></span>
+                            <span class="text-sm font-semibold leading-6 "> {{ __('subscription.per_additional_server') }} <span
+                                    class="font-normal dark:text-white">{{ __('subscription.billed_monthly_vat') }}</span></span>
                         </span>
 
                         <span x-show="selected === 'yearly'" x-cloak>
                             <span class="text-base font-semibold tracking-tight dark:text-white">$2.7</span>
-                            <span class="text-sm font-semibold leading-6 "> per additional servers <span
-                                    class="font-normal dark:text-white">billed annually (+VAT)</span></span>
+                            <span class="text-sm font-semibold leading-6 "> {{ __('subscription.per_additional_server') }} <span
+                                    class="font-normal dark:text-white">{{ __('subscription.billed_annually_vat') }}</span></span>
                         </span>
                     </p>
                     <div class="flex items-center pt-6">
@@ -65,26 +65,26 @@
 
                         <div class="flex flex-col text-sm dark:text-white">
                             <div>
-                                You need to bring your own servers from any cloud provider (such as <a class="underline"
+                                {{ __('subscription.bring_own_servers_1') }} <a class="underline"
                                     href="https://coolify.io/hetzner" target="_blank">Hetzner</a>, DigitalOcean, AWS,
-                                etc.)
+                                {{ __('subscription.bring_own_servers_2') }}
                             </div>
                             <div>
-                                (You can connect your RPi, old laptop, or any other device that runs
-                                the <a class="underline"
+                                {{ __('subscription.bring_own_device_1') }}
+                                <a class="underline"
                                     href="https://coolify.io/docs/installation#supported-operating-systems"
-                                    target="_blank">supported operating systems</a>.)
+                                    target="_blank">{{ __('subscription.supported_os') }}</a>{{ __('subscription.bring_own_device_2') }}
                             </div>
                         </div>
                     </div>
                     <div class="flex pt-4 h-14">
                         <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
                             class="w-full" wire:click="subscribeStripe('dynamic-monthly')">
-                            Subscribe
+                            {{ __('button.subscribe') }}
                         </x-forms.button>
                         <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
                             class="w-full" wire:click="subscribeStripe('dynamic-yearly')">
-                            Subscribe
+                            {{ __('button.subscribe') }}
                         </x-forms.button>
                     </div>
                     <ul role="list" class="mt-8 space-y-3 text-sm leading-6 dark:text-neutral-400">
@@ -95,8 +95,8 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Connect
-                            <span class="px-1 font-bold dark:text-white">unlimited</span> servers
+                            {{ __('subscription.feature_connect') }}
+                            <span class="px-1 font-bold dark:text-white">{{ __('subscription.unlimited') }}</span> {{ __('subscription.servers') }}
                         </li>
                         <li class="flex">
                             <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
@@ -105,8 +105,8 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Deploy
-                            <span class="px-1 font-bold dark:text-white">unlimited</span> applications per server
+                            {{ __('subscription.feature_deploy') }}
+                            <span class="px-1 font-bold dark:text-white">{{ __('subscription.unlimited') }}</span> {{ __('subscription.feature_apps_per_server') }}
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -115,7 +115,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Free email notifications
+                            {{ __('subscription.feature_free_email_notifications') }}
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -124,7 +124,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Support by email
+                            {{ __('subscription.feature_email_support') }}
                         </li>
                         <li class="flex font-bold dark:text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-500"
@@ -136,7 +136,7 @@
                                     <path d="M7 14a6 6 0 0 0-3 6a6 6 0 0 0 6-3m4-8a1 1 0 1 0 2 0a1 1 0 1 0-2 0" />
                                 </g>
                             </svg>
-                            + All Upcoming Features
+                            {{ __('subscription.feature_upcoming_features') }}
                         </li>
                         <li class="flex dark:text-white gap-x-3">
                             <svg xmlns="http://www.w3.org/2000/svg" class="flex-none w-5 h-6 text-green-500"
@@ -151,8 +151,8 @@
                                     stroke-linejoin="round" stroke-width="16" />
                             </svg>
 
-                            Do you require official support for your self-hosted instance?<a class="underline"
-                                href="https://coolify.io/docs/contact" target="_blank">Contact Us</a>
+                            {{ __('subscription.official_support_question') }}<a class="underline"
+                                href="https://coolify.io/docs/contact" target="_blank">{{ __('subscription.contact_us') }}</a>
                         </li>
                     </ul>
                 </div>

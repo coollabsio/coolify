@@ -52,14 +52,12 @@
                                         clip-rule="evenodd" />
                                 </svg>
                                 <div>
-                                    <p class="font-bold text-warning mb-2">Email Not Configured</p>
+                                    <p class="font-bold text-warning mb-2">{{ __('auth.email_not_configured') }}</p>
                                     <p class="text-sm dark:text-white text-black mb-2">
-                                        Transactional emails are not active on this instance.
+                                        {{ __('auth.email_not_configured_description') }}
                                     </p>
                                     <p class="text-sm dark:text-white text-black">
-                                        See how to set it in our <a class="font-bold underline hover:text-coollabs"
-                                            target="_blank" href="{{ config('constants.urls.docs') }}">documentation</a>, or
-                                        learn how to manually reset your password.
+                                        {!! __('auth.email_not_configured_help', ['url' => config('constants.urls.docs')]) !!}
                                     </p>
                                 </div>
                             </div>
@@ -72,14 +70,14 @@
                         </div>
                         <div class="relative flex justify-center text-sm">
                             <span class="px-2 dark:bg-base text-neutral-500 dark:text-neutral-400">
-                                Remember your password?
+                                {{ __('auth.remember_password') }}
                             </span>
                         </div>
                     </div>
 
                     <a href="/login"
                         class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
-                        Back to Login
+                        {{ __('auth.back_to_login') }}
                     </a>
                 </div>
             </div>

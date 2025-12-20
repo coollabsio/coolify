@@ -1,6 +1,6 @@
 <div>
-    <h2>Resource Operations</h2>
-    <div>You can easily make different kind of operations on this resource.</div>
+    <h2>{{ __('resource_ops.title') }}</h2>
+    <div>{{ __('resource_ops.description') }}</div>
 
     <div x-data="{
         selectedCloneServer: null,
@@ -61,16 +61,16 @@
             return this.selectedMoveProject == this.currentProjectId;
         }
     }">
-        <h3 class="pt-4">Clone Resource</h3>
-        <div class="pb-2">Duplicate this resource to another server or network destination.</div>
+        <h3 class="pt-4">{{ __('resource_ops.clone_title') }}</h3>
+        <div class="pb-2">{{ __('resource_ops.clone_desc') }}</div>
 
         @can('update', $resource)
             <div class="space-y-4 pb-8">
                 <div class="flex flex-col lg:flex-row gap-4">
                     <div class="flex-1">
-                        <label class="block text-sm font-medium mb-2">Select Server</label>
+                        <label class="block text-sm font-medium mb-2">{{ __('resource_ops.select_server') }}</label>
                         <select x-model="selectedCloneServer" @change="selectedCloneDestination = null" class="select">
-                            <option value="">Choose a server...</option>
+                            <option value="">{{ __('resource_ops.choose_server') }}</option>
                             <template x-for="server in servers" :key="server.id">
                                 <option :value="server.id" x-text="`${server.name} (${server.ip})`"></option>
                             </template>
@@ -78,9 +78,9 @@
                     </div>
 
                     <div class="flex-1">
-                        <label class="block text-sm font-medium mb-2">Select Network Destination</label>
+                        <label class="block text-sm font-medium mb-2">{{ __('resource_ops.select_destination') }}</label>
                         <select x-model="selectedCloneDestination" :disabled="!selectedCloneServer" class="select">
-                            <option value="">Choose a destination...</option>
+                            <option value="">{{ __('resource_ops.choose_destination') }}</option>
                             <template x-for="destination in availableDestinations" :key="destination.id">
                                 <option :value="destination.id" x-text="destination.name"></option>
                             </template>
@@ -90,52 +90,50 @@
 
                 <div x-show="selectedCloneDestination" x-cloak>
                     <x-forms.button isHighlighted @click="$wire.cloneTo(selectedCloneDestination)" class="mt-2">
-                        Clone Resource
+                        {{ __('resource_ops.clone_button') }}
                     </x-forms.button>
                     <div class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                        All configurations will be duplicated to the selected destination. The running application won't be
-                        touched.
+                        {{ __('resource_ops.clone_notice') }}
                     </div>
                 </div>
             </div>
         @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to clone resources. Contact your team administrator to request access.
+            <x-callout type="warning" title="{{ __('resource_ops.clone_restricted') }}">
+                {{ __('resource_ops.clone_no_permission') }}
             </x-callout>
         @endcan
 
-        <h3 class="pt-4">Move Resource</h3>
-        <div class="pb-4">Transfer this resource between projects and environments.</div>
+        <h3 class="pt-4">{{ __('resource_ops.move_title') }}</h3>
+        <div class="pb-4">{{ __('resource_ops.move_desc') }}</div>
 
         @can('update', $resource)
             @if ($projects->count() > 0)
                 <div class="space-y-4">
                     <div class="flex flex-col lg:flex-row gap-4">
                         <div class="flex-1">
-                            <label class="block text-sm font-medium mb-2">Select Target Project</label>
+                            <label class="block text-sm font-medium mb-2">{{ __('resource_ops.select_project') }}</label>
                             <select x-model="selectedMoveProject" @change="selectedMoveEnvironment = null" class="select">
-                                <option value="">Choose a project...</option>
+                                <option value="">{{ __('resource_ops.choose_project') }}</option>
                                 <template x-for="project in projects" :key="project.id">
                                     <option :value="project.id"
-                                        x-text="project.name + (project.id === currentProjectId ? ' (current)' : '')">
+                                        x-text="project.name + (project.id === currentProjectId ? ' {{ __('resource_ops.current_marker') }}' : '')">
                                     </option>
                                 </template>
                             </select>
                         </div>
 
                         <div class="flex-1">
-                            <label class="block text-sm font-medium mb-2 flex gap-2 items-center">Select Target
-                                Environment
-                                <x-helper helper="Current environment is excluded." />
+                            <label class="block text-sm font-medium mb-2 flex gap-2 items-center">{{ __('resource_ops.select_environment') }}
+                                <x-helper helper="{{ __('resource_ops.environment_helper') }}" />
                             </label>
                             <select x-model="selectedMoveEnvironment"
                                 :disabled="!selectedMoveProject || availableEnvironments.length === 0" class="select">
                                 <option value=""
-                                    x-text="availableEnvironments.length === 0 && isCurrentProjectSelected ? 'No other environments available' : 'Choose an environment...'">
+                                    x-text="availableEnvironments.length === 0 && isCurrentProjectSelected ? '{{ __('resource_ops.no_environments') }}' : '{{ __('resource_ops.choose_environment') }}'">
                                 </option>
                                 <template x-for="environment in availableEnvironments" :key="environment.id">
                                     <option :value="environment.id"
-                                        x-text="environment.name + (environment.id === currentEnvironmentId ? ' (current)' : '')">
+                                        x-text="environment.name + (environment.id === currentEnvironmentId ? ' {{ __('resource_ops.current_marker') }}' : '')">
                                     </option>
                                 </template>
                             </select>
@@ -144,22 +142,20 @@
 
                     <div x-show="selectedMoveEnvironment" x-cloak>
                         <x-forms.button isHighlighted @click="$wire.moveTo(selectedMoveEnvironment)" class="mt-2">
-                            Move Resource
+                            {{ __('resource_ops.move_button') }}
                         </x-forms.button>
                         <div class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                            All configurations will be moved to the selected environment. The running application won't be
-                            touched.
+                            {{ __('resource_ops.move_notice') }}
                         </div>
                     </div>
                 </div>
             @else
-                <div class="text-neutral-600 dark:text-neutral-400">No other projects available for moving this resource.
+                <div class="text-neutral-600 dark:text-neutral-400">{{ __('resource_ops.no_projects') }}
                 </div>
             @endif
         @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to move resources between projects or environments. Contact your team
-                administrator to request access.
+            <x-callout type="warning" title="{{ __('resource_ops.clone_restricted') }}">
+                {{ __('resource_ops.move_no_permission') }}
             </x-callout>
         @endcan
     </div>

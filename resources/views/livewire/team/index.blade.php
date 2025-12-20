@@ -1,21 +1,21 @@
 <div>
     <x-slot:title>
-        Teams | Coolify
+        {{ __('teams.title') }}
     </x-slot>
     <x-team.navbar />
 
     <form class="flex flex-col" wire:submit='submit'>
-        <h2>General</h2>
+        <h2>{{ __('teams.general') }}</h2>
         <div class="subtitle">
-            Manage the general settings of this team.
+            {{ __('teams.general_subtitle') }}
         </div>
 
         <div class="flex items-end gap-2 pb-6">
-            <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
-            <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
+            <x-forms.input id="name" label="{{ __('input.name') }}" required canGate="update" :canResource="$team" />
+            <x-forms.input id="description" label="{{ __('teams.description') }}" canGate="update" :canResource="$team" />
             @can('update', $team)
                 <x-forms.button type="submit">
-                    Save
+                    {{ __('button.save') }}
                 </x-forms.button>
             @endcan
         </div>
@@ -23,30 +23,30 @@
 
     @can('delete', $team)
         <div>
-            <h2>Danger Zone</h2>
-            <div class="pb-4">Woah. I hope you know what are you doing.</div>
-            <h4 class="pb-4">Delete Team</h4>
+            <h2>{{ __('teams.danger_zone') }}</h2>
+            <div class="pb-4">{{ __('teams.danger_warning') }}</div>
+            <h4 class="pb-4">{{ __('teams.delete_team') }}</h4>
             @if (session('currentTeam.id') === 0)
-                <div>This is the default team. You can't delete it.</div>
+                <div>{{ __('teams.default_team_warning') }}</div>
             @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
-                <div>You can't delete your last / personal team.</div>
+                <div>{{ __('teams.last_team_warning') }}</div>
             @elseif(currentTeam()->subscription)
-                <div>Please cancel your subscription <a class="underline dark:text-white"
+                <div>{{ __('teams.cancel_subscription_first') }} <a class="underline dark:text-white"
                         {{ wireNavigate() }}
-                        href="{{ route('subscription.show') }}">here</a> before deleting this team.</div>
+                        href="{{ route('subscription.show') }}">{{ __('teams.here') }}</a> {{ __('teams.before_deleting') }}</div>
             @else
                 @if (currentTeam()->isEmpty())
-                    <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-                    <x-modal-confirmation title="Confirm Team Deletion?" buttonTitle="Delete" isErrorButton
-                        submitAction="delete({{ currentTeam()->id }})" :actions="['The current team will be permanently deleted from Coolify and the database.']"
+                    <div class="pb-4">{{ __('teams.delete_warning') }}</div>
+                    <x-modal-confirmation title="{{ __('teams.confirm_delete') }}" buttonTitle="{{ __('button.delete') }}" isErrorButton
+                        submitAction="delete({{ currentTeam()->id }})" :actions="[__('teams.delete_action_warning')]"
                         confirmationText="{{ currentTeam()->name }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the Team Name below"
-                        shortConfirmationLabel="Team Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+                        confirmationLabel="{{ __('teams.confirm_label') }}"
+                        shortConfirmationLabel="{{ __('teams.team_name') }}" :confirmWithPassword="false" step2ButtonText="{{ __('teams.permanently_delete') }}" />
                 @else
                     <div>
-                        <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>
+                        <div class="pb-4">{{ __('teams.delete_resources_first') }}</div>
                         @if (currentTeam()->projects()->count() > 0)
-                            <h4 class="pb-4">Projects:</h4>
+                            <h4 class="pb-4">{{ __('teams.projects') }}:</h4>
                             <ul class="pl-8 list-disc">
                                 @foreach (currentTeam()->projects as $resource)
                                     <li>{{ $resource->name }}</li>
@@ -54,7 +54,7 @@
                             </ul>
                         @endif
                         @if (currentTeam()->servers()->count() > 0)
-                            <h4 class="py-4">Servers:</h4>
+                            <h4 class="py-4">{{ __('teams.servers') }}:</h4>
                             <ul class="pl-8 list-disc">
                                 @foreach (currentTeam()->servers as $resource)
                                     <li>{{ $resource->name }}</li>
@@ -62,7 +62,7 @@
                             </ul>
                         @endif
                         @if (currentTeam()->privateKeys()->count() > 0)
-                            <h4 class="py-4">Private Keys:</h4>
+                            <h4 class="py-4">{{ __('teams.private_keys') }}:</h4>
                             <ul class="pl-8 list-disc">
                                 @foreach (currentTeam()->privateKeys as $resource)
                                     <li>{{ $resource->name }}</li>
@@ -70,7 +70,7 @@
                             </ul>
                         @endif
                         @if (currentTeam()->sources()->count() > 0)
-                            <h4 class="py-4">Sources:</h4>
+                            <h4 class="py-4">{{ __('teams.sources') }}:</h4>
                             <ul class="pl-8 list-disc">
                                 @foreach (currentTeam()->sources() as $resource)
                                     <li>{{ $resource->name }}</li>

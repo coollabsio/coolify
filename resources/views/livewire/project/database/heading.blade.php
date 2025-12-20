@@ -1,10 +1,10 @@
 <nav wire:poll.10000ms="checkStatus" class="pb-6">
     <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
-        <x-slot:title>Database Startup</x-slot:title>
+        <x-slot:title>{{ __('database.database_startup') }}</x-slot:title>
         <x-slot:content>
             <div wire:ignore>
-                <livewire:activity-monitor header="Logs" fullHeight />
+                <livewire:activity-monitor header="{{ __('menu.logs') }}" fullHeight />
             </div>
         </x-slot:content>
     </x-slide-over>
@@ -13,17 +13,17 @@
             class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.database.configuration', $parameters) }}">
-                Configuration
+                {{ __('menu.configuration') }}
             </a>
 
             <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
-                Logs
+                {{ __('menu.logs') }}
             </a>
             @can('canAccessTerminal')
                 <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
                     href="{{ route('project.database.command', $parameters) }}">
-                    Terminal
+                    {{ __('menu.terminal') }}
                 </a>
             @endcan
             @if (
@@ -33,18 +33,18 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
                 <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                     href="{{ route('project.database.backup.index', $parameters) }}">
-                    Backups
+                    {{ __('menu.backups') }}
                 </a>
             @endif
         </nav>
         @if ($database->destination->server->isFunctional())
             <div class="flex flex-wrap gap-2 items-center">
                 @if (!str($database->status)->startsWith('exited'))
-                    <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart" submitAction="restart"
+                    <x-modal-confirmation title="{{ __('database.confirm_restart_title') }}" buttonTitle="{{ __('database.restart') }}" submitAction="restart"
                         :actions="[
-                            'This database will be unavailable during the restart.',
-                            'If the database is currently in use data could be lost.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
+                            __('database.confirm_restart_action_1'),
+                            __('database.confirm_restart_action_2'),
+                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="{{ __('database.restart_database') }}"
                         :dispatchEvent="true" dispatchEventType="restartEvent">
                         <x-slot:button-title>
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
@@ -55,14 +55,14 @@
                                     <path d="M20 4v5h-5" />
                                 </g>
                             </svg>
-                            Restart
+                            {{ __('database.restart') }}
                         </x-slot:button-title>
                     </x-modal-confirmation>
-                    <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
+                    <x-modal-confirmation title="{{ __('database.confirm_stop_title') }}" buttonTitle="{{ __('database.stop') }}" submitAction="stop"
                         :checkboxes="$checkboxes" :actions="[
-                            'This database will be stopped.',
-                            'If the database is currently in use data could be lost.',
-                            'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).',
+                            __('database.confirm_stop_action_1'),
+                            __('database.confirm_stop_action_2'),
+                            __('database.confirm_stop_action_3'),
                         ]" :confirmWithText="false" :confirmWithPassword="false"
                         step1ButtonText="Continue" step2ButtonText="Confirm">
                         <x-slot:button-title>
@@ -76,7 +76,7 @@
                                     d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
                                 </path>
                             </svg>
-                            Stop
+                            {{ __('database.stop') }}
                         </x-slot:button-title>
                     </x-modal-confirmation>
                 @else
@@ -87,7 +87,7 @@
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                             <path d="M7 4v16l13 -8z" />
                         </svg>
-                        Start
+                        {{ __('database.start') }}
                     </button>
                 @endif
                 @script
@@ -105,7 +105,7 @@
                 @endscript
             </div>
         @else
-            <div class="text-error">Underlying server is not functional.</div>
+            <div class="text-error">{{ __('database.underlying_server_not_functional') }}</div>
         @endif
     </div>
 </nav>

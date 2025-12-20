@@ -3,7 +3,7 @@
         @if ($isReadOnly)
             @if (!$storage->isServiceResource() && !$storage->isDockerComposeResource())
                 <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
-                    This volume is mounted as read-only and cannot be modified from the UI.
+                    {{ __('storage.readonly_ui_warning') }}
                 </div>
             @endif
             @if ($isFirst)
@@ -11,24 +11,24 @@
                     @if (
                         $storage->resource_type === 'App\Models\ServiceApplication' ||
                             $storage->resource_type === 'App\Models\ServiceDatabase')
-                        <x-forms.input id="name" label="Volume Name" required readonly
-                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                        <x-forms.input id="name" label="{{ __('storage.volume_name') }}" required readonly
+                            helper="{{ __('storage.volume_name_change_warning') }}" />
                     @else
-                        <x-forms.input id="name" label="Volume Name" required readonly
-                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                        <x-forms.input id="name" label="{{ __('storage.volume_name') }}" required readonly
+                            helper="{{ __('storage.volume_name_change_warning') }}" />
                     @endif
                     @if ($isService || $startedAt)
-                        <x-forms.input id="hostPath" readonly helper="Directory on the host system."
-                            label="Source Path"
-                            helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required readonly />
+                        <x-forms.input id="hostPath" readonly helper="{{ __('storage.source_path_desc') }}"
+                            label="{{ __('storage.source_path') }}"
+                            helper="{{ __('storage.source_path_change_warning') }}" />
+                        <x-forms.input id="mountPath" label="{{ __('storage.destination_path') }}"
+                            helper="{{ __('storage.destination_path_desc') }}" required readonly />
                     @else
-                        <x-forms.input id="hostPath" readonly helper="Directory on the host system."
-                            label="Source Path"
-                            helper="Warning: Changing the source path after the initial start could cause problems. Only use it when you know what are you doing." />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required readonly />
+                        <x-forms.input id="hostPath" readonly helper="{{ __('storage.source_path_desc') }}"
+                            label="{{ __('storage.source_path') }}"
+                            helper="{{ __('storage.source_path_change_warning') }}" />
+                        <x-forms.input id="mountPath" label="{{ __('storage.destination_path') }}"
+                            helper="{{ __('storage.destination_path_desc') }}" required readonly />
                     @endif
                 </div>
             @else
@@ -42,10 +42,10 @@
             @can('update', $resource)
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" label="Volume Name" required />
-                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path" />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required />
+                        <x-forms.input id="name" label="{{ __('storage.volume_name') }}" required />
+                        <x-forms.input id="hostPath" helper="{{ __('storage.source_path_desc') }}" label="{{ __('storage.source_path') }}" />
+                        <x-forms.input id="mountPath" label="{{ __('storage.destination_path') }}"
+                            helper="{{ __('storage.destination_path_desc') }}" required />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
@@ -56,24 +56,24 @@
                 @endif
                 <div class="flex gap-2">
                     <x-forms.button type="submit">
-                        Update
+                        {{ __('button.save') }}
                     </x-forms.button>
-                    <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton buttonTitle="Delete"
+                    <x-modal-confirmation title="{{ __('storage.confirm_delete_title') }}" isErrorButton buttonTitle="{{ __('button.delete') }}"
                         submitAction="delete" :actions="[
-                            'The selected persistent storage/volume will be permanently deleted.',
-                            'If the persistent storage/volume is actvily used by a resource data will be lost.',
+                            __('storage.delete_action_1'),
+                            __('storage.delete_action_2'),
                         ]" confirmationText="{{ $storage->name }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
-                        shortConfirmationLabel="Storage Name" />
+                        confirmationLabel="{{ __('storage.confirm_delete_label') }}"
+                        shortConfirmationLabel="{{ __('storage.storage_name') }}" />
                 </div>
             @else
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" label="Volume Name" required disabled />
-                        <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path"
+                        <x-forms.input id="name" label="{{ __('storage.volume_name') }}" required disabled />
+                        <x-forms.input id="hostPath" helper="{{ __('storage.source_path_desc') }}" label="{{ __('storage.source_path') }}"
                             disabled />
-                        <x-forms.input id="mountPath" label="Destination Path"
-                            helper="Directory inside the container." required disabled />
+                        <x-forms.input id="mountPath" label="{{ __('storage.destination_path') }}"
+                            helper="{{ __('storage.destination_path_desc') }}" required disabled />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">

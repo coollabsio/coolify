@@ -1,21 +1,21 @@
 @php use App\Enums\ProxyTypes; @endphp
 <x-slot:title>
-    Onboarding | Coolify
+    {{ __('onboarding.title') }}
     </x-slot>
     <section class="w-full">
         <div class="flex flex-col items-center w-full space-y-8">
             @if ($currentState === 'welcome')
                 <div class="w-full max-w-2xl text-center space-y-8">
                     <div class="space-y-4">
-                        <h1 class="text-4xl font-bold lg:text-6xl">Welcome to Coolify</h1>
+                        <h1 class="text-4xl font-bold lg:text-6xl">{{ __('onboarding.welcome_heading') }}</h1>
                         <p class="text-lg lg:text-xl dark:text-neutral-400">
-                            Connect your first server and start deploying in minutes
+                            {{ __('onboarding.welcome_subtitle') }}
                         </p>
                     </div>
 
                     <div class="text-left space-y-4 p-8 rounded-lg border border-neutral-200 dark:border-coolgray-400">
                         <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400">
-                            What You'll Set Up
+                            {{ __('onboarding.what_youll_setup') }}
                         </h2>
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
@@ -28,8 +28,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Server Connection</div>
-                                    <div class="text-sm dark:text-neutral-400">Connect via SSH to deploy your resources
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.server_connection') }}</div>
+                                    <div class="text-sm dark:text-neutral-400">{{ __('onboarding.server_connection_desc') }}
                                     </div>
                                 </div>
                             </div>
@@ -43,8 +43,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Docker Environment</div>
-                                    <div class="text-sm dark:text-neutral-400">Automated installation and configuration
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.docker_environment') }}</div>
+                                    <div class="text-sm dark:text-neutral-400">{{ __('onboarding.docker_environment_desc') }}
                                     </div>
                                 </div>
                             </div>
@@ -58,8 +58,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Project Structure</div>
-                                    <div class="text-sm dark:text-neutral-400">Organize your applications and resources
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.project_structure') }}</div>
+                                    <div class="text-sm dark:text-neutral-400">{{ __('onboarding.project_structure_desc') }}
                                     </div>
                                 </div>
                             </div>
@@ -69,48 +69,43 @@
                     <div class="flex flex-col items-center gap-3 pt-4">
                         <x-forms.button class="justify-center px-12 py-4 text-lg font-bold box-boarding"
                             wire:click="explanation">
-                            Let's go!
+                            {{ __('onboarding.lets_go') }}
                         </x-forms.button>
                         <button wire:click="skipBoarding"
                             class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                            Skip Setup
+                            {{ __('onboarding.skip_setup') }}
                         </button>
                     </div>
                 </div>
             @elseif ($currentState === 'explanation')
                 <x-boarding-progress :currentStep="0" />
-                <x-boarding-step title="Platform Overview">
+                <x-boarding-step title="{{ __('onboarding.platform_overview') }}">
                     <x-slot:question>
-                        Coolify automates deployment and infrastructure management on your own servers. Deploy applications
-                        from Git, manage databases, and monitor everything—without vendor lock-in.
+                        {{ __('onboarding.platform_overview_desc') }}
                     </x-slot:question>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Automation:" /> Coolify handles server configuration, Docker management,
-                            and
-                            deployments automatically.
+                            <x-highlighted text="{{ __('onboarding.automation') }}" /> {{ __('onboarding.automation_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Self-hosted:" /> All data and configurations live on your infrastructure.
-                            Works offline except for external integrations.
+                            <x-highlighted text="{{ __('onboarding.self_hosted') }}" /> {{ __('onboarding.self_hosted_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Monitoring & Alerts:" /> Get real-time notifications via Discord, Telegram,
-                            Email, and other platforms.
+                            <x-highlighted text="{{ __('onboarding.monitoring_alerts') }}" /> {{ __('onboarding.monitoring_alerts_desc') }}
                         </p>
                     </x-slot:explanation>
                     <x-slot:actions>
                         <x-forms.button class="justify-center w-full lg:w-auto px-8 py-3 box-boarding"
                             wire:click="explanation">
-                            Continue
+                            {{ __('onboarding.continue') }}
                         </x-forms.button>
                     </x-slot:actions>
                 </x-boarding-step>
             @elseif ($currentState === 'select-server-type')
                 <x-boarding-progress :currentStep="1" />
-                <x-boarding-step title="Choose Server Type">
+                <x-boarding-step title="{{ __('onboarding.choose_server_type') }}">
                     <x-slot:question>
-                        Select where to deploy your applications and databases. You can add more servers later.
+                        {{ __('onboarding.choose_server_type_desc') }}
                     </x-slot:question>
                     <x-slot:actions>
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
@@ -126,13 +121,13 @@
                                         </svg>
                                         <span
                                             class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-neutral-100 dark:bg-coolgray-300 dark:text-neutral-400 rounded">
-                                            Quick Start
+                                            {{ __('onboarding.quick_start') }}
                                         </span>
                                     </div>
                                     <div>
-                                        <h3 class="text-xl font-bold mb-2">This Machine</h3>
+                                        <h3 class="text-xl font-bold mb-2">{{ __('onboarding.this_machine') }}</h3>
                                         <p class="text-sm dark:text-neutral-400">
-                                            Deploy on the server running Coolify. Best for testing and single-server setups.
+                                            {{ __('onboarding.this_machine_desc') }}
                                         </p>
                                     </div>
                                 </div>
@@ -152,20 +147,20 @@
                                         </svg>
                                         <span
                                             class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
-                                            Recommended
+                                            {{ __('onboarding.recommended') }}
                                         </span>
                                     </div>
                                     <div>
-                                        <h3 class="text-xl font-bold mb-2">Remote Server</h3>
+                                        <h3 class="text-xl font-bold mb-2">{{ __('onboarding.remote_server') }}</h3>
                                         <p class="text-sm dark:text-neutral-400">
-                                            Connect via SSH to any server—cloud VPS, bare metal, or home infrastructure.
+                                            {{ __('onboarding.remote_server_desc') }}
                                         </p>
                                     </div>
                                 </div>
                             </button>
                             @can('viewAny', App\Models\CloudProviderToken::class)
                                 @if ($currentState === 'select-server-type')
-                                    <x-modal-input title="Connect a Hetzner Server" isFullWidth>
+                                    <x-modal-input title="{{ __('onboarding.connect_hetzner') }}" isFullWidth>
                                         <x-slot:content>
                                             <div
                                                 class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
@@ -179,13 +174,13 @@
                                                         </svg>
                                                         <span
                                                             class="px-2 py-1 text-xs font-bold uppercase tracking-wide bg-coollabs/10 dark:bg-warning/20 text-coollabs dark:text-warning rounded">
-                                                            Recommended
+                                                            {{ __('onboarding.recommended') }}
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <h3 class="text-xl font-bold mb-2">Hetzner Cloud</h3>
+                                                        <h3 class="text-xl font-bold mb-2">{{ __('onboarding.hetzner_cloud') }}</h3>
                                                         <p class="text-sm dark:text-neutral-400">
-                                                            Deploy servers directly from your Hetzner Cloud account.
+                                                            {{ __('onboarding.hetzner_cloud_desc') }}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -199,83 +194,76 @@
 
                         @if (!$serverReachable)
                             <div class="mt-6 p-4 border border-error rounded-lg text-gray-800 dark:text-gray-200">
-                                <h2 class="text-lg font-bold mb-2">Server is not reachable</h2>
-                                <p class="mb-4">Please check the connection details below and correct them if they are
-                                    incorrect.</p>
+                                <h2 class="text-lg font-bold mb-2">{{ __('onboarding.server_not_reachable') }}</h2>
+                                <p class="mb-4">{{ __('onboarding.check_connection_details') }}</p>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <x-forms.input placeholder="Default is 22" label="Port" id="remoteServerPort"
+                                    <x-forms.input placeholder="{{ __('onboarding.default_port') }}" label="{{ __('onboarding.port') }}" id="remoteServerPort"
                                         wire:model="remoteServerPort" :value="$remoteServerPort" />
                                     <div>
-                                        <x-forms.input placeholder="Default is root" label="User" id="remoteServerUser"
+                                        <x-forms.input placeholder="{{ __('onboarding.default_user') }}" label="{{ __('onboarding.user') }}" id="remoteServerUser"
                                             wire:model="remoteServerUser" :value="$remoteServerUser" />
                                         <p class="text-xs mt-1">
-                                            Non-root user is experimental:
+                                            {{ __('onboarding.non_root_experimental') }}
                                             <a class="font-bold underline" target="_blank"
-                                                href="https://coolify.io/docs/knowledge-base/server/non-root-user">docs</a>
+                                                href="https://coolify.io/docs/knowledge-base/server/non-root-user">{{ __('onboarding.docs') }}</a>
                                         </p>
                                     </div>
                                 </div>
 
                                 <div class="mb-4">
-                                    <p class="mb-2">If the connection details are correct, please ensure:</p>
+                                    <p class="mb-2">{{ __('onboarding.if_connection_correct') }}</p>
                                     <ul class="list-disc list-inside">
-                                        <li>The correct public key is in your <code
-                                                class="bg-red-200 dark:bg-red-900 px-1 rounded-sm">~/.ssh/authorized_keys</code>
-                                            file for the specified user</li>
-                                        <li>Or skip the boarding process and manually add a new private key to Coolify and
-                                            the server</li>
+                                        <li>{{ __('onboarding.public_key_hint') }}</li>
+                                        <li>{{ __('onboarding.skip_boarding_hint') }}</li>
                                     </ul>
                                 </div>
 
                                 <p class="mb-4">
-                                    For more help, check this <a target="_blank" class="underline font-semibold"
-                                        href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a>.
+                                    {{ __('onboarding.more_help') }} <a target="_blank" class="underline font-semibold"
+                                        href="https://coolify.io/docs/knowledge-base/server/openssh">{{ __('onboarding.documentation') }}</a>.
                                 </p>
 
                                 <x-forms.input readonly id="serverPublicKey" class="mb-4"
-                                    label="Current Public Key"></x-forms.input>
+                                    label="{{ __('onboarding.current_public_key') }}"></x-forms.input>
 
                                 <x-forms.button class="w-full box-boarding" wire:click="saveAndValidateServer">
-                                    Check Again
+                                    {{ __('onboarding.check_again') }}
                                 </x-forms.button>
                             </div>
                         @endif
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Servers" /> host your applications, databases, and services (collectively
-                            called resources). All CPU-intensive operations run on the target server.
+                            <x-highlighted text="{{ __('onboarding.servers_label') }}" /> {{ __('onboarding.servers_explanation') }}
                         </p>
                         <p>
-                            <x-highlighted text="Localhost:" /> The machine running Coolify. Not recommended for production
-                            workloads due to resource contention.
+                            <x-highlighted text="{{ __('onboarding.localhost_label') }}" /> {{ __('onboarding.localhost_explanation') }}
                         </p>
                         <p>
-                            <x-highlighted text="Remote Server:" /> Any SSH-accessible server—cloud providers (AWS, Hetzner,
-                            DigitalOcean), bare metal, or self-hosted infrastructure.
+                            <x-highlighted text="{{ __('onboarding.remote_server_label') }}" /> {{ __('onboarding.remote_server_explanation') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'private-key')
                 <x-boarding-progress :currentStep="2" />
-                <x-boarding-step title="SSH Authentication">
+                <x-boarding-step title="{{ __('onboarding.ssh_authentication') }}">
                     <x-slot:question>
-                        Configure SSH key-based authentication for secure server access.
+                        {{ __('onboarding.ssh_authentication_desc') }}
                     </x-slot:question>
                     <x-slot:actions>
                         @if ($privateKeys && $privateKeys->count() > 0)
                             <div class="w-full space-y-4">
                                 <div class="p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
                                     <form wire:submit='selectExistingPrivateKey' class="flex flex-col gap-4">
-                                        <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
+                                        <x-forms.select label="{{ __('onboarding.existing_ssh_keys') }}" id='selectedExistingPrivateKey'>
                                             @foreach ($privateKeys as $privateKey)
                                                 <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
                                                     {{ $privateKey->name }}
                                                 </option>
                                             @endforeach
                                         </x-forms.select>
-                                        <x-forms.button type="submit" class="w-full lg:w-auto">Use Selected Key</x-forms.button>
+                                        <x-forms.button type="submit" class="w-full lg:w-auto">{{ __('onboarding.use_selected_key') }}</x-forms.button>
                                     </form>
                                 </div>
                                 <div class="relative">
@@ -285,7 +273,7 @@
                                     <div class="relative flex justify-center text-sm">
                                         <div
                                             class="px-2 py-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-300 rounded text-xs font-bold text-neutral-500 dark:text-neutral-400">
-                                            OR
+                                            {{ __('onboarding.or') }}
                                         </div>
                                     </div>
                                 </div>
@@ -302,8 +290,8 @@
                                             d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
                                     </svg>
                                     <div class="text-center">
-                                        <h3 class="text-xl font-bold mb-2">Use Existing Key</h3>
-                                        <p class="text-sm dark:text-neutral-400">I have my own SSH key</p>
+                                        <h3 class="text-xl font-bold mb-2">{{ __('onboarding.use_existing_key') }}</h3>
+                                        <p class="text-sm dark:text-neutral-400">{{ __('onboarding.use_existing_key_desc') }}</p>
                                     </div>
                                 </div>
                             </x-forms.button>
@@ -317,8 +305,8 @@
                                             d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                                     </svg>
                                     <div class="text-center">
-                                        <h3 class="text-xl font-bold mb-2">Generate New Key</h3>
-                                        <p class="text-sm dark:text-neutral-400">Create ED25519 key pair</p>
+                                        <h3 class="text-xl font-bold mb-2">{{ __('onboarding.generate_new_key') }}</h3>
+                                        <p class="text-sm dark:text-neutral-400">{{ __('onboarding.generate_new_key_desc') }}</p>
                                     </div>
                                 </div>
                             </x-forms.button>
@@ -326,38 +314,36 @@
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="SSH Key Authentication:" /> Uses public-key cryptography for secure,
-                            password-less server access.
+                            <x-highlighted text="{{ __('onboarding.ssh_key_auth_label') }}" /> {{ __('onboarding.ssh_key_auth_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Public Key Deployment:" /> Add the public key to your server's
+                            <x-highlighted text="{{ __('onboarding.public_key_deployment_label') }}" /> {{ __('onboarding.public_key_deployment_desc') }}
                             <code
                                 class="text-xs bg-coolgray-300 dark:bg-coolgray-400 px-1 py-0.5 rounded">~/.ssh/authorized_keys</code>
-                            file.
+                            {{ __('onboarding.file') }}
                         </p>
                         <p>
-                            <x-highlighted text="Key Generation:" /> Coolify generates ED25519 keys by default for optimal
-                            security and performance.
+                            <x-highlighted text="{{ __('onboarding.key_generation_label') }}" /> {{ __('onboarding.key_generation_desc') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'create-private-key')
                 <x-boarding-progress :currentStep="2" />
-                <x-boarding-step title="SSH Key Configuration">
+                <x-boarding-step title="{{ __('onboarding.ssh_key_config') }}">
                     <x-slot:question>
-                        Configure your SSH key for server authentication.
+                        {{ __('onboarding.ssh_key_config_desc') }}
                     </x-slot:question>
                     <x-slot:actions>
                         <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-4">
-                            <x-forms.input required placeholder="e.g., production-server-key" label="Key Name"
+                            <x-forms.input required placeholder="{{ __('onboarding.key_name_placeholder') }}" label="{{ __('onboarding.key_name') }}"
                                 id="privateKeyName" />
-                            <x-forms.input placeholder="Optional: Note what this key is used for" label="Description"
+                            <x-forms.input placeholder="{{ __('onboarding.key_description_placeholder') }}" label="{{ __('onboarding.key_description') }}"
                                 id="privateKeyDescription" />
                             @if ($privateKeyType === 'create')
-                                <x-forms.textarea required readonly label="Private Key" id="privateKey" rows="8" />
-                                <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
+                                <x-forms.textarea required readonly label="{{ __('onboarding.private_key') }}" id="privateKey" rows="8" />
+                                <x-forms.textarea rows="7" readonly label="{{ __('onboarding.public_key') }}" id="publicKey" />
                             @else
-                                <x-forms.textarea required placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key"
+                                <x-forms.textarea required placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="{{ __('onboarding.private_key') }}"
                                     id="privateKey" rows="8" />
                             @endif
                             @if ($privateKeyType === 'create')
@@ -370,51 +356,50 @@
                                                 clip-rule="evenodd" />
                                         </svg>
                                         <div>
-                                            <p class="font-bold text-warning mb-1">Action Required</p>
+                                            <p class="font-bold text-warning mb-1">{{ __('onboarding.action_required') }}</p>
                                             <p class="text-sm dark:text-white text-black">
-                                                Copy the public key above and add it to your server's
+                                                {{ __('onboarding.action_required_desc') }}
                                                 <code
                                                     class="text-xs bg-coolgray-300 dark:bg-coolgray-400 px-1 py-0.5 rounded">~/.ssh/authorized_keys</code>
-                                                file.
+                                                {{ __('onboarding.file') }}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             @endif
-                            <x-forms.button type="submit" class="w-full lg:w-auto">Save SSH Key</x-forms.button>
+                            <x-forms.button type="submit" class="w-full lg:w-auto">{{ __('onboarding.save_ssh_key') }}</x-forms.button>
                         </form>
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Key Storage:" /> Private keys are encrypted at rest in Coolify's database.
+                            <x-highlighted text="{{ __('onboarding.key_storage_label') }}" /> {{ __('onboarding.key_storage_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Public Key Distribution:" /> Deploy the public key to
+                            <x-highlighted text="{{ __('onboarding.public_key_distribution_label') }}" /> {{ __('onboarding.public_key_distribution_desc') }}
                             <code
                                 class="text-xs bg-coolgray-300 dark:bg-coolgray-400 px-1 py-0.5 rounded">~/.ssh/authorized_keys</code>
-                            on your target server for the specified user.
+                            {{ __('onboarding.on_target_server') }}
                         </p>
                         <p>
-                            <x-highlighted text="Key Format:" /> Supports RSA, ED25519, ECDSA, and DSA key types in OpenSSH
-                            format.
+                            <x-highlighted text="{{ __('onboarding.key_format_label') }}" /> {{ __('onboarding.key_format_desc') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'create-server')
                 <x-boarding-progress :currentStep="2" />
-                <x-boarding-step title="Server Configuration">
+                <x-boarding-step title="{{ __('onboarding.server_config') }}">
                     <x-slot:question>
-                        Provide connection details for your remote server.
+                        {{ __('onboarding.server_config_desc') }}
                     </x-slot:question>
                     <x-slot:actions>
                         <form wire:submit='saveServer' class="flex flex-col w-full gap-4">
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <x-forms.input required placeholder="e.g., production-app-server" label="Server Name"
+                                <x-forms.input required placeholder="{{ __('onboarding.server_name_placeholder') }}" label="{{ __('onboarding.server_name') }}"
                                     id="remoteServerName" wire:model="remoteServerName" />
-                                <x-forms.input required placeholder="IP address or hostname" label="IP Address/Hostname"
+                                <x-forms.input required placeholder="{{ __('onboarding.ip_address_placeholder') }}" label="{{ __('onboarding.ip_address') }}"
                                     id="remoteServerHost" wire:model="remoteServerHost" />
                             </div>
-                            <x-forms.input placeholder="Optional: Note what this server hosts" label="Description"
+                            <x-forms.input placeholder="{{ __('onboarding.server_desc_placeholder') }}" label="{{ __('onboarding.server_desc') }}"
                                 id="remoteServerDescription" wire:model="remoteServerDescription" />
 
                             <div x-data="{ showAdvanced: false }" class="flex flex-col gap-4">
@@ -432,54 +417,49 @@
                                             d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
                                             clip-rule="evenodd" />
                                     </svg>
-                                    Advanced Connection Settings
+                                    {{ __('onboarding.advanced_settings') }}
                                 </button>
                                 <div x-show="showAdvanced" x-cloak
                                     class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                    <x-forms.input placeholder="Default: 22" label="SSH Port" type="number"
+                                    <x-forms.input placeholder="{{ __('onboarding.ssh_port_default') }}" label="{{ __('onboarding.ssh_port') }}" type="number"
                                         id="remoteServerPort" wire:model="remoteServerPort" />
                                     <div>
-                                        <x-forms.input placeholder="Default: root" label="SSH User" id="remoteServerUser"
+                                        <x-forms.input placeholder="{{ __('onboarding.ssh_user_default') }}" label="{{ __('onboarding.ssh_user') }}" id="remoteServerUser"
                                             wire:model="remoteServerUser" />
                                         <p class="mt-1 text-xs dark:text-white text-black">
-                                            Non-root user support is experimental.
+                                            {{ __('onboarding.non_root_experimental') }}
                                             <a class="font-bold underline hover:text-coollabs" target="_blank"
-                                                href="https://coolify.io/docs/knowledge-base/server/non-root-user">Learn
-                                                more</a>
+                                                href="https://coolify.io/docs/knowledge-base/server/non-root-user">{{ __('onboarding.learn_more') }}</a>
                                         </p>
                                     </div>
                                 </div>
                             </div>
-                            <x-forms.button type="submit" class="w-full lg:w-auto">Validate Connection</x-forms.button>
+                            <x-forms.button type="submit" class="w-full lg:w-auto">{{ __('onboarding.validate_connection') }}</x-forms.button>
                         </form>
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Connection Requirements:" /> Server must be accessible via SSH on the
-                            specified port (default 22).
+                            <x-highlighted text="{{ __('onboarding.connection_req_label') }}" /> {{ __('onboarding.connection_req_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Hostname Resolution:" /> Use IP addresses for direct connections or ensure
-                            DNS resolution is configured.
+                            <x-highlighted text="{{ __('onboarding.hostname_res_label') }}" /> {{ __('onboarding.hostname_res_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="User Permissions:" /> Root or sudo-enabled users recommended for full
-                            Docker
-                            management capabilities.
+                            <x-highlighted text="{{ __('onboarding.user_perms_label') }}" /> {{ __('onboarding.user_perms_desc') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'validate-server')
                 <x-boarding-progress :currentStep="2" />
-                <x-boarding-step title="Server Validation">
+                <x-boarding-step title="{{ __('onboarding.server_validation') }}">
                     <x-slot:question>
-                        Coolify will automatically install Docker {{ $minDockerVersion }}+ if not present.
+                        {{ __('onboarding.server_validation_desc', ['version' => $minDockerVersion]) }}
                     </x-slot:question>
                     <x-slot:actions>
                         <div class="w-full space-y-6">
                             <div
                                 class="p-6 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                <h3 class="font-bold text-black dark:text-white mb-4">Validation Steps</h3>
+                                <h3 class="font-bold text-black dark:text-white mb-4">{{ __('onboarding.validation_steps') }}</h3>
                                 <div class="space-y-3">
                                     <div class="flex items-start gap-3">
                                         <div class="flex-shrink-0 mt-0.5">
@@ -491,8 +471,8 @@
                                             </svg>
                                         </div>
                                         <div>
-                                            <div class="font-semibold text-base dark:text-white">Test SSH Connection</div>
-                                            <div class="text-sm dark:text-neutral-400">Verify key-based authentication</div>
+                                            <div class="font-semibold text-base dark:text-white">{{ __('onboarding.test_ssh') }}</div>
+                                            <div class="text-sm dark:text-neutral-400">{{ __('onboarding.test_ssh_desc') }}</div>
                                         </div>
                                     </div>
                                     <div class="flex items-start gap-3">
@@ -505,26 +485,9 @@
                                             </svg>
                                         </div>
                                         <div>
-                                            <div class="font-semibold text-base dark:text-white">Check OS Compatibility
+                                            <div class="font-semibold text-base dark:text-white">{{ __('onboarding.check_os') }}
                                             </div>
-                                            <div class="text-sm dark:text-neutral-400">Verify supported Linux distribution
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-start gap-3">
-                                        <div class="flex-shrink-0 mt-0.5">
-                                            <svg class="size-5 text-success" xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd"
-                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                    clip-rule="evenodd" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div class="font-semibold text-base dark:text-white">Install Docker Engine</div>
-                                            <div class="text-sm dark:text-neutral-400">Auto-install if version
-                                                {{ $minDockerVersion }}+ not
-                                                found
+                                            <div class="text-sm dark:text-neutral-400">{{ __('onboarding.check_os_desc') }}
                                             </div>
                                         </div>
                                     </div>
@@ -538,8 +501,23 @@
                                             </svg>
                                         </div>
                                         <div>
-                                            <div class="font-semibold text-base dark:text-white">Configure Network</div>
-                                            <div class="text-sm dark:text-neutral-400">Set up Docker networks and proxy
+                                            <div class="font-semibold text-base dark:text-white">{{ __('onboarding.install_docker') }}</div>
+                                            <div class="text-sm dark:text-neutral-400">{{ __('onboarding.install_docker_desc', ['version' => $minDockerVersion]) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start gap-3">
+                                        <div class="flex-shrink-0 mt-0.5">
+                                            <svg class="size-5 text-success" xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-base dark:text-white">{{ __('onboarding.configure_network') }}</div>
+                                            <div class="text-sm dark:text-neutral-400">{{ __('onboarding.configure_network_desc') }}
                                             </div>
                                         </div>
                                     </div>
@@ -548,55 +526,52 @@
 
                             @if ($prerequisiteInstallAttempts > 0)
                                 <div class="p-6 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                    <h3 class="font-bold text-black dark:text-white mb-4">Installing Prerequisites</h3>
-                                    <livewire:activity-monitor header="Prerequisites Installation Logs" :showWaiting="false" />
+                                    <h3 class="font-bold text-black dark:text-white mb-4">{{ __('onboarding.installing_prereqs') }}</h3>
+                                    <livewire:activity-monitor header="{{ __('onboarding.prereqs_logs') }}" :showWaiting="false" />
                                 </div>
                             @endif
 
                             <x-slide-over closeWithX fullScreen>
-                                <x-slot:title>Server Validation</x-slot:title>
+                                <x-slot:title>{{ __('onboarding.server_validation') }}</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$this->createdServer" />
                                 </x-slot:content>
                                 <x-forms.button @click="slideOverOpen=true" class="w-full font-bold py-4 box-boarding"
                                     wire:click.prevent='installServer' isHighlighted>
-                                    Start Validation
+                                    {{ __('onboarding.start_validation') }}
                                 </x-forms.button>
                             </x-slide-over>
                         </div>
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Automated Setup:" /> Coolify installs Docker Engine, Docker Compose, and
-                            configures system requirements automatically.
+                            <x-highlighted text="{{ __('onboarding.automated_setup_label') }}" /> {{ __('onboarding.automated_setup_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Version Requirements:" /> Minimum Docker Engine {{ $minDockerVersion }}.x
-                            required.
+                            <x-highlighted text="{{ __('onboarding.version_req_label') }}" /> {{ __('onboarding.version_req_desc', ['version' => $minDockerVersion]) }}
                             <a target="_blank" class="underline hover:text-coollabs"
-                                href="https://docs.docker.com/engine/install/#server">Manual installation guide</a>
+                                href="https://docs.docker.com/engine/install/#server">{{ __('onboarding.manual_install_guide') }}</a>
                         </p>
                         <p>
-                            <x-highlighted text="System Configuration:" /> Sets up Docker networks, proxy configuration, and
-                            resource monitoring.
+                            <x-highlighted text="{{ __('onboarding.system_config_label') }}" /> {{ __('onboarding.system_config_desc') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'create-project')
                 <x-boarding-progress :currentStep="3" />
-                <x-boarding-step title="Project Setup">
+                <x-boarding-step title="{{ __('onboarding.project_setup') }}">
                     <x-slot:question>
                         @if ($projects && $projects->count() > 0)
-                            You have existing projects. Select one or create a new project to organize your resources.
+                            {{ __('onboarding.project_setup_existing') }}
                         @else
-                            Create your first project to organize applications, databases, and services.
+                            {{ __('onboarding.project_setup_new') }}
                         @endif
                     </x-slot:question>
                     <x-slot:actions>
                         <div class="w-full space-y-4">
                             <x-forms.button class="justify-center w-full py-4 font-bold box-boarding"
                                 wire:click="createNewProject" isHighlighted>
-                                Create "My First Project"
+                                {{ __('onboarding.create_first_project') }}
                             </x-forms.button>
 
                             @if ($projects && $projects->count() > 0)
@@ -605,36 +580,31 @@
                                         <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
                                     </div>
                                     <div class="relative flex justify-center text-sm">
-                                        <span class="px-2 text-neutral-500 dark:text-neutral-400">Or use existing</span>
+                                        <span class="px-2 text-neutral-500 dark:text-neutral-400">{{ __('onboarding.or_use_existing') }}</span>
                                     </div>
                                 </div>
                                 <form wire:submit='selectExistingProject' class="flex flex-col gap-4">
-                                    <x-forms.select label="Existing Projects" id='selectedProject'>
+                                    <x-forms.select label="{{ __('onboarding.existing_projects') }}" id='selectedProject'>
                                         @foreach ($projects as $project)
                                             <option wire:key="{{ $loop->index }}" value="{{ $project->id }}">
                                                 {{ $project->name }}
                                             </option>
                                         @endforeach
                                     </x-forms.select>
-                                    <x-forms.button type="submit" class="w-full lg:w-auto">Use Selected Project</x-forms.button>
+                                    <x-forms.button type="submit" class="w-full lg:w-auto">{{ __('onboarding.use_selected_project') }}</x-forms.button>
                                 </form>
                             @endif
                         </div>
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>
-                            <x-highlighted text="Project Organization:" /> Group related resources (apps, databases,
-                            services)
-                            into logical projects.
+                            <x-highlighted text="{{ __('onboarding.project_org_label') }}" /> {{ __('onboarding.project_org_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Environments:" /> Each project includes a production environment by
-                            default.
-                            Add staging, development, or custom environments as needed.
+                            <x-highlighted text="{{ __('onboarding.environments_label') }}" /> {{ __('onboarding.environments_desc') }}
                         </p>
                         <p>
-                            <x-highlighted text="Team Access:" /> Projects inherit team permissions and can be managed
-                            collaboratively.
+                            <x-highlighted text="{{ __('onboarding.team_access_label') }}" /> {{ __('onboarding.team_access_desc') }}
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
@@ -649,15 +619,15 @@
                                     d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <h1 class="text-4xl font-bold lg:text-5xl">Setup Complete!</h1>
+                        <h1 class="text-4xl font-bold lg:text-5xl">{{ __('onboarding.setup_complete') }}</h1>
                         <p class="text-lg dark:text-neutral-400">
-                            Your server is connected and ready. Start deploying your first resource.
+                            {{ __('onboarding.setup_complete_desc') }}
                         </p>
                     </div>
 
                     <div class="text-left space-y-4 p-8 rounded-lg border border-neutral-200 dark:border-coolgray-400">
                         <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400">
-                            What's Configured
+                            {{ __('onboarding.whats_configured') }}
                         </h2>
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
@@ -670,7 +640,7 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Server: {{ $createdServer->name }}
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.server_label') }}: {{ $createdServer->name }}
                                     </div>
                                     <div class="text-sm dark:text-neutral-400">{{ $createdServer->ip }}</div>
                                 </div>
@@ -685,10 +655,10 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Project:
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.project_label') }}:
                                         {{ $createdProject->name }}
                                     </div>
-                                    <div class="text-sm dark:text-neutral-400">Production environment ready</div>
+                                    <div class="text-sm dark:text-neutral-400">{{ __('onboarding.production_ready') }}</div>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
@@ -701,8 +671,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-base dark:text-white">Docker Engine</div>
-                                    <div class="text-sm dark:text-neutral-400">Installed and running</div>
+                                    <div class="font-semibold text-base dark:text-white">{{ __('onboarding.docker_engine') }}</div>
+                                    <div class="text-sm dark:text-neutral-400">{{ __('onboarding.installed_running') }}</div>
                                 </div>
                             </div>
                         </div>
@@ -711,11 +681,11 @@
                     <div class="flex flex-col gap-3">
                         <x-forms.button class="justify-center w-full py-4 text-lg font-bold box-boarding"
                             wire:click="showNewResource" isHighlighted>
-                            Deploy Your First Resource
+                            {{ __('onboarding.deploy_first_resource') }}
                         </x-forms.button>
                         <button wire:click="skipBoarding"
                             class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                            Go to Dashboard
+                            {{ __('onboarding.go_to_dashboard') }}
                         </button>
                     </div>
                 </div>
@@ -727,18 +697,18 @@
                 <div class="flex justify-center gap-6 text-sm">
                     <button wire:click='skipBoarding'
                         class="dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                        Skip Setup
+                        {{ __('onboarding.skip_setup') }}
                     </button>
                     <button wire:click='restartBoarding'
                         class="dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                        Restart
+                        {{ __('onboarding.restart') }}
                     </button>
                 </div>
-                <x-modal-input title="Need Help?">
+                <x-modal-input title="{{ __('onboarding.need_help') }}">
                     <x-slot:content>
                         <button
                             class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                            Contact Support
+                            {{ __('onboarding.contact_support') }}
                         </button>
                     </x-slot:content>
                     <livewire:help />

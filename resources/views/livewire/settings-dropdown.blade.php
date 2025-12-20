@@ -38,6 +38,11 @@
         localStorage.setItem('zoom', zoom);
         window.location.reload();
     },
+    setLocale(locale) {
+        localStorage.setItem('locale', locale);
+        document.cookie = `locale=${locale};path=/;max-age=31536000;samesite=lax`;
+        window.location.reload();
+    },
     setTheme(type) {
         this.theme = type;
         localStorage.setItem('theme', type);
@@ -188,6 +193,27 @@
                                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                         <span>System</span>
+                    </button>
+
+                    <!-- Language Section -->
+                    <div
+                        class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
+                        Language</div>
+                    <button @click="setLocale('en'); dropdownOpen = false"
+                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span>English</span>
+                    </button>
+                    <button @click="setLocale('zh-cn'); dropdownOpen = false"
+                        class="px-1 dropdown-item-no-padding flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span>中文</span>
                     </button>
 
                     <!-- Width Section -->

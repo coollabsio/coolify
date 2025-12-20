@@ -8,10 +8,8 @@
                             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <div class="text-center">
-                        <h3 class="text-lg font-medium">Terminal Not Available</h3>
-                        <p class="mt-2 text-sm text-neutral-300">No shell (bash/sh) is available in this container.
-                            Please
-                            ensure either bash or sh is installed to use the terminal.</p>
+                        <h3 class="text-lg font-medium">{{ __('terminal.not_available') }}</h3>
+                        <p class="mt-2 text-sm text-neutral-300">{{ __('terminal.no_shell') }}</p>
                     </div>
                 </div>
             </div>
@@ -23,13 +21,13 @@
         <div id="terminal" wire:ignore
             :class="fullscreen ? 'px-2 py-1 h-full bg-black' : 'px-2 py-1 rounded-sm bg-black'" x-show="terminalActive">
         </div>
-        <button title="Minimize" x-show="fullscreen" class="fixed bg-black/40 top-4 right-6 text-white"
+        <button title="{{ __('terminal.minimize') }}" x-show="fullscreen" class="fixed bg-black/40 top-4 right-6 text-white"
             x-on:click="makeFullscreen"><svg class="w-5 h-5 text-gray-500 hover:text-white bg-black/80"
                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                     stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
             </svg></button>
-        <button title="Fullscreen" x-show="!fullscreen && terminalActive" class="absolute right-5 top-6 text-white "
+        <button title="{{ __('terminal.fullscreen') }}" x-show="!fullscreen && terminalActive" class="absolute right-5 top-6 text-white "
             x-on:click="makeFullscreen"> <svg class="w-5 h-5 text-gray-500 hover:text-white bg-black/80"
                 viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g fill="none">

@@ -1,41 +1,41 @@
 <div class="flex flex-col gap-4">
     <div>
         <div class="flex items-center gap-2">
-            <h2>Environment Variables</h2>
+            <h2>{{ __('env_var.title') }}</h2>
             @can('manageEnvironment', $resource)
                 <div class="flex flex-col items-center">
-                    <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
+                    <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('env_var.new_variable') }}" :closeOutside="false">
                         <livewire:project.shared.environment-variable.add />
                     </x-modal-input>
                 </div>
                 <x-forms.button
-                    wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+                    wire:click='switch'>{{ $view === 'normal' ? __('env_var.developer_view') : __('env_var.normal_view') }}</x-forms.button>
             @endcan
         </div>
-        <div>Environment variables (secrets) for this resource. </div>
+        <div>{{ __('env_var.description') }}</div>
         @if ($resourceClass === 'App\Models\Application')
             <div class="flex flex-col gap-2 pt-2">
                 @if (data_get($resource, 'build_pack') !== 'dockercompose')
                     <div class="w-64">
                         @can('manageEnvironment', $resource)
-                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="{{ __('env_var.sort_alphabetically') }}"
+                                helper="{{ __('env_var.sort_helper') }}"
                                 instantSave></x-forms.checkbox>
                         @else
-                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="{{ __('env_var.sort_alphabetically') }}"
+                                helper="{{ __('env_var.sort_helper') }}"
                                 disabled></x-forms.checkbox>
                         @endcan
                     </div>
                 @endif
                 <div class="w-64">
                     @can('manageEnvironment', $resource)
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                        <x-forms.checkbox id="use_build_secrets" label="{{ __('env_var.use_build_secrets') }}"
+                            helper="{{ __('env_var.build_secrets_helper') }}"
                             instantSave></x-forms.checkbox>
                     @else
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                        <x-forms.checkbox id="use_build_secrets" label="{{ __('env_var.use_build_secrets') }}"
+                            helper="{{ __('env_var.build_secrets_helper') }}"
                             disabled></x-forms.checkbox>
                     @endcan
                 </div>
@@ -49,7 +49,7 @@
                         d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16">
                     </path>
                 </svg>
-                Hardcoded variables are not shown here.
+                {{ __('env_var.hardcoded_warning') }}
             </div>
             {{-- <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a variable, you must add it to
                 your compose file.</div> --}}
@@ -57,19 +57,19 @@
     </div>
     @if ($view === 'normal')
         <div>
-            <h3>Production Environment Variables</h3>
-            <div>Environment (secrets) variables for Production.</div>
+            <h3>{{ __('env_var.production_title') }}</h3>
+            <div>{{ __('env_var.production_desc') }}</div>
         </div>
         @forelse ($this->environmentVariables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
-            <div>No environment variables found.</div>
+            <div>{{ __('env_var.no_variables') }}</div>
         @endforelse
         @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
             <div>
-                <h3>Preview Deployments Environment Variables</h3>
-                <div>Environment (secrets) variables for Preview Deployments.</div>
+                <h3>{{ __('env_var.preview_title') }}</h3>
+                <div>{{ __('env_var.preview_desc') }}</div>
             </div>
             @foreach ($this->environmentVariablesPreview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
@@ -80,22 +80,22 @@
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
             @can('manageEnvironment', $resource)
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
-                    label="Production Environment Variables"></x-forms.textarea>
+                    label="{{ __('env_var.production_title') }}"></x-forms.textarea>
 
                 @if ($showPreview)
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap"
-                        label="Preview Deployments Environment Variables" id="variablesPreview"
+                        label="{{ __('env_var.preview_title') }}" id="variablesPreview"
                         wire:model="variablesPreview"></x-forms.textarea>
                 @endif
 
-                <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
+                <x-forms.button type="submit" class="btn btn-primary">{{ __('env_var.save_all') }}</x-forms.button>
             @else
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
-                    label="Production Environment Variables" disabled></x-forms.textarea>
+                    label="{{ __('env_var.production_title') }}" disabled></x-forms.textarea>
 
                 @if ($showPreview)
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap"
-                        label="Preview Deployments Environment Variables" id="variablesPreview"
+                        label="{{ __('env_var.preview_title') }}" id="variablesPreview"
                         wire:model="variablesPreview" disabled></x-forms.textarea>
                 @endif
             @endcan

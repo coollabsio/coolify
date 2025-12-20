@@ -62,7 +62,7 @@
                             </div>
                             <div class="relative flex justify-center text-sm">
                                 <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400 ">
-                                    Don't have an account?
+                                    {{ __('auth.no_account') }}
                                 </span>
                             </div>
                         </div>
@@ -82,8 +82,7 @@
                                 <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
                             </div>
                             <div class="relative flex justify-center text-sm">
-                                <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">or
-                                    continue with</span>
+                                <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">{{ __('auth.or_continue_with') }}</span>
                             </div>
                         </div>
                         <div class="flex flex-col gap-3">

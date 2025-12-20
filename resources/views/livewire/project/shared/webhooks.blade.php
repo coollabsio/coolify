@@ -1,80 +1,80 @@
 <div class="flex flex-col gap-2">
     <div class="flex items-center gap-2">
-        <h2>Webhooks</h2>
+        <h2>{{ __('webhooks.title') }}</h2>
         <x-helper
-            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid' target='_blank'>docs</a>." />
+            helper="{{ __('webhooks.helper_docs') }}" />
     </div>
     <div>
         <x-forms.input readonly
-            helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid'>documentation</a>."
-            label="Deploy Webhook (auth required)" id="deploywebhook"></x-forms.input>
+            helper="{{ __('webhooks.deploy_webhook_helper') }}"
+            label="{{ __('webhooks.deploy_webhook_label') }}" id="deploywebhook"></x-forms.input>
     </div>
     @if ($resource->type() === 'application')
         <div>
-            <h3>Manual Git Webhooks</h3>
+            <h3>{{ __('webhooks.manual_git_webhooks') }}</h3>
             @if ($githubManualWebhook && $gitlabManualWebhook)
                 <form wire:submit='submit' class="flex flex-col gap-2">
                     <div class="flex items-end gap-2">
-                        <x-forms.input helper="Content Type in GitHub configuration could be json or form-urlencoded."
-                            readonly label="GitHub" id="githubManualWebhook"></x-forms.input>
+                        <x-forms.input helper="{{ __('webhooks.github_content_type_helper') }}"
+                            readonly label="{{ __('webhooks.github_label') }}" id="githubManualWebhook"></x-forms.input>
                         @can('update', $resource)
                             <x-forms.input type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
-                                label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.github_secret_helper') }}"
+                                label="{{ __('webhooks.github_secret_label') }}" id="githubManualWebhookSecret"></x-forms.input>
                         @else
                             <x-forms.input disabled type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
-                                label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.github_secret_helper') }}"
+                                label="{{ __('webhooks.github_secret_label') }}" id="githubManualWebhookSecret"></x-forms.input>
                         @endcan
                     </div>
                     <a target="_blank" class="flex hover:no-underline" href="{{ $resource?->gitWebhook }}">
-                        <x-forms.button>Webhook Configuration on GitHub
+                        <x-forms.button>{{ __('webhooks.github_config_button') }}
                             <x-external-link />
                         </x-forms.button>
                     </a>
                     <div class="flex gap-2">
-                        <x-forms.input readonly label="GitLab" id="gitlabManualWebhook"></x-forms.input>
+                        <x-forms.input readonly label="{{ __('webhooks.gitlab_label') }}" id="gitlabManualWebhook"></x-forms.input>
                         @can('update', $resource)
                             <x-forms.input type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
-                                label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.gitlab_secret_helper') }}"
+                                label="{{ __('webhooks.gitlab_secret_label') }}" id="gitlabManualWebhookSecret"></x-forms.input>
                         @else
                             <x-forms.input disabled type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
-                                label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.gitlab_secret_helper') }}"
+                                label="{{ __('webhooks.gitlab_secret_label') }}" id="gitlabManualWebhookSecret"></x-forms.input>
                         @endcan
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input readonly label="Bitbucket" id="bitbucketManualWebhook"></x-forms.input>
+                        <x-forms.input readonly label="{{ __('webhooks.bitbucket_label') }}" id="bitbucketManualWebhook"></x-forms.input>
                         @can('update', $resource)
                             <x-forms.input type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
-                                label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.bitbucket_secret_helper') }}"
+                                label="{{ __('webhooks.bitbucket_secret_label') }}" id="bitbucketManualWebhookSecret"></x-forms.input>
                         @else
                             <x-forms.input disabled type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
-                                label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.bitbucket_secret_helper') }}"
+                                label="{{ __('webhooks.bitbucket_secret_label') }}" id="bitbucketManualWebhookSecret"></x-forms.input>
                         @endcan
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input readonly label="Gitea" id="giteaManualWebhook"></x-forms.input>
+                        <x-forms.input readonly label="{{ __('webhooks.gitea_label') }}" id="giteaManualWebhook"></x-forms.input>
                         @can('update', $resource)
                             <x-forms.input type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
-                                label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.gitea_secret_helper') }}"
+                                label="{{ __('webhooks.gitea_secret_label') }}" id="giteaManualWebhookSecret"></x-forms.input>
                         @else
                             <x-forms.input disabled type="password"
-                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
-                                label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                                helper="{{ __('webhooks.gitea_secret_helper') }}"
+                                label="{{ __('webhooks.gitea_secret_label') }}" id="giteaManualWebhookSecret"></x-forms.input>
                         @endcan
                     </div>
                     @can('update', $resource)
-                        <x-forms.button type="submit">Save</x-forms.button>
+                        <x-forms.button type="submit">{{ __('button.save') }}</x-forms.button>
                     @endcan
                 </form>
             @else
-                <x-callout type="info" title="Information">
-                    You are using an official Git App. You do not need manual webhooks.
+                <x-callout type="info" title="{{ __('webhooks.official_git_app_info_title') }}">
+                    {{ __('webhooks.official_git_app_info_message') }}
                 </x-callout>
             @endif
         </div>

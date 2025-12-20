@@ -34,9 +34,9 @@
                 ])>
                     @php
                         $statusText = match(data_get($execution, 'status')) {
-                            'success' => 'Success',
-                            'running' => 'In Progress',
-                            'failed' => 'Failed',
+                            'success' => __('task_execution.status_success'),
+                            'running' => __('task_execution.status_running'),
+                            'failed' => __('task_execution.status_failed'),
                             default => ucfirst(data_get($execution, 'status'))
                         };
                     @endphp
@@ -44,24 +44,24 @@
                 </span>
             </div>
             <div class="text-gray-600 dark:text-gray-400 text-sm">
-                Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at', now()), data_get($task, 'application.destination.server') ?? data_get($task, 'service.destination.server')) }}
+                {{ __('task_execution.started') }} {{ formatDateInServerTimezone(data_get($execution, 'created_at', now()), data_get($task, 'application.destination.server') ?? data_get($task, 'service.destination.server')) }}
                 @if(data_get($execution, 'status') !== 'running')
-                    <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), data_get($task, 'application.destination.server') ?? data_get($task, 'service.destination.server')) }}
-                    <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
-                    <br>Finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
+                    <br>{{ __('task_execution.ended') }} {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), data_get($task, 'application.destination.server') ?? data_get($task, 'service.destination.server')) }}
+                    <br>{{ __('task_execution.duration') }} {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
+                    <br>{{ __('task_execution.finished_ago') }} {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
                 @endif
             </div>
         </a>
         @if (strlen($execution->message) > 0)
             <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
-                Download Logs
+                {{ __('task_execution.download_logs') }}
             </x-forms.button>
         @endif
         @if (data_get($execution, 'id') == $selectedKey)
             <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded-sm">
                 @if (data_get($execution, 'status') === 'running')
                     <div class="flex items-center gap-2 mb-2">
-                        <span>Task is running...</span>
+                        <span>{{ __('task_execution.task_running') }}</span>
                         <x-loading class="w-4 h-4" />
                     </div>
                 @endif
@@ -77,20 +77,20 @@
                         <div class="flex gap-2 mt-4">
                             @if ($this->hasMoreLogs())
                                 <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
-                                    Load More
+                                    {{ __('task_execution.load_more') }}
                                 </x-forms.button>
                                 <x-forms.button wire:click.prevent="loadAllLogs">
-                                    Load All
+                                    {{ __('task_execution.load_all') }}
                                 </x-forms.button>
                             @endif
                         </div>
                     </div>
                 @else
-                    <div>No output was recorded for this execution.</div>
+                    <div>{{ __('task_execution.no_output') }}</div>
                 @endif
             </div>
         @endif
     @empty
-        <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
+        <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">{{ __('task_execution.no_executions') }}</div>
     @endforelse
 </div>

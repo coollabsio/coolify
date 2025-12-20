@@ -1,1 +1,1 @@
-<x-forms.button wire:click='backupNow'>Backup Now</x-forms.button>
+<x-forms.button wire:click='backupNow'>{{ __('backup.backup_now') }}</x-forms.button>

@@ -1,9 +1,9 @@
 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
-    <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
+    <x-forms.input placeholder="NODE_ENV" id="key" label="{{ __('env_var.name_label') }}" required />
     @if ($is_multiline)
-        <x-forms.textarea id="value" label="Value" required />
+        <x-forms.textarea id="value" label="{{ __('env_var.value_label') }}" required />
     @else
-        <x-forms.env-var-input placeholder="production" id="value" label="Value" required
+        <x-forms.env-var-input placeholder="production" id="value" label="{{ __('env_var.value_label') }}" required
             :availableVars="$shared ? [] : $this->availableSharedVariables"
             :projectUuid="data_get($parameters, 'project_uuid')"
             :environmentUuid="data_get($parameters, 'environment_uuid')" />
@@ -11,27 +11,26 @@
 
     @if (!$shared && !$is_multiline)
         <div class="text-xs text-neutral-500 dark:text-neutral-400 -mt-1">
-            Tip: Type <span class="font-mono dark:text-warning text-coollabs">{{</span> to reference a shared environment
-            variable
+            {!! __('env_var.shared_var_tip') !!}
         </div>
     @endif
 
     @if (!$shared)
         <x-forms.checkbox id="is_buildtime"
-            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-            label="Available at Buildtime" />
+            helper="{{ __('env_var.buildtime_helper') }}"
+            label="{{ __('env_var.buildtime_label') }}" />
 
         <x-environment-variable-warning :problematic-variables="$problematicVariables" />
 
-        <x-forms.checkbox id="is_runtime" helper="Make this variable available in the running container at runtime."
-            label="Available at Runtime" />
+        <x-forms.checkbox id="is_runtime" helper="{{ __('env_var.runtime_helper') }}"
+            label="{{ __('env_var.runtime_label') }}" />
         <x-forms.checkbox id="is_literal"
-            helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
-            label="Is Literal?" />
+            helper="{{ __('env_var.literal_helper') }}"
+            label="{{ __('env_var.literal_label') }}" />
     @endif
 
-    <x-forms.checkbox id="is_multiline" label="Is Multiline?" />
+    <x-forms.checkbox id="is_multiline" label="{{ __('env_var.multiline_label') }}" />
     <x-forms.button type="submit" @click="slideOverOpen=false">
-        Save
+        {{ __('button.save') }}
     </x-forms.button>
 </form>

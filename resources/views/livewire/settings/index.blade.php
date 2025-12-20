@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        Settings | Coolify
+        {{ __('settings.title') }}
         </x-slot>
         <x-settings.navbar />
         <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
@@ -8,26 +8,26 @@
             <x-settings.sidebar activeMenu="general" />
             <form wire:submit='submit' class="flex flex-col">
                 <div class="flex items-center gap-2">
-                    <h2>General</h2>
+                    <h2>{{ __('settings.general') }}</h2>
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                        Save
+                        {{ __('button.save') }}
                     </x-forms.button>
                 </div>
-                <div class="pb-4">General configuration for your Coolify instance.</div>
+                <div class="pb-4">{{ __('settings.general_desc') }}</div>
 
                 <div class="flex flex-col gap-2">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="Domain"
-                                helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
+                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="{{ __('settings.domain') }}"
+                                helper="{{ __('settings.domain_helper') }}"
                                 placeholder="https://coolify.yourdomain.com" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name" placeholder="Coolify"
-                                helper="Custom name for your Coolify instance, shown in the URL." />
+                            <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="{{ __('input.name') }}" placeholder="Coolify"
+                                helper="{{ __('settings.instance_name_helper') }}" />
                             <div class="w-full" x-data="{
                             open: false,
                             search: '{{ $settings->instance_timezone ?: '' }}',
                             timezones: @js($this->timezones),
-                            placeholder: '{{ $settings->instance_timezone ? 'Search timezone...' : 'Select Server Timezone' }}',
+                            placeholder: '{{ $settings->instance_timezone ? __('settings.search_timezone') : __('settings.select_timezone') }}',
                             init() {
                                 this.$watch('search', value => {
                                     if (value === '') {
@@ -37,10 +37,9 @@
                             }
                         }">
                                 <div class="flex items-center mb-1">
-                                    <label for="instance_timezone">Instance
-                                        Timezone</label>
+                                    <label for="instance_timezone">{{ __('settings.timezone') }}</label>
                                     <x-helper class="ml-2"
-                                        helper="Timezone for the Coolify instance. This is used for the update check and automatic update frequency." />
+                                        helper="{{ __('settings.timezone_helper') }}" />
                                 </div>
                                 <div class="relative">
                                     <div class="inline-flex relative items-center w-full">
@@ -71,23 +70,23 @@
                             </div>
                         </div>
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password" label="Instance's Public IPv4"
-                                helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
+                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password" label="{{ __('settings.public_ipv4') }}"
+                                helper="{{ __('settings.public_ipv4_helper') }}"
                                 placeholder="1.2.3.4" autocomplete="new-password" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password" label="Instance's Public IPv6"
-                                helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
+                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password" label="{{ __('settings.public_ipv6') }}"
+                                helper="{{ __('settings.public_ipv6_helper') }}"
                                 placeholder="2001:db8::1" autocomplete="new-password" />
                         </div>
 
                         @if($buildActivityId)
                             <div class="w-full mt-4">
-                                <livewire:activity-monitor header="Building Helper Image" :activityId="$buildActivityId"
+                                <livewire:activity-monitor header="{{ __('settings.building_helper_image') }}" :activityId="$buildActivityId"
                                     :fullHeight="false" />
                             </div>
                         @endif
                         @if(isDev())
-                            <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="Dev Helper Version (Development Only)"
-                                helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
+                            <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="{{ __('settings.dev_helper_version') }}"
+                                helper="{{ __('settings.dev_helper_version_helper', ['version' => config('constants.coolify.helper_version')]) }}"
                                 placeholder="{{ config('constants.coolify.helper_version') }}" />
                         @endif
                 </div>
@@ -97,10 +96,10 @@
                 confirmAction="confirmDomainUsage">
                 <x-slot:consequences>
                     <ul class="mt-2 ml-4 list-disc">
-                        <li>The Coolify instance domain will conflict with existing resources</li>
-                        <li>SSL certificates might not work correctly</li>
-                        <li>Routing behavior will be unpredictable</li>
-                        <li>You may not be able to access the Coolify dashboard properly</li>
+                        <li>{{ __('settings.domain_conflict_1') }}</li>
+                        <li>{{ __('settings.domain_conflict_2') }}</li>
+                        <li>{{ __('settings.domain_conflict_3') }}</li>
+                        <li>{{ __('settings.domain_conflict_4') }}</li>
                     </ul>
                 </x-slot:consequences>
             </x-domain-conflict-modal>

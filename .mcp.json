@@ -6,6 +6,15 @@
                 "artisan",
                 "boost:mcp"
             ]
+        },
+        "Relace": {
+            "command": "uvx",
+            "args": [
+                "relace-mcp-server"
+            ],
+            "env": {
+                "RELACE_API_KEY": "rlc-7fznAhiS2ueKuzxx_YZHRWmL56HFMNnrcC3QTA"
+            }
         }
     }
 }

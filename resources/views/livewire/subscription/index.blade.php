@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        Subscribe | Coolify
+        {{ __('subscription.title') }}
     </x-slot>
     @if (auth()->user()->isAdminFromSession())
         @if (request()->query->get('cancelled'))
@@ -10,27 +10,25 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Something went wrong with your subscription. Please try again or contact
-                    support.</span>
+                <span>{{ __('subscription.error_cancelled') }}</span>
             </div>
         @endif
         <div class="flex gap-2">
-            <h1>Subscriptions</h1>
+            <h1>{{ __('subscription.heading') }}</h1>
         </div>
         @if ($loading)
             <div class="flex gap-2" wire:init="getStripeStatus">
-                Loading your subscription status...
+                {{ __('subscription.loading') }}
             </div>
         @else
             @if ($isUnpaid)
                 <div class="mb-6 rounded-sm alert-error">
-                    <span>Your last payment was failed for Coolify Cloud.</span>
+                    <span>{{ __('subscription.payment_failed') }}</span>
                 </div>
                 <div>
-                    <p class="mb-2">Open the following link, navigate to the button and pay your unpaid/past due
-                        subscription.
+                    <p class="mb-2">{{ __('subscription.pay_unpaid') }}
                     </p>
-                    <x-forms.button wire:click='stripeCustomerPortal'>Billing Portal</x-forms.button>
+                    <x-forms.button wire:click='stripeCustomerPortal'>{{ __('button.billing_portal') }}</x-forms.button>
                 </div>
             @else
                 @if (config('subscription.provider') === 'stripe')
@@ -40,9 +38,7 @@
                     ])>
                         @if ($isCancelled)
                             <div class="alert-error">
-                                <span>It looks like your previous subscription has been cancelled, because you forgot to
-                                    pay
-                                    the bills.<br />Please subscribe again to continue using Coolify.</span>
+                                <span>{!! __('subscription.cancelled_notice') !!}</span>
                             </div>
                         @endif
                     </div>
@@ -53,11 +49,11 @@
     @else
         <div class="flex flex-col justify-center mx-10">
             <div class="flex gap-2">
-                <h1>Subscription</h1>
+                <h1>{{ __('subscription.heading_singular') }}</h1>
             </div>
-            <x-callout type="warning" title="Permission Required">
-                You are not an admin so you cannot manage your Team's subscription. If this does not make sense, please
-                <span class="underline cursor-pointer dark:text-white" wire:click="help">contact us</span>.
+            <x-callout type="warning" title="{{ __('subscription.permission_required') }}">
+                {{ __('subscription.not_admin') }}
+                <span class="underline cursor-pointer dark:text-white" wire:click="help">{{ __('subscription.contact_us') }}</span>.
             </x-callout>
         </div>
     @endif

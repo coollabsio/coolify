@@ -1,8 +1,8 @@
 <div>
     <x-slot:title>
-        Subscription | Coolify
+        {{ __('subscription.title') }}
     </x-slot>
-    <h1>Subscription</h1>
-    <div class="subtitle">Here you can see and manage your subscription.</div>
+    <h1>{{ __('subscription.heading_singular') }}</h1>
+    <div class="subtitle">{{ __('subscription.description') }}</div>
     <livewire:subscription.actions />
 </div>

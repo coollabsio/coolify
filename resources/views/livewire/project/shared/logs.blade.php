@@ -1,23 +1,23 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($resource, 'name')->limit(10) }} > Logs | Coolify
+        {{ data_get_str($resource, 'name')->limit(10) }} > {{ __('logs.title') }} | Coolify
     </x-slot>
     <livewire:project.shared.configuration-checker :resource="$resource" />
     @if ($type === 'application')
-        <h1>Logs</h1>
+        <h1>{{ __('logs.title') }}</h1>
         <livewire:project.application.heading :application="$resource" />
         <div>
-            <h2>Logs</h2>
+            <h2>{{ __('logs.title') }}</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4">{{ __('logs.resource_not_running') }}</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
-                    Loading containers...
+                    {{ __('logs.loading_containers') }}
                 </div>
                 <div x-init="$wire.loadAllContainers()" wire:loading.remove wire:target="loadAllContainers">
                     @forelse ($servers as $server)
                         <div class="py-2">
-                            <h4>Server: {{ $server->name }}</h4>
+                            <h4>{{ __('logs.server_label') }} {{ $server->name }}</h4>
                             @if ($server->isFunctional())
                                 @if (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
                                     @php
@@ -30,28 +30,28 @@
                                             :expandByDefault="$totalContainers === 1" />
                                     @endforeach
                                 @else
-                                    <div class="pt-2">No containers are running on server: {{ $server->name }}</div>
+                                    <div class="pt-2">{{ __('logs.no_containers_on_server') }} {{ $server->name }}</div>
                                 @endif
                             @else
-                                <div class="pt-2">Server {{ $server->name }} is not functional.</div>
+                                <div class="pt-2">{{ __('logs.server_not_functional', ['name' => $server->name]) }}</div>
                             @endif
                         </div>
                     @empty
-                        <div>No functional server found for the application.</div>
+                        <div>{{ __('logs.no_functional_server_application') }}</div>
                     @endforelse
                 </div>
             @endif
         </div>
     @elseif ($type === 'database')
-        <h1>Logs</h1>
+        <h1>{{ __('logs.title') }}</h1>
         <livewire:project.database.heading :database="$resource" />
         <div>
-            <h2>Logs</h2>
+            <h2>{{ __('logs.title') }}</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4">{{ __('logs.resource_not_running') }}</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
-                    Loading containers...
+                    {{ __('logs.loading_containers') }}
                 </div>
                 <div x-init="$wire.loadAllContainers()" wire:loading.remove wire:target="loadAllContainers">
                     @forelse ($containers as $container)
@@ -60,23 +60,23 @@
                                 :resource="$resource" :container="$container"
                                 :expandByDefault="count($containers) === 1" />
                         @else
-                            <div>No functional server found for the database.</div>
+                            <div>{{ __('logs.no_functional_server_database') }}</div>
                         @endif
                     @empty
-                        <div class="pt-2">No containers are running.</div>
+                        <div class="pt-2">{{ __('logs.no_containers_running') }}</div>
                     @endforelse
                 </div>
             @endif
         </div>
     @elseif ($type === 'service')
-        <livewire:project.service.heading :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" :query="$query" title="{{ __('logs.title') }}" />
         <div>
-            <h2>Logs</h2>
+            <h2>{{ __('logs.title') }}</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4">{{ __('logs.resource_not_running') }}</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
-                    Loading containers...
+                    {{ __('logs.loading_containers') }}
                 </div>
                 <div x-init="$wire.loadAllContainers()" wire:loading.remove wire:target="loadAllContainers">
                     @forelse ($containers as $container)
@@ -85,10 +85,10 @@
                                 :resource="$resource" :container="$container"
                                 :expandByDefault="count($containers) === 1" />
                         @else
-                            <div>No functional server found for the service.</div>
+                            <div>{{ __('logs.no_functional_server_service') }}</div>
                         @endif
                     @empty
-                        <div class="pt-2">No containers are running.</div>
+                        <div class="pt-2">{{ __('logs.no_containers_running') }}</div>
                     @endforelse
                 </div>
             @endif

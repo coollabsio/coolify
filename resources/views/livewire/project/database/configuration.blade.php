@@ -1,42 +1,36 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($database, 'name')->limit(10) }} > Configuration | Coolify
+        {{ data_get_str($database, 'name')->limit(10) }} > {{ __('menu.configuration') }} | Coolify
     </x-slot>
-    <h1>Configuration</h1>
+    <h1>{{ __('menu.configuration') }}</h1>
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">General</a>
+                href="{{ route('project.database.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.general') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Environment
-                Variables</a>
+                href="{{ route('project.database.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.environment_variables') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Servers</a>
+                href="{{ route('project.database.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.servers') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Persistent
-                Storage</a>
+                href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.persistent_storage') }}</a>
             @can('update', $database)
                 <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                    href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
-                    Backups</a>
+                    href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('database.import_backups') }}</a>
             @endcan
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Webhooks</a>
+                href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.webhooks') }}</a>
             <a class="menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.resource-limits', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Resource
-                Limits</a>
+                href="{{ route('project.database.resource-limits', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.resource_limits') }}</a>
             <a class="menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Resource
-                Operations</a>
+                href="{{ route('project.database.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.resource_operations') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Metrics</a>
+                href="{{ route('project.database.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.metrics') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Tags</a>
+                href="{{ route('project.database.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.tags') }}</a>
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                href="{{ route('project.database.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Danger
-                Zone</a>
+                href="{{ route('project.database.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">{{ __('menu.danger_zone') }}</a>
         </div>
         <div class="w-full">
             @if ($currentRoute === 'project.database.configuration')

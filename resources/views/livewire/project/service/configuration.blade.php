@@ -1,49 +1,44 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
+        {{ data_get_str($service, 'name')->limit(10) }} > {{ __('menu.configuration') }} | Coolify
     </x-slot>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
-            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
+            <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">{{ __('menu.documentation') }}
                 <x-external-link /></a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">General</a>
+                href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.general') }}</a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Environment
-                Variables</a>
+                href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.environment_variables') }}</a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Persistent
-                Storages</a>
+                href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('service.persistent_storages') }}</a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Scheduled
-                Tasks</a>
+                href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.scheduled_tasks') }}</a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Webhooks</a>
+                href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.webhooks') }}</a>
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Resource
-                Operations</a>
+                href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.resource_operations') }}</a>
 
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Tags</a>
+                href="{{ route('project.service.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.tags') }}</a>
 
             <a class='menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Danger
-                Zone</a>
+                href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">{{ __('menu.danger_zone') }}</a>
         </div>
         <div class="w-full">
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
-                <h3>Services</h3>
+                <h3>{{ __('service.services') }}</h3>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @if ($applications->isEmpty() && $databases->isEmpty())
                         <div class="p-4 text-sm text-neutral-500">
-                            No services defined in this Docker Compose file.
+                            {{ __('service.no_services_defined') }}
                         </div>
                     @elseif($applications->isEmpty())
                         <div class="p-4 text-sm text-neutral-500">
-                            No applications with domains defined. Only database services are available.
+                            {{ __('service.no_applications_with_domains') }}
                         </div>
                     @endif
 
