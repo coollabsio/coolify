@@ -1,6 +1,6 @@
 <x-emails.layout>
 
-Connection could not be established with one of your S3 Storage ({{ $name }}). Please fix it [here]({{ $url }}).
+{{ __('email.s3_connection_error.body', ['name' => $name, 'url' => $url]) }}
 
 {{ $reason }}
 </x-emails.layout>

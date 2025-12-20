@@ -1,7 +1,7 @@
 <x-emails.layout>
-{{ $count }} server(s) are running outdated Traefik proxy. Update recommended for security and features.
+{{ __('email.traefik_outdated.body', ['count' => $count]) }}
 
-## Affected Servers
+## {{ __('email.traefik_outdated.affected_servers') }}
 
 @foreach ($servers as $server)
 @php
@@ -37,30 +37,27 @@
     }
 @endphp
 @if ($isPatch && $hasNewerBranch)
-- [**{{ $serverName }}**]({{ $serverUrl }}): {{ $current }} → {{ $upgradeTarget }} (patch update available) | Also available: {{ $newerBranchTarget }} (latest patch: {{ $newerBranchLatest }}) - new minor version
+{{ __('email.traefik_outdated.patch_available_with_newer', ['name' => $serverName, 'url' => $serverUrl, 'current' => $current, 'target' => $upgradeTarget, 'newer_target' => $newerBranchTarget, 'newer_latest' => $newerBranchLatest]) }}
 @elseif ($isPatch)
-- [**{{ $serverName }}**]({{ $serverUrl }}): {{ $current }} → {{ $upgradeTarget }} (patch update available)
+{{ __('email.traefik_outdated.patch_available', ['name' => $serverName, 'url' => $serverUrl, 'current' => $current, 'target' => $upgradeTarget]) }}
 @else
-- [**{{ $serverName }}**]({{ $serverUrl }}): {{ $current }} (latest patch: {{ $latest }}) → {{ $upgradeTarget }} (new minor version available)
+{{ __('email.traefik_outdated.minor_available', ['name' => $serverName, 'url' => $serverUrl, 'current' => $current, 'latest' => $latest, 'target' => $upgradeTarget]) }}
 @endif
 @endforeach
 
-## Recommendation
+## {{ __('email.traefik_outdated.recommendation') }}
 
-It is recommended to test the new Traefik version before switching it in production environments. You can update your proxy configuration by clicking on any server name above.
+{{ __('email.traefik_outdated.recommendation_body') }}
 
 @if ($hasUpgrades ?? false)
-**Important for minor version upgrades:** Before upgrading to a new minor version, please read the [Traefik changelog](https://github.com/traefik/traefik/releases) to understand breaking changes and new features.
+**{{ __('email.traefik_outdated.important') }}** {{ __('email.traefik_outdated.important_body') }}
 @endif
 
-## Next Steps
+## {{ __('email.traefik_outdated.next_steps') }}
 
-1. Review the [Traefik release notes](https://github.com/traefik/traefik/releases) for changes
-2. Test the new version in a non-production environment
-3. Update your proxy configuration when ready
-4. Monitor services after the update
+{{ __('email.traefik_outdated.next_steps_list') }}
 
 ---
 
-Click on any server name above to manage its proxy settings.
+{{ __('email.traefik_outdated.action') }}
 </x-emails.layout>

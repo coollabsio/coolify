@@ -2,19 +2,17 @@
 <div class="flex flex-col items-center justify-center h-full">
     <div>
         <p class="font-mono font-semibold text-7xl dark:text-warning">404</p>
-        <h1 class="mt-4 font-bold tracking-tight dark:text-white">How did you get here?</h1>
-        <p class="text-base leading-7 dark:text-neutral-400 text-black">Sorry, we couldn't find the page you're looking
-            for.
+        <h1 class="mt-4 font-bold tracking-tight dark:text-white">{{ __('error.404.title') }}</h1>
+        <p class="text-base leading-7 dark:text-neutral-400 text-black">{{ __('error.404.body') }}
         </p>
         <div class="flex items-center mt-10 gap-x-2">
             <a href="{{ url()->previous() }}">
-                <x-forms.button>Go back</x-forms.button>
+                <x-forms.button>{{ __('error.back') }}</x-forms.button>
             </a>
             <a href="{{ route('dashboard') }}" {{ wireNavigate() }}>
-                <x-forms.button>Dashboard</x-forms.button>
+                <x-forms.button>{{ __('error.dashboard') }}</x-forms.button>
             </a>
-            <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">Contact
-                support
+            <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">{{ __('error.contact_support') }}
                 <x-external-link />
             </a>
         </div>

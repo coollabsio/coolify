@@ -1,5 +1,5 @@
 <x-emails.layout>
-Your trial ended. All automations and integrations are disabled for all of your servers.
+{{ __('email.trial_ended.body') }}
 
-Please update payment details [here]({{ $stripeCustomerPortal }}) or in [Coolify Cloud](https://app.coolify.io) to continue using our services.
+{{ __('email.trial_ended.action', ['url' => $stripeCustomerPortal]) }}
 </x-emails.layout>

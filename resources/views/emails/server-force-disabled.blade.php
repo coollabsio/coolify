@@ -1,5 +1,5 @@
 <x-emails.layout>
-    Your server ({{ $name }}) disabled because it is not paid! All automations and integrations are stopped.
+    {{ __('email.server_force_disabled.body', ['name' => $name]) }}
 
-    Please update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).
+    {{ __('email.server_force_disabled.action', ['url' => 'https://app.coolify.io/subscriptions']) }}
 </x-emails.layout>

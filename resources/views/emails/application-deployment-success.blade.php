@@ -1,11 +1,10 @@
 <x-emails.layout>
 @if ($pull_request_id === 0)
-A new version of {{ $name }} is available at [{{ $fqdn }}]({{ $fqdn }}) .
+{{ __('email.application.deployment_success', ['name' => $name, 'url' => $fqdn]) }}
 @else
-Pull request #{{ $pull_request_id }} of {{ $name }} deployed successfully
-[{{ $fqdn }}]({{ $fqdn }}).
+{{ __('email.application.deployment_success_pr', ['pr_id' => $pull_request_id, 'name' => $name, 'url' => $fqdn]) }}
 @endif
 
-[View Deployment Logs]({{ $deployment_url }})
+[{{ __('email.application.view_deployment_logs') }}]({{ $deployment_url }})
 
 </x-emails.layout>

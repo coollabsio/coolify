@@ -1,3 +1,3 @@
 <x-emails.layout>
-If you are seeing this, it means that your Email settings are correct.
+{{ __('email.test.success') }}
 </x-emails.layout>

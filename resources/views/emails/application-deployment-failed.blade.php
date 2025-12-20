@@ -1,10 +1,9 @@
 <x-emails.layout>
 @if ($pull_request_id === 0)
-Failed to deploy a new version of {{ $name }} at [{{ $fqdn }}]({{ $fqdn }}) .
+{{ __('email.application.deployment_failed', ['name' => $name, 'url' => $fqdn]) }}
 @else
-Failed to deploy a pull request #{{ $pull_request_id }} of {{ $name }} at
-[{{ $fqdn }}]({{ $fqdn }}).
+{{ __('email.application.deployment_failed_pr', ['pr_id' => $pull_request_id, 'name' => $name, 'url' => $fqdn]) }}
 @endif
 
-[View Deployment Logs]({{ $deployment_url }})
+[{{ __('email.application.view_deployment_logs') }}]({{ $deployment_url }})
 </x-emails.layout>

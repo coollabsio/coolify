@@ -1,7 +1,7 @@
 <x-emails.layout>
-A resource ({{ $containerName }}) has been stopped unexpectedly on {{ $serverName }}.
+{{ __('email.container_stopped.body', ['name' => $containerName, 'server_name' => $serverName]) }}
 
 @if ($url)
-Please check what is going on [here]({{ $url }}).
+{{ __('email.container_stopped.action', ['url' => $url]) }}
 @endif
 </x-emails.layout>

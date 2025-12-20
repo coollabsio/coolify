@@ -1,5 +1,5 @@
 <x-emails.layout>
-Your last invoice has failed to be paid for Coolify Cloud.
+{{ __('email.subscription_invoice_failed.body') }}
 
-Please update payment details [here]({{ $stripeCustomerPortal }}).
+{{ __('email.subscription_invoice_failed.action', ['url' => $stripeCustomerPortal]) }}
 </x-emails.layout>

@@ -1,5 +1,5 @@
 <x-emails.layout>
-Docker Cleanup on {{ $name }} succeeded with the following message:
+{{ __('email.docker_cleanup.success', ['name' => $name]) }}
 
 
 <pre>

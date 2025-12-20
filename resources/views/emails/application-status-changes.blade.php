@@ -1,7 +1,7 @@
 <x-emails.layout>
-{{ $name }} has been stopped.
+{{ __('email.application_status_changed.body', ['name' => $name]) }}
 
-If it was your intention to stop this application, you can ignore this email.
+{{ __('email.application_status_changed.explanation') }}
 
-If not, [check what is going on]({{ $application_url }}).
+{{ __('email.application_status_changed.action', ['url' => $application_url]) }}
 </x-emails.layout>

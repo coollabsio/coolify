@@ -1,25 +1,25 @@
 <x-emails.layout>
-{{ $total_updates }} package updates are available for your server {{ $name }}.
+{{ __('email.server_patches.body', ['count' => $total_updates, 'name' => $name]) }}
 
-## Summary
+## {{ __('email.server_patches.summary') }}
 
-- Operating System: {{ ucfirst($osId) }}
-- Package Manager: {{ $package_manager }}
-- Total Updates: {{ $total_updates }}
+- {{ __('email.server_patches.os', ['os' => ucfirst($osId)]) }}
+- {{ __('email.server_patches.package_manager', ['manager' => $package_manager]) }}
+- {{ __('email.server_patches.total_updates', ['count' => $total_updates]) }}
 
-## Available Updates
+## {{ __('email.server_patches.available_updates') }}
 
 @if ($total_updates > 0)
 @foreach ($updates as $update)
 
-Package: {{ $update['package'] }} ({{ $update['architecture'] }}), from version {{ $update['current_version'] }} to {{ $update['new_version'] }} at repository {{ $update['repository'] ?? 'Unknown' }}
+{{ __('email.server_patches.package_details', ['package' => $update['package'], 'arch' => $update['architecture'], 'current' => $update['current_version'], 'new' => $update['new_version'], 'repo' => $update['repository'] ?? 'Unknown']) }}
 @endforeach
 
-## Security Considerations
+## {{ __('email.server_patches.security_considerations') }}
 
-Some of these updates may include important security patches. We recommend reviewing and applying these updates promptly.
+{{ __('email.server_patches.security_body') }}
 
-### Critical packages that may require container/server/service restarts:
+### {{ __('email.server_patches.critical_packages') }}
 @php
 $criticalPackages = collect($updates)->filter(function ($update) {
                 return str_contains(strtolower($update['package']), 'docker') ||
@@ -34,20 +34,17 @@ $criticalPackages = collect($updates)->filter(function ($update) {
 - {{ $package['package'] }}: {{ $package['current_version'] }} → {{ $package['new_version'] }}
 @endforeach
 @else
-No critical packages requiring container restarts detected.
+{{ __('email.server_patches.no_critical_packages') }}
 @endif
 
-## Next Steps
+## {{ __('email.server_patches.next_steps') }}
 
-1. Review the available updates
-2. Plan maintenance window if critical packages are involved
-3. Apply updates through the Coolify dashboard
-4. Monitor services after updates are applied
+{{ __('email.server_patches.next_steps_list') }}
 @else
-Your server is up to date! No packages require updating at this time.
+{{ __('email.server_patches.up_to_date') }}
 @endif
 
 ---
 
-You can manage server patches in your [Coolify Dashboard]({{ $server_url }}).
+{{ __('email.server_patches.action', ['url' => $server_url]) }}
 </x-emails.layout>
