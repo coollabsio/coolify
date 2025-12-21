@@ -1,53 +1,53 @@
 <div class="pb-6">
     <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
-        <x-slot:title>Proxy Startup Logs</x-slot:title>
+        <x-slot:title>{{ __('server.proxy_startup_logs') }}</x-slot:title>
         <x-slot:content>
             @if ($server->id === 0)
                 <div class="mb-4 p-3 text-sm bg-warning/10 border border-warning/30 rounded-lg text-warning">
-                    <span class="font-semibold">Note:</span> This is the localhost server where Coolify runs.
-                    During proxy restart, the connection may be temporarily lost.
-                    If logs stop updating, please refresh the browser after a few minutes.
+                    <span class="font-semibold">{{ __('common.note') }}:</span> {{ __('server.note_localhost') }}
+                    {{ __('server.proxy_restart_warning') }}
+                    {{ __('server.logs_stop_updating') }}
                 </div>
             @endif
-            <livewire:activity-monitor header="Logs" fullHeight />
+            <livewire:activity-monitor header="{{ __('server.logs') }}" fullHeight />
         </x-slot:content>
     </x-slide-over>
     <div class="flex items-center gap-2">
-        <h1>Server</h1>
+        <h1>{{ __('server.server') }}</h1>
         @if ($server->proxySet())
             <div class="flex">
                 <div class="flex items-center">
                     @if ($proxyStatus === 'running')
                         <x-status.running status="{{ __('menu.proxy_running') }}" noLoading />
                     @elseif ($proxyStatus === 'restarting')
-                        <x-status.restarting status="Proxy Restarting" noLoading />
+                        <x-status.restarting status="{{ __('server.proxy_restarting') }}" noLoading />
                     @elseif ($proxyStatus === 'stopping')
-                        <x-status.restarting status="Proxy Stopping" noLoading />
+                        <x-status.restarting status="{{ __('server.proxy_stopping') }}" noLoading />
                     @elseif ($proxyStatus === 'starting')
-                        <x-status.restarting status="Proxy Starting" noLoading />
+                        <x-status.restarting status="{{ __('server.proxy_starting') }}" noLoading />
                     @elseif (data_get($server, 'proxy.force_stop'))
                         <div wire:loading.remove wire:target="checkProxy">
-                            <x-status.stopped status="Proxy Stopped (Force Stop)" noLoading />
+                            <x-status.stopped status="{{ __('server.proxy_stopped_force') }}" noLoading />
                         </div>
                     @elseif ($proxyStatus === 'exited')
                         <div wire:loading.remove wire:target="checkProxy">
-                            <x-status.stopped status="Proxy Exited" noLoading />
+                            <x-status.stopped status="{{ __('server.proxy_exited') }}" noLoading />
                         </div>
                     @endif
                     <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
                     <div wire:loading wire:target="checkProxy"
                         class="pl-2 pr-1 text-xs font-bold tracking-wider dark:text-warning">
-                        Checking Ports Availability...
+                        {{ __('server.checking_ports_availability') }}
                     </div>
                     @if ($proxyStatus !== 'exited')
-                        <button wire:loading.remove title="Refresh Status" wire:click='checkProxyStatus'
+                        <button wire:loading.remove title="{{ __('server.refresh_status') }}" wire:click='checkProxyStatus'
                             class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path
                                     d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
                             </svg>
                         </button>
-                        <button wire:loading title="Refreshing Status" wire:click='checkProxyStatus'
+                        <button wire:loading title="{{ __('server.refreshing_status') }}" wire:click='checkProxyStatus'
                             class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
                             <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path
@@ -94,11 +94,11 @@
                             {{ __('menu.terminal') }}
                         </a>
             @endcan
-            @can('update', $server)
+                            @can('update', $server)
                         <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
-                            Security
+                            {{ __('server.security') }}
                         </a>
             @endcan
         </nav>
@@ -108,12 +108,12 @@
                     @if ($proxyStatus === 'running')
                             <div class="flex gap-2">
                                 <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
-                                    <x-loading text="Checking Traefik dashboard" />
+                                    <x-loading text="{{ __('server.checking_traefik_dashboard') }}" />
                                 </div>
                                 @if ($traefikDashboardAvailable)
                                     <button>
                                         <a target="_blank" href="http://{{ $serverIp }}:8080">
-                                            Traefik Dashboard
+                                            {{ __('server.traefik_dashboard') }}
                                             <x-external-link />
                                         </a>
                                     </button>
@@ -166,7 +166,7 @@
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                 <path d="M7 4v16l13 -8z" />
                             </svg>
-                            Start Proxy
+                            {{ __('server.start_proxy') }}
                         </button>
                     @endif
                 @endif
@@ -177,7 +177,7 @@
                             $wire.$call('checkProxy');
                         } catch (error) {
                             console.error(error);
-                            $wire.$dispatch('error', 'Failed to check proxy status. Please try again.');
+                            $wire.$dispatch('error', '{{ __('server.failed_to_check_proxy_status') }}');
                         }
                     });
                     $wire.$on('restartEvent', () => {

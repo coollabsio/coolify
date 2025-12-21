@@ -17,4 +17,8 @@ return [
     'tag_name' => '标签名称',
     'tags_help_desc' => '标签帮助您对多个资源执行操作。',
     'no_tags_defined' => '尚未定义标签。请转到资源并在此处添加标签。',
+    'tag_details' => '标签详情',
+    'deploy_webhook_url' => '部署 Webhook URL',
+    'deployments' => '部署',
+    'no_deployments_running' => '没有正在运行的部署。',
 ];

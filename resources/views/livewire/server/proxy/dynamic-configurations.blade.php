@@ -10,7 +10,7 @@
                 <div class="flex gap-2">
                     <div>
                         <div class="flex gap-2">
-                            <h2>Dynamic Configurations</h2>
+                            <h2>{{ __('server.dynamic_configurations') }}</h2>
                             <x-forms.button wire:click="loadDynamicConfigurations">{{ __('common.reload') }}</x-forms.button>
                             @can('update', $server)
                                 <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_dynamic_configuration') }}">
@@ -18,11 +18,11 @@
                                 </x-modal-input>
                             @endcan
                         </div>
-                        <div class='pb-4'>You can add dynamic proxy configurations here.</div>
+                        <div class='pb-4'>{{ __('server.add_dynamic_proxy_config') }}</div>
                     </div>
                 </div>
                 <div wire:loading wire:target="initLoadDynamicConfigurations">
-                    <x-loading text="Loading dynamic configurations..." />
+                    <x-loading text="{{ __('server.loading_dynamic_configurations') }}" />
                 </div>
                 <div x-init="$wire.initLoadDynamicConfigurations" class="flex flex-col gap-4">
                     @if ($contents?->isNotEmpty())
@@ -48,7 +48,7 @@
                             </div>
                         @endforeach
                     @else
-                        <div wire:loading.remove> No dynamic configurations found.</div>
+                        <div wire:loading.remove>{{ __('server.no_dynamic_configurations_found') }}</div>
                     @endif
                 </div>
             </div>

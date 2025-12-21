@@ -42,18 +42,18 @@
                                 @else
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox instantSave id="is_buildtime"
-                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                            label="Available at Buildtime" />
+                                            helper="{{ __('env_var.available_at_buildtime_helper') }}"
+                                            label="{{ __('env_var.available_at_buildtime') }}" />
                                     @endif
                                     <x-forms.checkbox instantSave id="is_runtime"
-                                        helper="Make this variable available in the running container at runtime."
-                                        label="Available at Runtime" />
+                                        helper="{{ __('env_var.available_at_runtime_helper') }}"
+                                        label="{{ __('env_var.available_at_runtime') }}" />
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox instantSave id="is_multiline" label="{{ __('env_var.multiline_label') }}" />
                                         @if ($is_multiline === false)
                                             <x-forms.checkbox instantSave id="is_literal"
-                                                helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
-                                                label="Is Literal?" />
+                                                helper="{{ __('env_var.is_literal_helper') }}"
+                                                label="{{ __('env_var.is_literal_label') }}" />
                                         @endif
                                     @endif
                                 @endif
@@ -72,7 +72,7 @@
                                 <x-forms.checkbox disabled id="is_runtime"
                                     helper="{{ __('env_var.runtime_helper') }}"
                                     label="{{ __('env_var.runtime_label') }}" />
-                                <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox disabled id="is_multiline" label="{{ __('env_var.is_multiline') }}" />
                                 <x-forms.checkbox disabled id="is_literal"
                                     helper="{{ __('env_var.literal_helper') }}"
                                     label="{{ __('env_var.literal_label') }}" />
@@ -82,17 +82,17 @@
                                 @else
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox disabled id="is_buildtime"
-                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                            label="Available at Buildtime" />
+                                            helper="{{ __('env_var.available_at_buildtime_helper') }}"
+                                            label="{{ __('env_var.available_at_buildtime') }}" />
                                     @endif
                                     <x-forms.checkbox disabled id="is_runtime"
-                                        helper="Make this variable available in the running container at runtime."
-                                        label="Available at Runtime" />
+                                        helper="{{ __('env_var.available_at_runtime_helper') }}"
+                                        label="{{ __('env_var.available_at_runtime') }}" />
                                     <x-forms.checkbox disabled id="is_multiline" label="{{ __('env_var.multiline_label') }}" />
                                     @if ($is_multiline === false)
                                         <x-forms.checkbox disabled id="is_literal"
                                             helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
-                                            label="Is Literal?" />
+                                            label="{{ __('env_var.is_literal_label') }}" />
                                     @endif
                                 @endif
                             @endif
@@ -172,18 +172,18 @@
                                 @else
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox instantSave id="is_buildtime"
-                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                            label="Available at Buildtime" />
+                                            helper="{{ __('env_var.available_at_buildtime_helper') }}"
+                                            label="{{ __('env_var.available_at_buildtime') }}" />
                                     @endif
                                     <x-forms.checkbox instantSave id="is_runtime"
-                                        helper="Make this variable available in the running container at runtime."
-                                        label="Available at Runtime" />
+                                        helper="{{ __('env_var.available_at_runtime_helper') }}"
+                                        label="{{ __('env_var.available_at_runtime') }}" />
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox instantSave id="is_multiline" label="{{ __('env_var.multiline_label') }}" />
                                         @if ($is_multiline === false)
                                             <x-forms.checkbox instantSave id="is_literal"
-                                                helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
-                                                label="Is Literal?" />
+                                                helper="{{ __('env_var.is_literal_helper') }}"
+                                                label="{{ __('env_var.is_literal_label') }}" />
                                         @endif
                                     @endif
                                 @endif
@@ -224,7 +224,7 @@
                                 <x-forms.checkbox disabled id="is_runtime"
                                     helper="{{ __('env_var.runtime_helper') }}"
                                     label="{{ __('env_var.runtime_label') }}" />
-                                <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox disabled id="is_multiline" label="{{ __('env_var.is_multiline') }}" />
                                 <x-forms.checkbox disabled id="is_literal"
                                     helper="{{ __('env_var.literal_helper') }}"
                                     label="{{ __('env_var.literal_label') }}" />
@@ -234,17 +234,17 @@
                                 @else
                                     @if (!$env->is_nixpacks)
                                         <x-forms.checkbox disabled id="is_buildtime"
-                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
-                                            label="Available at Buildtime" />
+                                            helper="{{ __('env_var.available_at_buildtime_helper') }}"
+                                            label="{{ __('env_var.available_at_buildtime') }}" />
                                     @endif
                                     <x-forms.checkbox disabled id="is_runtime"
-                                        helper="Make this variable available in the running container at runtime."
-                                        label="Available at Runtime" />
+                                        helper="{{ __('env_var.available_at_runtime_helper') }}"
+                                        label="{{ __('env_var.available_at_runtime') }}" />
                                     <x-forms.checkbox disabled id="is_multiline" label="{{ __('env_var.multiline_label') }}" />
                                     @if ($is_multiline === false)
                                         <x-forms.checkbox disabled id="is_literal"
                                             helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
-                                            label="Is Literal?" />
+                                            label="{{ __('env_var.is_literal_label') }}" />
                                     @endif
                                 @endif
                             @endif

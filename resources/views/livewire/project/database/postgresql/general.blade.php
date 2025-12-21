@@ -3,7 +3,7 @@
         <form method="dialog" class="flex flex-col gap-2 rounded-sm modal-box" wire:submit='save_new_init_script'>
             <h3 class="text-lg font-bold">{{ __('database.add_init_script') }}</h3>
             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="{{ __('database.filename') }}" required />
-            <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="{{ __('database.content') }}" required />
+            <x-forms.textarea placeholder="{{ __('forms.placeholders.create_database_test') }}" id="new_content" label="{{ __('database.content') }}" required />
             <x-forms.button onclick="newInitScript.close()" type="submit">
                 {{ __('button.save') }}
             </x-forms.button>
@@ -190,7 +190,7 @@
                         <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
                             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="{{ __('database.filename') }}"
                                 required />
-                            <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
+                            <x-forms.textarea rows="20" placeholder="{{ __('forms.placeholders.create_database_test') }}" id="new_content"
                                 label="{{ __('database.content') }}" required />
                             <x-forms.button type="submit">
                                 {{ __('button.save') }}

@@ -17,4 +17,7 @@ return [
     'select_server' => '选择服务器',
     'permission_required' => '需要权限',
     'no_create_permission' => '您没有创建新目标的权限。请联系您的团队管理员获取访问权限。',
+    'available_destinations' => '可用目标',
+    'found_destinations' => '找到的目标',
+    'add' => '添加',
 ];

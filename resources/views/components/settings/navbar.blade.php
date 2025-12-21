@@ -17,7 +17,7 @@
             </a>
             <a class="{{ request()->routeIs('settings.oauth') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.oauth') }}">
-                OAuth
+                {{ __('settings.oauth') }}
             </a>
             <div class="flex-1"></div>
         </nav>

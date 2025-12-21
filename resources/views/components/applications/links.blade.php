@@ -88,6 +88,6 @@
             @endif
         </div>
     @else
-        <div class="px-2 py-1.5 text-xs">No links available</div>
+        <div class="px-2 py-1.5 text-xs">{{ __('common.no_links_available') }}</div>
     @endif
 </x-dropdown>

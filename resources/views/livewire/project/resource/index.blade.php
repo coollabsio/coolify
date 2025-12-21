@@ -113,7 +113,7 @@
                                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
                                             </path>
                                         </svg>
-                                        Create / Edit
+                                        {{ __('project.create_edit') }}
                                     </a>
                                 </div>
                             </div>
@@ -245,7 +245,7 @@
                                                             $res->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                                                             $res->getMorphClass() === 'App\Models\StandaloneMysql' ||
                                                             $res->getMorphClass() === 'App\Models\StandaloneMariadb')
-                                                            <a href="{{ route('project.database.backup.index', $resParams) }}" class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Backups</a>
+                                                            <a href="{{ route('project.database.backup.index', $resParams) }}" class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('project.backups') }}</a>
                                                         @endif
                                                     @endif
                                                 </div>
@@ -274,7 +274,7 @@
                                                         <a href="{{ route('project.application.metrics', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.metrics') }}</a>
                                                         <a href="{{ route('project.application.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.tags') }}</a>
                                                         <a href="{{ route('project.application.advanced', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.advanced') }}</a>
-                                                        <a href="{{ route('project.application.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">{{ __('menu.danger_zone') }}</a>
+                                                        <a href="{{ route('project.application.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">{{ __('menu.danger_zone') }}</a> 
                                                     @elseif ($resType === 'service')
                                                         <a href="{{ route('project.service.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.general') }}</a>
                                                         <a href="{{ route('project.service.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.environment_variables') }}</a>
@@ -325,15 +325,13 @@
         @endcan
     @else
         <div x-data="searchComponent()">
-            <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
+            <x-forms.input placeholder="{{ __('forms.placeholders.search_name_fqdn') }}" x-model="search" id="null" />
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
                 <div class="flex flex-col items-center justify-center p-8 text-center">
                     <div x-show="search.length > 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resource found with the search term "<span
-                                class="font-semibold" x-text="search"></span>".</p>
-                        <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Try adjusting your search
-                            criteria.</p>
+                        <p class="text-neutral-600 dark:text-neutral-400">{!! __('project.no_resource_found_search') !!}</p>
+                        <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">{{ __('project.try_adjusting_search') }}</p>
                     </div>
                     <div x-show="search.length === 0">
                         <p class="text-neutral-600 dark:text-neutral-400">{{ __('project.no_resources_in_environment') }}</p>
@@ -346,7 +344,7 @@
             </template>
 
             <template x-if="filteredApplications.length > 0">
-                <h2 class="pt-4">Applications</h2>
+                <h2 class="pt-4">{{ __('project.applications') }}</h2>
             </template>
             <div x-show="filteredApplications.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -376,8 +374,7 @@
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 text-xs font-bold text-error">{{ __('project.server_unreachable_misconfigured') }}
                                     </div>
                                 </template>
                             </div>
@@ -396,7 +393,7 @@
                 </template>
             </div>
             <template x-if="filteredDatabases.length > 0">
-                <h2 class="pt-4">Databases</h2>
+                <h2 class="pt-4">{{ __('project.databases') }}</h2>
             </template>
             <div x-show="filteredDatabases.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -426,8 +423,7 @@
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 text-xs font-bold text-error">{{ __('project.server_unreachable_misconfigured') }}
                                     </div>
                                 </template>
                             </div>
@@ -446,7 +442,7 @@
                 </template>
             </div>
             <template x-if="filteredServices.length > 0">
-                <h2 class="pt-4">Services</h2>
+                <h2 class="pt-4">{{ __('project.services') }}</h2>
             </template>
             <div x-show="filteredServices.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -476,8 +472,7 @@
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 text-xs font-bold text-error">{{ __('project.server_unreachable_misconfigured') }}
                                     </div>
                                 </template>
                             </div>

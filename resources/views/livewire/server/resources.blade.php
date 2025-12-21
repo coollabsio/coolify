@@ -7,7 +7,7 @@
         <div class="w-full">
             <div class="flex flex-col">
                 <div class="flex gap-2">
-                    <h2>Resources</h2>
+                    <h2>{{ __('server.resources') }}</h2>
                     <x-forms.button wire:click="refreshStatus">{{ __('common.refresh') }}</x-forms.button>
                 </div>
                 <div>{{ __('server.resources_managed_desc') }}</div>
@@ -16,7 +16,7 @@
                         'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
                         'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'managed',
                     ]) wire:click="loadManagedContainers">
-                        Managed
+                        {{ __('server.managed') }}
                         <div class="flex flex-col items-center justify-center">
                             <x-loading wire:loading wire:target="loadManagedContainers" />
                         </div>
@@ -25,7 +25,7 @@
                         'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
                         'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'unmanaged',
                     ]) wire:click="loadUnmanagedContainers">
-                        Unmanaged
+                        {{ __('server.unmanaged') }}
                         <div class="flex flex-col items-center justify-center">
                             <x-loading wire:loading wire:target="loadUnmanagedContainers" />
                         </div>
@@ -46,18 +46,18 @@
                                             <thead>
                                                 <tr>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Project
+                                                        {{ __('server.project') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Environment</th>
+                                                        {{ __('server.environment') }}</th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Name
+                                                        {{ __('server.name') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Type
+                                                        {{ __('server.type') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Status
+                                                        {{ __('server.status') }}
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -95,7 +95,7 @@
                         </div>
                     </div>
                 @else
-                    <div>No managed resources found.</div>
+                    <div>{{ __('server.no_managed_resources') }}</div>
                 @endif
             @elseif ($activeTab === 'unmanaged')
                 @if (count($unmanagedContainers) > 0)
@@ -108,16 +108,16 @@
                                             <thead>
                                                 <tr>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Name
+                                                        {{ __('server.name') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Image
+                                                        {{ __('server.image') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Status
+                                                        {{ __('server.status') }}
                                                     </th>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                        Action
+                                                        {{ __('server.action') }}
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -161,7 +161,7 @@
                         </div>
                     </div>
                 @else
-                    <div>No unmanaged resources found.</div>
+                    <div>{{ __('server.no_unmanaged_resources') }}</div>
                 @endif
             @endif
         </div>

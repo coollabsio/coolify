@@ -49,4 +49,22 @@ return [
     'content_refreshed' => '内容（部署成功后刷新）',
     'content_outdated_helper' => '显示的内容可能已过时。点击"从服务器加载"以获取最新版本。',
     'name' => '存储名称',
+    
+    // S3 Storage
+    'storage_details' => '存储详情',
+    'current_status' => '当前状态：',
+    'usable' => '可用',
+    'not_usable' => '不可用',
+    'endpoint' => '端点',
+    'bucket' => '存储桶',
+    'region' => '区域',
+    'access_key' => '访问密钥',
+    'secret_key' => '密钥',
+    'validate_connection' => '验证连接',
+    'validate_connection_continue' => '验证连接并继续',
+    'region_helper' => '区域仅对 AWS 必需。对于其他提供商，请保持原样。',
+    's3_docs_hint' => '更多详情，请访问',
+    'no_permission_create' => '您没有权限创建新的 S3 存储配置。请联系您的团队管理员获取访问权限。',
+    'delete_storage_action_1' => '选定的存储位置将从 Coolify 中永久删除。',
+    'delete_storage_action_2' => '如果存储位置被任何备份作业使用，这些备份作业将仅在服务器上本地存储备份。',
 ];

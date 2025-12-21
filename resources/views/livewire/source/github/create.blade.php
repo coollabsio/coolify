@@ -1,25 +1,21 @@
 @can('createAnyResource')
     <form wire:submit='createGitHubApp' class="flex flex-col w-full gap-2">
-        <div class="pb-2">This is required, if you would like to get full integration (commit / pull request
-            deployments, etc)
-            with GitHub.</div>
+        <div class="pb-2">{{ __('security.required_for_integration') }}</div>
         <div class="flex gap-2">
-            <x-forms.input id="name" label="Name" required />
+            <x-forms.input id="name" label="{{ __('security.name_label') }}" required />
             <x-forms.input helper="{{ __('forms.placeholders.github_org_hint') }}"
-                placeholder="{{ __('forms.placeholders.github_org_hint') }}" id="organization" label="Organization (on GitHub)" />
+                placeholder="{{ __('forms.placeholders.github_org_hint') }}" id="organization" label="{{ __('security.organization_on_github') }}" />
         </div>
         @if (!isCloud())
             <div x-data="{ showWarning: @entangle('is_system_wide') }">
                 <div class="w-48">
-                    <x-forms.checkbox id="is_system_wide" label="System Wide"
-                        helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
+                    <x-forms.checkbox id="is_system_wide" label="{{ __('security.system_wide_label') }}"
+                        helper="{{ __('security.system_wide_hint') }}" />
                 </div>
                 <div x-show="showWarning" x-transition x-cloak class="w-full max-w-2xl mx-auto pt-2">
-                    <x-callout type="warning" title="Not Recommended">
+                    <x-callout type="warning" title="{{ __('security.not_recommended') }}">
                         <div class="whitespace-normal break-words">
-                            System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team
-                            can use this GitHub App to deploy applications from your repositories. For better security and
-                            isolation, it's recommended to create team-specific GitHub Apps instead.
+                            {{ __('security.system_wide_warning') }}
                         </div>
                     </x-callout>
                 </div>
@@ -35,7 +31,7 @@
                 <button @click="setActiveAccordion(id)"
                     class="flex items-center justify-between w-full px-1 py-2 text-left select-none dark:hover:text-white hover:bg-white/5"
                     type="button">
-                    <h4>Self-hosted / Enterprise GitHub</h4>
+                    <h4>{{ __('security.self_hosted_enterprise') }}</h4>
                     <svg class="w-4 h-4 duration-200 ease-out" :class="{ 'rotate-180': activeAccordion == id }"
                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -45,12 +41,12 @@
                 <div x-show="activeAccordion==id" x-collapse x-cloak class="px-2">
                     <div class="flex flex-col gap-2 pt-0 opacity-70">
                         <div class="flex gap-2">
-                            <x-forms.input id="html_url" label="HTML Url" required />
-                            <x-forms.input id="api_url" label="API Url" required />
+                            <x-forms.input id="html_url" label="{{ __('security.html_url_label') }}" required />
+                            <x-forms.input id="api_url" label="{{ __('security.api_url_label') }}" required />
                         </div>
                         <div class="flex gap-2">
-                            <x-forms.input id="custom_user" label="Custom Git User" required />
-                            <x-forms.input id="custom_port" type="number" label="Custom Git Port" required />
+                            <x-forms.input id="custom_user" label="{{ __('security.custom_git_user') }}" required />
+                            <x-forms.input id="custom_port" type="number" label="{{ __('security.custom_git_port') }}" required />
                         </div>
                     </div>
                 </div>
@@ -59,11 +55,11 @@
 
 
         <x-forms.button class="mt-4" type="submit">
-            Continue
+            {{ __('button.continue') }}
         </x-forms.button>
     </form>
 @else
-    <x-callout type="warning" title="Permission Required">
-        You don't have permission to create new GitHub Apps. Please contact your team administrator for access.
+    <x-callout type="warning" title="{{ __('warning.title') }}">
+        {{ __('security.insufficient_permissions_hint') }}
     </x-callout>
 @endcan

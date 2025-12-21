@@ -3,7 +3,7 @@
         Project Variable | Coolify
     </x-slot>
     <div class="flex gap-2 items-center">
-        <h1>Shared Variables for {{ data_get($project, 'name') }}</h1>
+        <h1>{{ __('shared.shared_variables_for') }} {{ data_get($project, 'name') }}</h1>
         @can('update', $project)
             <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_shared_variable') }}">
                 <livewire:project.shared.environment-variable.add :shared="true" />
@@ -15,7 +15,7 @@
         <div>{{ __('shared.use_variables_hint') }}</div>
         <div class="dark:text-warning text-coollabs">@{{ project.VARIABLENAME }} </div>
         <x-helper
-            helper="More info <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
+            helper="{{ __('shared.more_info_here') }}"></x-helper>
     </div>
     @if ($view === 'normal')
         <div class="flex flex-col gap-2">

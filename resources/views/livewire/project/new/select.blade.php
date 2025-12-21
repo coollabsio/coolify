@@ -4,26 +4,26 @@
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)"
                 class="sticky z-10 top-0  backdrop-blur-sm border-b border-neutral-200 dark:border-coolgray-400">
                 <div class="flex flex-col gap-4 lg:flex-row">
-                    <h1>New Resource</h1>
+                    <h1>{{ __('project.new_resource') }}</h1>
                     <div class="w-full lg:w-96">
                         <x-forms.select wire:model.live="selectedEnvironment">
                             @foreach ($environments as $environment)
-                                <option value="{{ $environment->name }}">Environment: {{ $environment->name }}</option>
+                                <option value="{{ $environment->name }}">{{ __('common.environment') }}: {{ $environment->name }}</option>
                             @endforeach
                         </x-forms.select>
                     </div>
                 </div>
-                <div class="mb-4">Deploy resources, like Applications, Databases, Services...</div>
+                <div class="mb-4">{{ __('project.deploy_resources_desc') }}</div>
                 <div class="flex gap-2 items-start">
                     <input autocomplete="off" x-ref="searchInput" class="input-sticky flex-1"
-                        :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
+                        :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="{{ __('project.type_to_search') }}"
                         @keydown.window.slash.prevent="$refs.searchInput.focus()">
                     <!-- Category Filter Dropdown -->
                     <div class="relative" x-data="{ openCategoryDropdown: false, categorySearch: '' }" @click.outside="openCategoryDropdown = false">
                         <!-- Loading/Disabled State -->
                         <div x-show="loading || categories.length === 0"
                             class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-neutral-100 dark:bg-coolgray-200 cursor-not-allowed whitespace-nowrap opacity-50">
-                            <span class="text-sm text-neutral-400 dark:text-neutral-600">Filter by category</span>
+                            <span class="text-sm text-neutral-400 dark:text-neutral-600">{{ __('project.filter_by_category') }}</span>
                             <svg class="w-4 h-4 text-neutral-400 shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -35,7 +35,7 @@
                             @click="openCategoryDropdown = !openCategoryDropdown; $nextTick(() => { if (openCategoryDropdown) $refs.categorySearchInput.focus() })"
                             class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-pointer hover:ring-coolgray-400 transition-all whitespace-nowrap">
                             <span class="text-sm truncate"
-                                x-text="selectedCategory === '' ? 'Filter by category' : selectedCategory"
+                                x-text="selectedCategory === '' ? '{{ __('project.filter_by_category') }}' : selectedCategory"
                                 :class="selectedCategory === '' ? 'text-neutral-400 dark:text-neutral-600' :
                                     'capitalize text-black dark:text-white'"></span>
                             <svg class="w-4 h-4 transition-transform text-neutral-400 shrink-0"
@@ -51,7 +51,7 @@
                             <div
                                 class="sticky top-0 p-2 bg-white dark:bg-coolgray-100 border-b border-neutral-300 dark:border-coolgray-400">
                                 <input type="text" x-ref="categorySearchInput" x-model="categorySearch"
-                                    placeholder="Search categories..."
+                                    placeholder="{{ __('project.search_categories') }}"
                                     class="w-full px-2 py-1 text-sm rounded border border-neutral-300 dark:border-coolgray-400 bg-white dark:bg-coolgray-200 focus:outline-none focus:ring-2 focus:ring-coolgray-400"
                                     @click.stop>
                             </div>
@@ -59,7 +59,7 @@
                                 <div @click="selectedCategory = ''; categorySearch = ''; openCategoryDropdown = false"
                                     class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200"
                                     :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selectedCategory === '' }">
-                                    <span class="text-sm">All Categories</span>
+                                    <span class="text-sm">{{ __('project.all_categories') }}</span>
                                 </div>
                                 <template
                                     x-for="category in categories.filter(cat => categorySearch === '' || cat.toLowerCase().includes(categorySearch.toLowerCase()))"
@@ -75,13 +75,13 @@
                     </div>
                 </div>
             </div>
-            <div x-show="loading">Loading...</div>
+            <div x-show="loading">{{ __('project.loading') }}</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
-                <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
+                <h2 x-show="filteredGitBasedApplications.length > 0">{{ __('project.applications') }}</h2>
                 <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0"
                     class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div x-show="filteredGitBasedApplications.length > 0" class="space-y-4">
-                        <h4>Git Based</h4>
+                        <h4>{{ __('project.git_based') }}</h4>
                         <div class="grid justify-start grid-cols-1 gap-4 text-left">
                             <template x-for="application in filteredGitBasedApplications" :key="application.name">
                                 <div x-on:click='setType(application.id)'
@@ -101,7 +101,7 @@
                         </div>
                     </div>
                     <div x-show="filteredDockerBasedApplications.length > 0" class="space-y-4">
-                        <h4>Docker Based</h4>
+                        <h4>{{ __('project.docker_based') }}</h4>
                         <div class="grid justify-start grid-cols-1 gap-4 text-left">
                             <template x-for="application in filteredDockerBasedApplications" :key="application.name">
                                 <div x-on:click="setType(application.id)"
@@ -119,7 +119,7 @@
                     </div>
                 </div>
                 <div x-show="filteredDatabases.length > 0" class="mt-8">
-                    <h2 class="mb-4">Databases</h2>
+                    <h2 class="mb-4">{{ __('project.databases') }}</h2>
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="database in filteredDatabases" :key="database.id">
                             <div x-on:click="setType(database.id)"
@@ -139,12 +139,11 @@
                 </div>
                 <div x-show="filteredServices.length > 0" class="mt-8">
                     <div class="flex items-center gap-4" x-init="loadResources">
-                        <h2>Services</h2>
+                        <h2>{{ __('project.services') }}</h2>
                         <x-forms.button x-on:click="loadResources">{{ __('project.reload_list') }}</x-forms.button>
                     </div>
-                    <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
-                        The respective trademarks mentioned here are owned by the respective companies, and use of them
-                        does not imply any affiliation or endorsement.
+                    <x-callout type="info" title="{{ __('project.trademarks_policy') }}" class="mt-4 mb-6">
+                        {{ __('project.trademarks_policy_desc') }}
                     </x-callout>
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
@@ -178,7 +177,7 @@
                                         @click.stop @mouseenter="resolveDocLink(service)"
                                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                                         :class="{ 'opacity-50': docCheckInProgress[service.name] }"
-                                        title="View documentation">
+                                        title="{{ __('project.view_documentation') }}">
                                         <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
                                             stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -192,7 +191,7 @@
                 </div>
                 <div
                     x-show="filteredGitBasedApplications.length === 0 && filteredDockerBasedApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0 && loading === false">
-                    <div>No resources found.</div>
+                    <div>{{ __('project.no_resources_found') }}</div>
                 </div>
             </div>
             <script>
@@ -380,7 +379,7 @@
         @endif
     </div>
     @if ($current_step === 'servers')
-        <h2>Select a server</h2>
+        <h2>{{ __('project.select_a_server') }}</h2>
         <div class="pb-5"></div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($onlyBuildServerAvailable)
@@ -403,9 +402,9 @@
                 @empty
                     <div>
 
-                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
+                        <div>{{ __('project.no_validated_servers_found') }} <a class="underline dark:text-white"
                                 href="/servers" {{ wireNavigate() }}>
-                                Go to servers page
+                                {{ __('project.go_to_servers_page') }}
                             </a></div>
                     </div>
                 @endforelse
@@ -413,10 +412,8 @@
         </div>
     @endif
     @if ($current_step === 'destinations')
-        <h2>Select a destination</h2>
-        <div class="pb-4">Destinations are used to segregate resources by network. If you are unsure, select the
-            default
-            Standalone Docker (coolify).</div>
+        <h2>{{ __('project.select_a_destination') }}</h2>
+        <div class="pb-4">{{ __('destination.destinations_desc') }} {{ __('destination.select_default_hint') }}</div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())
                 @foreach ($swarmDockers as $swarmDocker)
@@ -445,10 +442,8 @@
     @endif
     @if ($current_step === 'select-postgresql-type')
         <div x-data="{ selecting: false }">
-            <h2>Select a Postgresql type</h2>
-            <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select
-                PostgreSQL
-                17 (default).</div>
+            <h2>{{ __('project.select_a_postgresql_type') }}</h2>
+            <div>{{ __('project.postgresql_type_helper') }}</div>
             <div class="flex flex-col gap-6 pt-8">
                 <div class="gap-2 coolbox group flex relative"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
@@ -539,7 +534,7 @@
     @endif
     @if ($current_step === 'existing-postgresql')
         <form wire:submit='addExistingPostgresql' class="flex items-end gap-4">
-            <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
+            <x-forms.input placeholder="{{ __('project.database_url_placeholder') }}" label="{{ __('project.database_url') }}"
                 id="existingPostgresqlUrl" />
             <x-forms.button type="submit">{{ __('button.add_database') }}</x-forms.button>
         </form>

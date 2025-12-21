@@ -8,45 +8,44 @@
         <div class="w-full">
              <div>
                 <div class="flex items-center gap-2">
-                    <h2>Terminal Access</h2>
+                    <h2>{{ __('server.terminal_access') }}</h2>
                     <x-helper
-                        helper="Decide if users (including admins and the owner) can access the terminal for this server and its containers from the dashboard.<br/>
-                                Only team administrators and owners can change this setting."/>
+                        helper="{{ __('server.terminal_access_helper') }}"/>
                     @if (auth()->user()->isAdmin())
                         <div wire:key="terminal-access-change-{{ $isTerminalEnabled }}">
-                            <x-modal-confirmation title="Confirm Terminal Access Change?"
+                            <x-modal-confirmation title="{{ __('server.confirm_terminal_access_change') }}"
                                 temporaryDisableTwoStepConfirmation
-                                buttonTitle="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
+                                buttonTitle="{{ $isTerminalEnabled ? __('server.disable_terminal') : __('server.enable_terminal') }}"
                                 submitAction="toggleTerminal" :actions="[
                                     $isTerminalEnabled
-                                        ? 'This will disable terminal access for this server and all its containers.'
-                                        : 'This will enable terminal access for this server and all its containers.',
+                                        ? __('server.disable_terminal_action_1')
+                                        : __('server.enable_terminal_action_1'),
                                     $isTerminalEnabled
-                                        ? 'Users will no longer be able to access terminal views from the UI.'
-                                        : 'Users will be able to access terminal views from the UI.',
-                                    'This change will take effect immediately.',
+                                        ? __('server.disable_terminal_action_2')
+                                        : __('server.enable_terminal_action_2'),
+                                    __('server.change_takes_effect_immediately'),
                                 ]" confirmationText="{{ $server->name }}"
                                 shortConfirmationLabel="{{ __('server.name') }}"
-                                step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
+                                step3ButtonText="{{ $isTerminalEnabled ? __('server.disable_terminal') : __('server.enable_terminal') }}"
                                 isHighlightedButton>
                             </x-modal-confirmation>
                         </div>
                     @endif
                 </div>
-                <div class="mb-4">Manage terminal access to this server and its containers.</div>
+                <div class="mb-4">{{ __('server.manage_terminal_access') }}</div>
             </div>
 
             <div class="flex items-center gap-2">
-                <h3>Terminal Status:</h3>
+                <h3>{{ __('server.terminal_status') }}</h3>
                 @if ($isTerminalEnabled)
                     <span
                         class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded dark:text-green-100 dark:bg-green-800">
-                        Operational
+                        {{ __('server.operational') }}
                     </span>
                 @else
                     <span
                         class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded dark:text-red-100 dark:bg-red-800">
-                        Disabled
+                        {{ __('server.disabled') }}
                     </span>
                 @endif
             </div>

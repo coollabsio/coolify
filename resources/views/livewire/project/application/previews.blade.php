@@ -1,7 +1,7 @@
 <div>
     <livewire:project.application.preview.form :application="$application" />
     @if (count($application->additional_servers) > 0)
-        <div class="pb-4">Previews will be deployed on <span
+        <div class="pb-4">{{ __('application.previews_will_be_deployed_on') }} <span
                 class="dark:text-warning">{{ $application->destination->server->name }}</span>.</div>
     @endif
     <div>
@@ -14,7 +14,7 @@
             </div>
         @endif
         @isset($rate_limit_remaining)
-            <div class="pt-1 pb-4">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
+            <div class="pt-1 pb-4">{{ __('application.requests_remaining_till_rate_limited') }} {{ $rate_limit_remaining }}</div>
         @endisset
         <div wire:loading.remove wire:target='load_prs'>
             @if ($pull_requests->count() > 0)
@@ -22,10 +22,10 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>PR Number</th>
-                                <th>PR Title</th>
-                                <th>Git</th>
-                                <th>Actions</th>
+                                <th>{{ __('application.pr_number') }}</th>
+                                <th>{{ __('application.pr_title') }}</th>
+                                <th>{{ __('application.git') }}</th>
+                                <th>{{ __('common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -35,8 +35,7 @@
                                     <td>{{ data_get($pull_request, 'title') }}</td>
                                     <td>
                                         <a target="_blank" class="text-xs"
-                                            href="{{ data_get($pull_request, 'html_url') }}">Open PR on
-                                            Git
+                                            href="{{ data_get($pull_request, 'html_url') }}">{{ __('application.open_pr_on_git') }}
                                             <x-external-link />
                                         </a>
                                     </td>
@@ -44,7 +43,7 @@
                                         @can('update', $application)
                                             <x-forms.button
                                                 wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
-                                                Configure
+                                                {{ __('application.configure') }}
                                             </x-forms.button>
                                         @endcan
                                         @can('deploy', $application)
@@ -68,7 +67,7 @@
         </div>
     </div>
     @if ($application->previews->count() > 0)
-        <h3 class="py-4">Deployments</h3>
+        <h3 class="py-4">{{ __('application.deployments') }}</h3>
         <div class="flex flex-wrap w-full gap-4">
             @foreach (data_get($application, 'previews') as $previewName => $preview)
                 <div class="flex flex-col w-full p-4 border dark:border-coolgray-200"
@@ -82,25 +81,24 @@
                             <x-status.stopped :status="data_get($preview, 'status')" />
                         @endif
                         @if (data_get($preview, 'status') !== 'exited')
-                            | <a target="_blank" href="{{ data_get($preview, 'fqdn') }}">Open Preview
+                            | <a target="_blank" href="{{ data_get($preview, 'fqdn') }}">{{ __('application.open_preview') }}
                                 <x-external-link />
                             </a>
                         @endif
                         |
-                        <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">Open
-                            PR on Git
+                        <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">{{ __('application.open_pr_on_git') }}
                             <x-external-link />
                         </a>
                         @if (count($parameters) > 0)
                             |
                             <a {{ wireNavigate() }}
                                 href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
-                                Deployment Logs
+                                {{ __('application.deployment_logs') }}
                             </a>
                             |
                             <a {{ wireNavigate() }}
                                 href="{{ route('project.application.logs', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
-                                Application Logs
+                                {{ __('application.application_logs') }}
                             </a>
                         @endif
                     </div>
@@ -110,7 +108,7 @@
                             @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
                                 <form wire:submit="save_preview('{{ $preview->id }}')"
                                     class="flex items-end gap-2 pt-4">
-                                    <x-forms.input label="Domain" helper="One domain per preview."
+                                    <x-forms.input label="{{ __('application.domain') }}" helper="{{ __('application.one_domain_per_preview') }}"
                                         id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                                     @can('update', $application)
                                         <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
@@ -151,8 +149,7 @@
                                     <path d="M4 12v6c0 1.657 3.582 3 8 3c3.217 0 5.991 -.712 7.261 -1.74m.739 -3.26v-4" />
                                     <path d="M3 3l18 18" />
                                 </svg>
-                                Force deploy (without
-                                cache)
+                                {{ __('application.force_deploy_without_cache') }}
                             </x-forms.button>
                             <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
                                 @if (data_get($preview, 'status') === 'exited')
@@ -179,12 +176,12 @@
                         @if (data_get($preview, 'status') !== 'exited')
                             @can('deploy', $application)
                                 <x-modal-confirmation title="{{ __('modal.confirm_preview_stopping') }}" buttonTitle="{{ __('modal.stop_preview') }}"
-                                    submitAction="stop({{ data_get($preview, 'pull_request_id') }})" :actions="[
-                                        'This preview deployment will be stopped.',
-                                        'If the preview deployment is currently in use data could be lost.',
-                                        'All non-persistent data of this preview deployment (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the preview deployment again).',
-                                    ]"
-                                    :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop Preview Deployment">
+                                    submitAction="stop({{ data_get($preview, 'pull_request_id') }})"                                 :actions="[
+                                    __('modal.preview_deployment_will_be_stopped'),
+                                    __('modal.preview_deployment_data_could_be_lost'),
+                                    __('modal.preview_deployment_will_be_deleted'),
+                                ]"
+                                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="{{ __('modal.stop_preview_deployment') }}">
                                     <x-slot:customButton>
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error"
                                             viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -206,10 +203,10 @@
                             <x-modal-confirmation title="{{ __('modal.confirm_preview_deletion') }}" buttonTitle="{{ __('modal.delete_preview') }}"
                                 isErrorButton submitAction="delete({{ data_get($preview, 'pull_request_id') }})"
                                 :actions="[
-                                    'All containers of this preview deployment will be stopped and permanently deleted.',
+                                    __('modal.all_containers_will_be_stopped'),
                                 ]" confirmationText="{{ data_get($preview, 'fqdn') . '/' }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Preview Deployment name below"
-                                shortConfirmationLabel="Preview Deployment Name" :confirmWithPassword="false" />
+                                confirmationLabel="{{ __('modal.confirm_preview_deployment_name_label') }}"
+                                shortConfirmationLabel="{{ __('application.preview_deployment_name') }}" :confirmWithPassword="false" />
                         @endcan
                     </div>
                 </div>
@@ -221,13 +218,13 @@
         :conflicts="$domainConflicts" 
         :showModal="$showDomainConflictModal" 
         confirmAction="confirmDomainUsage">
-        The preview deployment domain is already in use by other resources. Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.
+        {{ __('application.preview_deployment_domain_conflict') }}
         <x-slot:consequences>
             <ul class="mt-2 ml-4 list-disc">
-                <li>The preview deployment may not be accessible</li>
-                <li>Conflicts with production or other preview deployments</li>
-                <li>SSL certificates might not work correctly</li>
-                <li>Unpredictable routing behavior</li>
+                <li>{{ __('application.preview_may_not_be_accessible') }}</li>
+                <li>{{ __('application.conflicts_with_production_or_other_previews') }}</li>
+                <li>{{ __('application.ssl_certificates_might_not_work') }}</li>
+                <li>{{ __('application.unpredictable_routing_behavior') }}</li>
             </ul>
         </x-slot:consequences>
     </x-domain-conflict-modal>

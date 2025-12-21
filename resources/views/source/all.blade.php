@@ -21,10 +21,10 @@
                     <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
                         <div class="box-title">{{ $source->name }}</div>
                         @if (is_null($source->app_id))
-                            <span class="box-description text-error! ">Configuration is not finished.</span>
+                            <span class="box-description text-error! ">{{ __('source.configuration_not_finished') }}</span>
                         @else
                             @if ($source->organization)
-                                <span class="box-description">Organization: {{ $source->organization }}</span>
+                                <span class="box-description">{{ __('source.organization') }} {{ $source->organization }}</span>
                             @endif
                         @endif
                     </div>

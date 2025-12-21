@@ -2,6 +2,8 @@
 
 return [
     'title' => '团队 | Coolify',
+    'team' => '团队',
+    'team_wide_configurations' => '团队级配置。',
     'general' => '常规',
     'general_subtitle' => '管理此团队的常规设置。',
     'description' => '描述',

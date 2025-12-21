@@ -7,17 +7,17 @@
         <x-server.sidebar :server="$server" activeMenu="private-key" />
         <div class="w-full">
             <div class="flex items-end gap-2">
-                <h2>Private Key</h2>
+                <h2>{{ __('server.private_key') }}</h2>
                 @can('createAnyResource')
                     <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_private_key') }}">
                         <livewire:security.private-key.create />
                     </x-modal-input>
                 @endcan
                 <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click.prevent='checkConnection'>
-                    Check connection
+                    {{ __('server.check_connection') }}
                 </x-forms.button>
             </div>
-            <div class="pb-4">Change your server's private key.</div>
+            <div class="pb-4">{{ __('server.change_server_private_key') }}</div>
             <div class="grid xl:grid-cols-2 grid-cols-1 gap-2">
                 @forelse ($privateKeys as $private_key)
                     <div
@@ -28,16 +28,16 @@
                         </div>
                         @if (data_get($server, 'privateKey.uuid') !== $private_key->uuid)
                             <x-forms.button canGate="update" :canResource="$server" class="w-full" wire:click='setPrivateKey({{ $private_key->id }})'>
-                                Use this key
+                                {{ __('server.use_this_key') }}
                             </x-forms.button>
                         @else
                             <x-forms.button class="w-full" disabled>
-                                Currently used
+                                {{ __('server.currently_used') }}
                             </x-forms.button>
                         @endif
                     </div>
                 @empty
-                    <div>No private keys found. </div>
+                    <div>{{ __('server.no_private_keys_found') }}</div>
                 @endforelse
             </div>
         </div>

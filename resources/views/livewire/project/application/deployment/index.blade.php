@@ -177,7 +177,7 @@
                 </a>
             </div>
         @empty
-            <div>No deployments found</div>
+            <div>{{ __('common.no_deployments_found') }}</div>
         @endforelse
     </div>
 </div>

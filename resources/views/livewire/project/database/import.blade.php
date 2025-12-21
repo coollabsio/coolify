@@ -47,53 +47,52 @@
         };
     </script>
     @endscript
-    <h2>Import Backup</h2>
+    <h2>{{ __('database.import_backup') }}</h2>
     @if ($unsupported)
-        <div>Database restore is not supported.</div>
+        <div>{{ __('database.restore_not_supported') }}</div>
     @else
         <div class="pt-2 rounded-sm alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span>This is a destructive action, existing data will be replaced!</span>
+            <span>{{ __('database.destructive_action_warning') }}</span>
         </div>
         @if (str(data_get($resource, 'status'))->startsWith('running'))
             {{-- Restore Command Configuration --}}
             @if ($resource->type() === 'standalone-postgresql')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
+                    <x-forms.textarea rows="6" readonly label="{{ __('database.custom_import_command') }}"
                         wire:model='restoreCommandText'></x-forms.textarea>
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
+                    <x-forms.input label="{{ __('database.custom_import_command') }}" wire:model='postgresqlRestoreCommand'></x-forms.input>
                     <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
+                        <span class="text-xs">{{ __('database.add_clean_flag') }}</span>
+                        <span class="text-xs">{{ __('database.add_verbose_flag') }}</span>
                     </div>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="{{ __('database.backup_includes_all_databases') }}" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @elseif ($resource->type() === 'standalone-mysql')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
+                    <x-forms.textarea rows="14" readonly label="{{ __('database.custom_import_command') }}"
                         wire:model='restoreCommandText'></x-forms.textarea>
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
+                    <x-forms.input label="{{ __('database.custom_import_command') }}" wire:model='mysqlRestoreCommand'></x-forms.input>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="{{ __('database.backup_includes_all_databases') }}" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @elseif ($resource->type() === 'standalone-mariadb')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
+                    <x-forms.textarea rows="14" readonly label="{{ __('database.custom_import_command') }}"
                         wire:model='restoreCommandText'></x-forms.textarea>
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
+                    <x-forms.input label="{{ __('database.custom_import_command') }}" wire:model='mariadbRestoreCommand'></x-forms.input>
                 @endif
                 <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.checkbox label="{{ __('database.backup_includes_all_databases') }}" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @endif
 
@@ -108,7 +107,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
                         <h4 class="text-lg font-bold">Restore from File</h4>
-                        <p class="text-sm text-neutral-600 dark:text-neutral-400">Upload a backup file or specify a file path on the server</p>
+                        <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('database.upload_backup_file') }}</p>
                     </div>
                 </div>
 
@@ -121,7 +120,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                             </svg>
                             <h4 class="text-lg font-bold">Restore from S3</h4>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">Download and restore a backup from S3 storage</p>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('database.download_restore_s3') }}</p>
                         </div>
                     </div>
                 @endif
@@ -132,12 +131,12 @@
                 <div x-show="restoreType === 'file'" class="pt-6">
                     <h3>Backup File</h3>
                     <form class="flex gap-2 items-end pt-2">
-                        <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
+                        <x-forms.input label="{{ __('database.location_of_backup_file') }}" placeholder="{{ __('database.location_of_backup_file_placeholder') }}"
                             wire:model='customLocation' x-model="$wire.customLocation"></x-forms.input>
                         <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation">{{ __('common.check_file') }}</x-forms.button>
                     </form>
                     <div class="pt-2 text-center text-xl font-bold">
-                        Or
+                        {{ __('database.or') }}
                     </div>
                     <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone" wire:ignore>
                         @csrf
@@ -147,20 +146,20 @@
                     </div>
 
                     <div x-show="filename && !error" class="pt-6">
-                        <h3>File Information</h3>
-                        <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
+                        <h3>{{ __('database.file_information') }}</h3>
+                        <div class="pt-2">{{ __('database.location') }} <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
                         <div class="pt-2">
                             <x-modal-confirmation title="{{ __('modal.restore_database_from_file') }}" buttonTitle="{{ __('modal.restore_from_file') }}"
                                 submitAction="runImport" isErrorButton>
                                 <x-slot:button-title>
-                                    Restore Database from File
+                                    {{ __('database.restore_database_from_file') }}
                                 </x-slot:button-title>
-                                This will perform the following actions:
+                                {{ __('database.this_will_perform_actions') }}
                                 <ul class="list-disc list-inside pt-2">
-                                    <li>Copy backup file to database container</li>
-                                    <li>Execute restore command</li>
+                                    <li>{{ __('database.copy_backup_to_container') }}</li>
+                                    <li>{{ __('database.execute_restore_command') }}</li>
                                 </ul>
-                                <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                <div class="pt-2 font-bold text-error">{{ __('database.warning_replace_data') }}</div>
                             </x-modal-confirmation>
                         </div>
                     </div>
@@ -171,10 +170,10 @@
             @if ($availableS3Storages->count() > 0)
                 @can('update', $resource)
                     <div x-show="restoreType === 's3'" class="pt-6">
-                        <h3>Restore from S3</h3>
+                        <h3>{{ __('database.restore_from_s3') }}</h3>
                         <div class="flex flex-col gap-2 pt-2">
-                            <x-forms.select label="S3 Storage" wire:model.live="s3StorageId">
-                                <option value="">Select S3 Storage</option>
+                            <x-forms.select label="{{ __('database.s3_storage') }}" wire:model.live="s3StorageId">
+                                <option value="">{{ __('database.select_s3_storage_option') }}</option>
                                 @foreach ($availableS3Storages as $storage)
                                     <option value="{{ $storage->id }}">{{ $storage->name }}
                                         @if ($storage->description)
@@ -184,9 +183,9 @@
                                 @endforeach
                             </x-forms.select>
 
-                            <x-forms.input label="S3 File Path (within bucket)"
-                                helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
-                                placeholder="/backups/database-backup.gz" wire:model.blur='s3Path'
+                            <x-forms.input label="{{ __('database.s3_file_path') }}"
+                                helper="{{ __('database.s3_file_path_helper') }}"
+                                placeholder="{{ __('database.s3_file_path_placeholder') }}" wire:model.blur='s3Path'
                                 wire:keydown.enter='checkS3File'></x-forms.input>
 
                             <div class="flex gap-2">
@@ -203,15 +202,15 @@
                                         <x-modal-confirmation title="{{ __('modal.restore_database_from_s3') }}" buttonTitle="{{ __('modal.restore_from_s3') }}"
                                             submitAction="restoreFromS3" isErrorButton>
                                             <x-slot:button-title>
-                                                Restore Database from S3
+                                                {{ __('database.restore_database_from_s3') }}
                                             </x-slot:button-title>
-                                            This will perform the following actions:
+                                            {{ __('database.this_will_perform_actions') }}
                                             <ul class="list-disc list-inside pt-2">
-                                                <li>Download backup from S3 storage</li>
-                                                <li>Copy file into database container</li>
-                                                <li>Execute restore command</li>
+                                                <li>{{ __('database.download_backup_from_s3') }}</li>
+                                                <li>{{ __('database.copy_file_into_container') }}</li>
+                                                <li>{{ __('database.execute_restore_command') }}</li>
                                             </ul>
-                                            <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                            <div class="pt-2 font-bold text-error">{{ __('database.warning_replace_data') }}</div>
                                         </x-modal-confirmation>
                                     </div>
                                 </div>
@@ -223,7 +222,7 @@
 
             {{-- Slide-over for activity monitor (all restore operations) --}}
             <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>
-                <x-slot:title>Database Restore Output</x-slot:title>
+                <x-slot:title>{{ __('database.database_restore_output') }}</x-slot:title>
                 <x-slot:content>
                     <div wire:ignore>
                         <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Logs" fullHeight />
@@ -231,7 +230,7 @@
                 </x-slot:content>
             </x-slide-over>
         @else
-            <div>Database must be running to restore a backup.</div>
+            <div>{{ __('database.database_must_be_running') }}</div>
         @endif
     @endif
 </div>

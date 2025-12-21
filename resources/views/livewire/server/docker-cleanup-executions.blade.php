@@ -34,9 +34,9 @@
             ])>
                 @php
                 $statusText = match(data_get($execution, 'status')) {
-                    'success' => 'Success',
-                    'running' => 'In Progress',
-                    'failed' => 'Failed',
+                    'success' => __('server.success'),
+                    'running' => __('server.in_progress'),
+                    'failed' => __('server.failed'),
                     default => ucfirst(data_get($execution, 'status'))
                 };
                 @endphp
@@ -70,7 +70,7 @@
             @endif
             @if ($this->logLines->isNotEmpty())
             <div>
-                <h3 class="font-semibold mb-2">Status Message:</h3>
+                <h3 class="font-semibold mb-2">{{ __('server.status_message') }}</h3>
                 <pre class="whitespace-pre-wrap">
 @foreach ($this->logLines as $line)
 {{ $line }}
@@ -79,21 +79,21 @@
                 <div class="flex gap-2">
                     @if ($this->hasMoreLogs())
                     <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
-                        Load More
+                        {{ __('server.load_more') }}
                     </x-forms.button>
                     @endif
                 </div>
             </div>
             @else
             <div>
-                <div class="font-semibold mb-2">Status Message:</div>
-                <div>No output was recorded for this execution.</div>
+                <div class="font-semibold mb-2">{{ __('server.status_message') }}</div>
+                <div>{{ __('server.no_output_recorded') }}</div>
             </div>
             @endif
 
             @if (data_get($execution, 'cleanup_log'))
             <div class="mt-6 space-y-6">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Cleanup Log:</h3>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ __('server.cleanup_log') }}</h3>
                 @foreach(json_decode(data_get($execution, 'cleanup_log'), true) as $result)
                 <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-coolgray-400 bg-white dark:bg-coolgray-100 shadow-xs">
                     <div class="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-coolgray-200 border-b border-gray-200 dark:border-coolgray-400">
@@ -123,6 +123,6 @@
     </div>
     @endif
     @empty
-    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
+    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">{{ __('server.no_executions_found') }}</div>
     @endforelse
 </div>

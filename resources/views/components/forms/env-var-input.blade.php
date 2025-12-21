@@ -228,11 +228,11 @@
 
             <template x-if="suggestions.length === 0 && currentScope">
                 <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                    <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
+                    <div>{!! __('common.no_shared_variables_found') !!}</div>
                     <a :href="getScopeUrl(currentScope)"
                        class="text-coollabs dark:text-warning hover:underline text-xs mt-1 inline-block"
                        target="_blank">
-                        Add <span x-text="currentScope"></span> variables →
+                        {!! __('common.add_scope_variables') !!}
                     </a>
                 </div>
             </template>

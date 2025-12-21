@@ -1,9 +1,9 @@
 <div>
-    <h1>Create a new Application</h1>
-    <div class="pb-4">You can deploy a simple Dockerfile, without Git.</div>
+    <h1>{{ __('application.create_new_application') }}</h1>
+    <div class="pb-4">{{ __('application.simple_dockerfile_desc') }}</div>
     <form wire:submit="submit">
         <div class="flex gap-2 pb-1">
-            <h2>Dockerfile</h2>
+            <h2>{{ __('application.dockerfile') }}</h2>
             <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
         </div>
         <x-forms.textarea useMonacoEditor monacoEditorLanguage="dockerfile" rows="20" id="dockerfile" autofocus

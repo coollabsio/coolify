@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        Team Admin | Coolify
+        {{ __('teams.admin_view') }} | Coolify
     </x-slot>
     <x-team.navbar />
     <h2>{{ __('teams.admin_view') }}</h2>

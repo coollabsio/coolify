@@ -49,4 +49,38 @@ return [
     'backups' => '备份',
     'scheduled_tasks' => '定时任务',
     'server' => '服务器',
+    
+    // 通用通知设置
+    'notification_settings' => '通知设置',
+    'select_events_for_discord' => '选择您希望接收 Discord 通知的事件。',
+    'select_events_for_telegram' => '选择您希望接收 Telegram 通知的事件。',
+    'select_events_for_slack' => '选择您希望接收 Slack 通知的事件。',
+    'select_events_for_pushover' => '选择您希望接收 Pushover 通知的事件。',
+    'select_events_for_webhook' => '选择您希望接收 Webhook 通知的事件。',
+    'send_test_notification' => '发送测试通知',
+    
+    // Discord 特定
+    'ping_enabled' => '启用 Ping',
+    'ping_enabled_helper' => '如果启用，当发生关键事件时，通知中将发送 ping（@here）。',
+    'webhook' => 'Webhook',
+    'webhook_helper_discord' => '创建 Discord 服务器并生成 Webhook URL。<br><a class=\'inline-block underline dark:text-white\' href=\'https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks\' target=\'_blank\'>Webhook 文档</a>',
+    
+    // Telegram 特定
+    'bot_api_token' => 'Bot API Token',
+    'bot_api_token_helper' => '从 Telegram 上的 <a class=\'inline-block underline dark:text-white\' href=\'https://t.me/botfather\' target=\'_blank\'>BotFather Bot</a> 获取。',
+    'chat_id' => 'Chat ID',
+    'chat_id_helper' => '将您的机器人添加到群聊中，并在此处添加其 Chat ID。',
+    
+    // Slack 特定
+    'webhook_helper_slack' => '创建 Slack APP 并生成 Incoming Webhook URL。<br><a class=\'inline-block underline dark:text-white\' href=\'https://api.slack.com/apps\' target=\'_blank\'>创建 Slack APP</a>',
+    
+    // Pushover 特定
+    'user_key' => 'User Key',
+    'user_key_helper' => '在 Pushover 中获取您的 User Key。您需要登录 Pushover 才能在右上角看到您的用户密钥。<br><a class=\'inline-block underline dark:text-white\' href=\'https://pushover.net/\' target=\'_blank\'>Pushover 仪表板</a>',
+    'api_token' => 'API Token',
+    'api_token_helper' => '通过在 Pushover 中创建新应用程序来生成 API Token/Key。<br><a class=\'inline-block underline dark:text-white\' href=\'https://pushover.net/apps/build\' target=\'_blank\'>创建 Pushover 应用程序</a>',
+    
+    // Webhook 特定
+    'webhook_url_post' => 'Webhook URL (POST)',
+    'webhook_url_helper' => '输入有效的 HTTP 或 HTTPS URL。当事件发生时，Coolify 将向此端点发送 POST 请求。',
 ];

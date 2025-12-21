@@ -72,6 +72,19 @@ return [
     'insufficient_permissions' => '权限不足',
     'insufficient_permissions_hint' => '您没有创建新 GitHub 应用的权限。请联系您的团队管理员。',
     'continue' => '继续',
+    'github_app_deletion_action' => '选定的 GitHub 应用将被永久删除。',
+    'github_app_name_confirmation_label' => '请在下方输入 GitHub 应用名称以确认执行操作',
+    'register_github_app_hint' => '在使用此源之前，您需要注册 GitHub 应用。',
+    'manual_installation_hint_text' => '如果您想手动填写表单，可以继续下面的操作。仅适用于高级用户。',
+    'self_hosted_enterprise' => '自托管 / 企业 GitHub',
+    'html_url_label' => 'HTML 地址',
+    'api_url_label' => 'API 地址',
+    'custom_git_user' => '自定义 Git 用户',
+    'custom_git_port' => '自定义 Git 端口',
+    'required_for_integration' => '如果您想获得完整的集成（提交/拉取请求部署等），这是必需的。',
+    'name_label' => '名称',
+    'organization_on_github' => '组织（在 GitHub 上）',
+    'system_wide_label' => '系统级',
 
     // GitHub App 资源表格
     'table_project' => '项目',
@@ -94,6 +107,8 @@ return [
     'description' => '描述',
     'create' => '创建',
     'permissions_hint' => '这些权限将被授予令牌。',
+    'please_select_webhook_endpoint' => '请选择 webhook 端点。',
+];
     'token_permissions' => '令牌权限',
     'root_access' => 'Root 权限',
     'root_access_careful' => 'Root 权限，请小心！',
@@ -138,4 +153,8 @@ return [
     'script_name' => '脚本名称',
     'delete_script' => '删除脚本',
     'no_cloud_init_scripts' => '未找到 cloud-init 脚本。创建一个即可开始。',
+    'name_label' => '名称',
+    'description_label' => '描述',
+    'private_key_label' => '私钥',
+    'public_key_label' => '公钥',
 ];

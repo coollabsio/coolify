@@ -56,6 +56,7 @@ return [
         'type_to_search' => '输入 / 搜索...',
         'search_categories' => '搜索类别...',
         'search_name_fqdn' => '搜索名称、FQDN...',
+        'create_database_test' => 'CREATE DATABASE test;',
 
         // 证书相关
         'paste_ca_certificate' => '在此粘贴或编辑 CA 证书内容...',

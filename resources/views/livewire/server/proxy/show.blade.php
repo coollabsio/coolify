@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        Proxy Configuration | Coolify
+        {{ __('server.proxy_configuration') }} | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
     @if ($server->isFunctional())
@@ -11,6 +11,6 @@
             </div>
         </div>
     @else
-        <div>Server is not validated. Validate first.</div>
+        <div>{{ __('server.server_not_validated') }} {{ __('server.validate_first') }}</div>
     @endif
 </div>

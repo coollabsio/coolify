@@ -7,7 +7,7 @@
         @can('update', $project)
             <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_environment') }}">
                 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
-                    <x-forms.input placeholder="{{ __('forms.placeholders.environment_name') }}" id="name" label="Name" required />
+                    <x-forms.input placeholder="{{ __('forms.placeholders.environment_name') }}" id="name" label="{{ __('common.name') }}" required />
                     <x-forms.button type="submit">
                         {{ __('button.save') }}
                     </x-forms.button>
@@ -40,7 +40,7 @@
                 </div>
             </div>
         @empty
-            <p>No environments found.</p>
+            <p>{{ __('common.no_environments_found') }}</p>
         @endforelse
     </div>
 </div>

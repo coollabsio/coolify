@@ -72,6 +72,12 @@ return [
     'confirm_token_deletion' => '确认删除令牌？',
     'confirm_api_token_revocation' => '确认撤销 API 令牌？',
     'confirm_team_deletion' => '确认删除团队？',
+    'confirm_team_name_label' => '请在下方输入团队名称以确认执行操作',
+    'confirm_init_script_name_label' => '请在下方输入初始化脚本名称以确认执行操作',
+    'confirm_preview_deployment_name_label' => '请在下方输入预览部署名称以确认执行操作',
+    'restore_database_from_file' => '从文件恢复数据库',
+    'restore_from_file' => '从文件恢复',
+];
     'confirm_user_deletion' => '确认删除用户？',
     'confirm_environment_deletion' => '确认删除环境？',
     'confirm_project_deletion' => '确认删除项目？',
@@ -111,4 +117,9 @@ return [
     'restart_proxy' => '重启代理',
     'confirm_proxy_stopping' => '确认停止代理？',
     'stop_proxy' => '停止代理',
+    'stop_preview_deployment' => '停止预览部署',
+    'preview_deployment_will_be_stopped' => '此预览部署将被停止。',
+    'preview_deployment_data_could_be_lost' => '如果预览部署当前正在使用，数据可能会丢失。',
+    'preview_deployment_will_be_deleted' => '此预览部署的所有非持久数据（容器、网络、未使用的镜像）将被删除（不用担心，不会丢失数据，您可以再次启动预览部署）。',
+    'all_containers_will_be_stopped' => '此预览部署的所有容器将被停止并永久删除。',
 ];

@@ -103,27 +103,27 @@
                             :disabled="$isValidating">{{ __('common.save') }}</x-forms.button>
                         @if ($server->isFunctional())
                             <x-slide-over closeWithX fullScreen>
-                                <x-slot:title>Validate & configure</x-slot:title>
+                                <x-slot:title>{{ __('server.validate_configure') }}</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$server" ask />
                                 </x-slot:content>
                                 <x-forms.button @click="slideOverOpen=true" wire:click.prevent='validateServer'
                                     isHighlighted canGate="update" :canResource="$server">
-                                    Revalidate server
+                                    {{ __('server.revalidate_server') }}
                                 </x-forms.button>
                             </x-slide-over>
                         @endif
                     @endif
                 </div>
                 @if ($server->isFunctional())
-                    Server is reachable and validated.
+                    {{ __('server.server_is_reachable') }}
                 @else
-                    You can't use this server until it is validated.
+                    {{ __('server.server_not_validated_message') }}
                 @endif
                 @if ($isValidating)
                     <div x-data="{ slideOverOpen: true }">
                         <x-slide-over closeWithX fullScreen>
-                            <x-slot:title>Validation in Progress</x-slot:title>
+                            <x-slot:title>{{ __('server.validation_in_progress') }}</x-slot:title>
                             <x-slot:content>
                                 <livewire:server.validate-and-install :server="$server" />
                             </x-slot:content>
@@ -136,18 +136,18 @@
                         !$isValidating &&
                         !in_array($hetznerServerStatus, ['initializing', 'starting', 'stopping', 'off']))
                     <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Validate & configure</x-slot:title>
+                        <x-slot:title>{{ __('server.validate_configure') }}</x-slot:title>
                         <x-slot:content>
                             <livewire:server.validate-and-install :server="$server" />
                         </x-slot:content>
                         <x-forms.button @click="slideOverOpen=true"
                             class="mt-8 mb-4 w-full font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
                             wire:click.prevent='validateServer' isHighlighted>
-                            Validate Server & Install Docker Engine
+                            {{ __('server.validate_server_install_docker') }}
                         </x-forms.button>
                     </x-slide-over>
                     @if ($server->validation_logs)
-                        <h4>Previous Validation Logs</h4>
+                        <h4>{{ __('server.previous_validation_logs') }}</h4>
                         <div class="pb-8">
                             {!! $server->validation_logs !!}
                         </div>
@@ -156,13 +156,12 @@
                 @if ((!$isReachable || !$isUsable) && $server->id === 0)
                     <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
                         wire:click.prevent='checkLocalhostConnection' isHighlighted>
-                        Validate Server
+                        {{ __('server.validate_server') }}
                     </x-forms.button>
                 @endif
                 @if ($server->isForceDisabled() && isCloud())
-                    <x-callout type="danger" title="Server Disabled" class="mt-4">
-                        The system has disabled the server because you have exceeded the
-                        number of servers for which you have paid.
+                    <x-callout type="danger" title="{{ __('server.server_disabled') }}" class="mt-4">
+                        {{ __('server.server_disabled_message') }}
                     </x-callout>
                 @endif
                 <div class="flex flex-col gap-2 pt-4">
@@ -173,29 +172,29 @@
                             :disabled="$isValidating" />
                         @if (!$isSwarmWorker && !$isBuildServer)
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://example.com"
-                                id="wildcardDomain" label="Wildcard Domain"
-                                helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".'
+                                id="wildcardDomain" label="{{ __('server.wildcard_domain') }}"
+                                helper="{{ __('server.wildcard_domain_helper') }}"
                                 :disabled="$isValidating" />
                         @endif
 
                     </div>
                     <div class="flex flex-col gap-2 w-full lg:flex-row">
                         <x-forms.input canGate="update" :canResource="$server" type="password" id="ip"
-                            label="IP Address/Domain"
-                            helper="An IP Address (127.0.0.1) or domain (example.com). Make sure there is no protocol like http(s):// so you provide a FQDN not a URL."
+                            label="{{ __('server.ip_address_domain') }}"
+                            helper="{{ __('server.ip_address_domain_helper') }}"
                             required :disabled="$isValidating" />
                         <div class="flex gap-2">
-                            <x-forms.input canGate="update" :canResource="$server" id="user" label="User" required
+                            <x-forms.input canGate="update" :canResource="$server" id="user" label="{{ __('server.user') }}" required
                                 :disabled="$isValidating" />
                             <x-forms.input canGate="update" :canResource="$server" type="number" id="port"
-                                label="Port" required :disabled="$isValidating" />
+                                label="{{ __('server.port') }}" required :disabled="$isValidating" />
                         </div>
                     </div>
                     <div class="w-full">
                         <div class="flex items-center mb-1">
-                            <label for="serverTimezone">Server Timezone</label>
+                            <label for="serverTimezone">{{ __('server.server_timezone') }}</label>
                             <x-helper class="ml-2"
-                                helper="Server's timezone. This is used for backups, cron jobs, etc." />
+                                helper="{{ __('server.server_timezone_helper') }}" />
                         </div>
                         @can('update', $server)
                             @if ($isValidating)
@@ -203,8 +202,8 @@
                                     <div class="inline-flex relative items-center w-64">
                                         <input readonly disabled autocomplete="off"
                                             class="w-full input opacity-50 cursor-not-allowed"
-                                            value="{{ $serverTimezone ?: 'No timezone set' }}"
-                                            placeholder="Server Timezone">
+                                            value="{{ $serverTimezone ?: __('server.no_timezone_set') }}"
+                                            placeholder="{{ __('server.server_timezone') }}">
                                         <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50"
                                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor">
@@ -218,7 +217,7 @@
                                     open: false,
                                     search: '{{ $serverTimezone ?: '' }}',
                                     timezones: @js($this->timezones),
-                                    placeholder: '{{ $serverTimezone ? 'Search timezone...' : 'Select Server Timezone' }}',
+                                    placeholder: '{{ $serverTimezone ? __('server.search_timezone') : __('server.select_server_timezone') }}',
                                     init() {
                                         this.$watch('search', value => {
                                             if (value === '') {
@@ -260,7 +259,7 @@
                                 <div class="inline-flex relative items-center w-64">
                                     <input readonly disabled autocomplete="off"
                                         class="w-full input opacity-50 cursor-not-allowed"
-                                        value="{{ $serverTimezone ?: 'No timezone set' }}" placeholder="Server Timezone">
+                                        value="{{ $serverTimezone ?: __('server.no_timezone_set') }}" placeholder="{{ __('server.server_timezone') }}">
                                     <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50"
                                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke-width="1.5" stroke="currentColor">
@@ -277,11 +276,11 @@
                             <div class="w-96">
                                 @if ($isBuildServerLocked)
                                     <x-forms.checkbox disabled instantSave id="isBuildServer"
-                                        helper="You can't use this server as a build server because it has defined resources."
-                                        label="Use it as a build server?" />
+                                        helper="{{ __('server.cannot_use_build_server') }}"
+                                        label="{{ __('server.use_as_build_server') }}" />
                                 @else
                                     <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                        id="isBuildServer" label="Use it as a build server?" :disabled="$isValidating" />
+                                        id="isBuildServer" label="{{ __('server.use_as_build_server') }}" :disabled="$isValidating" />
                                 @endif
                             </div>
 
@@ -291,16 +290,16 @@
             </form>
             @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                 <div class="pt-6">
-                    <h3>Link to Hetzner Cloud</h3>
+                    <h3>{{ __('server.link_to_hetzner_cloud') }}</h3>
                     <p class="pb-4 text-sm dark:text-neutral-400">
-                        Link this server to a Hetzner Cloud instance to enable power controls and status monitoring.
+                        {{ __('server.link_to_hetzner_cloud_desc') }}
                     </p>
 
                     <div class="flex flex-wrap gap-4 items-end">
                         <div class="w-72">
-                            <x-forms.select wire:model="selectedHetznerTokenId" label="Hetzner Token"
+                            <x-forms.select wire:model="selectedHetznerTokenId" label="{{ __('server.hetzner_token') }}"
                                 canGate="update" :canResource="$server">
-                                <option value="">Select a token...</option>
+                                <option value="">{{ __('server.select_token') }}</option>
                                 @foreach ($availableHetznerTokens as $token)
                                     <option value="{{ $token->id }}">{{ $token->name }}</option>
                                 @endforeach
@@ -308,23 +307,23 @@
                         </div>
                         <div class="w-48">
                             <x-forms.input wire:model="manualHetznerServerId"
-                                label="Server ID"
+                                label="{{ __('server.server_id') }}"
                                 placeholder="e.g., 12345678"
-                                helper="Enter the Hetzner Server ID from your Hetzner Cloud console"
+                                helper="{{ __('server.server_id_helper') }}"
                                 canGate="update" :canResource="$server" />
                         </div>
                         <x-forms.button wire:click="searchHetznerServerById"
                             wire:loading.attr="disabled"
                             canGate="update" :canResource="$server">
-                            <span wire:loading.remove wire:target="searchHetznerServerById">Search by ID</span>
-                            <span wire:loading wire:target="searchHetznerServerById">Searching...</span>
+                            <span wire:loading.remove wire:target="searchHetznerServerById">{{ __('server.search_by_id') }}</span>
+                            <span wire:loading wire:target="searchHetznerServerById">{{ __('server.searching') }}</span>
                         </x-forms.button>
-                        <div class="self-end pb-2 text-sm dark:text-neutral-500">OR</div>
+                        <div class="self-end pb-2 text-sm dark:text-neutral-500">{{ __('server.or') }}</div>
                         <x-forms.button wire:click="searchHetznerServer"
                             wire:loading.attr="disabled"
                             canGate="update" :canResource="$server">
-                            <span wire:loading.remove wire:target="searchHetznerServer">Search by IP</span>
-                            <span wire:loading wire:target="searchHetznerServer">Searching...</span>
+                            <span wire:loading.remove wire:target="searchHetznerServer">{{ __('server.search_by_ip') }}</span>
+                            <span wire:loading wire:target="searchHetznerServer">{{ __('server.searching') }}</span>
                         </x-forms.button>
                     </div>
 
@@ -338,9 +337,9 @@
                         <div class="mt-4 p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
                             <p class="text-yellow-600 dark:text-yellow-400">
                                 @if ($manualHetznerServerId)
-                                    No Hetzner server found with ID: {{ $manualHetznerServerId }}
+                                    {{ __('server.no_hetzner_server_found_id', ['id' => $manualHetznerServerId]) }}
                                 @else
-                                    No Hetzner server found matching IP: {{ $server->ip }}
+                                    {{ __('server.no_hetzner_server_found_ip', ['ip' => $server->ip]) }}
                                 @endif
                             </p>
                             <p class="text-sm dark:text-neutral-400 mt-1">
@@ -351,15 +350,15 @@
 
                     @if ($matchedHetznerServer)
                         <div class="mt-4 p-4 border border-green-500 rounded-md bg-green-50 dark:bg-green-900/20">
-                            <h4 class="font-semibold text-green-700 dark:text-green-400 mb-2">Match Found!</h4>
+                            <h4 class="font-semibold text-green-700 dark:text-green-400 mb-2">{{ __('server.match_found') }}</h4>
                             <div class="grid grid-cols-2 gap-2 text-sm mb-4">
-                                <div><span class="font-medium">Name:</span> {{ $matchedHetznerServer['name'] }}</div>
-                                <div><span class="font-medium">ID:</span> {{ $matchedHetznerServer['id'] }}</div>
-                                <div><span class="font-medium">Status:</span> {{ ucfirst($matchedHetznerServer['status']) }}</div>
-                                <div><span class="font-medium">Type:</span> {{ data_get($matchedHetznerServer, 'server_type.name', 'Unknown') }}</div>
+                                <div><span class="font-medium">{{ __('server.name_label') }}</span> {{ $matchedHetznerServer['name'] }}</div>
+                                <div><span class="font-medium">{{ __('server.id_label') }}</span> {{ $matchedHetznerServer['id'] }}</div>
+                                <div><span class="font-medium">{{ __('server.status_label') }}</span> {{ ucfirst($matchedHetznerServer['status']) }}</div>
+                                <div><span class="font-medium">{{ __('server.type_label') }}</span> {{ data_get($matchedHetznerServer, 'server_type.name', 'Unknown') }}</div>
                             </div>
                             <x-forms.button wire:click="linkToHetzner" isHighlighted canGate="update" :canResource="$server">
-                                Link This Server
+                                {{ __('server.link_this_server') }}
                             </x-forms.button>
                         </div>
                     @endif

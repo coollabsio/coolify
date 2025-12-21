@@ -1,22 +1,22 @@
 <div x-init="$wire.loadImages">
     <div class="flex items-center gap-2">
-        <h2>Rollback</h2>
+        <h2>{{ __('application.rollback') }}</h2>
         @can('view', $application)
             <x-forms.button wire:click='loadImages(true)'>{{ __('common.reload_available_images') }}</x-forms.button>
         @endcan
     </div>
-    <div class="pb-4">You can easily rollback to a previously built (local) images quickly.</div>
+    <div class="pb-4">{{ __('application.rollback_desc') }}</div>
 
     @if($serverRetentionDisabled)
         <x-callout type="warning" class="mb-4">
-            Image retention is disabled at the server level. This setting has no effect until the server administrator enables it.
+            {{ __('application.image_retention_disabled') }}
         </x-callout>
     @endif
 
     <div class="pb-4">
         <form wire:submit="saveSettings" class="flex items-end gap-2 w-96">
-            <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Images to keep for rollback"
-                helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable image retention at the server level, which overrides this setting."
+            <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="{{ __('application.images_to_keep_for_rollback') }}"
+                helper="{{ __('application.images_to_keep_helper') }}"
                 canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
             <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">{{ __('common.save') }}</x-forms.button>
         </form>
@@ -56,7 +56,7 @@
                         <div class="flex justify-end p-2">
                             @can('deploy', $application)
                                 @if (data_get($image, 'is_current'))
-                                    <x-forms.button disabled tooltip="This image is currently running.">
+                                    <x-forms.button disabled tooltip="{{ __('application.this_image_is_currently_running') }}">
                                         {{ __('common.rollback') }}
                                     </x-forms.button>
                                 @elseif (!$isRollbackable)
@@ -74,9 +74,9 @@
                     </div>
                 </div>
             @empty
-                <div>No images found locally.</div>
+                <div>{{ __('common.no_images_found') }}</div>
             @endforelse
         </div>
     </div>
-    <div wire:target='loadImages' wire:loading>Loading available docker images...</div>
+    <div wire:target='loadImages' wire:loading>{{ __('application.loading_available_docker_images') }}</div>
 </div>

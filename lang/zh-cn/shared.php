@@ -51,4 +51,8 @@ return [
     'get_notified' => '获取基础设施通知。',
     'tags_help_desc' => '标签帮助您对多个资源执行操作。',
     'no_tags_defined' => '尚未定义标签。请转到资源并在此处添加标签。',
+    'shared_variables_for' => '共享变量',
+    'environment_shared_variables' => '环境共享变量',
+    'more_info_here' => '更多信息<a class=\'underline dark:text-white\' href=\'https://coolify.io/docs/knowledge-base/environment-variables#shared-variables\' target=\'_blank\'>这里</a>。',
+    'no_environment_variables_found' => '未找到环境变量。',
 ];

@@ -69,11 +69,11 @@
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         @if (data_get($execution, 'status') === 'running')
-                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}">
+                            <span title="{{ __('deployment.started') }} {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}">
                                 Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
                             </span>
                         @else
-                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}">
+                            <span title="{{ __('deployment.started') }} {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}&#10;{{ __('deployment.ended') }} {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}">
                                 {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
                                 ({{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }})
                                 • {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->format('M j, H:i') }}
@@ -183,7 +183,7 @@
                     </div>
                 </div>
             @empty
-                <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
+                <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">{{ __('server.no_executions_found') }}</div>
             @endforelse
         </div>
         <script>

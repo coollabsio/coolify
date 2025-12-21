@@ -8,25 +8,23 @@
         <div class="w-full">
             <div class="flex flex-col">
                 <div class="flex gap-2 items-center">
-                    <h2>Cloudflare Tunnel</h2>
+                    <h2>{{ __('server.cloudflare_tunnel') }}</h2>
                     <x-helper class="inline-flex"
-                        helper="If you are using Cloudflare Tunnel, enable this. It will proxy all SSH requests to your server through Cloudflare.<br> You then can close your server's SSH port in the firewall of your hosting provider.<br><span class='dark:text-warning'>If you choose manual configuration, Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>" />
+                        helper="{{ __('server.cloudflare_tunnel_helper') }}" />
                     @if ($isCloudflareTunnelsEnabled)
                         <span
                             class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded dark:text-green-100 dark:bg-green-800">
-                            Enabled
+                            {{ __('server.enabled') }}
                         </span>
                     @endif
                 </div>
-                <div>Secure your servers with Cloudflare Tunnel.</div>
+                <div>{{ __('server.secure_servers_cloudflare') }}</div>
             </div>
             <div class="flex flex-col gap-2 pt-6">
                 @if ($isCloudflareTunnelsEnabled)
                     <div class="flex flex-col gap-4">
-                        <x-callout type="warning" title="Warning!">
-                            If you disable Cloudflare Tunnel, you will need to update the server's IP address back
-                            to its real IP address in the server "General" settings. The server may become inaccessible
-                            if the IP address is not updated correctly.
+                        <x-callout type="warning" title="{{ __('server.warning') }}">
+                            {{ __('server.disable_cloudflare_warning') }}
                         </x-callout>
                         <div class="w-64">
                             @if ($server->ip_previous)
@@ -56,44 +54,38 @@
                         </div>
                     </div>
                 @elseif (!$server->isFunctional())
-                    <x-callout type="info" title="Configuration Options" class="mb-4">
-                        To <span class="font-semibold">automatically</span> configure Cloudflare Tunnel, please
-                        validate your server first. Then you will need a Cloudflare token and an SSH
-                        domain configured.
+                    <x-callout type="info" title="{{ __('server.configuration_options') }}" class="mb-4">
+                        {!! __('server.auto_config_desc') !!}
                         <br />
-                        To <span class="font-semibold">manually</span> configure Cloudflare Tunnel, please
-                        click <span wire:click="manualCloudflareConfig" class="underline cursor-pointer">here</span>,
-                        then you should validate the server.
+                        {!! __('server.manual_config_desc') !!}
                         <br /><br />
-                        For more information, please read our <a
-                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="underline">documentation</a>.
+                        {!! __('server.for_more_info') !!}
                     </x-callout>
                 @endif
                 @if (!$isCloudflareTunnelsEnabled && $server->isFunctional())
                     <div class="flex  flex-col pb-2">
-                        <h3>Automated </h3>
+                        <h3>{{ __('server.automated') }} </h3>
                         <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="text-xs underline hover:text-warning-600 dark:hover:text-warning-200">Docs<x-external-link /></a>
+                            class="text-xs underline hover:text-warning-600 dark:hover:text-warning-200">{{ __('menu.documentation') }}<x-external-link /></a>
                     </div>
                     <div class="flex gap-2">
                         <x-slide-over @automated.window="slideOverOpen = true" fullScreen>
-                            <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
+                            <x-slot:title>{{ __('server.cloudflare_tunnel_configuration') }}</x-slot:title>
                             <x-slot:content>
-                                <livewire:activity-monitor header="Logs" fullHeight />
+                                <livewire:activity-monitor header="{{ __('server.logs') }}" fullHeight />
                             </x-slot:content>
                         </x-slide-over>
                         @can('update', $server)
                             <form @submit.prevent="$wire.dispatch('automatedCloudflareConfig')"
                                 class="flex flex-col gap-2 w-full">
-                                <x-forms.input id="cloudflare_token" required label="Cloudflare Token" type="password" />
-                                <x-forms.input id="ssh_domain" label="Configured SSH Domain" required
-                                    helper="The SSH domain you configured in Cloudflare. Make sure there is no protocol like http(s):// so you provide a FQDN not a URL. <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh' target='_blank'>Documentation</a>" />
+                                <x-forms.input id="cloudflare_token" required label="{{ __('server.cloudflare_token') }}" type="password" />
+                                <x-forms.input id="ssh_domain" label="{{ __('server.configured_ssh_domain') }}" required
+                                    helper="{{ __('server.configured_ssh_domain_helper') }}" />
                                 <x-forms.button type="submit" isHighlighted>{{ __('common.continue') }}</x-forms.button>
                             </form>
                         @else
-                            <x-callout type="warning" title="Permission Required" class="mb-4">
-                                You don't have permission to configure Cloudflare Tunnel for this server.
+                            <x-callout type="warning" title="{{ __('server.permission_required') }}" class="mb-4">
+                                {{ __('server.no_permission_configure_cloudflare') }}
                             </x-callout>
                         @endcan
                     </div>
@@ -110,20 +102,20 @@
                         </script>
                     @endscript
             </div>
-            <h3 class="pt-6 pb-2">Manual</h3>
+            <h3 class="pt-6 pb-2">{{ __('server.manual') }}</h3>
             <div class="pl-2">
                 @can('update', $server)
                     <x-modal-confirmation buttonFullWidth title="{{ __('server.confirm_manually_configured_cloudflare_tunnel') }}"
                         buttonTitle="{{ __('server.manually_configured_cloudflare_tunnel') }}" submitAction="manualCloudflareConfig"
                         :actions="[
-                            'You set everything up manually, including in Cloudflare and on the server (cloudflared is running).',
-                            'If you missed something, the connection will not work.',
-                        ]" confirmationText="I manually configured Cloudflare Tunnel"
+                            __('server.manual_config_actions_1'),
+                            __('server.manual_config_actions_2'),
+                        ]" confirmationText="{{ __('server.i_manually_configured') }}"
                         confirmationLabel="{{ __('modal.manually_configured_cloudflare_tunnel_confirmation') }}"
                         shortConfirmationLabel="{{ __('modal.confirmation_text') }}" />
                 @else
-                    <x-callout type="warning" title="Permission Required" class="mb-4">
-                        You don't have permission to configure Cloudflare Tunnel for this server.
+                    <x-callout type="warning" title="{{ __('server.permission_required') }}" class="mb-4">
+                        {{ __('server.no_permission_configure_cloudflare') }}
                     </x-callout>
                 @endcan
             </div>

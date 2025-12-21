@@ -119,7 +119,7 @@
                 {{-- Search Input (Borderless, Inside Container) --}}
                 <input type="text" x-model="search" x-ref="searchInput" @input="filterOptions()" @focus="open = true"
                     @keydown.escape="open = false" :placeholder="(Array.isArray(selected) && selected.length > 0) ? '' :
-                        {{ json_encode($placeholder ?: 'Search...') }}" @required($required) @readonly($readonly)
+                        {{ json_encode($placeholder ?: __('common.search_placeholder')) }}" @required($required) @readonly($readonly)
                     @disabled($disabled) @if ($autofocus) autofocus @endif
                     class="flex-1 min-w-[120px] text-sm border-0 outline-none bg-transparent p-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 text-black dark:text-white" />
             </div>
@@ -130,7 +130,7 @@
 
                 <template x-if="filteredOptions.length === 0">
                     <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                        No options found
+                        {{ __('common.no_options_found') }}
                     </div>
                 </template>
 
@@ -260,7 +260,7 @@
 
                     <template x-if="filteredOptions.length === 0">
                         <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                            No options found
+                            {{ __('common.no_options_found') }}
                         </div>
                     </template>
 

@@ -4,9 +4,9 @@
     </x-slot>
     <livewire:server.navbar :server="$server" />
     <x-slide-over closeWithX fullScreen @startupdate.window="slideOverOpen = true">
-        <x-slot:title>Updating Packages</x-slot:title>
+        <x-slot:title>{{ __('server.updating_packages') }}</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" />
+            <livewire:activity-monitor header="{{ __('server.logs') }}" />
         </x-slot:content>
     </x-slide-over>
 
@@ -15,41 +15,40 @@
         <form wire:submit='submit' class="w-full">
             <div>
                 <div class="flex items-center gap-2 flex-row">
-                    <h2>Server Patching</h2>
-                    <span class="text-xs text-neutral-500">(experimental)</span>
+                    <h2>{{ __('server.server_patching') }}</h2>
+                    <span class="text-xs text-neutral-500">{{ __('server.experimental') }}</span>
                     <x-helper
-                        helper="Only available for apt, dnf and zypper package managers atm, more coming
-            soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}' {{ wireNavigate() }}>notification settings</a>." />
+                        helper="{{ __('server.server_patching_helper', ['url' => route('notifications.email')]) }}" />
                     @if (isDev())
                         <x-forms.button type="button" wire:click="sendTestEmail">
-                            Send Test Email (dev only)</x-forms.button>
+                            {{ __('server.send_test_email_dev') }}</x-forms.button>
                     @endif
                 </div>
-                <div>Update your servers semi-automatically.</div>
+                <div>{{ __('server.update_servers_semi_auto') }}</div>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
                         <x-forms.button type="button" wire:click="$dispatch('checkForUpdates')">
-                            Check for Updates</x-forms.button>
+                            {{ __('server.check_for_updates') }}</x-forms.button>
                         <div class="flex flex-col">
                             <div>
                                 <div class="pb-2" wire:target="checkForUpdates" wire:loading>
-                                    Checking for updates. It may take a few minutes. <x-loading />
+                                    {{ __('server.checking_for_updates') }} <x-loading />
                                 </div>
                                 @if ($error)
                                     <div class="text-red-500">{{ $error }}</div>
                                 @else
                                     @if ($totalUpdates === 0)
-                                        <div class="text-green-500">Your server is up to date.</div>
+                                        <div class="text-green-500">{{ __('server.server_up_to_date') }}</div>
                                     @endif
                                     @if (isset($updates) && count($updates) > 0)
                                         <div class="pb-2">
                                             <x-modal-confirmation title="{{ __('server.confirm_package_update') }}"
                                                 buttonTitle="{{ __('button.update_all') }}"
-                                                isHighlightedButton submitAction="updateAllPackages" dispatchAction
+                                                isHighlightedButton                                                 submitAction="updateAllPackages" dispatchAction
                                                 :actions="[
-                                                    'All packages will be updated to the latest version.',
-                                                    'This action could restart your currently running containers if docker will be updated.',
-                                                ]" confirmationText="Update All Packages"
+                                                    __('server.all_packages_will_update'),
+                                                    __('server.action_could_restart_containers'),
+                                                ]" confirmationText="{{ __('server.update_all_packages_text') }}"
                                                 confirmationLabel="{{ __('modal.update_all_packages_confirmation') }}"
                                                 shortConfirmationLabel="{{ __('modal.name') }}" :confirmWithPassword=false
                                                 step2ButtonText="{{ __('button.update_all') }}
@@ -59,9 +58,9 @@
                                             <table class="min-w-full">
                                                 <thead>
                                                     <tr>
-                                                        <th>Package</th>
-                                                        <th>Version</th>
-                                                        <th>Action</th>
+                                                        <th>{{ __('server.package') }}</th>
+                                                        <th>{{ __('server.version') }}</th>
+                                                        <th>{{ __('server.action') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -70,7 +69,7 @@
                                                             <td>
                                                                 <div class="flex gap-2 items-center">
                                                                     @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
-                                                                        <x-helper :helper="'This package will restart your currently running containers'">
+                                                                        <x-helper :helper="__('server.package_will_restart_containers')">
                                                                             <x-slot:icon>
                                                                                 <svg class="w-4 h-4 text-red-500 block flex-shrink-0"
                                                                                     viewBox="0 0 256 256"
@@ -89,7 +88,7 @@
                                                                 <div class="flex gap-1 items-center">
                                                                     <span>{{ data_get($update, 'new_version') }}</span>
                                                                     @if ($packageManager !== 'dnf' && data_get($update, 'current_version'))
-                                                                        <x-helper helper="Current: {{ data_get($update, 'current_version') }}" />
+                                                                        <x-helper helper="{{ __('server.current') }} {{ data_get($update, 'current_version') }}" />
                                                                     @endif
                                                                 </div>
                                                             </td>

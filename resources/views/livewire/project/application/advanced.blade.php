@@ -3,7 +3,7 @@
         <div class="flex items-center gap-2">
             <h2>Advanced</h2>
         </div>
-        <div>Advanced configuration for your application.</div>
+        <div>{{ __('application.advanced_configuration_desc') }}</div>
         <div class="flex flex-col gap-1 pt-4">
             <h3>General</h3>
             @if ($application->git_based())

@@ -17,10 +17,10 @@
     </div>
     @if (isset($tag))
         <div>
-            <h3 class="py-4">Tag Details</h3>
+            <h3 class="py-4">{{ __('tags.tag_details') }}</h3>
             <div class="flex items-end gap-2 ">
                 <div class="w-[500px]">
-                    <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
+                    <x-forms.input readonly label="{{ __('tags.deploy_webhook_url') }}" id="webhook" />
                 </div>
                 <x-modal-confirmation title="{{ __('tags.redeploy_all_title') }}" isHighlighted
                     buttonTitle="{{ __('tags.redeploy_all') }}" submitAction="redeployAll" :actions="[
@@ -61,7 +61,7 @@
                 @endif
             </div>
             <div class="flex items-center gap-2">
-                <h3 class="py-4">Deployments</h3>
+                <h3 class="py-4">{{ __('tags.deployments') }}</h3>
                 @if (count($deploymentsPerTagPerServer) > 0)
                     <x-loading />
                 @endif
@@ -89,7 +89,7 @@
                         @endforeach
                     </div>
                 @empty
-                    <div>No deployments running.</div>
+                    <div>{{ __('tags.no_deployments_running') }}</div>
                 @endforelse
             </div>
         </div>

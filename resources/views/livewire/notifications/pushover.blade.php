@@ -1,89 +1,89 @@
 <div>
     <x-slot:title>
-        Notifications | Coolify
+        {{ __('notification.title') }} | Coolify
     </x-slot>
     <x-notification.navbar />
     <form wire:submit='submit' class="flex flex-col gap-4 pb-4">
         <div class="flex items-center gap-2">
-            <h2>Pushover</h2>
+            <h2>{{ __('notification.pushover') }}</h2>
             <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                Save
+                {{ __('button.save') }}
             </x-forms.button>
             @if ($pushoverEnabled)
                 <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
-                    Send Test Notification
+                    {{ __('notification.send_test_notification') }}
                 </x-forms.button>
             @else
                 <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
+                    {{ __('notification.send_test_notification') }}
                 </x-forms.button>
             @endif
         </div>
         <div class="w-32">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSavePushoverEnabled" id="pushoverEnabled" label="Enabled" />
+            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSavePushoverEnabled" id="pushoverEnabled" label="{{ __('common.enabled') }}" />
         </div>
         <div class="flex  gap-2">
             <x-forms.input canGate="update" :canResource="$settings" type="password"
-                helper="Get your User Key in Pushover. You need to be logged in to Pushover to see your user key in the top right corner. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/' target='_blank'>Pushover Dashboard</a>"
-                required id="pushoverUserKey" label="User Key" />
+                helper="{{ __('notification.user_key_helper') }}"
+                required id="pushoverUserKey" label="{{ __('notification.user_key') }}" />
             <x-forms.input canGate="update" :canResource="$settings" type="password"
-                helper="Generate an API Token/Key in Pushover by creating a new application. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/apps/build' target='_blank'>Create Pushover Application</a>"
-                required id="pushoverApiToken" label="API Token" />
+                helper="{{ __('notification.api_token_helper') }}"
+                required id="pushoverApiToken" label="{{ __('notification.api_token') }}" />
         </div>
     </form>
-    <h2 class="mt-4">Notification Settings</h2>
+    <h2 class="mt-4">{{ __('notification.notification_settings') }}</h2>
     <p class="mb-4">
-        Select events for which you would like to receive Pushover notifications.
+        {{ __('notification.select_events_for_pushover') }}
     </p>
     <div class="flex flex-col gap-4 max-w-2xl">
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Deployments</h3>
+            <h3 class="font-medium mb-3">{{ __('notification.deployments') }}</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessPushoverNotifications"
-                    label="Deployment Success" />
+                    label="{{ __('notification.deployment_success') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentFailurePushoverNotifications"
-                    label="Deployment Failure" />
+                    label="{{ __('notification.deployment_failure') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel"
-                    helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container."
-                    id="statusChangePushoverNotifications" label="Container Status Changes" />
+                    helper="{{ __('notification.status_change_hint') }}"
+                    id="statusChangePushoverNotifications" label="{{ __('notification.container_status_changes') }}" />
             </div>
         </div>
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Backups</h3>
+            <h3 class="font-medium mb-3">{{ __('notification.backups') }}</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupSuccessPushoverNotifications"
-                    label="Backup Success" />
+                    label="{{ __('notification.backup_success') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupFailurePushoverNotifications"
-                    label="Backup Failure" />
+                    label="{{ __('notification.backup_failure') }}" />
             </div>
         </div>
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Scheduled Tasks</h3>
+            <h3 class="font-medium mb-3">{{ __('notification.scheduled_tasks') }}</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskSuccessPushoverNotifications"
-                    label="Scheduled Task Success" />
+                    label="{{ __('notification.scheduled_task_success') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskFailurePushoverNotifications"
-                    label="Scheduled Task Failure" />
+                    label="{{ __('notification.scheduled_task_failure') }}" />
             </div>
         </div>
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Server</h3>
+            <h3 class="font-medium mb-3">{{ __('notification.server') }}</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupSuccessPushoverNotifications"
-                    label="Docker Cleanup Success" />
+                    label="{{ __('notification.docker_cleanup_success') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupFailurePushoverNotifications"
-                    label="Docker Cleanup Failure" />
+                    label="{{ __('notification.docker_cleanup_failure') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverDiskUsagePushoverNotifications"
-                    label="Server Disk Usage" />
+                    label="{{ __('notification.server_disk_usage') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverReachablePushoverNotifications"
-                    label="Server Reachable" />
+                    label="{{ __('notification.server_reachable') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachablePushoverNotifications"
-                    label="Server Unreachable" />
+                    label="{{ __('notification.server_unreachable') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchPushoverNotifications"
-                    label="Server Patching" />
+                    label="{{ __('notification.server_patching') }}" />
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedPushoverNotifications"
-                    label="Traefik Proxy Outdated" />
+                    label="{{ __('notification.traefik_outdated') }}" />
             </div>
         </div>
     </div>

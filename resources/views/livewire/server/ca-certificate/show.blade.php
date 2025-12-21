@@ -39,8 +39,7 @@
                     <ul class="list-disc pl-5 space-y-1">
                         <li>Mount this CA certificate of Coolify into all containers that need to connect to one of
                             your databases over SSL. You can see and copy the bind mount below.</li>
-                        <li>Read more when and why this is needed <a class="underline dark:text-white"
-                                href="https://coolify.io/docs/databases/ssl" target="_blank">here</a>.</li>
+                        <li>{!! __('server.read_more_ca_cert') !!}</li>
                     </ul>
                 </div>
                 <div class="relative">

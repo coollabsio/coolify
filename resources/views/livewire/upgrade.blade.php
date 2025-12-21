@@ -1,4 +1,4 @@
-<div @if ($isUpgradeAvailable) title="New version available" @else title="No upgrade available" @endif
+<div @if ($isUpgradeAvailable) title="{{ __('upgrade.new_version_available') }}" @else title="{{ __('upgrade.no_upgrade_available') }}" @endif
     x-init="$wire.checkUpdate" x-data="upgradeModal({
         currentVersion: @js($currentVersion),
         latestVersion: @js($latestVersion),
@@ -46,7 +46,7 @@
                         <div class="flex items-center justify-between pb-3">
                             <div>
                                 <h3 class="text-lg font-semibold"
-                                    x-text="upgradeComplete ? 'Upgrade Complete!' : (showProgress ? 'Upgrading...' : 'Upgrade Available')">
+                                    x-text="upgradeComplete ? '{{ __('upgrade.upgrade_complete') }}' : (showProgress ? '{{ __('upgrade.upgrading') }}' : '{{ __('upgrade.upgrade_available') }}')">
                                 </h3>
                                 <div class="text-sm text-neutral-500 dark:text-neutral-400">
                                     {{ $currentVersion }} <span class="mx-1">&rarr;</span> {{ $latestVersion }}
@@ -114,11 +114,11 @@
                                     <template x-if="upgradeComplete">
                                         <div class="flex flex-col items-center gap-4">
                                             <p class="text-sm text-neutral-500 dark:text-neutral-400">
-                                                Reloading in <span x-text="successCountdown"
-                                                    class="font-bold text-warning"></span> seconds...
+                                                {{ __('upgrade.reloading_in') }} <span x-text="successCountdown"
+                                                    class="font-bold text-warning"></span> {{ __('upgrade.reloading_in_seconds') }}
                                             </p>
                                             <x-forms.button @click="reloadNow()" type="button">
-                                                Reload Now
+                                                {{ __('upgrade.reload_now') }}
                                             </x-forms.button>
                                         </div>
                                     </template>
@@ -127,7 +127,7 @@
                                     <template x-if="upgradeError">
                                         <div class="flex flex-col items-center gap-4">
                                             <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                                                Check the logs on the server at /data/coolify/source/upgrade*.
+                                                {{ __('upgrade.check_logs_on_server') }}
                                             </p>
                                             <x-forms.button @click="closeErrorModal()" type="button">
                                                 Close
@@ -141,7 +141,7 @@
                             <template x-if="!showProgress">
                                 <div class="space-y-4">
                                     {{-- Warning --}}
-                                    <x-callout type="warning" title="Caution">
+                                    <x-callout type="warning" title="{{ __('upgrade.caution') }}">
                                         <p>Any deployments running during the update process will
                                             fail.
                                         </p>
@@ -276,15 +276,15 @@
 
             getReviveStatusMessage(elapsedMinutes, attempts) {
                 if (elapsedMinutes === 0) {
-                    return `Waiting for Coolify to come back online... (attempt ${attempts})`;
+                    return `{{ __('upgrade.waiting_for_coolify_online', ['attempts' => '']) }}`.replace(':attempts', attempts);
                 } else if (elapsedMinutes < 2) {
-                    return `Waiting for Coolify to come back online... (${elapsedMinutes} minute${elapsedMinutes !== 1 ? 's' : ''} elapsed)`;
+                    return `{{ __('upgrade.waiting_for_coolify_online_minutes', ['minutes' => '']) }}`.replace(':minutes', elapsedMinutes);
                 } else if (elapsedMinutes < 5) {
-                    return `Update in progress, this may take several minutes... (${elapsedMinutes} minutes elapsed)`;
+                    return `{{ __('upgrade.update_in_progress', ['minutes' => '']) }}`.replace(':minutes', elapsedMinutes);
                 } else if (elapsedMinutes < 10) {
-                    return `Large updates can take 10+ minutes. Please be patient... (${elapsedMinutes} minutes elapsed)`;
+                    return `{{ __('upgrade.large_updates_patient', ['minutes' => '']) }}`.replace(':minutes', elapsedMinutes);
                 } else {
-                    return `Still updating. If this takes longer than 15 minutes, please check server logs... (${elapsedMinutes} minutes elapsed)`;
+                    return `{{ __('upgrade.still_updating', ['minutes' => '']) }}`.replace(':minutes', elapsedMinutes);
                 }
             },
 

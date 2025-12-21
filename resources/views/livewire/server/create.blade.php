@@ -2,7 +2,7 @@
     <div class="flex flex-col gap-4">
         @can('viewAny', App\Models\CloudProviderToken::class)
             <div>
-                <x-modal-input title="Connect a Hetzner Server">
+                <x-modal-input title="{{ __('server.connect_hetzner_server') }}">
                     <x-slot:content>
                         <div class="relative gap-2 cursor-pointer coolbox group">
                             <div class="flex items-center gap-4 mx-6">
@@ -11,9 +11,9 @@
                                     <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z" fill="white" />
                                 </svg>
                                 <div class="flex flex-col justify-center flex-1">
-                                    <div class="box-title">Connect a Hetzner Server</div>
+                                    <div class="box-title">{{ __('server.connect_hetzner_server') }}</div>
                                     <div class="box-description">
-                                        Deploy servers directly from your Hetzner Cloud account
+                                        {{ __('server.connect_hetzner_server_desc') }}
                                     </div>
                                 </div>
                             </div>
@@ -27,7 +27,7 @@
         @endcan
 
         <div>
-            <h3 class="pb-2">Add Server by IP Address</h3>
+            <h3 class="pb-2">{{ __('server.add_server_by_ip') }}</h3>
             <livewire:server.new.by-ip :private_keys="$private_keys" :limit_reached="$limit_reached" />
         </div>
     </div>

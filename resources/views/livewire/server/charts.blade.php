@@ -6,18 +6,18 @@
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="metrics" />
         <div class="w-full">
-            <h2>Metrics</h2>
-            <div class="pb-4">Basic metrics for your server.</div>
+            <h2>{{ __('server.metrics') }}</h2>
+            <div class="pb-4">{{ __('server.basic_metrics_desc') }}</div>
             @if ($server->isMetricsEnabled())
                 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
-                    <x-forms.select label="Interval" wire:change="setInterval" id="interval">
-                        <option value="5">5 minutes (live)</option>
-                        <option value="10">10 minutes (live)</option>
-                        <option value="30">30 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="720">12 hours</option>
-                        <option value="10080">1 week</option>
-                        <option value="43200">30 days</option>
+                    <x-forms.select label="{{ __('server.interval') }}" wire:change="setInterval" id="interval">
+                        <option value="5">5 {{ __('server.minutes_live') }}</option>
+                        <option value="10">10 {{ __('server.minutes_live') }}</option>
+                        <option value="30">30 {{ __('server.minutes') }}</option>
+                        <option value="60">1 {{ __('server.hour') }}</option>
+                        <option value="720">12 {{ __('server.hours') }}</option>
+                        <option value="10080">1 {{ __('server.week') }}</option>
+                        <option value="43200">30 {{ __('server.days') }}</option>
                     </x-forms.select>
                     <h4 class="pt-4">CPU Usage</h4>
                     <div wire:ignore id="{!! $chartId !!}-cpu"></div>
@@ -288,8 +288,8 @@
                     </div>
                 </div>
             @else
-                <div>Metrics are disabled for this server. Enable them in <a class="underline dark:text-white"
-                        href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}>General</a> settings.</div>
+                <div>{{ __('server.metrics_disabled') }} <a class="underline dark:text-white"
+                        href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}>{{ __('server.general') }}</a> {{ __('server.enable_metrics_in') }}.</div>
             @endif
         </div>
     </div>

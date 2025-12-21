@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'not_available' => '终端不可用',
-    'no_shell' => '此容器中没有可用的 Shell (bash/sh)。请确保安装了 bash 或 sh 以使用终端。',
-    'minimize' => '最小化',
-    'fullscreen' => '全屏',
+    'connection_trouble_helper' => '如果您在连接到服务器时遇到问题，请确保端口已打开。<br><br><a class=\'underline\' href=\'https://coolify.io/docs/knowledge-base/server/firewall/#terminal\' target=\'_blank\'>文档</a>',
+    'loading_servers_containers' => '正在加载服务器和容器...',
+    'select_server_container' => '选择服务器或容器',
+    'no_servers_terminal_access' => '未找到具有终端访问权限的服务器。',
 ];

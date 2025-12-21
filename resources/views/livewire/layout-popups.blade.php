@@ -24,7 +24,7 @@
                         if (checkNumber > 5) {
                             this.popups.realtime = true;
                             console.error(
-                                'Coolify could not connect to its real-time service. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/knowledge-base/cloudflare/tunnels/overview) or get help on Discord (https://coollabs.io/discord).)'
+                                '{{ __('common.realtime_connection_error') }}'
                             );
                         }
 
@@ -71,8 +71,7 @@
                         <span class="font-bold text-left text-red-500">WARNING: </span> Cannot connect to real-time service
                     </x-slot:title>
                     <x-slot:description>
-                        <div>This will cause unusual problems on the
-                            UI! <br><br>
+                        <div>{{ __('common.realtime_connection_error') }}<br><br>
                             Please ensure that you have opened the
                             <a class="underline" href='https://coolify.io/docs/knowledge-base/server/firewall'
                                 target='_blank'>required ports</a> or get
