@@ -4,7 +4,7 @@
     <form wire:submit="submit">
         <div class="flex gap-2 pt-4 pb-1">
             <h2>Docker Image</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
+            <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
         </div>
         <div class="space-y-4">
             <x-forms.input id="imageName" label="Image Name" placeholder="nginx, docker.io/nginx:latest, ghcr.io/user/app:v1.2.3, or nginx:stable@sha256:abc123..."

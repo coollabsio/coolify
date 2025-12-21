@@ -315,7 +315,7 @@
                 <!-- Search -->
                 <div class="pb-4 border-b dark:border-coolgray-200 flex-shrink-0">
                     <div class="relative">
-                        <input x-model="search" placeholder="Search updates..." class="input pl-10" />
+                        <input x-model="search" placeholder="{{ __('forms.placeholders.search_updates') }}" class="input pl-10" />
                         <svg class="absolute left-3 top-2 w-4 h-4 dark:text-neutral-400" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

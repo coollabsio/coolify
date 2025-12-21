@@ -4,9 +4,8 @@
         <div class="font-bold">You should not use passphrase protected keys.</div>
     </div>
     <div class="flex gap-2 mb-4 w-full">
-        <x-forms.button wire:click="generateNewEDKey" isHighlighted class="w-full">Generate new ED25519 SSH
-            Key</x-forms.button>
-        <x-forms.button wire:click="generateNewRSAKey">Generate new RSA SSH Key</x-forms.button>
+        <x-forms.button wire:click="generateNewEDKey" isHighlighted class="w-full">{{ __('security.generate_ed25519_key') }}</x-forms.button>
+        <x-forms.button wire:click="generateNewRSAKey">{{ __('security.generate_rsa_key') }}</x-forms.button>
     </div>
     <form class="flex flex-col gap-2" wire:submit='createPrivateKey'>
         <div class="flex gap-2">
@@ -19,8 +18,6 @@
         <span class="pt-2 pb-4 font-bold dark:text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
             ~/.ssh/authorized_keys
             file</span>
-        <x-forms.button type="submit">
-            Continue
-        </x-forms.button>
+        <x-forms.button type="submit">{{ __('common.continue') }}</x-forms.button>
     </form>
 </div>

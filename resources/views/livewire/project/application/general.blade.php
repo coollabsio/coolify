@@ -22,8 +22,8 @@
         <div>{{ __('application.general_config_desc') }}</div>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
-                <x-forms.input x-bind:disabled="shouldDisable()" id="name" label="Name" required />
-                <x-forms.input x-bind:disabled="shouldDisable()" id="description" label="Description" />
+                <x-forms.input x-bind:disabled="shouldDisable()" id="name" label="{{ __('common.name') }}" required />
+                <x-forms.input x-bind:disabled="shouldDisable()" id="description" label="{{ __('common.description') }}" />
             </div>
 
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
@@ -347,8 +347,8 @@
                                 @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                     <div class="pb-4">
                                         <x-forms.textarea
-                                            helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                            placeholder="src/pages/**" id="watchPaths" label="Watch Paths"
+                                            helper="{{ __('application.watch_paths_helper') }}"
+                                            placeholder="{{ __('application.watch_paths_placeholder_2') }}" id="watchPaths" label="{{ __('application.watch_paths') }}"
                                             x-bind:disabled="!canUpdate" />
                                     </div>
                                 @endif

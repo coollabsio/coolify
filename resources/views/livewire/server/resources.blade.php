@@ -8,9 +8,9 @@
             <div class="flex flex-col">
                 <div class="flex gap-2">
                     <h2>Resources</h2>
-                    <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
+                    <x-forms.button wire:click="refreshStatus">{{ __('common.refresh') }}</x-forms.button>
                 </div>
-                <div>Here you can find all resources that are managed by Coolify.</div>
+                <div>{{ __('server.resources_managed_desc') }}</div>
                 <div class="flex flex-row gap-4 py-10">
                     <div @class([
                         'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
@@ -137,18 +137,18 @@
                                                             @if (data_get($resource, 'State') === 'running')
                                                                 <x-forms.button
                                                                     wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Restart</x-forms.button>
+                                                                    wire:key="{{ data_get($resource, 'ID') }}">{{ __('common.restart') }}</x-forms.button>
                                                                 <x-forms.button isError
                                                                     wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
+                                                                    wire:key="{{ data_get($resource, 'ID') }}">{{ __('common.stop') }}</x-forms.button>
                                                             @elseif (data_get($resource, 'State') === 'exited')
                                                                 <x-forms.button
                                                                     wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Start</x-forms.button>
+                                                                    wire:key="{{ data_get($resource, 'ID') }}">{{ __('common.start') }}</x-forms.button>
                                                             @elseif (data_get($resource, 'State') === 'restarting')
                                                                 <x-forms.button
                                                                     wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
-                                                                    wire:key="{{ data_get($resource, 'ID') }}">Stop</x-forms.button>
+                                                                    wire:key="{{ data_get($resource, 'ID') }}">{{ __('common.stop') }}</x-forms.button>
                                                             @endif
                                                         </td>
                                                     </tr>

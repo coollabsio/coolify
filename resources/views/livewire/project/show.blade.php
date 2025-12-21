@@ -7,7 +7,7 @@
         @can('update', $project)
             <x-modal-input buttonTitle="+ Add" title="New Environment">
                 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
-                    <x-forms.input placeholder="production" id="name" label="Name" required />
+                    <x-forms.input placeholder="{{ __('forms.placeholders.environment_name') }}" id="name" label="Name" required />
                     <x-forms.button type="submit">
                         Save
                     </x-forms.button>

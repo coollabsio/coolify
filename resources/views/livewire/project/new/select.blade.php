@@ -140,7 +140,7 @@
                 <div x-show="filteredServices.length > 0" class="mt-8">
                     <div class="flex items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
-                        <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                        <x-forms.button x-on:click="loadResources">{{ __('project.reload_list') }}</x-forms.button>
                     </div>
                     <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
                         The respective trademarks mentioned here are owned by the respective companies, and use of them

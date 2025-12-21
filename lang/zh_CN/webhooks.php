@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'title' => 'Webhooks',
+    'helper_docs' => '更多详细信息请查看我们的 <a class="underline dark:text-white" href="https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid" target="_blank">文档</a>。',
+    'deploy_webhook_label' => '部署 Webhook (需要认证)',
+    'deploy_webhook_helper' => '查看 <a target="_blank" class="underline dark:text-white" href="https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid">文档</a> 中的详细信息。',
+    'manual_git_webhooks' => '手动 Git Webhooks',
+    'github_content_type_helper' => 'GitHub 配置中的 Content Type 可以是 json 或 form-urlencoded。',
+    'github_label' => 'GitHub',
+    'github_secret_helper' => '需要设置密钥才能使用此 Webhook。它应与 GitHub 中的密钥匹配。',
+    'github_secret_label' => 'GitHub Webhook 密钥',
+    'github_config_button' => 'GitHub 上的 Webhook 配置',
+    'gitlab_label' => 'GitLab',
+    'gitlab_secret_helper' => '需要设置密钥才能使用此 Webhook。它应与 GitLab 中的密钥匹配。',
+    'gitlab_secret_label' => 'GitLab Webhook 密钥',
+    'bitbucket_label' => 'Bitbucket',
+    'bitbucket_secret_helper' => '需要设置密钥才能使用此 Webhook。它应与 Bitbucket 中的密钥匹配。',
+    'bitbucket_secret_label' => 'Bitbucket Webhook 密钥',
+    'gitea_label' => 'Gitea',
+    'gitea_secret_helper' => '需要设置密钥才能使用此 Webhook。它应与 Gitea 中的密钥匹配。',
+    'gitea_secret_label' => 'Gitea Webhook 密钥',
+    'official_git_app_info_title' => '信息',
+    'official_git_app_info_message' => '您正在使用官方 Git 应用。无需手动 Webhooks。',
+];

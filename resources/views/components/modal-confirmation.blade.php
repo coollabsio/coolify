@@ -1,8 +1,8 @@
 @props([
-    'title' => 'Are you sure?',
+    'title' => __('modal.confirm.title'),
     'isErrorButton' => false,
     'isHighlightedButton' => false,
-    'buttonTitle' => 'Confirm Action',
+    'buttonTitle' => __('modal.confirm.button'),
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
@@ -13,13 +13,13 @@
     'actions' => [],
     'warningMessage' => null,
     'confirmWithText' => true,
-    'confirmationText' => 'Confirm Deletion',
-    'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
-    'shortConfirmationLabel' => 'Name',
+    'confirmationText' => __('modal.confirm.deletion'),
+    'confirmationLabel' => __('modal.confirm.label'),
+    'shortConfirmationLabel' => __('modal.confirm.name_label'),
     'confirmWithPassword' => true,
-    'step1ButtonText' => 'Continue',
-    'step2ButtonText' => 'Continue',
-    'step3ButtonText' => 'Confirm',
+    'step1ButtonText' => __('modal.buttons.continue'),
+    'step2ButtonText' => __('modal.buttons.continue'),
+    'step3ButtonText' => __('modal.buttons.confirm'),
     'dispatchEvent' => false,
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
@@ -38,7 +38,7 @@
         $skipPasswordConfirmation = false;
     }
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
-    $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
+    $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === __('modal.buttons.continue')) ? __('modal.buttons.confirm') : $step2ButtonText;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -79,7 +79,7 @@
     step3ButtonText: @js($step3ButtonText),
     validatePassword() {
         if (this.confirmWithPassword && !this.password) {
-            return 'Password is required.';
+            return @js(__('validation.password_required'));
         }
         return '';
     },
@@ -224,7 +224,7 @@
                             <div class="flex flex-wrap gap-2 justify-between mt-4">
                                 <x-forms.button @click="modalOpen = false; resetModal()"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Cancel
+                                    {{ __('modal.buttons.cancel') }}
                                 </x-forms.button>
                                 <x-forms.button @click="step++" class="w-auto" isError>
                                     <span x-text="step1ButtonText"></span>
@@ -235,10 +235,10 @@
 
                     <!-- Step 2: Confirm deletion -->
                     <div x-show="step === 2">
-                        <x-callout type="danger" title="Warning" class="mb-4">
-                            {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
+                        <x-callout type="danger" :title="__('common.warning')" class="mb-4">
+                            {!! $warningMessage ?: __('modal.confirm.warning_message') !!}
                         </x-callout>
-                        <div class="mb-4">The following actions will be performed:</div>
+                        <div class="mb-4">{{ __('modal.confirm.actions_list') }}</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-center text-red-500">
@@ -278,7 +278,7 @@
                         @if (!$disableTwoStepConfirmation)
                             @if ($confirmWithText)
                                 <div class="mb-4">
-                                    <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
+                                    <h4 class="mb-2 text-lg font-semibold">{{ __('modal.confirm.confirm_actions') }}</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
                                         <div class="relative">
@@ -311,12 +311,12 @@
                             @if (!empty($checkboxes))
                                 <x-forms.button @click="step--"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Back
+                                    {{ __('modal.buttons.back') }}
                                 </x-forms.button>
                             @else
                                 <x-forms.button @click="modalOpen = false; resetModal()"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Cancel
+                                    {{ __('modal.buttons.cancel') }}
                                 </x-forms.button>
                             @endif
                             <x-forms.button
@@ -343,8 +343,8 @@
                     <!-- Step 3: Password confirmation -->
                     @if (!$skipPasswordConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
-                            <x-callout type="danger" title="Final Confirmation" class="mb-4">
-                                Please enter your password to confirm this destructive action.
+                            <x-callout type="danger" :title="__('modal.confirm.final_confirmation')" class="mb-4">
+                                {{ __('modal.confirm.password_prompt') }}
                             </x-callout>
                             <div class="flex flex-col gap-2 mb-4">
                                 @php
@@ -352,13 +352,13 @@
                                 @endphp
                                 <label for="password-confirm-{{ $passwordConfirm }}"
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Your Password
+                                    {{ __('modal.confirm.your_password') }}
                                 </label>
                                 <form @submit.prevent="false" @keydown.enter.prevent>
                                     <input type="text" name="username" autocomplete="username"
                                         value="{{ auth()->user()->email }}" style="display: none;">
                                     <input type="password" id="password-confirm-{{ $passwordConfirm }}"
-                                        x-model="password" class="w-full input" placeholder="Enter your password"
+                                        x-model="password" class="w-full input" placeholder="{{ __('modal.confirm.enter_password') }}"
                                         autocomplete="current-password">
                                 </form>
                                 <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
@@ -371,7 +371,7 @@
                             <div class="flex flex-wrap gap-2 justify-between mt-4">
                                 <x-forms.button @click="step--"
                                     class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Back
+                                    {{ __('modal.buttons.back') }}
                                 </x-forms.button>
                                 <x-forms.button x-bind:disabled="!password" class="w-auto" isError
                                     @click="

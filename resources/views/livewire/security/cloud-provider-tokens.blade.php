@@ -1,13 +1,13 @@
 <div>
-    <h2>Cloud Provider Tokens</h2>
-    <div class="pb-4">Manage API tokens for cloud providers (Hetzner, DigitalOcean, etc.).</div>
+    <h2>{{ __('security.cloud_provider_tokens') }}</h2>
+    <div class="pb-4">{{ __('security.manage_cloud_tokens_helper') }}</div>
 
-    <h3>New Token</h3>
+    <h3>{{ __('security.new_token') }}</h3>
     @can('create', App\Models\CloudProviderToken::class)
         <livewire:security.cloud-provider-token-form :modal_mode="false" />
     @endcan
 
-    <h3 class="py-4">Saved Tokens</h3>
+    <h3 class="py-4">{{ __('security.saved_tokens') }}</h3>
     <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($tokens as $savedToken)
             <div wire:key="token-{{ $savedToken->id }}"
@@ -18,30 +18,30 @@
                     </span>
                     <span class="font-bold dark:text-white">{{ $savedToken->name }}</span>
                 </div>
-                <div class="text-sm">Created: {{ $savedToken->created_at->diffForHumans() }}</div>
+                <div class="text-sm">{{ __('security.created') }} {{ $savedToken->created_at->diffForHumans() }}</div>
 
                 <div class="flex gap-2 pt-2">
                     @can('view', $savedToken)
                         <x-forms.button wire:click="validateToken({{ $savedToken->id }})" type="button">
-                            Validate
+                            {{ __('security.validate') }}
                         </x-forms.button>
                     @endcan
 
                     @can('delete', $savedToken)
-                        <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete"
+                        <x-modal-confirmation title="{{ __('modal.confirm_token_deletion') }}" isErrorButton buttonTitle="{{ __('modal.delete_token') }}"
                             submitAction="deleteToken({{ $savedToken->id }})" :actions="[
-                                'This cloud provider token will be permanently deleted.',
-                                'Any servers using this token will need to be reconfigured.',
+                                __('security.delete_token_warning_1'),
+                                __('security.delete_token_warning_2'),
                             ]"
                             confirmationText="{{ $savedToken->name }}"
-                            confirmationLabel="Please confirm the deletion by entering the token name below"
-                            shortConfirmationLabel="Token Name" :confirmWithPassword="false" step2ButtonText="Delete Token" />
+                            confirmationLabel="{{ __('security.confirm_delete_token_label') }}"
+                            shortConfirmationLabel="{{ __('security.token_name') }}" :confirmWithPassword="false" step2ButtonText="{{ __('security.delete_token') }}" />
                     @endcan
                 </div>
             </div>
         @empty
             <div>
-                <div>No cloud provider tokens found.</div>
+                <div>{{ __('security.no_cloud_tokens') }}</div>
             </div>
         @endforelse
     </div>

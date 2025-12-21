@@ -1,9 +1,8 @@
 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
-    <x-forms.input placeholder="Your Cool Project" id="name" label="Name" required />
-    <x-forms.input placeholder="This is my cool project everyone knows about" id="description" label="Description" />
-    <div class="subtitle">New project will have a default <span class="dark:text-warning font-bold">production</span>
-        environment.</div>
+    <x-forms.input placeholder="{{ __('forms.placeholders.project_name') }}" id="name" label="Name" required />
+    <x-forms.input placeholder="{{ __('forms.placeholders.project_description') }}" id="description" label="Description" />
+    <div class="subtitle">{!! __('project.new_project_default_env') !!}</div>
     <x-forms.button type="submit">
-        Continue
+        {{ __('common.continue') }}
     </x-forms.button>
 </form>

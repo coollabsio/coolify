@@ -71,7 +71,7 @@
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
                                             @can('update', $service)
-                                                <x-modal-input title="Edit Domains" :closeOutside="false" minWidth="32rem"
+                                                <x-modal-input title="{{ __('service.edit_domains') }}" :closeOutside="false" minWidth="32rem"
                                                     maxWidth="40rem">
                                                     <x-slot:content>
                                                         <span class="cursor-pointer">
@@ -101,18 +101,18 @@
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
                                         href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}">
-                                        Settings
+                                        {{ __('service.settings') }}
                                     </a>
                                     @if (str($application->status)->contains('running'))
                                         @can('update', $service)
-                                            <x-modal-confirmation title="Confirm Service Application Restart?"
-                                                buttonTitle="Restart"
+                                            <x-modal-confirmation title="{{ __('service.confirm_restart_app_title') }}"
+                                                buttonTitle="{{ __('common.restart') }}"
                                                 submitAction="restartApplication({{ $application->id }})" :actions="[
-                                                    'The selected service application will be unavailable during the restart.',
-                                                    'If the service application is currently in use data could be lost.',
+                                                    __('service.confirm_restart_app_action_1'),
+                                                    __('service.confirm_restart_app_action_2'),
                                                 ]"
                                                 :confirmWithText="false" :confirmWithPassword="false"
-                                                step2ButtonText="Restart Service Container" />
+                                                step2ButtonText="{{ __('service.restart_service_container') }}" />
                                         @endcan
                                     @endif
                                 </div>
@@ -151,22 +151,22 @@
                                     @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
                                         <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
                                             href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
-                                            Backups
+                                            {{ __('menu.backups') }}
                                         </a>
                                     @endif
                                     <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
                                         href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
-                                        Settings
+                                        {{ __('service.settings') }}
                                     </a>
                                     @if (str($database->status)->contains('running'))
                                         @can('update', $service)
-                                            <x-modal-confirmation title="Confirm Service Database Restart?"
-                                                buttonTitle="Restart" submitAction="restartDatabase({{ $database->id }})"
+                                            <x-modal-confirmation title="{{ __('service.confirm_restart_db_title') }}"
+                                                buttonTitle="{{ __('common.restart') }}" submitAction="restartDatabase({{ $database->id }})"
                                                 :actions="[
-                                                    'This service database will be unavailable during the restart.',
-                                                    'If the service database is currently in use data could be lost.',
+                                                    __('service.confirm_restart_db_action_1'),
+                                                    __('service.confirm_restart_db_action_2'),
                                                 ]" :confirmWithText="false" :confirmWithPassword="false"
-                                                step2ButtonText="Restart Database" />
+                                                step2ButtonText="{{ __('service.restart_database') }}" />
                                         @endcan
                                     @endif
                                 </div>
@@ -178,9 +178,9 @@
                 <livewire:project.shared.environment-variable.all :resource="$service" />
             @elseif ($currentRoute === 'project.service.storages')
                 <div class="flex gap-2 items-center">
-                    <h2>Storages</h2>
+                    <h2>{{ __('service.storages') }}</h2>
                 </div>
-                <div class="pb-4">Persistent storage to preserve data between deployments.</div>
+                <div class="pb-4">{{ __('service.storages_desc') }}</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />

@@ -5,8 +5,8 @@
             with GitHub.</div>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
-            <x-forms.input helper="If empty, your GitHub user will be used."
-                placeholder="If empty, your GitHub user will be used." id="organization" label="Organization (on GitHub)" />
+            <x-forms.input helper="{{ __('forms.placeholders.github_org_hint') }}"
+                placeholder="{{ __('forms.placeholders.github_org_hint') }}" id="organization" label="Organization (on GitHub)" />
         </div>
         @if (!isCloud())
             <div x-data="{ showWarning: @entangle('is_system_wide') }">

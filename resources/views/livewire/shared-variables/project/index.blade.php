@@ -5,7 +5,7 @@
     <div class="flex gap-2">
         <h1>Projects</h1>
     </div>
-    <div class="subtitle">List of your projects.</div>
+    <div class="subtitle">{{ __('shared.list_projects') }}</div>
     <div class="flex flex-col gap-2">
         @forelse ($projects as $project)
             <a class="coolbox group"
@@ -18,7 +18,7 @@
             </a>
         @empty
             <div>
-                <div>No project found.</div>
+                <div>{{ __('shared.no_project_found') }}</div>
             </div>
         @endforelse
     </div>

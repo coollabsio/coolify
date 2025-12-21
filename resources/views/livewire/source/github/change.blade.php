@@ -5,7 +5,7 @@
                 <h1>GitHub App</h1>
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
-                        <x-forms.button canGate="update" :canResource="$github_app" type="submit">Save</x-forms.button>
+                        <x-forms.button canGate="update" :canResource="$github_app" type="submit">{{ __('common.save') }}</x-forms.button>
                     @endif
                     @can('delete', $github_app)
                         @if ($applications->count() > 0)
@@ -25,7 +25,7 @@
                     @endcan
                 </div>
             </div>
-            <div class="subtitle">Your Private GitHub App for private repositories.</div>
+            <div class="subtitle">{{ __('security.github_app_private_desc') }}</div>
             @if (!data_get($github_app, 'installation_id'))
                 <div class="mb-10 rounded-sm alert-error">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
@@ -44,7 +44,7 @@
                         <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2 w-full">
                             <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App Name" />
                             <x-forms.button canGate="update" :canResource="$github_app" wire:click.prevent="updateGithubAppName">
-                                Sync Name
+                                {{ __('common.sync_name') }}
                             </x-forms.button>
                             @can('update', $github_app)
                                 <a href="{{ $this->getGithubAppNameUpdatePath() }}">
@@ -65,7 +65,7 @@
                         </div>
                     </div>
                     <x-forms.input canGate="update" :canResource="$github_app" id="organization" label="Organization"
-                        placeholder="If empty, personal user will be used" />
+                        placeholder="{{ __('forms.placeholders.github_user_hint') }}" />
                     @if (!isCloud())
                         <div class="w-48">
                             <x-forms.checkbox canGate="update" :canResource="$github_app" label="System Wide?"
@@ -116,10 +116,10 @@
                     <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2">
                         <h2 class="pt-4">Permissions</h2>
                         @can('view', $github_app)
-                            <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
+                            <x-forms.button wire:click.prevent="checkPermissions">{{ __('common.refetch') }}</x-forms.button>
                             <a href="{{ getPermissionsPath($github_app) }}">
                                 <x-forms.button>
-                                    Update
+                                    {{ __('common.update') }}
                                     <x-external-link />
                                 </x-forms.button>
                             </a>
@@ -222,7 +222,7 @@
                 <div class="flex gap-2 items-center">
                     If you want to fill the form manually, you can continue below. Only for advanced users.
                     <x-forms.button wire:click.prevent="createGithubAppManually">
-                        Continue
+                        {{ __('common.continue') }}
                     </x-forms.button>
                 </div>
                 <h3>Automated Installation</h3>

@@ -14,7 +14,7 @@
                             <livewire:destination.new.docker :server_id="$server->id" />
                         </x-modal-input>
                     @endcan
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>
+                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>{{ __('common.scan_destinations') }}</x-forms.button>
                 </div>
                 <div>Destinations are used to segregate resources by network.</div>
                 <h4 class="pt-4 pb-2">Available Destinations</h4>

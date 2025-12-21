@@ -4,7 +4,7 @@
     <form wire:submit="submit">
         <div class="flex gap-2 pb-1">
             <h2>Dockerfile</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
+            <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
         </div>
         <x-forms.textarea useMonacoEditor monacoEditorLanguage="dockerfile" rows="20" id="dockerfile" autofocus
             placeholder='FROM nginx

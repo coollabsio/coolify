@@ -9,8 +9,7 @@
             <div class="flex items-center gap-2">
                 @can('update', $application)
                     <h3>Pull Requests on Git</h3>
-                    <x-forms.button wire:click="load_prs">Load Pull Requests
-                    </x-forms.button>
+                    <x-forms.button wire:click="load_prs">{{ __('common.load_pull_requests') }}</x-forms.button>
                 @endcan
             </div>
         @endif
@@ -114,9 +113,8 @@
                                     <x-forms.input label="Domain" helper="One domain per preview."
                                         id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                                     @can('update', $application)
-                                        <x-forms.button type="submit">Save</x-forms.button>
-                                        <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
-                                            Domain</x-forms.button>
+                                        <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
+                                        <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">{{ __('common.generate_domain') }}</x-forms.button>
                                     @endcan
                                 </form>
                             @else
@@ -132,9 +130,8 @@
                             <x-forms.input label="Domain" helper="One domain per preview."
                                 id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                             @can('update', $application)
-                                <x-forms.button type="submit">Save</x-forms.button>
-                                <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
-                                    Domain</x-forms.button>
+                                <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
+                                <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">{{ __('common.generate_domain') }}</x-forms.button>
                             @endcan
                         </form>
                     @endif
@@ -181,7 +178,7 @@
                         @endcan
                         @if (data_get($preview, 'status') !== 'exited')
                             @can('deploy', $application)
-                                <x-modal-confirmation title="Confirm Preview Deployment Stopping?" buttonTitle="Stop"
+                                <x-modal-confirmation title="{{ __('modal.confirm_preview_stopping') }}" buttonTitle="{{ __('modal.stop_preview') }}"
                                     submitAction="stop({{ data_get($preview, 'pull_request_id') }})" :actions="[
                                         'This preview deployment will be stopped.',
                                         'If the preview deployment is currently in use data could be lost.',
@@ -206,7 +203,7 @@
                             @endcan
                         @endif
                         @can('delete', $application)
-                            <x-modal-confirmation title="Confirm Preview Deployment Deletion?" buttonTitle="Delete"
+                            <x-modal-confirmation title="{{ __('modal.confirm_preview_deletion') }}" buttonTitle="{{ __('modal.delete_preview') }}"
                                 isErrorButton submitAction="delete({{ data_get($preview, 'pull_request_id') }})"
                                 :actions="[
                                     'All containers of this preview deployment will be stopped and permanently deleted.',

@@ -1,0 +1,48 @@
+<?php
+
+return [
+    'title' => '团队 | Coolify',
+    'general' => '常规',
+    'general_subtitle' => '管理此团队的常规设置。',
+    'description' => '描述',
+    'danger_zone' => '危险区域',
+    'danger_warning' => '哇。希望您知道自己在做什么。',
+    'delete_team' => '删除团队',
+    'default_team_warning' => '这是默认团队。您不能删除它。',
+    'last_team_warning' => '您不能删除您的最后一个/个人团队。',
+    'cancel_subscription_first' => '请先取消您的订阅',
+    'here' => '这里',
+    'before_deleting' => '然后才能删除此团队。',
+    'delete_warning' => '这将删除您的团队。请注意！无法恢复！',
+    'confirm_delete' => '确认删除团队？',
+    'delete_action_warning' => '当前团队将从 Coolify 和数据库中永久删除。',
+    'confirm_label' => '请在下方输入团队名称以确认执行操作',
+    'team_name' => '团队名称',
+    'permanently_delete' => '永久删除',
+    'delete_resources_first' => '您需要删除以下资源才能删除团队：',
+    'projects' => '项目',
+    'servers' => '服务器',
+    'private_keys' => '私钥',
+    'sources' => '来源',
+
+    // Admin View 页面
+    'admin_view' => '管理员视图',
+    'admin_view_desc' => '管理此实例的用户。',
+    'users' => '用户',
+    'delete_user_action_1' => '所选用户将从 Coolify 数据库中永久删除。',
+    'delete_user_action_2' => '与此用户默认团队相关的所有资源（应用程序、数据库、服务、配置、服务器、私钥、标签等）将从 Coolify 数据库中删除。',
+    'confirm_user_deletion_label' => '请在下方输入用户名以确认执行操作',
+    'user_name' => '用户名',
+    'no_users_found' => '除 root 外未找到其他用户。',
+    'more_users_hint' => '显示的用户多于实际。请使用搜索栏查找您要查找的用户。',
+
+    // Members 页面
+    'members' => '成员',
+    'members_desc' => '管理或邀请此团队的成员。',
+    'table_name' => '名称',
+    'table_email' => '邮箱',
+    'table_role' => '角色',
+    'table_actions' => '操作',
+    'invite_new_member' => '邀请新成员',
+    'email_config_warning' => '在邀请新成员之前，您需要配置（作为 root 团队）<a {{ wireNavigate() }} href="/settings/email" class="underline dark:text-warning">事务邮件</a>。',
+];

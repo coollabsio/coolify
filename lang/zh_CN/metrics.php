@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'title' => '指标',
+    'description' => '应用容器的基本指标。',
+    'not_available_compose' => 'Docker Compose 应用暂不支持指标！',
+    'not_available_no_metrics' => '指标仅适用于启用了 Sentinel 和 Metrics 的服务器！',
+    'go_to_settings_prefix' => '前往 ',
+    'server_settings_link' => '服务器设置',
+    'go_to_settings_suffix' => ' 以启用它。',
+    'not_available_stopped' => '指标仅在应用容器运行时可用！',
+    'interval_label' => '间隔',
+    'interval_5min' => '5 分钟 (实时)',
+    'interval_10min' => '10 分钟 (实时)',
+    'interval_30min' => '30 分钟',
+    'interval_1hour' => '1 小时',
+    'interval_12hours' => '12 小时',
+    'interval_1week' => '1 周',
+    'interval_30days' => '30 天',
+    'cpu_usage' => 'CPU 使用率',
+    'memory_usage' => '内存 使用率',
+    'cpu_percent' => 'CPU %',
+    'memory_mb' => '内存 (MB)',
+    'loading' => '加载中...',
+    'cpu_label' => 'CPU：',
+    'memory_label' => '内存：',
+];

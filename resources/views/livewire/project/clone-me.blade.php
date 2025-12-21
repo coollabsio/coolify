@@ -99,9 +99,7 @@
         </div>
     </div>
     <div class="flex gap-4 pt-4 w-full">
-        <x-forms.button isHighlighted class="w-full" wire:click="clone('project')" :disabled="!filled($selectedDestination)">Clone to new
-            Project</x-forms.button>
-        <x-forms.button isHighlighted class="w-full" wire:click="clone('environment')" :disabled="!filled($selectedDestination)">Clone to new
-            Environment</x-forms.button>
+        <x-forms.button isHighlighted class="w-full" wire:click="clone('project')" :disabled="!filled($selectedDestination)">{{ __('project.clone_to_new_project') }}</x-forms.button>
+        <x-forms.button isHighlighted class="w-full" wire:click="clone('environment')" :disabled="!filled($selectedDestination)">{{ __('project.clone_to_new_environment') }}</x-forms.button>
     </div>
 </form>

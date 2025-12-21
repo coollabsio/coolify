@@ -1,8 +1,8 @@
 <form wire:submit="submit">
     <div class="flex items-end gap-2">
         <x-forms.input id="filename" label="Filename" />
-        <x-forms.button type="submit">Save</x-forms.button>
-        <x-modal-confirmation title="Confirm init-script deletion?" buttonTitle="Delete" isErrorButton
+        <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
+        <x-modal-confirmation title="{{ __('modal.confirm_init_script_deletion') }}" buttonTitle="{{ __('modal.delete_init_script') }}" isErrorButton
             submitAction="delete" :actions="[
                 'The init-script of this database will be permanently deleted form the database and the server.',
                 'If you are actively using this init-script, it could cause errors on redeployment.',

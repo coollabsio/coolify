@@ -17,7 +17,7 @@
                     <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
                 @endif
 
-                <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
+                <x-modal-confirmation title="{{ __('modal.confirm_server_deletion') }}" isErrorButton buttonTitle="{{ __('modal.delete_server') }}"
                     submitAction="delete"
                     :actions="['This server will be permanently deleted from Coolify.']"
                     :checkboxes="$checkboxes"

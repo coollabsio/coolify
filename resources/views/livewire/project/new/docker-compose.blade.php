@@ -4,7 +4,7 @@
     <form wire:submit="submit">
         <div class="flex gap-2 pb-1">
             <h2>Docker Compose</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
+            <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
         </div>
         <x-forms.textarea useMonacoEditor monacoEditorLanguage="yaml" label="Docker Compose file" rows="20"
             id="dockerComposeRaw" autofocus

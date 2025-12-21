@@ -2,8 +2,8 @@
     <div class="flex items-center gap-2">
         <h2>Preview Deployments</h2>
         @can('update', $application)
-            <x-forms.button type="submit">Save</x-forms.button>
-            <x-forms.button isHighlighted wire:click="resetToDefault">Reset template to default</x-forms.button>
+            <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
+            <x-forms.button isHighlighted wire:click="resetToDefault">{{ __('common.reset_to_default') }}</x-forms.button>
         @endcan
     </div>
     <div class="pb-4 ">Preview Deployments based on pull requests are here.</div>

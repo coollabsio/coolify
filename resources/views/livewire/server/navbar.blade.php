@@ -118,7 +118,7 @@
                                         </a>
                                     </button>
                                 @endif
-                                <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
+                                <x-modal-confirmation title="{{ __('modal.confirm_proxy_restart') }}" buttonTitle="{{ __('modal.restart_proxy') }}"
                                     submitAction="restart" :actions="[
                             'This proxy will be stopped and started again.',
                             'All resources hosted on coolify will be unavailable during the restart.',
@@ -136,7 +136,7 @@
                                         Restart Proxy
                                     </x-slot:button-title>
                                 </x-modal-confirmation>
-                                <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
+                                <x-modal-confirmation title="{{ __('modal.confirm_proxy_stopping') }}" buttonTitle="{{ __('modal.stop_proxy') }}"
                                     submitAction="stop(true)" :actions="[
                             'The coolify proxy will be stopped.',
                             'All resources hosted on coolify will be unavailable.',

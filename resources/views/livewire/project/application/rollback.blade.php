@@ -2,7 +2,7 @@
     <div class="flex items-center gap-2">
         <h2>Rollback</h2>
         @can('view', $application)
-            <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
+            <x-forms.button wire:click='loadImages(true)'>{{ __('common.reload_available_images') }}</x-forms.button>
         @endcan
     </div>
     <div class="pb-4">You can easily rollback to a previously built (local) images quickly.</div>
@@ -18,7 +18,7 @@
             <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Images to keep for rollback"
                 helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable image retention at the server level, which overrides this setting."
                 canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
-            <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">Save</x-forms.button>
+            <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">{{ __('common.save') }}</x-forms.button>
         </form>
     </div>
     <div wire:target='loadImages' wire:loading.remove>
@@ -57,16 +57,16 @@
                             @can('deploy', $application)
                                 @if (data_get($image, 'is_current'))
                                     <x-forms.button disabled tooltip="This image is currently running.">
-                                        Rollback
+                                        {{ __('common.rollback') }}
                                     </x-forms.button>
                                 @elseif (!$isRollbackable)
                                     <x-forms.button disabled tooltip="Rollback not available for '{{ $tag }}' tag. Only commit-based tags support rollback. Re-deploy to create a rollback-enabled image.">
-                                        Rollback
+                                        {{ __('common.rollback') }}
                                     </x-forms.button>
                                 @else
                                     <x-forms.button class="dark:bg-coolgray-100"
                                         wire:click="rollbackImage('{{ $tag }}')">
-                                        Rollback
+                                        {{ __('common.rollback') }}
                                     </x-forms.button>
                                 @endif
                             @endcan

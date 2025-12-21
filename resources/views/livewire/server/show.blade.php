@@ -8,7 +8,7 @@
         <div class="w-full">
             <form wire:submit.prevent='submit' class="flex flex-col">
                 <div class="flex gap-2">
-                    <h2>General</h2>
+                    <h2>{{ __('server.general') }}</h2>
                     @if ($server->hetzner_server_id)
                         <div class="flex items-center">
                             <div @class([
@@ -50,11 +50,11 @@
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                             </path>
                                         </svg>
-                                        <span>Checking status...</span>
+                                        <span>{{ __('server.checking_status') }}</span>
                                     </span>
                                 @endif
                             </div>
-                            <button wire:loading.remove wire:target="checkHetznerServerStatus" title="Refresh Status"
+                            <button wire:loading.remove wire:target="checkHetznerServerStatus" title="{{ __('server.refresh_status') }}"
                                 wire:click.prevent='checkHetznerServerStatus(true)'
                                 class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -62,7 +62,7 @@
                                         d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
                                 </svg>
                             </button>
-                            <button wire:loading wire:target="checkHetznerServerStatus" title="Refreshing Status"
+                            <button wire:loading wire:target="checkHetznerServerStatus" title="{{ __('server.refreshing_status') }}"
                                 class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
                                 <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"
                                     xmlns="http://www.w3.org/2000/svg">
@@ -74,7 +74,7 @@
                         @if ($server->cloudProviderToken && !$server->isFunctional() && $hetznerServerStatus === 'off')
                             <x-forms.button wire:click.prevent='startHetznerServer' isHighlighted canGate="update"
                                 :canResource="$server">
-                                Power On
+                                {{ __('server.power_on') }}
                             </x-forms.button>
                         @endif
                     @endif
@@ -89,18 +89,18 @@
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                 </path>
                             </svg>
-                            <span>Validating...</span>
+                            <span>{{ __('server.validating') }}</span>
                         </div>
                     @endif
                     @if ($server->id === 0)
-                        <x-modal-confirmation title="Confirm Server Settings Change?" buttonTitle="Save"
+                        <x-modal-confirmation title="{{ __('server.confirm_settings_change') }}" buttonTitle="{{ __('common.save') }}"
                             submitAction="submit" :actions="[
-                                'If you misconfigure the server, you could lose a lot of functionalities of Coolify.',
+                                __('server.misconfigure_warning'),
                             ]" :confirmWithText="false" :confirmWithPassword="false"
-                            step2ButtonText="Save" canGate="update" :canResource="$server" />
+                            step2ButtonText="{{ __('common.save') }}" canGate="update" :canResource="$server" />
                     @else
                         <x-forms.button type="submit" canGate="update" :canResource="$server"
-                            :disabled="$isValidating">Save</x-forms.button>
+                            :disabled="$isValidating">{{ __('common.save') }}</x-forms.button>
                         @if ($server->isFunctional())
                             <x-slide-over closeWithX fullScreen>
                                 <x-slot:title>Validate & configure</x-slot:title>
@@ -167,9 +167,9 @@
                 @endif
                 <div class="flex flex-col gap-2 pt-4">
                     <div class="flex flex-col gap-2 w-full lg:flex-row">
-                        <x-forms.input canGate="update" :canResource="$server" id="name" label="Name" required
+                        <x-forms.input canGate="update" :canResource="$server" id="name" label="{{ __('common.name') }}" required
                             :disabled="$isValidating" />
-                        <x-forms.input canGate="update" :canResource="$server" id="description" label="Description"
+                        <x-forms.input canGate="update" :canResource="$server" id="description" label="{{ __('common.description') }}"
                             :disabled="$isValidating" />
                         @if (!$isSwarmWorker && !$isBuildServer)
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://example.com"

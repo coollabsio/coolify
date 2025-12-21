@@ -22,7 +22,7 @@
                 </div>
             @endif
             <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
-            <x-modal-confirmation title="Cleanup Deleted Backup Entries?" buttonTitle="Cleanup Deleted" isErrorButton
+            <x-modal-confirmation title="{{ __('modal.cleanup_deleted_backup_entries') }}" buttonTitle="{{ __('modal.cleanup_deleted') }}" isErrorButton
                 submitAction="cleanupDeleted()" 
                 :actions="['This will permanently delete all backup execution entries that are marked as deleted from local storage.', 'This only removes database entries, not actual backup files.']" 
                 confirmationText="cleanup deleted backups"
@@ -175,7 +175,7 @@
                                 $deleteActions[] = 'This backup execution record will be deleted.';
                             }
                         @endphp
-                        <x-modal-confirmation title="Confirm Backup Deletion?" buttonTitle="Delete" isErrorButton
+                        <x-modal-confirmation title="{{ __('modal.confirm_backup_deletion') }}" buttonTitle="{{ __('modal.delete_backup') }}" isErrorButton
                             submitAction="deleteBackup({{ data_get($execution, 'id') }})" :checkboxes="$executionCheckboxes"
                             :actions="$deleteActions" confirmationText="{{ data_get($execution, 'filename') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"

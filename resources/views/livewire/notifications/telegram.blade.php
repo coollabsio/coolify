@@ -45,7 +45,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessTelegramNotifications"
                             label="Deployment Success" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsDeploymentSuccessThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
@@ -53,7 +53,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentFailureTelegramNotifications"
                             label="Deployment Failure" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsDeploymentFailureThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
@@ -63,7 +63,7 @@
                             helper="Send a notification when a container status changes. It will send a notification for Stopped and Restarted events of a container." />
                     </div>
                     <x-forms.input canGate="update" :canResource="$settings" type="password" id="telegramNotificationsStatusChangeThreadId"
-                        placeholder="Custom Telegram Thread ID" />
+                        placeholder="{{ __('forms.placeholders.telegram_thread_id') }}" />
                 </div>
             </div>
         </div>
@@ -75,7 +75,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupSuccessTelegramNotifications"
                             label="Backup Success" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsBackupSuccessThreadId" />
                 </div>
 
@@ -84,7 +84,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupFailureTelegramNotifications"
                             label="Backup Failure" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsBackupFailureThreadId" />
                 </div>
             </div>
@@ -98,7 +98,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskSuccessTelegramNotifications"
                             label="Scheduled Task Success" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsScheduledTaskSuccessThreadId" />
                 </div>
 
@@ -107,7 +107,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskFailureTelegramNotifications"
                             label="Scheduled Task Failure" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsScheduledTaskFailureThreadId" />
                 </div>
             </div>
@@ -121,7 +121,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupSuccessTelegramNotifications"
                             label="Docker Cleanup Success" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsDockerCleanupSuccessThreadId" />
                 </div>
 
@@ -130,7 +130,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupFailureTelegramNotifications"
                             label="Docker Cleanup Failure" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsDockerCleanupFailureThreadId" />
                 </div>
 
@@ -139,7 +139,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverDiskUsageTelegramNotifications"
                             label="Server Disk Usage" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsServerDiskUsageThreadId" />
                 </div>
 
@@ -148,7 +148,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverReachableTelegramNotifications"
                             label="Server Reachable" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsServerReachableThreadId" />
                 </div>
 
@@ -157,7 +157,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachableTelegramNotifications"
                             label="Server Unreachable" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsServerUnreachableThreadId" />
                 </div>
 
@@ -166,7 +166,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchTelegramNotifications"
                             label="Server Patching" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsServerPatchThreadId" />
                 </div>
 
@@ -175,7 +175,7 @@
                         <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedTelegramNotifications"
                             label="Traefik Proxy Outdated" />
                     </div>
-                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="{{ __('forms.placeholders.telegram_thread_id') }}"
                         id="telegramNotificationsTraefikOutdatedThreadId" />
                 </div>
             </div>

@@ -12,7 +12,7 @@
             @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress"
+                        <x-forms.input wire:model="testEmailAddress" placeholder="{{ __('forms.placeholders.test_email') }}" id="testEmailAddress"
                             label="Recipient" required />
                         <x-forms.button type="submit" @click="modalOpen=false">
                             Send Email
@@ -41,8 +41,8 @@
                 </div>
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
-                        <x-forms.input required id="smtpPort" type="number" placeholder="587" label="Port" />
+                        <x-forms.input required id="smtpHost" placeholder="{{ __('forms.placeholders.smtp_host') }}" label="Host" />
+                        <x-forms.input required id="smtpPort" type="number" placeholder="{{ __('forms.placeholders.smtp_port') }}" label="Port" />
                         <x-forms.select required id="smtpEncryption" label="Encryption">
                             <option value="starttls">StartTLS</option>
                             <option value="tls">TLS/SSL</option>
@@ -71,7 +71,7 @@
                 </div>
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" id="resendApiKey" placeholder="API key" required label="API Key"
+                        <x-forms.input type="password" id="resendApiKey" placeholder="{{ __('forms.placeholders.api_key') }}" required label="API Key"
                             autocomplete="new-password" />
                     </div>
                 </div>

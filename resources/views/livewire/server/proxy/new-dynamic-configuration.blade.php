@@ -2,5 +2,5 @@
     <x-forms.input canGate="update" :canResource="$server" id="fileName" label="Filename" required />
     <x-forms.textarea canGate="update" :canResource="$server" allowTab useMonacoEditor id="value" label="Configuration"
         required rows="20" />
-    <x-forms.button canGate="update" :canResource="$server" type="submit" @click="slideOverOpen=false">Save</x-forms.button>
+    <x-forms.button canGate="update" :canResource="$server" type="submit" @click="slideOverOpen=false">{{ __('common.save') }}</x-forms.button>
 </form>

@@ -5,7 +5,7 @@
     <div class="flex gap-2">
         <h1>Environments</h1>
     </div>
-    <div class="subtitle">List of your environments by projects.</div>
+    <div class="subtitle">{{ __('shared.list_environments') }}</div>
     <div class="flex flex-col gap-2">
         @forelse ($projects as $project)
             <h2>Project: {{ data_get($project, 'name') }}</h2>
@@ -23,11 +23,11 @@
                     </div>
                 </a>
             @empty
-                <p class="pb-4">No environments found.</p>
+                <p class="pb-4">{{ __('shared.no_environments_found') }}</p>
             @endforelse
         @empty
             <div>
-                <div>No project found.</div>
+                <div>{{ __('shared.no_project_found') }}</div>
             </div>
         @endforelse
     </div>

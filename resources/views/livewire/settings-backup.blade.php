@@ -8,7 +8,7 @@
             <h2>Backup</h2>
             @if (isset($database) && $server->isFunctional())
                 <x-forms.button type="submit" wire:click="submit">
-                    Save
+                    {{ __('common.save') }}
                 </x-forms.button>
             @endif
         </div>
@@ -34,7 +34,7 @@
                 @else
                     To configure automatic backup for your Coolify instance, you first need to add a database resource
                     into Coolify.
-                    <x-forms.button class="mt-2" wire:click="addCoolifyDatabase">Configure Backup</x-forms.button>
+                    <x-forms.button class="mt-2" wire:click="addCoolifyDatabase">{{ __('common.configure_backup') }}</x-forms.button>
                 @endif
             @else
                 <div class="p-6 bg-red-500/10 rounded-lg border border-red-500/20">

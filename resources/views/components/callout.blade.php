@@ -1,4 +1,4 @@
-@props(['type' => 'warning', 'title' => 'Warning', 'class' => '', 'dismissible' => false, 'onDismiss' => null])
+@props(['type' => 'warning', 'title' => __('common.warning'), 'class' => '', 'dismissible' => false, 'onDismiss' => null])
 
 @php
     $icons = [

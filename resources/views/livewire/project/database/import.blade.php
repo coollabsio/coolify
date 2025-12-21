@@ -134,7 +134,7 @@
                     <form class="flex gap-2 items-end pt-2">
                         <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
                             wire:model='customLocation' x-model="$wire.customLocation"></x-forms.input>
-                        <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation">Check File</x-forms.button>
+                        <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation">{{ __('common.check_file') }}</x-forms.button>
                     </form>
                     <div class="pt-2 text-center text-xl font-bold">
                         Or
@@ -150,7 +150,7 @@
                         <h3>File Information</h3>
                         <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
                         <div class="pt-2">
-                            <x-modal-confirmation title="Restore Database from File?" buttonTitle="Restore from File"
+                            <x-modal-confirmation title="{{ __('modal.restore_database_from_file') }}" buttonTitle="{{ __('modal.restore_from_file') }}"
                                 submitAction="runImport" isErrorButton>
                                 <x-slot:button-title>
                                     Restore Database from File
@@ -191,7 +191,7 @@
 
                             <div class="flex gap-2">
                                 <x-forms.button class="w-full" wire:click='checkS3File' x-bind:disabled="!s3StorageId || !s3Path">
-                                    Check File
+                                    {{ __('common.check_file') }}
                                 </x-forms.button>
                             </div>
 
@@ -200,7 +200,7 @@
                                     <h3>File Information</h3>
                                     <div class="pt-2">Location: {{ $s3Path }} {{ formatBytes($s3FileSize ?? 0) }}</div>
                                     <div class="pt-2">
-                                        <x-modal-confirmation title="Restore Database from S3?" buttonTitle="Restore from S3"
+                                        <x-modal-confirmation title="{{ __('modal.restore_database_from_s3') }}" buttonTitle="{{ __('modal.restore_from_s3') }}"
                                             submitAction="restoreFromS3" isErrorButton>
                                             <x-slot:button-title>
                                                 Restore Database from S3

@@ -14,8 +14,8 @@
                         <div class="flex gap-2 items-center">
                             @if ($server->isSentinelLive())
                                 <x-status.running status="In sync" noLoading title="{{ $sentinelUpdatedAt }}" />
-                                <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
-                                <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server">Restart</x-forms.button>
+                                <x-forms.button type="submit" canGate="update" :canResource="$server">{{ __('common.save') }}</x-forms.button>
+                                <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server">{{ __('common.restart') }}</x-forms.button>
                                 <x-slide-over fullScreen>
                                     <x-slot:title>Sentinel Logs</x-slot:title>
                                     <x-slot:content>
@@ -23,13 +23,13 @@
                                             container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
                                             lazy />
                                     </x-slot:content>
-                                    <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
+                                    <x-forms.button @click="slideOverOpen=true">{{ __('common.logs') }}</x-forms.button>
                                 </x-slide-over>
                             @else
                                 <x-status.stopped status="Out of sync" noLoading
                                     title="{{ $sentinelUpdatedAt }}" />
-                                <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
-                                <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server">Sync</x-forms.button>
+                                <x-forms.button type="submit" canGate="update" :canResource="$server">{{ __('common.save') }}</x-forms.button>
+                                <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server">{{ __('common.sync') }}</x-forms.button>
                                 <x-slide-over fullScreen>
                                     <x-slot:title>Sentinel Logs</x-slot:title>
                                     <x-slot:content>
@@ -37,7 +37,7 @@
                                             container="coolify-sentinel" displayName="Sentinel" :collapsible="false"
                                             lazy />
                                     </x-slot:content>
-                                    <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
+                                    <x-forms.button @click="slideOverOpen=true">{{ __('common.logs') }}</x-forms.button>
                                 </x-slide-over>
                             @endif
                         </div>

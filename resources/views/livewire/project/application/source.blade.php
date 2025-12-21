@@ -3,7 +3,7 @@
         <div class="flex items-center gap-2">
             <h2>Source</h2>
             @can('update', $application)
-                <x-forms.button type="submit">Save</x-forms.button>
+                <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>
             @endcan
             <div class="flex items-center gap-4 px-2">
                 <a target="_blank" class="hover:no-underline flex items-center gap-1"

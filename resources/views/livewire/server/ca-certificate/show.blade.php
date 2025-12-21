@@ -10,7 +10,7 @@
                 <h2>CA Certificate</h2>
                 @can('update', $server)
                     <div class="flex gap-2">
-                        <x-modal-confirmation title="Confirm changing of CA Certificate?" buttonTitle="Save"
+                        <x-modal-confirmation title="{{ __('modal.confirm_ca_certificate_change') }}" buttonTitle="{{ __('modal.save_certificate') }}"
                             submitAction="saveCaCertificate" :actions="[
                                 'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.',
                                 'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
@@ -20,7 +20,7 @@
                             confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
                             step3ButtonText="Save Certificate">
                         </x-modal-confirmation>
-                        <x-modal-confirmation title="Confirm Regenerate Certificate?" buttonTitle="Regenerate "
+                        <x-modal-confirmation title="{{ __('modal.confirm_certificate_regeneration') }}" buttonTitle="{{ __('modal.regenerate_certificate') }}"
                             submitAction="regenerateCaCertificate" :actions="[
                                 'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.',
                                 'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',

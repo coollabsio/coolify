@@ -66,7 +66,7 @@
                         helper="You can add a custom name for your container.<br><br>The name will be converted to slug format when you save it. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                         instantSave id="customInternalName" label="Custom Container Name" canGate="update"
                         :canResource="$application" />
-                    <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+                    <x-forms.button canGate="update" :canResource="$application" type="submit">{{ __('common.save') }}</x-forms.button>
                 </form>
             @endif
             @if ($application->build_pack === 'dockercompose')
@@ -96,7 +96,7 @@
             <div class="flex gap-2 items-end pt-4">
                 <h3>GPU</h3>
                 @if ($isGpuEnabled)
-                    <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+                    <x-forms.button canGate="update" :canResource="$application" type="submit">{{ __('common.save') }}</x-forms.button>
                 @endif
             </div>
         @endif

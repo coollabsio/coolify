@@ -19,10 +19,10 @@
                     @endif
                 </div>
             </div>
-            <x-forms.button canGate="update" :canResource="$storage" type="submit">Save</x-forms.button>
+            <x-forms.button canGate="update" :canResource="$storage" type="submit">{{ __('common.save') }}</x-forms.button>
 
             @can('delete', $storage)
-                <x-modal-confirmation title="Confirm Storage Deletion?" isErrorButton buttonTitle="Delete"
+                <x-modal-confirmation title="{{ __('modal.confirm_storage_deletion') }}" isErrorButton buttonTitle="{{ __('modal.delete_storage') }}"
                     submitAction="delete({{ $storage->id }})" :actions="[
                         'The selected storage location will be permanently deleted from Coolify.',
                         'If the storage location is in use by any backup jobs those backup jobs will only store the backup locally on the server.',

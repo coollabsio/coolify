@@ -2,13 +2,13 @@
     <div class="flex gap-2 pb-2">
         <h2>Scheduled Backup</h2>
         <x-forms.button type="submit">
-            Save
+            {{ __('common.save') }}
         </x-forms.button>
         @if (str($status)->startsWith('running'))
             <livewire:project.database.backup-now :backup="$backup" />
         @endif
         @if ($backup->database_id !== 0)
-            <x-modal-confirmation title="Confirm Backup Schedule Deletion?" buttonTitle="Delete Backups and Schedule"
+            <x-modal-confirmation title="{{ __('modal.confirm_backup_schedule_deletion') }}" buttonTitle="{{ __('modal.delete_backups_and_schedule') }}"
                 isErrorButton submitAction="delete" :checkboxes="$checkboxes" :actions="[
                     'The selected backup schedule will be deleted.',
                     'Scheduled backups for this database will be stopped (if this is the only backup schedule for this database).',

@@ -30,7 +30,7 @@
                                 @endforeach
                             @endforeach
                         </x-forms.select>
-                        <x-forms.button type="submit">Connect</x-forms.button>
+                        <x-forms.button type="submit">{{ __('common.connect') }}</x-forms.button>
                     </form>
                 @else
                     <div>No servers with terminal access found.</div>

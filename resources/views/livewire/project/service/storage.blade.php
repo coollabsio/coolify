@@ -11,11 +11,9 @@
             $resource->getMorphClass() == 'App\Models\StandaloneMysql')
         <div>
             <div class="flex items-center gap-2">
-                <h2>Storages</h2>
+                <h2>{{ __('storage.storages') }}</h2>
                 <x-helper
-                    helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
-                        volume
-                        name, example: <span class='text-helper'>-pr-1</span>" />
+                    helper="{!! __('storage.preview_helper') !!}" />
                 @if ($resource?->build_pack !== 'dockercompose')
                     @can('update', $resource)
                         <div x-data="{
@@ -52,7 +50,7 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                                                 </svg>
-                                                Volume Mount
+                                                {{ __('storage.volume_mount') }}
                                             </a>
                                             <a class="dropdown-item" @click="fileModalOpen = true; dropdownOpen = false">
                                                 <svg class="size-4" fill="none" stroke="currentColor"
@@ -60,7 +58,7 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                                 </svg>
-                                                File Mount
+                                                {{ __('storage.file_mount') }}
                                             </a>
                                             <a class="dropdown-item"
                                                 @click="directoryModalOpen = true; dropdownOpen = false">
@@ -69,7 +67,7 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                                 </svg>
-                                                Directory Mount
+                                                {{ __('storage.directory_mount') }}
                                             </a>
                                         </div>
                                     </div>
@@ -94,7 +92,7 @@
                                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                                         class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
                                         <div class="flex items-center justify-between pb-3">
-                                            <h3 class="text-2xl font-bold">Add Volume Mount</h3>
+                                            <h3 class="text-2xl font-bold">{{ __('storage.add_volume_mount') }}</h3>
                                             <button @click="volumeModalOpen=false"
                                                 class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -116,32 +114,25 @@
                                             <form class="flex flex-col w-full gap-2 rounded-sm"
                                                 wire:submit='submitPersistentVolume'>
                                                 <div class="flex flex-col">
-                                                    <div>Docker Volumes mounted to the container.</div>
+                                                    <div>{{ __('storage.docker_volumes_helper') }}</div>
                                                 </div>
                                                 @if ($isSwarm)
-                                                    <div class="text-warning">Swarm Mode detected: You need to set a shared
-                                                        volume
-                                                        (EFS/NFS/etc) on all the worker nodes if you would like to use a
-                                                        persistent
-                                                        volumes.</div>
+                                                    <div class="text-warning">{{ __('storage.swarm_mode_warning') }}</div>
                                                 @endif
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
-                                                        id="name" label="Name" required helper="Volume name." />
+                                                        id="name" label="{{ __('input.name') }}" required helper="{{ __('storage.volume_name') }}." />
                                                     @if ($isSwarm)
                                                         <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path" required
-                                                            helper="Directory on the host system." />
+                                                            placeholder="/root" id="host_path" label="{{ __('storage.source_path') }}" required
+                                                            helper="{{ __('storage.host_path_helper') }}" />
                                                     @else
                                                         <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path"
-                                                            helper="Directory on the host system." />
+                                                            placeholder="/root" id="host_path" label="{{ __('storage.source_path') }}"
+                                                            helper="{{ __('storage.host_path_helper') }}" />
                                                     @endif
-                                                    <x-forms.input canGate="update" :canResource="$resource"
-                                                        placeholder="/tmp/root" id="mount_path" label="Destination Path"
-                                                        required helper="Directory inside the container." />
-                                                    <x-forms.button canGate="update" :canResource="$resource" type="submit">
-                                                        Add
+<x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                        {{ __('storage.add') }}
                                                     </x-forms.button>
                                                 </div>
                                             </form>
@@ -168,7 +159,7 @@
                                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                                         class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
                                         <div class="flex items-center justify-between pb-3">
-                                            <h3 class="text-2xl font-bold">Add File Mount</h3>
+                                            <h3 class="text-2xl font-bold">{{ __('storage.add_file_mount') }}</h3>
                                             <button @click="fileModalOpen=false"
                                                 class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -190,17 +181,17 @@
                                             <form class="flex flex-col w-full gap-2 rounded-sm"
                                                 wire:submit='submitFileStorage'>
                                                 <div class="flex flex-col">
-                                                    <div>Actual file mounted from the host system to the container.</div>
+                                                    <div>{{ __('storage.file_mount_helper') }}</div>
                                                 </div>
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx/nginx.conf" id="file_storage_path"
-                                                        label="Destination Path" required
-                                                        helper="File location inside the container" />
-                                                    <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
+                                                        label="{{ __('storage.destination_path') }}" required
+                                                        helper="{{ __('storage.file_location_helper') }}" />
+                                                    <x-forms.textarea canGate="update" :canResource="$resource" label="{{ __('storage.content') }}"
                                                         id="file_storage_content"></x-forms.textarea>
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
-                                                        Add
+                                                        {{ __('storage.add') }}
                                                     </x-forms.button>
                                                 </div>
                                             </form>
@@ -227,7 +218,7 @@
                                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                                         class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
                                         <div class="flex items-center justify-between pb-3">
-                                            <h3 class="text-2xl font-bold">Add Directory Mount</h3>
+                                            <h3 class="text-2xl font-bold">{{ __('storage.add_directory_mount') }}</h3>
                                             <button @click="directoryModalOpen=false"
                                                 class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
                                                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -249,19 +240,19 @@
                                             <form class="flex flex-col w-full gap-2 rounded-sm"
                                                 wire:submit='submitFileStorageDirectory'>
                                                 <div class="flex flex-col">
-                                                    <div>Directory mounted from the host system to the container.</div>
+                                                    <div>{{ __('storage.directory_mount_helper') }}</div>
                                                 </div>
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
-                                                        id="file_storage_directory_source" label="Source Directory"
-                                                        required helper="Directory on the host system." />
+                                                        id="file_storage_directory_source" label="{{ __('storage.source_directory') }}"
+                                                        required helper="{{ __('storage.host_path_helper') }}" />
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx" id="file_storage_directory_destination"
-                                                        label="Destination Directory" required
-                                                        helper="Directory inside the container." />
+                                                        label="{{ __('storage.destination_directory') }}" required
+                                                        helper="{{ __('storage.container_path_helper') }}" />
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
-                                                        Add
+                                                        {{ __('storage.add') }}
                                                     </x-forms.button>
                                                 </div>
                                             </form>
@@ -273,10 +264,10 @@
                     @endcan
                 @endif
             </div>
-            <div>Persistent storage to preserve data between deployments.</div>
+            <div>{{ __('storage.persistent_storage_helper') }}</div>
         </div>
         @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-            <div>No storage found.</div>
+            <div>{{ __('storage.no_storage_found') }}</div>
         @endif
         @php
             $hasVolumes = $this->volumeCount > 0;
@@ -296,21 +287,21 @@
                             'border-b-2 border-transparent'"
                         @if (!$hasVolumes) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasVolumes ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                        Volumes ({{ $this->volumeCount }})
+                        {{ __('storage.volumes') }} ({{ $this->volumeCount }})
                     </button>
                     <button @click="activeTab = 'files'"
                         :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' :
                             'border-b-2 border-transparent'"
                         @if (!$hasFiles) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasFiles ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                        Files ({{ $this->fileCount }})
+                        {{ __('storage.files') }} ({{ $this->fileCount }})
                     </button>
                     <button @click="activeTab = 'directories'"
                         :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' :
                             'border-b-2 border-transparent'"
                         @if (!$hasDirectories) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasDirectories ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                        Directories ({{ $this->directoryCount }})
+                        {{ __('storage.directories') }} ({{ $this->directoryCount }})
                     </button>
                 </div>
 
@@ -322,7 +313,7 @@
                             <livewire:project.shared.storages.all :resource="$resource" />
                         @else
                             <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No volumes configured.
+                                {{ __('storage.no_volumes_configured') }}
                             </div>
                         @endif
                     </div>
@@ -336,7 +327,7 @@
                             @endforeach
                         @else
                             <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No file mounts configured.
+                                {{ __('storage.no_files_configured') }}
                             </div>
                         @endif
                     </div>
@@ -350,7 +341,7 @@
                             @endforeach
                         @else
                             <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No directory mounts configured.
+                                {{ __('storage.no_directories_configured') }}
                             </div>
                         @endif
                     </div>
@@ -365,7 +356,7 @@
                 </div>
             </div>
             @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-                <div>No storage found.</div>
+                <div>{{ __('storage.no_storage_found') }}</div>
             @endif
 
             @php
@@ -386,21 +377,21 @@
                                 'border-b-2 border-transparent'"
                             @if (!$hasVolumes) disabled @endif
                             class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasVolumes ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                            Volumes ({{ $this->volumeCount }})
+                            {{ __('storage.volumes') }} ({{ $this->volumeCount }})
                         </button>
                         <button @click="activeTab = 'files'"
                             :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' :
                                 'border-b-2 border-transparent'"
                             @if (!$hasFiles) disabled @endif
                             class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasFiles ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                            Files ({{ $this->fileCount }})
+                            {{ __('storage.files') }} ({{ $this->fileCount }})
                         </button>
                         <button @click="activeTab = 'directories'"
                             :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' :
                                 'border-b-2 border-transparent'"
                             @if (!$hasDirectories) disabled @endif
                             class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasDirectories ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
-                            Directories ({{ $this->directoryCount }})
+                            {{ __('storage.directories') }} ({{ $this->directoryCount }})
                         </button>
                     </div>
 
@@ -412,7 +403,7 @@
                                 <livewire:project.shared.storages.all :resource="$resource" />
                             @else
                                 <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No volumes configured.
+                                    {{ __('storage.no_volumes_configured') }}
                                 </div>
                             @endif
                         </div>
@@ -426,7 +417,7 @@
                                 @endforeach
                             @else
                                 <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No file mounts configured.
+                                    {{ __('storage.no_files_configured') }}
                                 </div>
                             @endif
                         </div>
@@ -440,7 +431,7 @@
                                 @endforeach
                             @else
                                 <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No directory mounts configured.
+                                    {{ __('storage.no_directories_configured') }}
                                 </div>
                             @endif
                         </div>

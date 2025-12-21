@@ -11,7 +11,7 @@
                     <div>
                         <div class="flex gap-2">
                             <h2>Dynamic Configurations</h2>
-                            <x-forms.button wire:click="loadDynamicConfigurations">Reload</x-forms.button>
+                            <x-forms.button wire:click="loadDynamicConfigurations">{{ __('common.reload') }}</x-forms.button>
                             @can('update', $server)
                                 <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
                                     <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />

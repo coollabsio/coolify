@@ -6,73 +6,71 @@
             @else
                 <h2>{{ Str::headline($application->name) }}</h2>
             @endif
-            <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            <x-forms.button canGate="update" :canResource="$application" type="submit">{{ __('button.save') }}</x-forms.button>
             @can('update', $application)
-                <x-modal-confirmation wire:click="convertToDatabase" title="Convert to Database"
-                    buttonTitle="Convert to Database" submitAction="convertToDatabase" :actions="['The selected resource will be converted to a service database.']"
+                <x-modal-confirmation wire:click="convertToDatabase" title="{{ __('service.convert_to_database') }}"
+                    buttonTitle="{{ __('service.convert_to_database') }}" submitAction="convertToDatabase" :actions="[__('service.convert_to_database_warning')]"
                     confirmationText="{{ Str::headline($application->name) }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
-                    shortConfirmationLabel="Service Application Name" />
+                    confirmationLabel="{{ __('service.confirm_service_application_deletion_label') }}"
+                    shortConfirmationLabel="{{ __('service.service_application_name') }}" />
             @endcan
             @can('delete', $application)
-                <x-modal-confirmation title="Confirm Service Application Deletion?" buttonTitle="Delete" isErrorButton
-                    submitAction="delete" :actions="['The selected service application container will be stopped and permanently deleted.']" confirmationText="{{ Str::headline($application->name) }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
-                    shortConfirmationLabel="Service Application Name" />
+                <x-modal-confirmation title="{{ __('modal.confirm_service_application_deletion') }}" buttonTitle="{{ __('modal.delete_service_application') }}" isErrorButton
+                    submitAction="delete" :actions="[__('service.service_application_deletion_warning')]" confirmationText="{{ Str::headline($application->name) }}"
+                    confirmationLabel="{{ __('service.confirm_service_application_deletion_label') }}"
+                    shortConfirmationLabel="{{ __('service.service_application_name') }}" />
             @endcan
         </div>
         <div class="flex flex-col gap-2">
             @if($requiredPort && !$application->serviceType()?->contains(str($application->image)->before(':')))
-                <x-callout type="warning" title="Required Port: {{ $requiredPort }}" class="mb-2">
-                    This service requires port <strong>{{ $requiredPort }}</strong> to function correctly. All domains must include this port number (or any other port if you know what you're doing).
-                    <br><br>
-                    <strong>Example:</strong> http://app.coolify.io:{{ $requiredPort }}
+                <x-callout type="warning" title="{{ __('service.required_port', ['port' => $requiredPort]) }}" class="mb-2">
+                    {!! __('service.required_port_helper', ['port' => $requiredPort]) !!}
                 </x-callout>
             @endif
 
             <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$application" label="Name" id="humanName"
-                    placeholder="Human readable name"></x-forms.input>
-                <x-forms.input canGate="update" :canResource="$application" label="Description"
+                <x-forms.input canGate="update" :canResource="$application" label="{{ __('input.name') }}" id="humanName"
+                    placeholder="{{ __('service.human_readable_name') }}"></x-forms.input>
+                <x-forms.input canGate="update" :canResource="$application" label="{{ __('input.description') }}"
                     id="description"></x-forms.input>
             </div>
             <div class="flex gap-2">
                 @if (!$application->serviceType()?->contains(str($application->image)->before(':')))
                     @if ($application->required_fqdn)
                         <x-forms.input canGate="update" :canResource="$application" required placeholder="https://app.coolify.io"
-                            label="Domains" id="fqdn"
-                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
+                            label="{{ __('application.domains') }}" id="fqdn"
+                            helper="{{ __('application.domains_helper') }}"></x-forms.input>
                     @else
                         <x-forms.input canGate="update" :canResource="$application" placeholder="https://app.coolify.io"
-                            label="Domains" id="fqdn"
-                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
+                            label="{{ __('application.domains') }}" id="fqdn"
+                            helper="{{ __('application.domains_helper') }}"></x-forms.input>
                     @endif
                 @endif
                 <x-forms.input canGate="update" :canResource="$application"
-                    helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
-                    label="Image" id="image"></x-forms.input>
+                    helper="{!! __('service.image_helper') !!}"
+                    label="{{ __('input.image') }}" id="image"></x-forms.input>
             </div>
         </div>
-        <h3 class="py-2 pt-4">Advanced</h3>
+        <h3 class="py-2 pt-4">{{ __('menu.advanced') }}</h3>
         <div class="w-96 flex flex-col gap-1">
             @if (str($application->image)->contains('pocketbase'))
                 <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isGzipEnabled"
-                    label="Enable Gzip Compression"
-                    helper="Pocketbase does not need gzip compression, otherwise SSE will not work." disabled />
+                    label="{{ __('service.gzip_compression') }}"
+                    helper="{{ __('service.pocketbase_gzip_helper') }}" disabled />
             @else
                 <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isGzipEnabled"
-                    label="Enable Gzip Compression"
-                    helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
+                    label="{{ __('service.gzip_compression') }}"
+                    helper="{{ __('service.gzip_helper') }}" />
             @endif
             <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" id="isStripprefixEnabled"
-                label="Strip Prefixes"
-                helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api." />
-            <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" label="Exclude from service status"
-                helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
+                label="{{ __('service.strip_prefixes') }}"
+                helper="{{ __('service.strip_prefixes_helper') }}" />
+            <x-forms.checkbox canGate="update" :canResource="$application" instantSave="instantSaveSettings" label="{{ __('service.exclude_from_status') }}"
+                helper="{{ __('service.exclude_from_status_helper') }}"
                 id="excludeFromStatus"></x-forms.checkbox>
             <x-forms.checkbox canGate="update" :canResource="$application"
-                helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" />
+                helper="{{ __('service.drain_logs_helper') }}"
+                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="{{ __('service.drain_logs') }}" />
         </div>
     </form>
     
@@ -82,10 +80,10 @@
         confirmAction="confirmDomainUsage">
         <x-slot:consequences>
             <ul class="mt-2 ml-4 list-disc">
-                <li>Only one service will be accessible at this domain</li>
-                <li>The routing behavior will be unpredictable</li>
-                <li>You may experience service disruptions</li>
-                <li>SSL certificates might not work correctly</li>
+                <li>{{ __('service.domain_conflict_consequences.only_one') }}</li>
+                <li>{{ __('service.domain_conflict_consequences.unpredictable') }}</li>
+                <li>{{ __('service.domain_conflict_consequences.disruptions') }}</li>
+                <li>{{ __('service.domain_conflict_consequences.ssl') }}</li>
             </ul>
         </x-slot:consequences>
     </x-domain-conflict-modal>
@@ -106,7 +104,7 @@
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                         <div class="flex justify-between items-center pb-3">
-                            <h2 class="pr-8 font-bold">Remove Required Port?</h2>
+                            <h2 class="pr-8 font-bold">{{ __('service.remove_required_port') }}</h2>
                             <button @click="modalOpen = false; $wire.call('cancelRemovePort')"
                                 class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
                                 <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -116,28 +114,27 @@
                             </button>
                         </div>
                         <div class="relative w-auto">
-                            <x-callout type="warning" title="Port Requirement Warning" class="mb-4">
-                                This service requires port <strong>{{ $requiredPort }}</strong> to function correctly.
-                                One or more of your domains are missing a port number.
+                            <x-callout type="warning" title="{{ __('service.port_requirement_warning') }}" class="mb-4">
+                                {!! __('service.port_requirement_warning_body', ['port' => $requiredPort]) !!}
                             </x-callout>
 
-                            <x-callout type="danger" title="What will happen if you continue?" class="mb-4">
+                            <x-callout type="danger" title="{{ __('service.consequences_title') }}" class="mb-4">
                                 <ul class="mt-2 ml-4 list-disc">
-                                    <li>The service may become unreachable</li>
-                                    <li>The proxy may not be able to route traffic correctly</li>
-                                    <li>Environment variables may not be generated properly</li>
-                                    <li>The service may fail to start or function</li>
+                                    <li>{{ __('service.consequences_unreachable') }}</li>
+                                    <li>{{ __('service.consequences_proxy') }}</li>
+                                    <li>{{ __('service.consequences_env') }}</li>
+                                    <li>{{ __('service.consequences_fail') }}</li>
                                 </ul>
                             </x-callout>
 
                             <div class="flex flex-wrap gap-2 justify-between mt-4">
                                 <x-forms.button @click="modalOpen = false; $wire.call('cancelRemovePort')"
                                     class="w-auto dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Cancel - Keep Port
+                                    {{ __('service.cancel_keep_port') }}
                                 </x-forms.button>
                                 <x-forms.button wire:click="confirmRemovePort" @click="modalOpen = false" class="w-auto"
                                     isError>
-                                    I understand, remove port anyway
+                                    {{ __('service.remove_port_anyway') }}
                                 </x-forms.button>
                             </div>
                         </div>

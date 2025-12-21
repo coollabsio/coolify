@@ -1,6 +1,6 @@
 @props([
-    'title' => 'Are you sure?',
-    'buttonTitle' => 'Open Modal',
+    'title' => __('modal.title'),
+    'buttonTitle' => __('modal.open'),
     'isErrorButton' => false,
     'isHighlightedButton' => false,
     'disabled' => false,
