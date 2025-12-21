@@ -120,8 +120,8 @@
                                 @endif
                                 <x-modal-confirmation title="{{ __('modal.confirm_proxy_restart') }}" buttonTitle="{{ __('modal.restart_proxy') }}"
                                     submitAction="restart" :actions="[
-                            'This proxy will be stopped and started again.',
-                            'All resources hosted on coolify will be unavailable during the restart.',
+                            __('server.proxy_will_be_stopped_and_started'),
+                            __('server.all_resources_unavailable_during_restart'),
                         ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="{{ __('menu.restart_proxy') }}"
                                     :dispatchEvent="true" dispatchEventType="restartEvent">
                                     <x-slot:button-title>
@@ -138,8 +138,8 @@
                                 </x-modal-confirmation>
                                 <x-modal-confirmation title="{{ __('modal.confirm_proxy_stopping') }}" buttonTitle="{{ __('modal.stop_proxy') }}"
                                     submitAction="stop(true)" :actions="[
-                            'The coolify proxy will be stopped.',
-                            'All resources hosted on coolify will be unavailable.',
+                            __('server.coolify_proxy_will_be_stopped'),
+                            __('server.all_resources_unavailable'),
                         ]" :confirmWithText="false"
                                     :confirmWithPassword="false" step2ButtonText="{{ __('menu.stop_proxy') }}" :dispatchEvent="true"
                                     dispatchEventType="stopEvent">

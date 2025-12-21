@@ -68,18 +68,18 @@
             @if (!isCloud())
                 <x-popup>
                     <x-slot:title>
-                        <span class="font-bold text-left text-red-500">WARNING: </span> Cannot connect to real-time service
+                        <span class="font-bold text-left text-red-500">{{ __('common.warning') }}</span> {{ __('common.cannot_connect_realtime_service') }}
                     </x-slot:title>
                     <x-slot:description>
                         <div>{{ __('common.realtime_connection_error') }}<br><br>
-                            Please ensure that you have opened the
+                            {{ __('common.please_ensure_opened_ports') }}
                             <a class="underline" href='https://coolify.io/docs/knowledge-base/server/firewall'
-                                target='_blank'>required ports</a> or get
-                            help on <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a>.
+                                target='_blank'>{{ __('common.required_ports') }}</a> {{ __('common.or_get_help') }}
+                            <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a> {{ __('common.get_help') }}。
                         </div>
                     </x-slot:description>
                     <x-slot:button-text @click="disableRealtime()">
-                        Acknowledge & Disable This Popup
+                        {{ __('common.acknowledge_disable_popup') }}
                     </x-slot:button-text>
                 </x-popup>
             @endif
@@ -133,23 +133,15 @@
     @endif
     @if (currentTeam()->subscriptionPastOverDue())
         <x-banner :closable=false>
-            <div><span class="font-bold text-red-500">WARNING:</span> Your subscription is in over-due. If your
-                latest
-                payment is not paid within a week, all automations <span class="font-bold text-red-500">will
-                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
-                    class="underline dark:text-white">/subscription</a> to check your subscription status or pay
-                your
-                invoice (or check your email for the invoice).
+            <div><span class="font-bold text-red-500">{{ __('common.warning') }}</span> {{ __('common.subscription_overdue') }} <span class="font-bold text-red-500">{{ __('common.will_be_deactivated') }}</span>。{{ __('common.visit_subscription') }} <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
+                    class="underline dark:text-white">/subscription</a> {{ __('common.to_check_status') }}
             </div>
         </x-banner>
     @endif
     @if (currentTeam()->serverOverflow())
         <x-banner :closable=false>
-            <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
-                covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
-                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
-                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some
-                servers.
+            <div><span class="font-bold text-red-500">{{ __('common.warning') }}</span> {{ __('common.active_servers_exceed_limit') }} <span class="font-bold text-red-500">{{ __('common.will_be_deactivated') }}</span>。{{ __('common.visit_subscription') }} <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
+                    class="underline dark:text-white">/subscription</a> {{ __('common.visit_subscription_update') }}
             </div>
         </x-banner>
     @endif

@@ -125,7 +125,7 @@
                         </div>
                     @else
                         <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
-                            <x-forms.input label="Domain" helper="One domain per preview."
+                            <x-forms.input label="{{ __('application.domain') }}" helper="{{ __('application.one_domain_per_preview') }}"
                                 id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                             @can('update', $application)
                                 <x-forms.button type="submit">{{ __('common.save') }}</x-forms.button>

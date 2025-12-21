@@ -458,7 +458,7 @@
                     <a href="https://hub.docker.com/_/postgres/" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
-                        title="View documentation">
+                        title="{{ __('common.view_documentation') }}">
                         <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -479,7 +479,7 @@
                     <a href="https://github.com/supabase/postgres" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
-                        title="View documentation">
+                        title="{{ __('common.view_documentation') }}">
                         <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -500,7 +500,7 @@
                     <a href="https://github.com/postgis/docker-postgis" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
-                        title="View documentation">
+                        title="{{ __('common.view_documentation') }}">
                         <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -521,7 +521,7 @@
                     <a href="https://github.com/pgvector/pgvector" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
-                        title="View documentation">
+                        title="{{ __('common.view_documentation') }}">
                         <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

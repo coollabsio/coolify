@@ -22,6 +22,6 @@
              @endforeach
          </div>
      @empty
-         <div>No deployments running.</div>
+         <div>{{ __('tags.no_deployments_running') }}</div>
      @endforelse
  </div>

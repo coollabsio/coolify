@@ -178,7 +178,7 @@ return [
     // Server Navbar
     'server' => '服务器',
     'proxy_startup_logs' => '代理启动日志',
-    'note_localhost' => '注意：这是运行 Coolify 的本地服务器。',
+    'note_localhost' => '这是运行 Coolify 的服务器。不要删除此服务器！',
     'proxy_restart_warning' => '代理重启期间，连接可能会暂时丢失。',
     'logs_stop_updating' => '如果日志停止更新，请在几分钟后刷新浏览器。',
     'proxy_restarting' => '代理重启中',
@@ -435,4 +435,11 @@ return [
     // CA Certificate
     'read_more_ca_cert' => '阅读更多关于何时以及为什么需要此信息<a class="underline dark:text-white" href="https://coolify.io/docs/databases/ssl" target="_blank">这里</a>。',
     'failed_to_check_proxy_status' => '检查代理状态失败。请重试。',
+    'proxy_will_be_stopped_and_started' => '此代理将被停止并重新启动。',
+    'all_resources_unavailable_during_restart' => '重启期间，所有托管在 Coolify 上的资源将不可用。',
+    'coolify_proxy_will_be_stopped' => 'Coolify 代理将被停止。',
+    'all_resources_unavailable' => '所有托管在 Coolify 上的资源将不可用。',
+    'execution_is_running' => '执行正在运行...',
+    'download_logs' => '下载日志',
+    'no_output_returned' => '未返回输出 - 命令已成功完成',
 ];

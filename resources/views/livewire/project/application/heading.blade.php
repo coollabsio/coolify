@@ -15,7 +15,7 @@
                 <div class="flex items-center gap-1">
                     {{ __('menu.logs') }}
                     @if ($application->restart_count > 0 && !str($application->status)->startsWith('exited'))
-                        <svg class="w-4 h-4 dark:text-warning" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" title="Container has restarted {{ $application->restart_count }} time{{ $application->restart_count > 1 ? 's' : '' }}">
+                        <svg class="w-4 h-4 dark:text-warning" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" title="{{ str_replace(':count', $application->restart_count, __('application.container_restarted_times')) }}">
                             <path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z"/>
                         </svg>
                     @endif

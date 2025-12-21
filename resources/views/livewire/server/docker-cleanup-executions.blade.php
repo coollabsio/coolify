@@ -55,7 +55,7 @@
     @if (strlen(data_get($execution, 'message', '')) > 0)
     <div class="flex flex-col">
         <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
-            Download Logs
+            {{ __('server.download_logs') }}
         </x-forms.button>
     </div>
     @endif
@@ -64,7 +64,7 @@
         <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded-sm">
             @if (data_get($execution, 'status') === 'running')
             <div class="flex items-center gap-2 mb-2">
-                <span>Execution is running...</span>
+                <span>{{ __('server.execution_is_running') }}</span>
                 <x-loading class="w-4 h-4" />
             </div>
             @endif
@@ -111,7 +111,7 @@
                         <pre class="font-mono text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{{ $output }}</pre>
                         @else
                         <p class="text-sm text-gray-500 dark:text-gray-400 italic">
-                            No output returned - command completed successfully
+                            {{ __('server.no_output_returned') }}
                         </p>
                         @endif
                     </div>

@@ -1,9 +1,9 @@
 <div>
-    <h1>Create a new Application</h1>
+    <h1>{{ __('application.create_new_application') }}</h1>
     <div class="pb-4">{{ __('application.deploy_deploy_key_desc') }}</div>
     <div class="flex flex-col ">
         @if ($current_step === 'private_keys')
-            <h2 class="pb-4">Select a private key</h2>
+            <h2 class="pb-4">{{ __('application.select_private_key') }}</h2>
             <div class="flex flex-col justify-center gap-2 text-left ">
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)

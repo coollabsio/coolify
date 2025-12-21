@@ -142,8 +142,7 @@
                                 <div class="space-y-4">
                                     {{-- Warning --}}
                                     <x-callout type="warning" title="{{ __('upgrade.caution') }}">
-                                        <p>Any deployments running during the update process will
-                                            fail.
+                                        <p>{{ __('upgrade.any_deployments_will_fail') }}
                                         </p>
                                     </x-callout>
 

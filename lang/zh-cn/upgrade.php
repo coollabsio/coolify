@@ -20,5 +20,6 @@ return [
     'check_logs_on_server' => '请检查服务器上的日志：/data/coolify/source/upgrade*。',
     'waiting_for_coolify_online' => '等待 Coolify 重新上线...（尝试 :attempts）',
     'waiting_for_coolify_online_minutes' => '等待 Coolify 重新上线...（已过去 :minutes 分钟）',
+    'any_deployments_will_fail' => '更新过程中正在运行的任何部署都将失败。',
 ];
 

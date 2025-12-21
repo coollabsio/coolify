@@ -72,7 +72,7 @@
                 </div>
                 @if ($showCertificate)
                     <textarea class="w-full h-[370px] input" wire:model="certificateContent"
-                        placeholder="Paste or edit CA certificate content here..."></textarea>
+                        placeholder="{{ __('common.paste_or_edit_ca_certificate') }}"></textarea>
                 @else
                     <div class="w-full h-[370px] input">
                         <div class="h-full flex flex-col items-center justify-center text-gray-300">
