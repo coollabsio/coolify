@@ -89,9 +89,7 @@ return [
     'service' => '服务',
     'realtime_connection_error' => 'Coolify 无法连接到其实时服务。如果不修复，这将在 UI 上造成异常问题！请查看相关文档 (https://coolify.io/docs/knowledge-base/cloudflare/tunnels/overview) 或在 Discord 上寻求帮助 (https://coollabs.io/discord)。',
     'subject' => '主题',
-    'description' => '描述',
     'your_feedback_helps' => '您的反馈有助于我们改进 Coolify。谢谢！💜',
-];
 
     // 通用词汇
     'warning' => '警告',
