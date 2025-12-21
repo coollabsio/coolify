@@ -3,7 +3,7 @@
         Project Variables | Coolify
     </x-slot>
     <div class="flex gap-2">
-        <h1>Projects</h1>
+        <h1>{{ __('common.project') }}</h1>
     </div>
     <div class="subtitle">{{ __('shared.list_projects') }}</div>
     <div class="flex flex-col gap-2">

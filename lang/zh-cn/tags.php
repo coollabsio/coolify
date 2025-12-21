@@ -15,4 +15,6 @@ return [
     'redeploy_all_action_2' => '重新部署期间，资源将暂时不可用。',
     'confirm_tag_name_label' => '请在下方输入标签名称以确认执行操作',
     'tag_name' => '标签名称',
+    'tags_help_desc' => '标签帮助您对多个资源执行操作。',
+    'no_tags_defined' => '尚未定义标签。请转到资源并在此处添加标签。',
 ];

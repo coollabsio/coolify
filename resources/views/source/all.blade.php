@@ -3,14 +3,14 @@
         Sources | Coolify
     </x-slot>
     <div class="flex items-center gap-2">
-        <h1>Sources</h1>
+        <h1>{{ __('source.title') }}</h1>
         @can('createAnyResource')
             <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_github_app') }}" :closeOutside="false">
                 <livewire:source.github.create />
             </x-modal-input>
         @endcan
     </div>
-    <div class="subtitle">Git sources for your applications.</div>
+    <div class="subtitle">{{ __('source.git_sources_desc') }}</div>
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
@@ -32,7 +32,7 @@
             @endif
         @empty
             <div>
-                <div>No sources found.</div>
+                <div>{{ __('source.no_sources_found') }}</div>
             </div>
         @endforelse
     </div>

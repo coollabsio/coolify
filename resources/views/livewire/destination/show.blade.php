@@ -14,15 +14,15 @@
         </div>
 
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-            <div class="subtitle ">A simple Docker network.</div>
+            <div class="subtitle ">{{ __('destination.simple_docker_network') }}</div>
         @else
-            <div class="subtitle ">A swarm Docker network. WIP</div>
+            <div class="subtitle ">{{ __('destination.swarm_docker_network') }}</div>
         @endif
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$destination" id="name" label="Name" />
-            <x-forms.input id="serverIp" label="Server IP" readonly />
+            <x-forms.input canGate="update" :canResource="$destination" id="name" label="{{ __('common.name') }}" />
+            <x-forms.input id="serverIp" label="{{ __('destination.server_ip') }}" readonly />
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-                <x-forms.input id="network" label="Docker Network" readonly />
+                <x-forms.input id="network" label="{{ __('destination.docker_network') }}" readonly />
             @endif
         </div>
     </form>

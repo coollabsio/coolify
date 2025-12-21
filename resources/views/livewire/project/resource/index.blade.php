@@ -4,24 +4,24 @@
     </x-slot>
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
-            <h1>Resources</h1>
+            <h1>{{ __('menu.resources') }}</h1>
             @if ($environment->isEmpty())
                 @can('createAnyResource')
                     <a class="button" {{ wireNavigate() }}
                         href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
+                        {{ __('menu.clone') }}
                     </a>
                 @endcan
             @else
                 @can('createAnyResource')
                     <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" {{ wireNavigate() }}
-                        class="button">+
-                        New</a>
+                        class="button">{{ __('button.add') }}
+                    </a>
                 @endcan
                 @can('createAnyResource')
                     <a class="button" {{ wireNavigate() }}
                         href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
+                        {{ __('menu.clone') }}
                     </a>
                 @endcan
             @endif
@@ -259,42 +259,42 @@
                                                     class="pl-1">
                                                     <div class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                                     @if ($resType === 'application')
-                                                        <a href="{{ route('project.application.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                        <a href="{{ route('project.application.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment Variables</a>
-                                                        <a href="{{ route('project.application.persistent-storage', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent Storage</a>
-                                                        <a href="{{ route('project.application.source', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Source</a>
-                                                        <a href="{{ route('project.application.servers', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                        <a href="{{ route('project.application.scheduled-tasks.show', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled Tasks</a>
-                                                        <a href="{{ route('project.application.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                        <a href="{{ route('project.application.preview-deployments', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Preview Deployments</a>
-                                                        <a href="{{ route('project.application.healthcheck', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Healthcheck</a>
-                                                        <a href="{{ route('project.application.rollback', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Rollback</a>
-                                                        <a href="{{ route('project.application.resource-limits', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource Limits</a>
-                                                        <a href="{{ route('project.application.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource Operations</a>
-                                                        <a href="{{ route('project.application.metrics', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                        <a href="{{ route('project.application.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                        <a href="{{ route('project.application.advanced', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Advanced</a>
-                                                        <a href="{{ route('project.application.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger Zone</a>
+                                                        <a href="{{ route('project.application.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.general') }}</a>
+                                                        <a href="{{ route('project.application.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.environment_variables') }}</a>
+                                                        <a href="{{ route('project.application.persistent-storage', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.persistent_storage') }}</a>
+                                                        <a href="{{ route('project.application.source', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.source') }}</a>
+                                                        <a href="{{ route('project.application.servers', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.servers') }}</a>
+                                                        <a href="{{ route('project.application.scheduled-tasks.show', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.scheduled_tasks') }}</a>
+                                                        <a href="{{ route('project.application.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.webhooks') }}</a>
+                                                        <a href="{{ route('project.application.preview-deployments', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.preview_deployments') }}</a>
+                                                        <a href="{{ route('project.application.healthcheck', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.healthcheck') }}</a>
+                                                        <a href="{{ route('project.application.rollback', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.rollback') }}</a>
+                                                        <a href="{{ route('project.application.resource-limits', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.resource_limits') }}</a>
+                                                        <a href="{{ route('project.application.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.resource_operations') }}</a>
+                                                        <a href="{{ route('project.application.metrics', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.metrics') }}</a>
+                                                        <a href="{{ route('project.application.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.tags') }}</a>
+                                                        <a href="{{ route('project.application.advanced', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.advanced') }}</a>
+                                                        <a href="{{ route('project.application.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">{{ __('menu.danger_zone') }}</a>
                                                     @elseif ($resType === 'service')
-                                                        <a href="{{ route('project.service.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                        <a href="{{ route('project.service.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment Variables</a>
-                                                        <a href="{{ route('project.service.storages', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Storages</a>
-                                                        <a href="{{ route('project.service.scheduled-tasks.show', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled Tasks</a>
-                                                        <a href="{{ route('project.service.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                        <a href="{{ route('project.service.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource Operations</a>
-                                                        <a href="{{ route('project.service.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                        <a href="{{ route('project.service.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger Zone</a>
+                                                        <a href="{{ route('project.service.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.general') }}</a>
+                                                        <a href="{{ route('project.service.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.environment_variables') }}</a>
+                                                        <a href="{{ route('project.service.storages', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.storages') }}</a>
+                                                        <a href="{{ route('project.service.scheduled-tasks.show', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.scheduled_tasks') }}</a>
+                                                        <a href="{{ route('project.service.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.webhooks') }}</a>
+                                                        <a href="{{ route('project.service.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.resource_operations') }}</a>
+                                                        <a href="{{ route('project.service.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.tags') }}</a>
+                                                        <a href="{{ route('project.service.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">{{ __('menu.danger_zone') }}</a>
                                                     @else
-                                                        <a href="{{ route('project.database.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                        <a href="{{ route('project.database.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment Variables</a>
-                                                        <a href="{{ route('project.database.servers', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                        <a href="{{ route('project.database.persistent-storage', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent Storage</a>
-                                                        <a href="{{ route('project.database.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                        <a href="{{ route('project.database.resource-limits', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource Limits</a>
-                                                        <a href="{{ route('project.database.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource Operations</a>
-                                                        <a href="{{ route('project.database.metrics', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                        <a href="{{ route('project.database.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                        <a href="{{ route('project.database.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger Zone</a>
+                                                        <a href="{{ route('project.database.configuration', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.general') }}</a>
+                                                        <a href="{{ route('project.database.environment-variables', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.environment_variables') }}</a>
+                                                        <a href="{{ route('project.database.servers', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.servers') }}</a>
+                                                        <a href="{{ route('project.database.persistent-storage', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.persistent_storage') }}</a>
+                                                        <a href="{{ route('project.database.webhooks', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.webhooks') }}</a>
+                                                        <a href="{{ route('project.database.resource-limits', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.resource_limits') }}</a>
+                                                        <a href="{{ route('project.database.resource-operations', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.resource_operations') }}</a>
+                                                        <a href="{{ route('project.database.metrics', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.metrics') }}</a>
+                                                        <a href="{{ route('project.database.tags', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">{{ __('menu.tags') }}</a>
+                                                        <a href="{{ route('project.database.danger', $resParams) }}" class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">{{ __('menu.danger_zone') }}</a>
                                                     @endif
                                                     </div>
                                                 </div>
@@ -312,14 +312,14 @@
     @if ($environment->isEmpty())
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}" {{ wireNavigate() }}
-                class="items-center justify-center coolbox">+ Add Resource</a>
+                class="items-center justify-center coolbox">{{ __('button.add_resource') }}</a>
         @else
             <div
                 class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">
-                <h3 class="mb-2 text-lg font-semibold text-neutral-600 dark:text-neutral-400">No Resources Found</h3>
+                <h3 class="mb-2 text-lg font-semibold text-neutral-600 dark:text-neutral-400">{{ __('project.no_resources_found') }}</h3>
                 <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    This environment doesn't have any resources yet.<br>
-                    Contact your team administrator to add resources.
+                    {{ __('project.no_resources_desc') }}<br>
+                    {{ __('project.contact_team_admin') }}
                 </p>
             </div>
         @endcan
@@ -336,10 +336,10 @@
                             criteria.</p>
                     </div>
                     <div x-show="search.length === 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resources found in this environment.</p>
+                        <p class="text-neutral-600 dark:text-neutral-400">{{ __('project.no_resources_in_environment') }}</p>
                         @cannot('createAnyResource')
-                            <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Contact your team administrator
-                                to add resources.</p>
+                            <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">{{ __('project.contact_team_admin') }}
+                            </p>
                         @endcannot
                     </div>
                 </div>

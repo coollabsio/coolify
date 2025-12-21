@@ -107,4 +107,8 @@ return [
     'github_app_name_confirmation' => '请在下方输入 GitHub 应用名称以确认执行操作',
     'storage_name_confirmation' => '请在下方输入存储名称以确认执行操作',
     'server_name_confirmation' => '请在下方输入服务器名称以确认执行操作',
+    'confirm_proxy_restart' => '确认重启代理？',
+    'restart_proxy' => '重启代理',
+    'confirm_proxy_stopping' => '确认停止代理？',
+    'stop_proxy' => '停止代理',
 ];

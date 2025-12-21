@@ -3,7 +3,7 @@
         {{ data_get_str($project, 'name')->limit(10) }} > Environments | Coolify
     </x-slot>
     <div class="flex items-center gap-2">
-        <h1>Environments</h1>
+        <h1>{{ __('common.environment') }}</h1>
         @can('update', $project)
             <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_environment') }}">
                 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>

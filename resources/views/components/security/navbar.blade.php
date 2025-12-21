@@ -1,23 +1,23 @@
 <div class="pb-6">
-    <h1>Security</h1>
-    <div class="subtitle">Security related settings.</div>
+    <h1>{{ __('menu.security') }}</h1>
+    <div class="subtitle">{{ __('shared.security_related_settings') }}</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 scrollbar min-h-10">
             <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
-                <button>Private Keys</button>
+                <button>{{ __('menu.private_key') }}</button>
             </a>
             @can('viewAny', App\Models\CloudProviderToken::class)
                 <a href="{{ route('security.cloud-tokens') }}" {{ wireNavigate() }}>
-                    <button>Cloud Tokens</button>
+                    <button>{{ __('security.cloud_tokens') }}</button>
                 </a>
             @endcan
             @can('viewAny', App\Models\CloudInitScript::class)
                 <a href="{{ route('security.cloud-init-scripts') }}" {{ wireNavigate() }}>
-                    <button>Cloud-Init Scripts</button>
+                    <button>{{ __('security.cloud_init_scripts') }}</button>
                 </a>
             @endcan
             <a href="{{ route('security.api-tokens') }}" {{ wireNavigate() }}>
-                <button>API Tokens</button>
+                <button>{{ __('security.api_tokens') }}</button>
             </a>
         </nav>
     </div>

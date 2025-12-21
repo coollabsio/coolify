@@ -1,8 +1,8 @@
 <div>
     <div class="flex items-start gap-2 pb-10">
         <div>
-            <h1 class="pb-2">Tags</h1>
-            <div>Tags help you to perform actions on multiple resources.</div>
+            <h1 class="pb-2">{{ __('tags.title') }}</h1>
+            <div>{{ __('tags.tags_help_desc') }}</div>
         </div>
     </div>
     <div class="flex flex-wrap gap-2 ">
@@ -12,7 +12,7 @@
                 {{ wireNavigate() }}
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ data_get_str($oneTag, 'name')->limit(30) }}</a>
         @empty
-            <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
+            <div>{{ __('tags.no_tags_defined') }}</div>
         @endforelse
     </div>
     @if (isset($tag))

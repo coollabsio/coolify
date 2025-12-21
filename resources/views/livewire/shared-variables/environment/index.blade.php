@@ -3,7 +3,7 @@
         Environment Variables | Coolify
     </x-slot>
     <div class="flex gap-2">
-        <h1>Environments</h1>
+        <h1>{{ __('common.environment') }}</h1>
     </div>
     <div class="subtitle">{{ __('shared.list_environments') }}</div>
     <div class="flex flex-col gap-2">

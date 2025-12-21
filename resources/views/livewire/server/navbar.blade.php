@@ -18,7 +18,7 @@
             <div class="flex">
                 <div class="flex items-center">
                     @if ($proxyStatus === 'running')
-                        <x-status.running status="Proxy Running" noLoading />
+                        <x-status.running status="{{ __('menu.proxy_running') }}" noLoading />
                     @elseif ($proxyStatus === 'restarting')
                         <x-status.restarting status="Proxy Restarting" noLoading />
                     @elseif ($proxyStatus === 'stopping')
@@ -66,14 +66,14 @@
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
     'server_uuid' => data_get($server, 'uuid'),
 ]) }}" {{ wireNavigate() }}>
-                Configuration
+                {{ __('menu.configuration') }}
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
                         <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
-                            Proxy
+                            {{ __('menu.proxy') }}
                             @if ($this->hasTraefikOutdated)
                                 <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="currentColor"
@@ -85,13 +85,13 @@
             <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}" href="{{ route('server.resources', [
     'server_uuid' => data_get($server, 'uuid'),
 ]) }}" {{ wireNavigate() }}>
-                Resources
+                {{ __('menu.resources') }}
             </a>
             @can('canAccessTerminal')
                         <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}" href="{{ route('server.command', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
-                            Terminal
+                            {{ __('menu.terminal') }}
                         </a>
             @endcan
             @can('update', $server)
@@ -122,7 +122,7 @@
                                     submitAction="restart" :actions="[
                             'This proxy will be stopped and started again.',
                             'All resources hosted on coolify will be unavailable during the restart.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
+                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="{{ __('menu.restart_proxy') }}"
                                     :dispatchEvent="true" dispatchEventType="restartEvent">
                                     <x-slot:button-title>
                                         <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
@@ -133,7 +133,7 @@
                                                 <path d="M20 4v5h-5" />
                                             </g>
                                         </svg>
-                                        Restart Proxy
+                                        {{ __('menu.restart_proxy') }}
                                     </x-slot:button-title>
                                 </x-modal-confirmation>
                                 <x-modal-confirmation title="{{ __('modal.confirm_proxy_stopping') }}" buttonTitle="{{ __('modal.stop_proxy') }}"
@@ -141,7 +141,7 @@
                             'The coolify proxy will be stopped.',
                             'All resources hosted on coolify will be unavailable.',
                         ]" :confirmWithText="false"
-                                    :confirmWithPassword="false" step2ButtonText="Stop Proxy" :dispatchEvent="true"
+                                    :confirmWithPassword="false" step2ButtonText="{{ __('menu.stop_proxy') }}" :dispatchEvent="true"
                                     dispatchEventType="stopEvent">
                                     <x-slot:button-title>
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
@@ -154,7 +154,7 @@
                                                 d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
                                             </path>
                                         </svg>
-                                        Stop Proxy
+                                        {{ __('menu.stop_proxy') }}
                                     </x-slot:button-title>
                                 </x-modal-confirmation>
                             </div>

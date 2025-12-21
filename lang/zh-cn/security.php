@@ -5,6 +5,7 @@ return [
     'api_tokens' => 'API 令牌',
     'private_keys' => '私钥',
     'cloud_provider_tokens' => '云提供商令牌',
+    'cloud_tokens' => '云令牌',
     'cloud_init_scripts' => 'Cloud-Init 脚本',
     'create_token' => '创建令牌',
     'create_key' => '创建私钥',

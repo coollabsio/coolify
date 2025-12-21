@@ -27,4 +27,8 @@ return [
     'reload_list' => '重新加载列表',
     'add_database' => '添加数据库',
     'new_project_default_env' => '新项目将拥有一个默认的 <span class="dark:text-warning font-bold">production</span> 环境。',
+    'no_resources_found' => '未找到资源',
+    'no_resources_desc' => '此环境目前没有任何资源。',
+    'contact_team_admin' => '请联系您的团队管理员添加资源。',
+    'no_resources_in_environment' => '此环境中未找到资源。',
 ];
