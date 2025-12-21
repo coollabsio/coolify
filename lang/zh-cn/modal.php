@@ -77,7 +77,6 @@ return [
     'confirm_preview_deployment_name_label' => '请在下方输入预览部署名称以确认执行操作',
     'restore_database_from_file' => '从文件恢复数据库',
     'restore_from_file' => '从文件恢复',
-];
     'confirm_user_deletion' => '确认删除用户？',
     'confirm_environment_deletion' => '确认删除环境？',
     'confirm_project_deletion' => '确认删除项目？',

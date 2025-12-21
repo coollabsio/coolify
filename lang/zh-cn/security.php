@@ -108,7 +108,6 @@ return [
     'create' => '创建',
     'permissions_hint' => '这些权限将被授予令牌。',
     'please_select_webhook_endpoint' => '请选择 webhook 端点。',
-];
     'token_permissions' => '令牌权限',
     'root_access' => 'Root 权限',
     'root_access_careful' => 'Root 权限，请小心！',
