@@ -1,7 +1,7 @@
 <div class="pb-6">
     <div class="flex items-end gap-2">
         <h1>Team</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Team">
+        <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_team') }}">
             <livewire:team.create />
         </x-modal-input>
     </div>

@@ -26,7 +26,7 @@
                                         : 'Users will be able to access terminal views from the UI.',
                                     'This change will take effect immediately.',
                                 ]" confirmationText="{{ $server->name }}"
-                                shortConfirmationLabel="Server Name"
+                                shortConfirmationLabel="{{ __('server.name') }}"
                                 step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
                                 isHighlightedButton>
                             </x-modal-confirmation>

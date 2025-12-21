@@ -5,7 +5,7 @@
     <div class="flex items-center gap-2">
         <h1>Sources</h1>
         @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
+            <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_github_app') }}" :closeOutside="false">
                 <livewire:source.github.create />
             </x-modal-input>
         @endcan

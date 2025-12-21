@@ -9,7 +9,7 @@
             <div class="flex items-end gap-2">
                 <h2>Private Key</h2>
                 @can('createAnyResource')
-                    <x-modal-input buttonTitle="+ Add" title="New Private Key">
+                    <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_private_key') }}">
                         <livewire:security.private-key.create />
                     </x-modal-input>
                 @endcan

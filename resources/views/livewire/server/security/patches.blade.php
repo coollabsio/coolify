@@ -43,17 +43,16 @@
                                     @endif
                                     @if (isset($updates) && count($updates) > 0)
                                         <div class="pb-2">
-                                            <x-modal-confirmation title="Confirm package update?"
-                                                buttonTitle="Update All
-                                            Packages"
+                                            <x-modal-confirmation title="{{ __('server.confirm_package_update') }}"
+                                                buttonTitle="{{ __('button.update_all') }}"
                                                 isHighlightedButton submitAction="updateAllPackages" dispatchAction
                                                 :actions="[
                                                     'All packages will be updated to the latest version.',
                                                     'This action could restart your currently running containers if docker will be updated.',
                                                 ]" confirmationText="Update All Packages"
-                                                confirmationLabel="Please confirm the execution of the actions by entering the name below"
-                                                shortConfirmationLabel="Name" :confirmWithPassword=false
-                                                step2ButtonText="Update All
+                                                confirmationLabel="{{ __('modal.update_all_packages_confirmation') }}"
+                                                shortConfirmationLabel="{{ __('modal.name') }}" :confirmWithPassword=false
+                                                step2ButtonText="{{ __('button.update_all') }}
                                             Packages" />
                                         </div>
                                         <div class="overflow-x-auto">
@@ -96,7 +95,7 @@
                                                             </td>
                                                             <td class="whitespace-nowrap">
                                                                 <x-forms.button type="button"
-                                                                    wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">Update</x-forms.button>
+                                                                    wire:click="$dispatch('updatePackage', { package: '{{ data_get($update, 'package') }}' })">{{ __('button.update') }}</x-forms.button>
                                                             </td>
                                                         </tr>
                                                     @endforeach

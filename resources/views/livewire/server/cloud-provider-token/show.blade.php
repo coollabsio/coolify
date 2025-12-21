@@ -10,7 +10,7 @@
                 <div class="flex items-end gap-2">
                     <h2>Hetzner Token</h2>
                     @can('create', App\Models\CloudProviderToken::class)
-                        <x-modal-input buttonTitle="+ Add" title="Add Hetzner Token">
+                        <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.add_hetzner_token') }}">
                             <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
                         </x-modal-input>
                     @endcan

@@ -27,8 +27,8 @@
                         'The selected storage location will be permanently deleted from Coolify.',
                         'If the storage location is in use by any backup jobs those backup jobs will only store the backup locally on the server.',
                     ]" confirmationText="{{ $storage->name }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
-                    shortConfirmationLabel="Storage Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+                    confirmationLabel="{{ __('modal.storage_name_confirmation') }}"
+                    shortConfirmationLabel="{{ __('storage.name') }}" :confirmWithPassword="false" step2ButtonText="{{ __('button.permanently_delete') }}" />
             @endcan
         </div>
         <div class="flex gap-2">

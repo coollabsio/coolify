@@ -5,11 +5,11 @@
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
         @can('update', $project)
-            <x-modal-input buttonTitle="+ Add" title="New Environment">
+            <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_environment') }}">
                 <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
                     <x-forms.input placeholder="{{ __('forms.placeholders.environment_name') }}" id="name" label="Name" required />
                     <x-forms.button type="submit">
-                        Save
+                        {{ __('button.save') }}
                     </x-forms.button>
                 </form>
             </x-modal-input>

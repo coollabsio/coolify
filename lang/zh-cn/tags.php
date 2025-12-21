@@ -9,4 +9,10 @@ return [
     'assigned_tags' => '已分配标签',
     'existing_tags' => '现有标签',
     'click_to_add' => '点击快速添加',
+    'redeploy_all_title' => '重新部署所有带此标签的资源？',
+    'redeploy_all' => '全部重新部署',
+    'redeploy_all_action_1' => '所有带此标签的资源将被重新部署。',
+    'redeploy_all_action_2' => '重新部署期间，资源将暂时不可用。',
+    'confirm_tag_name_label' => '请在下方输入标签名称以确认执行操作',
+    'tag_name' => '标签名称',
 ];

@@ -10,7 +10,7 @@
                 <div class="flex items-end gap-2">
                     <h2>Destinations</h2>
                     @can('update', $server)
-                        <x-modal-input buttonTitle="+ Add" title="New Destination">
+                        <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_destination') }}">
                             <livewire:destination.new.docker :server_id="$server->id" />
                         </x-modal-input>
                     @endcan

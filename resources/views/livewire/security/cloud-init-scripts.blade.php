@@ -3,7 +3,7 @@
     <div class="flex gap-2">
         <h2 class="pb-4">{{ __('security.cloud_init_scripts') }}</h2>
         @can('create', App\Models\CloudInitScript::class)
-            <x-modal-input buttonTitle="+ Add" title="{{ __('modal.new_cloud_init_script') }}">
+            <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_cloud_init_script') }}">
                 <livewire:security.cloud-init-script-form />
             </x-modal-input>
         @endcan

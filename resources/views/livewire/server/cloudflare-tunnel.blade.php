@@ -30,27 +30,27 @@
                         </x-callout>
                         <div class="w-64">
                             @if ($server->ip_previous)
-                                <x-modal-confirmation title="Disable Cloudflare Tunnel?"
-                                    buttonTitle="Disable Cloudflare Tunnel" isErrorButton
+                                <x-modal-confirmation title="{{ __('server.confirm_disable_cloudflare_tunnel') }}"
+                                    buttonTitle="{{ __('server.disable_cloudflare_tunnel') }}" isErrorButton
                                     submitAction="toggleCloudflareTunnels" :actions="[
-                                        'Cloudflare Tunnel will be disabled for this server.',
-                                        'The server IP address will be updated to its previous IP address.',
+                                        __('server.disable_cloudflare_tunnel_action_1'),
+                                        __('server.disable_cloudflare_tunnel_action_2'),
                                     ]"
                                     confirmationText="DISABLE CLOUDFLARE TUNNEL"
-                                    confirmationLabel="Please type the confirmation text to disable Cloudflare Tunnel."
-                                    shortConfirmationLabel="Confirmation text" />
+                                    confirmationLabel="{{ __('modal.disable_cloudflare_tunnel_confirmation') }}"
+                                    shortConfirmationLabel="{{ __('modal.confirmation_text') }}" />
                             @else
-                                <x-modal-confirmation title="Disable Cloudflare Tunnel?"
-                                    buttonTitle="Disable Cloudflare Tunnel" isErrorButton
+                                <x-modal-confirmation title="{{ __('server.confirm_disable_cloudflare_tunnel') }}"
+                                    buttonTitle="{{ __('server.disable_cloudflare_tunnel') }}" isErrorButton
                                     submitAction="toggleCloudflareTunnels" :actions="[
-                                        'Cloudflare Tunnel will be disabled for this server.',
-                                        'You will need to update the server IP address to its real IP address.',
+                                        __('server.disable_cloudflare_tunnel_action_1'),
+                                        __('server.disable_cloudflare_tunnel_action_2'),
                                         'The server may become inaccessible if the IP address is not updated correctly.',
                                         'SSH access will revert to the standard port configuration.',
                                     ]"
                                     confirmationText="DISABLE CLOUDFLARE TUNNEL"
-                                    confirmationLabel="Please type the confirmation text to disable Cloudflare Tunnel."
-                                    shortConfirmationLabel="Confirmation text" />
+                                    confirmationLabel="{{ __('modal.disable_cloudflare_tunnel_confirmation') }}"
+                                    shortConfirmationLabel="{{ __('modal.confirmation_text') }}" />
                             @endif
 
                         </div>
@@ -113,14 +113,14 @@
             <h3 class="pt-6 pb-2">Manual</h3>
             <div class="pl-2">
                 @can('update', $server)
-                    <x-modal-confirmation buttonFullWidth title="I manually configured Cloudflare Tunnel?"
-                        buttonTitle="I manually configured Cloudflare Tunnel" submitAction="manualCloudflareConfig"
+                    <x-modal-confirmation buttonFullWidth title="{{ __('server.confirm_manually_configured_cloudflare_tunnel') }}"
+                        buttonTitle="{{ __('server.manually_configured_cloudflare_tunnel') }}" submitAction="manualCloudflareConfig"
                         :actions="[
                             'You set everything up manually, including in Cloudflare and on the server (cloudflared is running).',
                             'If you missed something, the connection will not work.',
                         ]" confirmationText="I manually configured Cloudflare Tunnel"
-                        confirmationLabel="Please type the confirmation text to confirm that you manually configured Cloudflare Tunnel."
-                        shortConfirmationLabel="Confirmation text" />
+                        confirmationLabel="{{ __('modal.manually_configured_cloudflare_tunnel_confirmation') }}"
+                        shortConfirmationLabel="{{ __('modal.confirmation_text') }}" />
                 @else
                     <x-callout type="warning" title="Permission Required" class="mb-4">
                         You don't have permission to configure Cloudflare Tunnel for this server.

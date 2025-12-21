@@ -29,8 +29,8 @@
                 @endif
 
                 <x-modal-input isFullWidth
-                    buttonTitle="{{ $available_tokens->count() > 0 ? '+ Add New Token' : 'Add Hetzner Token' }}"
-                    title="Add Hetzner Token">
+                    buttonTitle="{{ $available_tokens->count() > 0 ? __('button.add_new_token') : __('modal.add_hetzner_token') }}"
+                    title="{{ __('modal.add_hetzner_token') }}">
                     <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
                 </x-modal-input>
             </div>
@@ -115,7 +115,7 @@
                                     <p class="text-sm mb-3 text-neutral-700 dark:text-neutral-300">
                                         No private keys found. You need to create a private key to continue.
                                     </p>
-                                    <x-modal-input buttonTitle="Create New Private Key" title="New Private Key" isHighlightedButton>
+                                    <x-modal-input buttonTitle="{{ __('common.create') }} {{ __('modal.new_private_key') }}" title="{{ __('modal.new_private_key') }}" isHighlightedButton>
                                         <livewire:security.private-key.create :modal_mode="true" from="server" />
                                     </x-modal-input>
                                 </div>

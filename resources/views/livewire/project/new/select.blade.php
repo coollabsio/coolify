@@ -541,7 +541,7 @@
         <form wire:submit='addExistingPostgresql' class="flex items-end gap-4">
             <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
                 id="existingPostgresqlUrl" />
-            <x-forms.button type="submit">Add Database</x-forms.button>
+            <x-forms.button type="submit">{{ __('button.add_database') }}</x-forms.button>
         </form>
     @endif
 </div>

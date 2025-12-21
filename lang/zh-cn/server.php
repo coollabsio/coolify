@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'name' => '服务器名称',
     'general' => '常规',
     'checking_status' => '检查状态中...',
     'refresh_status' => '刷新状态',
@@ -116,4 +117,19 @@ return [
 
     // Resources
     'resources_managed_desc' => '这里您可以找到所有由 Coolify 管理的资源。',
+
+    // Cloudflare Tunnel
+    'disable_cloudflare_tunnel' => '禁用 Cloudflare Tunnel',
+    'confirm_disable_cloudflare_tunnel' => '确认禁用 Cloudflare Tunnel？',
+    'disable_cloudflare_tunnel_action_1' => '此服务器的 Cloudflare Tunnel 将被禁用。',
+    'disable_cloudflare_tunnel_action_2' => '服务器 IP 地址将更新为其之前的 IP 地址。',
+    'manually_configured_cloudflare_tunnel' => '我已手动配置 Cloudflare Tunnel',
+    'confirm_manually_configured_cloudflare_tunnel' => '您已手动配置 Cloudflare Tunnel？',
+
+    // Security Patches
+    'confirm_package_update' => '确认更新软件包？',
+    'update_all_packages' => '全部更新软件包',
+
+    // Sentinel
+    'regenerate_sentinel_token' => '重新生成 Sentinel Token',
 ];

@@ -1,7 +1,7 @@
 @can('manageInvitations', currentTeam())
     <div>
         @if ($invitations->count() > 0)
-            <h2 class="pb-2">Pending Invitations</h2>
+            <h2 class="pb-2">{{ __('team.pending_invitations') }}</h2>
             <div class="flex flex-col">
                 <div class="flex flex-col">
                     <div class="overflow-x-auto">
@@ -10,14 +10,14 @@
                                 <table class="min-w-full">
                                     <thead>
                                         <tr>
-                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email
+                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">{{ __('team.table_email') }}
                                             </th>
                                             <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                Via</th>
-                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">Role</th>
-                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">Invitation Link
+                                                {{ __('team.table_via') }}</th>
+                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">{{ __('team.table_role') }}</th>
+                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">{{ __('team.table_invitation_link') }}
                                             </th>
-                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions
+                                            <th class="px-5 py-3 text-xs font-medium text-left uppercase">{{ __('team.table_actions') }}
                                             </th>
                                         </tr>
                                     </thead>
@@ -33,9 +33,8 @@
                                                             <x-forms.input id="null" type="password"
                                                                 value="{{ $invite->link }}" />
                                                             <x-forms.button
-                                                                x-on:click="copyToClipboard('{{ $invite->link }}')">Copy
-                                                                Invitation
-                                                                Link</x-forms.button>
+                                                                x-on:click="copyToClipboard('{{ $invite->link }}')">{{ __('team.copy_invitation_link') }}
+                                                            </x-forms.button>
                                                         </div>
                                                     </template>
                                                     <template x-if="!isHttps">
@@ -45,8 +44,7 @@
                                                 </td>
                                                 <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                     <x-forms.button
-                                                        wire:click.prevent='deleteInvitation({{ $invite->id }})'>Revoke
-                                                        Invitation
+                                                        wire:click.prevent='deleteInvitation({{ $invite->id }})'>{{ __('team.revoke_invitation') }}
                                                     </x-forms.button>
                                                 </td>
                                             </tr>

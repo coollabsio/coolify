@@ -7,15 +7,15 @@
         <div class="flex items-center gap-2">
             <h2>Transactional Email</h2>
             <x-forms.button type="submit">
-                Save
+                {{ __('button.save') }}
             </x-forms.button>
             @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
-                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
+                <x-modal-input buttonTitle="{{ __('modal.send_test_email') }}" title="{{ __('modal.send_test_email') }}">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
                         <x-forms.input wire:model="testEmailAddress" placeholder="{{ __('forms.placeholders.test_email') }}" id="testEmailAddress"
                             label="Recipient" required />
                         <x-forms.button type="submit" @click="modalOpen=false">
-                            Send Email
+                            {{ __('common.send') }}
                         </x-forms.button>
                     </form>
                 </x-modal-input>
@@ -33,7 +33,7 @@
                 <div class="flex gap-2">
                     <h3>SMTP Server</h3>
                     <x-forms.button type="submit">
-                        Save
+                        {{ __('button.save') }}
                     </x-forms.button>
                 </div>
                 <div class="w-32">
@@ -63,7 +63,7 @@
                 <div class="flex gap-2">
                     <h3>Resend</h3>
                     <x-forms.button type="submit">
-                        Save
+                        {{ __('button.save') }}
                     </x-forms.button>
                 </div>
                 <div class="w-32">

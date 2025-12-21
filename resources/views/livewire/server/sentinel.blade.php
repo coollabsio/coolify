@@ -82,7 +82,7 @@
                             <x-forms.input canGate="update" :canResource="$server" type="password" id="sentinelToken"
                                 label="Sentinel token" required helper="Token for Sentinel." />
                             <x-forms.button canGate="update" :canResource="$server"
-                                wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
+                                wire:click="regenerateSentinelToken">{{ __('button.regenerate') }}</x-forms.button>
                         </div>
 
                         <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl" required

@@ -22,14 +22,14 @@
                 <div class="w-[500px]">
                     <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
                 </div>
-                <x-modal-confirmation title="Redeploy all resources with this tag?" isHighlighted
-                    buttonTitle="Redeploy All" submitAction="redeployAll" :actions="[
-                        'All resources with this tag will be redeployed.',
-                        'During redeploy resources will be temporarily unavailable.',
+                <x-modal-confirmation title="{{ __('tags.redeploy_all_title') }}" isHighlighted
+                    buttonTitle="{{ __('tags.redeploy_all') }}" submitAction="redeployAll" :actions="[
+                        __('tags.redeploy_all_action_1'),
+                        __('tags.redeploy_all_action_2'),
                     ]"
                     confirmationText="{{ $tag->name }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
-                    shortConfirmationLabel="Tag Name" :confirmWithPassword="false" step2ButtonText="Redeploy All" />
+                    confirmationLabel="{{ __('tags.confirm_tag_name_label') }}"
+                    shortConfirmationLabel="{{ __('tags.tag_name') }}" :confirmWithPassword="false" step2ButtonText="{{ __('tags.redeploy_all') }}" />
             </div>
 
             <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">

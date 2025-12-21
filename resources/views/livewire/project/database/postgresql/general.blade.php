@@ -186,7 +186,7 @@
 
                 <h3>{{ __('database.initialization_scripts') }}</h3>
                 @can('update', $database)
-                    <x-modal-input buttonTitle="+ Add" title="{{ __('database.new_init_script') }}">
+                    <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('database.new_init_script') }}">
                         <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
                             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="{{ __('database.filename') }}"
                                 required />

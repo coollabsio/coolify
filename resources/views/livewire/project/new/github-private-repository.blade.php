@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
+        <x-modal-input buttonTitle="{{ __('button.add_github_app') }}" title="{{ __('modal.new_github_app') }}" closeOutside="false">
             <livewire:source.github.create />
         </x-modal-input>
         @if ($repositories->count() > 0)
@@ -58,7 +58,7 @@
                                 @endforeach
                             </x-forms.select>
                         </div>
-                        <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
+                        <x-forms.button wire:click.prevent="loadBranches">{{ __('button.load_repository') }}</x-forms.button>
                     </div>
                 @else
                     <div>No repositories found. Check your GitHub App configuration.</div>
@@ -145,7 +145,7 @@
                                 @endif
                             </div>
                             <x-forms.button type="submit">
-                                Continue
+                                {{ __('button.continue') }}
                             </x-forms.button>
                 @endif
             @endif

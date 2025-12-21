@@ -21,13 +21,13 @@
                     </x-forms.button>
                 </div>
             @endif
-            <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
+            <x-forms.button wire:click='cleanupFailed'>{{ __('button.cleanup_failed_backups') }}</x-forms.button>
             <x-modal-confirmation title="{{ __('modal.cleanup_deleted_backup_entries') }}" buttonTitle="{{ __('modal.cleanup_deleted') }}" isErrorButton
                 submitAction="cleanupDeleted()" 
                 :actions="['This will permanently delete all backup execution entries that are marked as deleted from local storage.', 'This only removes database entries, not actual backup files.']" 
                 confirmationText="cleanup deleted backups"
-                confirmationLabel="Please confirm by typing 'cleanup deleted backups' below"
-                shortConfirmationLabel="Confirmation" />
+                confirmationLabel="{{ __('modal.cleanup_deleted_backups_confirmation') }}"
+                shortConfirmationLabel="{{ __('modal.confirmation') }}" />
         </div>
         <div @if (!$skip) wire:poll.5000ms="refreshBackupExecutions" @endif
             class="flex flex-col gap-4">
@@ -157,7 +157,7 @@
                     <div class="flex gap-2 mt-4">
                         @if (data_get($execution, 'status') === 'success')
                             <x-forms.button class="dark:hover:bg-coolgray-400"
-                                x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
+                                x-on:click="download_file('{{ data_get($execution, 'id') }}')">{{ __('button.download') }}</x-forms.button>
                         @endif
                         @php
                             $executionCheckboxes = [];
@@ -178,8 +178,8 @@
                         <x-modal-confirmation title="{{ __('modal.confirm_backup_deletion') }}" buttonTitle="{{ __('modal.delete_backup') }}" isErrorButton
                             submitAction="deleteBackup({{ data_get($execution, 'id') }})" :checkboxes="$executionCheckboxes"
                             :actions="$deleteActions" confirmationText="{{ data_get($execution, 'filename') }}"
-                            confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
-                            shortConfirmationLabel="Backup Filename" 1 />
+                            confirmationLabel="{{ __('modal.delete_backup_confirmation') }}"
+                            shortConfirmationLabel="{{ __('modal.backup_filename') }}" 1 />
                     </div>
                 </div>
             @empty

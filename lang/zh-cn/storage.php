@@ -47,5 +47,6 @@ return [
     'convert_to_directory' => '转换为目录',
     'is_based_on_git' => '这是基于 Git 仓库的吗？',
     'content_refreshed' => '内容（部署成功后刷新）',
-    'content_outdated_helper' => '显示的内容可能已过时。点击“从服务器加载”以获取最新版本。',
+    'content_outdated_helper' => '显示的内容可能已过时。点击"从服务器加载"以获取最新版本。',
+    'name' => '存储名称',
 ];

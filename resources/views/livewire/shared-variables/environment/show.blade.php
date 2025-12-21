@@ -5,7 +5,7 @@
     <div class="flex gap-2">
         <h1>Shared Variables for {{ $project->name }}/{{ $environment->name }}</h1>
         @can('update', $environment)
-            <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
+            <x-modal-input buttonTitle="{{ __('button.add') }}" title="{{ __('modal.new_shared_variable') }}">
                 <livewire:project.shared.environment-variable.add :shared="true" />
             </x-modal-input>
         @endcan
