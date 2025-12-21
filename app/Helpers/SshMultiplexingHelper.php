@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -201,14 +202,52 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
+    /**
+     * Validate that the SSH key file exists and contains the correct content.
+     *
+     * This method addresses sporadic "Permission denied (publickey)" errors that can occur
+     * when the SSH key file content becomes stale or mismatched with the database.
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7724
+     */
     private static function validateSshKey(PrivateKey $privateKey): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $disk = Storage::disk('ssh-keys');
+        $filename = "ssh_key@{$privateKey->uuid}";
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        if (! $disk->exists($filename)) {
+            Log::debug('SSH key file not found, storing key', [
+                'key_uuid' => $privateKey->uuid,
+            ]);
             $privateKey->storeInFileSystem();
+
+            return;
+        }
+
+        // Verify file content matches database to prevent stale key issues
+        $storedContent = $disk->get($filename);
+        if ($storedContent !== $privateKey->private_key) {
+            Log::warning('SSH key file content mismatch detected, re-storing key', [
+                'key_uuid' => $privateKey->uuid,
+            ]);
+            $privateKey->storeInFileSystem();
+
+            // Invalidate any multiplexed connections that may be using the old key
+            foreach ($privateKey->servers as $server) {
+                try {
+                    self::removeMuxFile($server);
+                    Log::debug('Invalidated mux connection due to key content mismatch', [
+                        'server_uuid' => $server->uuid,
+                        'key_uuid' => $privateKey->uuid,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to invalidate mux connection during key validation', [
+                        'server_uuid' => $server->uuid,
+                        'key_uuid' => $privateKey->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
         }
     }
 
