@@ -67,11 +67,6 @@ class GetLogs extends Component
         }
     }
 
-    public function doSomethingWithThisChunkOfOutput($output)
-    {
-        $this->outputs .= removeAnsiColors($output);
-    }
-
     public function instantSave()
     {
         if (! is_null($this->resource)) {
@@ -162,21 +157,30 @@ class GetLogs extends Component
                     $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             }
-            if ($refresh) {
-                $this->outputs = '';
-            }
-            Process::run($sshCommand, function (string $type, string $output) {
-                $this->doSomethingWithThisChunkOfOutput($output);
+            // Collect new logs into temporary variable first to prevent flickering
+            // (avoids clearing output before new data is ready)
+            $newOutputs = '';
+            Process::run($sshCommand, function (string $type, string $output) use (&$newOutputs) {
+                $newOutputs .= removeAnsiColors($output);
             });
+
             if ($this->showTimeStamps) {
-                $this->outputs = str($this->outputs)->split('/\n/')->sort(function ($a, $b) {
+                $newOutputs = str($newOutputs)->split('/\n/')->sort(function ($a, $b) {
                     $a = explode(' ', $a);
                     $b = explode(' ', $b);
 
                     return $a[0] <=> $b[0];
                 })->join("\n");
             }
+
+            // Only update outputs after new data is ready (atomic update prevents flicker)
+            $this->outputs = $newOutputs;
         }
+    }
+
+    public function copyLogs(): string
+    {
+        return sanitizeLogsForExport($this->outputs);
     }
 
     public function render()

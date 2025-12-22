@@ -3,11 +3,8 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\DeleteServer;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Delete extends Component
@@ -29,12 +26,8 @@ class Delete extends Component
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
         try {
             $this->authorize('delete', $this->server);

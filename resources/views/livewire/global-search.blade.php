@@ -70,6 +70,11 @@
     },
 
     openModal() {
+        // Check if $wire is available (may not be after SPA navigation destroys/recreates component)
+        if (typeof $wire === 'undefined' || !$wire) {
+            console.warn('Global search: $wire not available, skipping open');
+            return;
+        }
         this.modalOpen = true;
         this.selectedIndex = -1;
         this.isLoadingInitialData = true;
@@ -79,6 +84,10 @@
             this.creatableItems = $wire.creatableItems || [];
             this.isLoadingInitialData = false;
             setTimeout(() => this.$refs.searchInput?.focus(), 50);
+        }).catch(() => {
+            // Handle case where component was destroyed during navigation
+            this.modalOpen = false;
+            this.isLoadingInitialData = false;
         });
     },
     closeModal() {
@@ -90,7 +99,10 @@
         this.allSearchableItems = [];
         // Ensure scroll is restored
         document.body.style.overflow = '';
-        @this.closeSearchModal();
+        // Use $wire instead of @this for SPA navigation compatibility
+        if ($wire) {
+            $wire.closeSearchModal();
+        }
     },
     navigateResults(direction) {
         const results = document.querySelectorAll('.search-result-item');
@@ -120,7 +132,7 @@
             const trimmed = value.trim().toLowerCase();
 
             if (trimmed === '') {
-                if ($wire.isSelectingResource) {
+                if (typeof $wire !== 'undefined' && $wire && $wire.isSelectingResource) {
                     $wire.cancelResourceSelection();
                 }
                 return;
@@ -149,7 +161,7 @@
                            (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
                 });
 
-                if (matchingItem) {
+                if (matchingItem && typeof $wire !== 'undefined' && $wire) {
                     $wire.navigateToResource(matchingItem.type);
                 }
             }
@@ -186,7 +198,7 @@
                 // If search query is empty, close the modal
                 if (!this.searchQuery || this.searchQuery === '') {
                     // Check if we're in a selection state using Alpine-accessible Livewire state
-                    if ($wire.isSelectingResource) {
+                    if (typeof $wire !== 'undefined' && $wire && $wire.isSelectingResource) {
                         $wire.cancelResourceSelection();
                         setTimeout(() => this.$refs.searchInput?.focus(), 100);
                     } else {
@@ -227,19 +239,23 @@
             document.removeEventListener('keydown', arrowKeyHandler);
         });
 
-        // Watch for auto-open resource
-        this.$watch('$wire.autoOpenResource', value => {
-            if (value) {
-                // Close search modal first
-                this.closeModal();
-                // Open the specific resource modal after a short delay
-                setTimeout(() => {
-                    this.$dispatch('open-create-modal-' + value);
-                    // Reset the value so it can trigger again
-                    @this.set('autoOpenResource', null);
-                }, 150);
-            }
-        });
+        // Watch for auto-open resource (only if $wire is available)
+        if (typeof $wire !== 'undefined' && $wire) {
+            this.$watch('$wire.autoOpenResource', value => {
+                if (value) {
+                    // Close search modal first
+                    this.closeModal();
+                    // Open the specific resource modal after a short delay
+                    setTimeout(() => {
+                        this.$dispatch('open-create-modal-' + value);
+                        // Reset the value so it can trigger again
+                        if (typeof $wire !== 'undefined' && $wire) {
+                            $wire.set('autoOpenResource', null);
+                        }
+                    }, 150);
+                }
+            });
+        }
 
         // Listen for closeSearchModal event from backend
         window.addEventListener('closeSearchModal', () => {

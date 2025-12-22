@@ -13,7 +13,7 @@
     <div class="subtitle">All your servers are here.</div>
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($servers as $server)
-            <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+            <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}" {{ wireNavigate() }}
                 @class([
                     'gap-2 border cursor-pointer coolbox group',
                     'border-red-500' =>

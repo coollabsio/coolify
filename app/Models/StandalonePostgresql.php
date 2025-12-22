@@ -19,6 +19,9 @@ class StandalonePostgresql extends BaseModel
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()

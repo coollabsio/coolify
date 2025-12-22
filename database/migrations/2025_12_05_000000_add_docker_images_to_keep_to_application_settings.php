@@ -8,15 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('application_settings', function (Blueprint $table) {
-            $table->integer('docker_images_to_keep')->default(2);
-        });
+        if (! Schema::hasColumn('application_settings', 'docker_images_to_keep')) {
+            Schema::table('application_settings', function (Blueprint $table) {
+                $table->integer('docker_images_to_keep')->default(2);
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('application_settings', function (Blueprint $table) {
-            $table->dropColumn('docker_images_to_keep');
-        });
+        if (Schema::hasColumn('application_settings', 'docker_images_to_keep')) {
+            Schema::table('application_settings', function (Blueprint $table) {
+                $table->dropColumn('docker_images_to_keep');
+            });
+        }
     }
 };

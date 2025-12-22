@@ -309,7 +309,9 @@ class Github extends Controller
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
-            $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
+            $applications = Application::where('repository_project_id', $id)
+                ->where('source_id', $github_app->id)
+                ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
