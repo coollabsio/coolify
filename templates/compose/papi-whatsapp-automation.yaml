@@ -1,0 +1,61 @@
+# documentation: https://papi.mundoautomatik.com
+# slogan: WhatsApp API powered by Baileys for automation and messaging
+# category: backend
+# tags: pastorini-api,whatsapp,api,baileys,postgres,redis,automation,messaging
+# logo: svgs/pastorini-api.svg
+# port: 3000
+
+version: '3.8'
+services:
+  pastorini-api:
+    image: 'mgpastorini/pastorini-api:latest'
+    restart: always
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - SERVICE_URL_PASTORINI_3000
+      - NODE_ENV=production
+      - PORT=3000
+      - 'PANEL_API_KEY=${SERVICE_PASSWORD_PANELAPIKEY}'
+      - STORAGE_TYPE=postgres+redis
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - 'POSTGRES_DB=${POSTGRES_DB:-pastorini}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - POSTGRES_SSL=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD:-}'
+      - REDIS_DB=0
+      - LICENSE_KEY=${LICENSE_KEY:-}
+      - 'LICENSE_ADMIN_URL=${LICENSE_ADMIN_URL:-https://padmin.intrategica.com.br}'
+    volumes:
+      - 'pastorini_sessions:/app/sessions'
+      - 'pastorini_media:/app/Media'
+    expose:
+      - 3000
+  redis:
+    image: 'redis:alpine'
+    restart: always
+    volumes:
+      - 'redis_data:/data'
+    expose:
+      - 6379
+  postgres:
+    image: 'postgres:13-alpine'
+    restart: always
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-pastorini}'
+    volumes:
+      - 'postgres_data:/var/lib/postgresql/data'
+    expose:
+      - 5432
+volumes:
+  pastorini_sessions: null
+  pastorini_media: null
+  redis_data: null
+  postgres_data: null
