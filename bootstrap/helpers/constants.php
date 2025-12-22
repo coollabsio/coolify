@@ -73,6 +73,7 @@ const SUPPORTED_OS = [
 const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
     'pgadmin',
     'postgresus',
+    'redis-insight',
 ];
 const NEEDS_TO_DISABLE_GZIP = [
     'beszel' => ['beszel'],

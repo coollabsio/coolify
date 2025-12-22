@@ -1314,11 +1314,6 @@ class GlobalSearch extends Component
                 'server_id' => $this->selectedServerId,
             ];
 
-            // PostgreSQL requires a database_image parameter
-            if ($this->selectedResourceType === 'postgresql') {
-                $queryParams['database_image'] = 'postgres:16-alpine';
-            }
-
             $this->redirect(route('project.resource.create', [
                 'project_uuid' => $this->selectedProjectUuid,
                 'environment_uuid' => $this->selectedEnvironmentUuid,

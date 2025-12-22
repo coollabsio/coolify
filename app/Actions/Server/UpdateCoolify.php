@@ -30,7 +30,6 @@ class UpdateCoolify
         if (! $this->server) {
             return;
         }
-        CleanupDocker::dispatch($this->server, false, false);
 
         // Fetch fresh version from CDN instead of using cache
         try {
@@ -117,17 +116,12 @@ class UpdateCoolify
 
     private function update()
     {
-        $helperImage = config('constants.coolify.helper_image');
-        $latest_version = getHelperVersion();
-        instant_remote_process(["docker pull -q {$helperImage}:{$latest_version}"], $this->server, false);
-
-        $image = config('constants.coolify.registry_url').'/coollabsio/coolify:'.$this->latestVersion;
-        instant_remote_process(["docker pull -q $image"], $this->server, false);
-
+        $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
+
         remote_process([
             "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
+            "bash /data/coolify/source/upgrade.sh $this->latestVersion $latestHelperImageVersion",
         ], $this->server);
     }
 }

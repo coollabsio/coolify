@@ -5,142 +5,161 @@
         logsLoaded: false,
         fullscreen: false,
         alwaysScroll: false,
-        intervalId: null,
+        rafId: null,
         scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
+        matchCount: 0,
         containerName: '{{ $container ?? "logs" }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
                 this.alwaysScroll = false;
-                clearInterval(this.intervalId);
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
+            }
+        },
+        handleKeyDown(event) {
+            if (event.key === 'Escape' && this.fullscreen) {
+                this.makeFullscreen();
             }
         },
         isScrolling: false,
+        scrollToBottom() {
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                this.isScrolling = true;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(() => { this.isScrolling = false; }, 50);
+            }
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll) return;
+            this.rafId = requestAnimationFrame(() => {
+                this.scrollToBottom();
+                if (this.alwaysScroll) {
+                    setTimeout(() => this.scheduleScroll(), 250);
+                }
+            });
+        },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        this.isScrolling = true;
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
-                    }
-                }, 100);
+                this.scheduleScroll();
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
         handleScroll(event) {
-            // Skip if follow logs is disabled or this is a programmatic scroll
             if (!this.alwaysScroll || this.isScrolling) return;
-
-            // Debounce scroll handling to avoid false positives from DOM mutations
-            // when Livewire re-renders and adds new log lines
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                // Use larger threshold (100px) to avoid accidental disables
                 if (distanceFromBottom > 100) {
                     this.alwaysScroll = false;
-                    clearInterval(this.intervalId);
-                    this.intervalId = null;
+                    if (this.rafId) {
+                        cancelAnimationFrame(this.rafId);
+                        this.rafId = null;
+                    }
                 }
             }, 150);
         },
         toggleColorLogs() {
             this.colorLogs = !this.colorLogs;
             localStorage.setItem('coolify-color-logs', this.colorLogs);
+            this.applyColorLogs();
         },
-        getLogLevel(text) {
-            const lowerText = text.toLowerCase();
-            // Error detection (highest priority)
-            if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(lowerText)) {
-                return 'error';
-            }
-            // Warning detection
-            if (/\b(warn|warning|wrn|caution)\b/.test(lowerText)) {
-                return 'warning';
-            }
-            // Debug detection
-            if (/\b(debug|dbg|trace|verbose)\b/.test(lowerText)) {
-                return 'debug';
-            }
-            // Info detection
-            if (/\b(info|inf|notice)\b/.test(lowerText)) {
-                return 'info';
-            }
-            return null;
+        applyColorLogs() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                line.classList.remove('log-error', 'log-warning', 'log-debug', 'log-info');
+                if (!this.colorLogs) return;
+                if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) {
+                    line.classList.add('log-error');
+                } else if (/\b(warn|warning|wrn|caution)\b/.test(content)) {
+                    line.classList.add('log-warning');
+                } else if (/\b(debug|dbg|trace|verbose)\b/.test(content)) {
+                    line.classList.add('log-debug');
+                } else if (/\b(info|inf|notice)\b/.test(content)) {
+                    line.classList.add('log-info');
+                }
+            });
         },
-        matchesSearch(line) {
-            if (!this.searchQuery.trim()) return true;
-            return line.toLowerCase().includes(this.searchQuery.toLowerCase());
+        hasActiveLogSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                return false;
+            }
+            const logsContainer = document.getElementById('logs');
+            if (!logsContainer) return false;
+            const range = selection.getRangeAt(0);
+            return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
-            let decoded = text;
-            let prev = '';
-            let iterations = 0;
-            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
-
-            while (decoded !== prev && iterations < maxIterations) {
-                prev = decoded;
-                const doc = new DOMParser().parseFromString(decoded, 'text/html');
-                decoded = doc.documentElement.textContent;
-                iterations++;
-            }
-            return decoded;
+            const doc = new DOMParser().parseFromString(text, 'text/html');
+            return doc.documentElement.textContent;
         },
-        renderHighlightedLog(el, text) {
-            const decoded = this.decodeHtml(text);
-            el.textContent = '';
+        applySearch() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            const query = this.searchQuery.trim().toLowerCase();
+            let count = 0;
 
-            if (!this.searchQuery.trim()) {
-                el.textContent = decoded;
-                return;
-            }
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                const textSpan = line.querySelector('[data-line-text]');
+                const matches = !query || content.includes(query);
 
-            const query = this.searchQuery.toLowerCase();
-            const lowerText = decoded.toLowerCase();
-            let lastIndex = 0;
+                line.classList.toggle('hidden', !matches);
+                if (matches && query) count++;
 
-            let index = lowerText.indexOf(query, lastIndex);
-            while (index !== -1) {
-                // Add text before match
-                if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                // Update highlighting
+                if (textSpan) {
+                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    if (!query) {
+                        textSpan.textContent = originalText;
+                    } else if (matches) {
+                        this.highlightText(textSpan, originalText, query);
+                    }
                 }
-                // Add highlighted match
+            });
+
+            this.matchCount = query ? count : 0;
+        },
+        highlightText(el, text, query) {
+            // Skip if user has selection
+            if (this.hasActiveLogSelection()) return;
+
+            el.textContent = '';
+            const lowerText = text.toLowerCase();
+            let lastIndex = 0;
+            let index = lowerText.indexOf(query, lastIndex);
+
+            while (index !== -1) {
+                if (index > lastIndex) {
+                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+                }
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
-                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                mark.textContent = text.substring(index, index + query.length);
                 el.appendChild(mark);
-
-                lastIndex = index + this.searchQuery.length;
+                lastIndex = index + query.length;
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            // Add remaining text
-            if (lastIndex < decoded.length) {
-                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            if (lastIndex < text.length) {
+                el.appendChild(document.createTextNode(text.substring(lastIndex)));
             }
-        },
-        getMatchCount() {
-            if (!this.searchQuery.trim()) return 0;
-            const logs = document.getElementById('logs');
-            if (!logs) return 0;
-            const lines = logs.querySelectorAll('[data-log-line]');
-            let count = 0;
-            lines.forEach(line => {
-                if (line.textContent.toLowerCase().includes(this.searchQuery.toLowerCase())) {
-                    count++;
-                }
-            });
-            return count;
         },
         downloadLogs() {
             const logs = document.getElementById('logs');
@@ -167,8 +186,38 @@
                 this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
+
+            // Watch search query changes
+            this.$watch('searchQuery', () => {
+                this.applySearch();
+            });
+
+            // Handler for applying colors and search after DOM changes
+            const applyAfterUpdate = () => {
+                this.$nextTick(() => {
+                    this.applyColorLogs();
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
+                });
+            };
+
+            // Apply colors after Livewire updates (existing content)
+            Livewire.hook('morph.updated', ({ el }) => {
+                if (el.id === 'logs') {
+                    applyAfterUpdate();
+                }
+            });
+
+            // Apply colors after Livewire adds new content (initial load)
+            Livewire.hook('morph.added', ({ el }) => {
+                if (el.id === 'logs') {
+                    applyAfterUpdate();
+                }
+            });
         }
-    }">
+    }" @keydown.window="handleKeyDown($event)">
         @if ($collapsible)
             <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
                 x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
@@ -206,7 +255,7 @@
                                 title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
                                 class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
-                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                        <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -235,6 +284,38 @@
                                     d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                             </svg>
                         </button>
+                        <button wire:click="toggleStreamLogs"
+                            title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
+                            @if ($streamLogs)
+                                {{-- Pause icon --}}
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                                    fill="currentColor">
+                                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                                </svg>
+                            @else
+                                {{-- Play icon --}}
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                                    fill="currentColor">
+                                    <path d="M8 5v14l11-7L8 5z" />
+                                </svg>
+                            @endif
+                        </button>
+                        <button
+                            x-on:click="
+                                $wire.copyLogs().then(logs => {
+                                    navigator.clipboard.writeText(logs);
+                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                });
+                            "
+                            title="Copy Logs"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                            </svg>
+                        </button>
                         <button x-on:click="downloadLogs()" title="Download Logs"
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -259,23 +340,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                             </svg>
-                        </button>
-                        <button wire:click="toggleStreamLogs"
-                            title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
-                            @if ($streamLogs)
-                                {{-- Pause icon --}}
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                                    fill="currentColor">
-                                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                                </svg>
-                            @else
-                                {{-- Play icon --}}
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                                    fill="currentColor">
-                                    <path d="M8 5v14l11-7L8 5z" />
-                                </svg>
-                            @endif
                         </button>
                         <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
                             x-on:click="toggleScroll"
@@ -323,11 +387,11 @@
                                     Showing last {{ number_format($maxDisplayLines) }} of {{ number_format($totalLines) }} lines
                                 </div>
                             @endif
-                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
-                            @foreach ($displayLines as $line)
+                            @foreach ($displayLines as $index => $line)
                                 @php
                                     // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
                                     $timestamp = '';
@@ -344,26 +408,17 @@
                                         $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                                         $monthName = $monthNames[(int)$month - 1] ?? $month;
 
-                                        // Format: 2025-Dec-04 09:44:58.198879
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}.{$microseconds}";
+                                        // Format for display: 2025-Dec-04 09:44:58
+                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        // Include microseconds in key for uniqueness
+                                        $lineKey = "{$timestamp}.{$microseconds}";
                                     }
-
                                 @endphp
-                                <div data-log-line data-log-content="{{ $line }}"
-                                    x-bind:class="{
-                                        'hidden': !matchesSearch($el.dataset.logContent),
-                                        'bg-red-500/10 dark:bg-red-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'error',
-                                        'bg-yellow-500/10 dark:bg-yellow-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'warning',
-                                        'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
-                                        'bg-blue-500/10 dark:bg-blue-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'info',
-                                    }"
-                                    class="flex gap-2">
+                                <div wire:key="{{ $lineKey ?? 'line-' . $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
-                                    <span data-line-text="{{ $logContent }}"
-                                        x-effect="searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
-                                        class="whitespace-pre-wrap break-all"></span>
+                                    <span data-line-text="{{ $logContent }}" class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
                                 </div>
                             @endforeach
                         </div>

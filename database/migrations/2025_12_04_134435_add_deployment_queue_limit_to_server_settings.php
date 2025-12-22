@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('server_settings', function (Blueprint $table) {
-            $table->integer('deployment_queue_limit')->default(25)->after('concurrent_builds');
-        });
+        if (! Schema::hasColumn('server_settings', 'deployment_queue_limit')) {
+            Schema::table('server_settings', function (Blueprint $table) {
+                $table->integer('deployment_queue_limit')->default(25)->after('concurrent_builds');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('server_settings', function (Blueprint $table) {
-            $table->dropColumn('deployment_queue_limit');
-        });
+        if (Schema::hasColumn('server_settings', 'deployment_queue_limit')) {
+            Schema::table('server_settings', function (Blueprint $table) {
+                $table->dropColumn('deployment_queue_limit');
+            });
+        }
     }
 };

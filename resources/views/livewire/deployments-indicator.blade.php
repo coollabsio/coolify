@@ -39,7 +39,7 @@
 
                 <div class="p-4 space-y-3">
                     @foreach ($this->deployments as $deployment)
-                        <a href="{{ $deployment->deployment_url }}"
+                        <a href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
                             class="flex items-start gap-3 p-3 rounded-lg dark:bg-coolgray-200 bg-gray-50 transition-all duration-200 hover:ring-2 hover:ring-coollabs dark:hover:ring-warning cursor-pointer">
                             <!-- Status indicator -->
                             <div class="flex-shrink-0 mt-1">

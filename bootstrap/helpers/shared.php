@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
@@ -298,6 +299,24 @@ function generate_application_name(string $git_repository, string $git_branch, ?
     }
 
     return Str::kebab("$git_repository:$git_branch-$cuid");
+}
+
+/**
+ * Sort branches by priority: main first, master second, then alphabetically.
+ *
+ * @param  Collection  $branches  Collection of branch objects with 'name' key
+ */
+function sortBranchesByPriority(Collection $branches): Collection
+{
+    return $branches->sortBy(function ($branch) {
+        $name = data_get($branch, 'name');
+
+        return match ($name) {
+            'main' => '0_main',
+            'master' => '1_master',
+            default => '2_'.$name,
+        };
+    })->values();
 }
 
 function base_ip(): string
@@ -651,6 +670,12 @@ function generateGitManualWebhook($resource, $type)
 function removeAnsiColors($text)
 {
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
+}
+
+function sanitizeLogsForExport(string $text): string
+{
+    // All sanitization is now handled by remove_iip()
+    return remove_iip($text);
 }
 
 function getTopLevelNetworks(Service|Application $resource)
@@ -2897,6 +2922,18 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function wireNavigate(): string
+{
+    try {
+        $settings = instanceSettings();
+
+        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+    } catch (\Exception $e) {
+        return 'wire:navigate.hover';
+    }
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();
@@ -3307,4 +3344,58 @@ function formatContainerStatus(string $status): string
         // Simple status: running → Running
         return str($status)->headline()->value();
     }
+}
+
+/**
+ * Check if password confirmation should be skipped.
+ * Returns true if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ *
+ * @return bool True if password confirmation should be skipped
+ */
+function shouldSkipPasswordConfirmation(): bool
+{
+    // Skip if two-step confirmation is globally disabled
+    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+        return true;
+    }
+
+    // Skip if user has no password (OAuth users)
+    if (! Auth::user()?->hasPassword()) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Verify password for two-step confirmation.
+ * Skips verification if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
+ * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
+ * @return bool True if verification passed (or skipped), false if password is incorrect
+ */
+function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
+{
+    // Skip if password confirmation should be skipped
+    if (shouldSkipPasswordConfirmation()) {
+        return true;
+    }
+
+    // Verify the password
+    if (! Hash::check($password, Auth::user()->password)) {
+        if ($component) {
+            $component->addError('password', 'The provided password is incorrect.');
+        }
+
+        return false;
+    }
+
+    return true;
 }

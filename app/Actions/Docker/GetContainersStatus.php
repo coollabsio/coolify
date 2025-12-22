@@ -199,11 +199,25 @@ class GetContainersStatus
                             $isPublic = data_get($database, 'is_public');
                             $foundDatabases[] = $database->id;
                             $statusFromDb = $database->status;
+
+                            // Track restart count for databases (single-container)
+                            $restartCount = data_get($container, 'RestartCount', 0);
+                            $previousRestartCount = $database->restart_count ?? 0;
+
                             if ($statusFromDb !== $containerStatus) {
-                                $database->update(['status' => $containerStatus]);
+                                $updateData = ['status' => $containerStatus];
                             } else {
-                                $database->update(['last_online_at' => now()]);
+                                $updateData = ['last_online_at' => now()];
                             }
+
+                            // Update restart tracking if restart count increased
+                            if ($restartCount > $previousRestartCount) {
+                                $updateData['restart_count'] = $restartCount;
+                                $updateData['last_restart_at'] = now();
+                                $updateData['last_restart_type'] = 'crash';
+                            }
+
+                            $database->update($updateData);
 
                             if ($isPublic) {
                                 $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
@@ -365,7 +379,13 @@ class GetContainersStatus
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
-            $database->update(['status' => 'exited']);
+            // Reset restart tracking when database exits completely
+            $database->update([
+                'status' => 'exited',
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
 
             $name = data_get($database, 'name');
             $fqdn = data_get($database, 'fqdn');

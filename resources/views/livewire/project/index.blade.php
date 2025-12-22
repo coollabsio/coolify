@@ -25,7 +25,7 @@
                     <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
                         @if ($project->environments->first())
                             @can('createAnyResource')
-                                <a class="hover:underline"
+                                <a class="hover:underline" {{ wireNavigate() }}
                                     href="{{ route('project.resource.create', [
                                         'project_uuid' => $project->uuid,
                                         'environment_uuid' => $project->environments->first()->uuid,
@@ -35,7 +35,7 @@
                             @endcan
                         @endif
                         @can('update', $project)
-                            <a class="hover:underline"
+                            <a class="hover:underline" {{ wireNavigate() }}
                                 href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                 Settings
                             </a>

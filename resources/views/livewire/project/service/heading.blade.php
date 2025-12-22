@@ -10,7 +10,7 @@
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
@@ -127,7 +127,7 @@
         @else
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <div class="text-error">
-                    Unable to deploy. <a class="underline font-bold cursor-pointer"
+                    Unable to deploy. <a class="underline font-bold cursor-pointer" {{ wireNavigate() }}
                         href="{{ route('project.service.environment-variables', $parameters) }}">
                         Required environment variables missing.</a>
                 </div>

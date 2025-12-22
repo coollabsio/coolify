@@ -236,11 +236,7 @@
                     @endif
                     <div class="flex flex-col gap-2 pt-6 pb-10">
                         @if ($application->build_pack === 'dockercompose')
-                            @can('update', $application)
-                                <div class="flex flex-col gap-2" x-init="$wire.dispatch('loadCompose', true)">
-                            @else
-                                    <div class="flex flex-col gap-2">
-                                @endcan
+                                <div class="flex flex-col gap-2" @can('update', $application) x-init="$wire.dispatch('loadCompose', true)" @endcan>
                                     <div x-data="{
                                         baseDir: '{{ $application->base_directory }}',
                                         composeLocation: '{{ $application->docker_compose_location }}',
