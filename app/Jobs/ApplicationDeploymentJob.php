@@ -371,7 +371,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             try {
                 $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
-                $this->graceful_shutdown_container($this->deployment_uuid);
+                $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
             } catch (Exception $e) {
                 // Log but don't fail - container cleanup errors are expected when container is already gone
                 \Log::warning('Failed to shutdown container '.$this->deployment_uuid.': '.$e->getMessage());
@@ -1968,7 +1968,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Preparing container with helper image with updated envs.');
         }
 
-        $this->graceful_shutdown_container($this->deployment_uuid);
+        $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
         $this->execute_remote_command(
             [
                 $runCommand,
@@ -1983,8 +1983,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function restart_builder_container_with_actual_commit()
     {
-        // Stop and remove the current helper container
-        $this->graceful_shutdown_container($this->deployment_uuid);
+        // Stop the current helper container (no need for rm -f as it was started with --rm)
+        $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
 
         // Clear cached env_args to force regeneration with actual SOURCE_COMMIT value
         $this->env_args = null;
@@ -3171,14 +3171,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName)
+    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
     {
         try {
             $timeout = isDev() ? 1 : 30;
-            $this->execute_remote_command(
-                ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
-                ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
-            );
+            if ($skipRemove) {
+                $this->execute_remote_command(
+                    ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true]
+                );
+            } else {
+                $this->execute_remote_command(
+                    ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                    ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+                );
+            }
         } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
