@@ -831,34 +831,67 @@ $schema://$host {
 
     public function databases()
     {
-        return $this->destinations()->map(function ($standaloneDocker) {
-            $postgresqls = data_get($standaloneDocker, 'postgresqls', collect([]));
-            $redis = data_get($standaloneDocker, 'redis', collect([]));
-            $mongodbs = data_get($standaloneDocker, 'mongodbs', collect([]));
-            $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
-            $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
-            $keydbs = data_get($standaloneDocker, 'keydbs', collect([]));
-            $dragonflies = data_get($standaloneDocker, 'dragonflies', collect([]));
-            $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
 
-            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->flatten()->filter(function ($item) {
-            return data_get($item, 'name') !== 'coolify-db';
-        });
+        $destinationCondition = function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        };
+
+        // Query each database type with the destination condition
+        $postgresqls = StandalonePostgresql::where($destinationCondition)->get();
+        $redis = StandaloneRedis::where($destinationCondition)->get();
+        $mongodbs = StandaloneMongodb::where($destinationCondition)->get();
+        $mysqls = StandaloneMysql::where($destinationCondition)->get();
+        $mariadbs = StandaloneMariadb::where($destinationCondition)->get();
+        $keydbs = StandaloneKeydb::where($destinationCondition)->get();
+        $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
+        $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+
+        return $postgresqls
+            ->concat($redis)
+            ->concat($mongodbs)
+            ->concat($mysqls)
+            ->concat($mariadbs)
+            ->concat($keydbs)
+            ->concat($dragonflies)
+            ->concat($clickhouses)
+            ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
     }
 
     public function applications()
     {
-        $applications = $this->destinations()->map(function ($standaloneDocker) {
-            return $standaloneDocker->applications;
-        })->flatten();
-        $additionalApplicationIds = DB::table('additional_destinations')->where('server_id', $this->id)->get('application_id');
-        $additionalApplicationIds = collect($additionalApplicationIds)->map(function ($item) {
-            return $item->application_id;
-        });
-        Application::whereIn('id', $additionalApplicationIds)->get()->each(function ($application) use ($applications) {
-            $applications->push($application);
-        });
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
+
+        // Query all applications in a single query using polymorphic conditions
+        $applications = Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        })->get();
+
+        // Get additional server applications
+        $additionalApplicationIds = DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->pluck('application_id');
+
+        if ($additionalApplicationIds->isNotEmpty()) {
+            $additionalApps = Application::whereIn('id', $additionalApplicationIds)->get();
+            $applications = $applications->concat($additionalApps);
+        }
 
         return $applications;
     }

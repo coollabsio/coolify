@@ -3,7 +3,7 @@
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item"
-                class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
+                class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
             </a>

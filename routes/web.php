@@ -56,7 +56,9 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
+use App\Livewire\Server\Sentinel as ServerSentinel;
 use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\Updates as SettingsUpdates;
@@ -251,6 +253,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
+        Route::get('/sentinel', ServerSentinel::class)->name('server.sentinel');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
         Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');

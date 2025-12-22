@@ -184,6 +184,7 @@
                                                             </td>
                                                             <td class="px-5 py-4 text-sm whitespace-nowrap"><a
                                                                     class=""
+                                                                    {{ wireNavigate() }}
                                                                     href="{{ $resource->link() }}">{{ $resource->name }}
                                                                     <x-internal-link /></a>
                                                             </td>

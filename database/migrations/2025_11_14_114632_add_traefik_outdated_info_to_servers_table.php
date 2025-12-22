@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->json('traefik_outdated_info')->nullable();
-        });
+        if (! Schema::hasColumn('servers', 'traefik_outdated_info')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->json('traefik_outdated_info')->nullable();
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn('traefik_outdated_info');
-        });
+        if (Schema::hasColumn('servers', 'traefik_outdated_info')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->dropColumn('traefik_outdated_info');
+            });
+        }
     }
 };

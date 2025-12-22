@@ -29,9 +29,14 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
-echo -e "Welcome to Coolify Installer!"
-echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
+echo ""
+echo "=========================================="
+echo "   Coolify Installation - ${DATE}"
+echo "=========================================="
+echo ""
+echo "Welcome to Coolify Installer!"
+echo "This script will install everything for you. Sit back and relax."
+echo "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
 
 # Predefined root user
 ROOT_USERNAME=${ROOT_USERNAME:-}
@@ -242,6 +247,29 @@ getAJoke() {
     fi
 }
 
+# Helper function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Helper function to log section headers
+log_section() {
+    echo ""
+    echo "============================================================"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "============================================================"
+}
+
+# Helper function to check if all required packages are installed
+all_packages_installed() {
+    for pkg in curl wget git jq openssl; do
+        if ! command -v "$pkg" >/dev/null 2>&1; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
@@ -288,9 +316,11 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-LATEST_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
-LATEST_REALTIME_VERSION=$(curl -L --silent $CDN/versions.json | grep -i version | xargs | awk '{print $8}' | tr -d ',')
+# Fetch versions.json once and parse all values from it
+VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
+LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+LATEST_REALTIME_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $8}' | tr -d ',')
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -315,7 +345,7 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "---------------------------------------------"
+echo "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
 echo "| Coolify           | $LATEST_VERSION"
@@ -323,46 +353,61 @@ echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
 echo "| Registry URL      | $REGISTRY_URL"
-echo -e "---------------------------------------------\n"
-echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
+echo "---------------------------------------------"
+echo ""
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
-    ;;
-alpine)
-    sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
-    apk update >/dev/null
-    apk add curl wget git jq openssl >/dev/null
-    ;;
-ubuntu | debian | raspbian)
-    apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq openssl >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq openssl >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
-        fi
-        if ! command -v curl >/dev/null; then
-            dnf install -y curl >/dev/null
-        fi
-        dnf install -y wget git jq openssl >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq openssl >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+log_section "Step 1/9: Installing required packages"
+echo "1/9 Installing required packages (curl, wget, git, jq, openssl)..."
 
-echo -e "2. Check OpenSSH server configuration. "
+# Track if apt-get update was run to avoid redundant calls later
+APT_UPDATED=false
+
+if all_packages_installed; then
+    log "All required packages already installed, skipping installation"
+    echo " - All required packages already installed."
+else
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
+        ;;
+    alpine)
+        sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+        apk update >/dev/null
+        apk add curl wget git jq openssl >/dev/null
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        APT_UPDATED=true
+        apt-get install -y curl wget git jq openssl >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq openssl >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            if ! command -v curl >/dev/null; then
+                dnf install -y curl >/dev/null
+            fi
+            dnf install -y wget git jq openssl >/dev/null
+        fi
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq openssl >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+    log "Required packages installed successfully"
+fi
+echo "     Done."
+
+log_section "Step 2/9: Checking OpenSSH server configuration"
+echo "2/9 Checking OpenSSH server configuration..."
 
 # Detect OpenSSH server
 SSH_DETECTED=false
@@ -398,7 +443,10 @@ if [ "$SSH_DETECTED" = "false" ]; then
         service sshd start >/dev/null 2>&1
         ;;
     ubuntu | debian | raspbian)
-        apt-get update -y >/dev/null
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update -y >/dev/null
+            APT_UPDATED=true
+        fi
         apt-get install -y openssh-server >/dev/null
         systemctl enable ssh >/dev/null 2>&1
         systemctl start ssh >/dev/null 2>&1
@@ -465,7 +513,10 @@ install_docker() {
 install_docker_manually() {
     case "$OS_TYPE" in
     "ubuntu" | "debian" | "raspbian")
-        apt-get update
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update
+            APT_UPDATED=true
+        fi
         apt-get install -y ca-certificates curl
         install -m 0755 -d /etc/apt/keyrings
         curl -fsSL https://download.docker.com/linux/$OS_TYPE/gpg -o /etc/apt/keyrings/docker.asc
@@ -491,7 +542,8 @@ install_docker_manually() {
         echo "Docker installed successfully."
     fi
 }
-echo -e "3. Check Docker Installation. "
+log_section "Step 3/9: Checking Docker installation"
+echo "3/9 Checking Docker installation..."
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
     getAJoke
@@ -575,7 +627,8 @@ else
     echo " - Docker is installed."
 fi
 
-echo -e "4. Check Docker Configuration. "
+log_section "Step 4/9: Checking Docker configuration"
+echo "4/9 Checking Docker configuration..."
 
 echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
 echo " - To override existing configuration: DOCKER_POOL_FORCE_OVERRIDE=true"
@@ -704,13 +757,38 @@ else
     fi
 fi
 
-echo -e "5. Download required files from CDN. "
-curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+log_section "Step 5/9: Downloading required files from CDN"
+echo "5/9 Downloading required files from CDN..."
+log "Downloading configuration files in parallel..."
 
-echo -e "6. Setting up environment variable file"
+# Download files in parallel for faster installation
+curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml &
+PID1=$!
+curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml &
+PID2=$!
+curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production &
+PID3=$!
+curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh &
+PID4=$!
+
+# Wait for all downloads to complete and check for errors
+DOWNLOAD_FAILED=false
+for PID in $PID1 $PID2 $PID3 $PID4; do
+    if ! wait $PID; then
+        DOWNLOAD_FAILED=true
+    fi
+done
+
+if [ "$DOWNLOAD_FAILED" = true ]; then
+    echo " - ERROR: One or more downloads failed. Please check your network connection."
+    exit 1
+fi
+
+log "All configuration files downloaded successfully"
+echo "     Done."
+
+log_section "Step 6/9: Setting up environment variable file"
+echo "6/9 Setting up environment variable file..."
 
 if [ -f "$ENV_FILE" ]; then
     # If .env exists, create backup
@@ -725,8 +803,11 @@ else
     echo " - No .env file found, copying .env.production to .env"
     cp "/data/coolify/source/.env.production" "$ENV_FILE"
 fi
+log "Environment file setup completed"
+echo "     Done."
 
-echo -e "7. Checking and updating environment variables if necessary..."
+log_section "Step 7/9: Checking and updating environment variables"
+echo "7/9 Checking and updating environment variables..."
 
 update_env_var() {
     local key="$1"
@@ -786,8 +867,11 @@ else
         update_env_var "DOCKER_ADDRESS_POOL_SIZE" "$DOCKER_ADDRESS_POOL_SIZE"
     fi
 fi
+log "Environment variables check completed"
+echo "     Done."
 
-echo -e "8. Checking for SSH key for localhost access."
+log_section "Step 8/9: Checking SSH key for localhost access"
+echo "8/9 Checking SSH key for localhost access..."
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
@@ -812,8 +896,11 @@ fi
 
 chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify
+log "SSH key check completed"
+echo "     Done."
 
-echo -e "9. Installing Coolify ($LATEST_VERSION)"
+log_section "Step 9/9: Installing Coolify"
+echo "9/9 Installing Coolify ($LATEST_VERSION)..."
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
 echo -e " - Please wait."
 getAJoke
@@ -824,11 +911,85 @@ else
     bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
 fi
 echo " - Coolify installed successfully."
+echo " - Waiting for Coolify to be ready..."
 
-echo " - Waiting 20 seconds for Coolify database migrations to complete."
-getAJoke
+# Wait for upgrade.sh background process to complete
+# upgrade.sh writes status to /data/coolify/source/.upgrade-status
+# Status file format: step|message|timestamp
+# Step 6 = "Upgrade complete", file deleted 10 seconds after
+UPGRADE_STATUS_FILE="/data/coolify/source/.upgrade-status"
+MAX_WAIT=180
+WAITED=0
+SEEN_STATUS_FILE=false
 
-sleep 20
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if [ -f "$UPGRADE_STATUS_FILE" ]; then
+        SEEN_STATUS_FILE=true
+        STATUS=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f1)
+        MESSAGE=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f2)
+        if [ "$STATUS" = "6" ]; then
+            log "Upgrade completed: $MESSAGE"
+            echo " - Upgrade complete!"
+            break
+        elif [ "$STATUS" = "error" ]; then
+            echo " - ERROR: Upgrade failed: $MESSAGE"
+            echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+            exit 1
+        else
+            if [ $((WAITED % 10)) -eq 0 ]; then
+                echo " - Upgrade in progress: $MESSAGE (${WAITED}s)"
+            fi
+        fi
+    else
+        # Status file doesn't exist
+        if [ "$SEEN_STATUS_FILE" = true ]; then
+            # We saw the file before, now it's gone = upgrade completed and cleaned up
+            log "Upgrade status file cleaned up - upgrade complete"
+            echo " - Upgrade complete!"
+            break
+        fi
+        # Haven't seen status file yet - either very early or upgrade.sh hasn't started
+        if [ $((WAITED % 10)) -eq 0 ] && [ $WAITED -gt 0 ]; then
+            echo " - Waiting for upgrade process to start... (${WAITED}s)"
+        fi
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    if [ "$SEEN_STATUS_FILE" = false ]; then
+        # Never saw status file - fallback to old behavior (wait 20s + health check)
+        log "Status file not found, using fallback wait"
+        echo " - Status file not found, waiting 20 seconds..."
+        sleep 20
+    else
+        echo " - ERROR: Upgrade timed out after ${MAX_WAIT}s"
+        echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+        exit 1
+    fi
+fi
+
+# Final health verification - wait for container to be healthy
+echo " - Verifying Coolify is healthy..."
+HEALTH_WAIT=60
+HEALTH_WAITED=0
+while [ $HEALTH_WAITED -lt $HEALTH_WAIT ]; do
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' coolify 2>/dev/null || echo "unknown")
+    if [ "$HEALTH" = "healthy" ]; then
+        log "Coolify container is healthy"
+        echo " - Coolify is ready!"
+        break
+    fi
+    sleep 2
+    HEALTH_WAITED=$((HEALTH_WAITED + 2))
+done
+
+if [ "$HEALTH" != "healthy" ]; then
+    echo " - ERROR: Coolify container is not healthy after ${HEALTH_WAIT}s. Status: $HEALTH"
+    echo " - Please check: docker logs coolify"
+    exit 1
+fi
 echo -e "\033[0;35m
    ____                            _         _       _   _                 _
   / ___|___  _ __   __ _ _ __ __ _| |_ _   _| | __ _| |_(_) ___  _ __  ___| |
@@ -838,8 +999,18 @@ echo -e "\033[0;35m
                    |___/
 \033[0m"
 
-IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
-IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
+# Fetch public IPs in parallel for faster completion
+IPV4_TMP=$(mktemp)
+IPV6_TMP=$(mktemp)
+curl -4s --max-time 5 https://ifconfig.io > "$IPV4_TMP" 2>/dev/null &
+IPV4_PID=$!
+curl -6s --max-time 5 https://ifconfig.io > "$IPV6_TMP" 2>/dev/null &
+IPV6_PID=$!
+wait $IPV4_PID 2>/dev/null || true
+wait $IPV6_PID 2>/dev/null || true
+IPV4_PUBLIC_IP=$(cat "$IPV4_TMP" 2>/dev/null || true)
+IPV6_PUBLIC_IP=$(cat "$IPV6_TMP" 2>/dev/null || true)
+rm -f "$IPV4_TMP" "$IPV6_TMP"
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
@@ -864,3 +1035,8 @@ if [ -n "$PRIVATE_IPS" ]; then
 fi
 
 echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
+
+log_section "Installation Complete"
+log "Coolify installation completed successfully"
+log "Version: ${LATEST_VERSION}"
+log "Log file: ${INSTALLATION_LOG_WITH_DATE}"

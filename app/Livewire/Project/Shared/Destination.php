@@ -5,12 +5,9 @@ namespace App\Livewire\Project\Shared;
 use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -140,12 +137,8 @@ class Destination extends Component
     public function removeServer(int $network_id, int $server_id, $password)
     {
         try {
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-                if (! Hash::check($password, Auth::user()->password)) {
-                    $this->addError('password', 'The provided password is incorrect.');
-
-                    return;
-                }
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return;
             }
 
             if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
