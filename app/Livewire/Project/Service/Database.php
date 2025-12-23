@@ -45,7 +45,7 @@ class Database extends Component
         'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer',
-        'proxyTimeout' => 'nullable|integer|min:0|max:86400',
+        'proxyTimeout' => 'nullable|integer|min:0|max:31536000',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
     ];

@@ -29,8 +29,8 @@ class StartDatabaseProxy
         if ($database->proxy_timeout <= 0) {
             throw new \Exception('Proxy timeout must be greater than 0.');
         }
-        if ($database->proxy_timeout > 86400) {
-            throw new \Exception('Proxy timeout must not exceed 86400 seconds (24 hours).');
+        if ($database->proxy_timeout > 31536000) {
+            throw new \Exception('Proxy timeout must not exceed 31536000 seconds (1 year).');
         }
 
         $databaseType = $database->database_type;
