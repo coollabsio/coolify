@@ -33,10 +33,11 @@ This implementation introduces server-level environment variables to Coolify, al
 
 ### 2. Automatic Server Identity Variables
 The following variables are automatically injected into all containers:
-- `COOLIFY_SERVER_ID` - Server ID
-- `COOLIFY_SERVER_NAME` - Server name
-- `COOLIFY_SERVER_HOSTNAME` - Server IP/hostname
-- `COOLIFY_SERVER_IP` - Server IP address
+- `COOLIFY_SERVER_ID` - Server ID (internal identifier)
+- `COOLIFY_SERVER_NAME` - Server name (user-friendly name)
+- `COOLIFY_SERVER_UUID` - Server UUID (unique identifier)
+
+**Security Note:** IP addresses and hostnames are intentionally excluded from automatic variables to prevent security risks if containers are compromised. Server identification is achieved through non-sensitive identifiers only.
 
 These are read-only and cannot be overridden by user-defined variables.
 
@@ -79,9 +80,10 @@ Expected output:
 ```
 COOLIFY_SERVER_ID=1
 COOLIFY_SERVER_NAME=my-server
-COOLIFY_SERVER_HOSTNAME=192.168.1.100
-COOLIFY_SERVER_IP=192.168.1.100
+COOLIFY_SERVER_UUID=abc123def456...
 ```
+
+**Security Verification:** Verify that no IP addresses or hostnames are exposed in the environment variables.
 
 ### 4. Test Multi-Server Deployment
 1. Set up two servers with different server-level environment variables
@@ -103,6 +105,9 @@ COOLIFY_SERVER_IP=192.168.1.100
 - Server environment variables are encrypted at rest
 - Only users with appropriate permissions can manage server environment variables
 - Automatic server identity variables are read-only and cannot be overridden
+- **IP addresses and hostnames are intentionally excluded** from automatic variables to prevent security risks
+- Server identification uses only non-sensitive identifiers (ID, name, UUID)
+- Container compromise cannot expose server network information through environment variables
 
 ## Performance Impact
 - Minimal performance impact during deployment

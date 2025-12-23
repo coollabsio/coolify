@@ -4155,18 +4155,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function add_server_identity_variables($envs)
     {
         // Add automatic server identity variables (read-only, not overrideable)
+        // Note: We only include non-sensitive information for security
         $envs->push('COOLIFY_SERVER_ID='.$this->server->id);
         $envs->push('COOLIFY_SERVER_NAME='.$this->server->name);
-        $envs->push('COOLIFY_SERVER_HOSTNAME='.$this->server->ip);
-        $envs->push('COOLIFY_SERVER_IP='.$this->server->ip);
+        $envs->push('COOLIFY_SERVER_UUID='.$this->server->uuid);
     }
 
     private function add_server_identity_variables_to_dict(&$envs_dict)
     {
         // Add automatic server identity variables (read-only, not overrideable)
+        // Note: We only include non-sensitive information for security
         $envs_dict['COOLIFY_SERVER_ID'] = escapeBashEnvValue($this->server->id);
         $envs_dict['COOLIFY_SERVER_NAME'] = escapeBashEnvValue($this->server->name);
-        $envs_dict['COOLIFY_SERVER_HOSTNAME'] = escapeBashEnvValue($this->server->ip);
-        $envs_dict['COOLIFY_SERVER_IP'] = escapeBashEnvValue($this->server->ip);
+        $envs_dict['COOLIFY_SERVER_UUID'] = escapeBashEnvValue($this->server->uuid);
     }
 }

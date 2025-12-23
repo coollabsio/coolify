@@ -208,12 +208,12 @@
                 <strong>COOLIFY_SERVER_NAME:</strong> {{ $server->name }}
             </div>
             <div class="font-mono bg-base-300 rounded px-2 py-1">
-                <strong>COOLIFY_SERVER_HOSTNAME:</strong> {{ $server->ip }}
+                <strong>COOLIFY_SERVER_UUID:</strong> {{ $server->uuid }}
             </div>
-            <div class="font-mono bg-base-300 rounded px-2 py-1">
-                <strong>COOLIFY_SERVER_IP:</strong> {{ $server->ip }}
+            <div class="font-mono bg-base-300 rounded px-2 py-1 text-xs text-base-content/60">
+                <em>Security: IP addresses excluded for container safety</em>
             </div>
         </div>
-        <p class="text-xs mt-3 text-base-content/60">These variables are read-only and cannot be overridden by user-defined environment variables.</p>
+        <p class="text-xs mt-3 text-base-content/60">These variables are read-only and cannot be overridden by user-defined environment variables. IP addresses are intentionally excluded for security reasons.</p>
     </div>
 </div>
