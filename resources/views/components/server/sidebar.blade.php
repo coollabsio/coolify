@@ -33,6 +33,9 @@
             Tunnel</a>
     @endif
     @if ($server->isFunctional())
+        <a class="menu-item {{ $activeMenu === 'environment-variables' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+            href="{{ route('server.environment-variables', ['server_uuid' => $server->uuid]) }}">Environment Variables
+        </a>
         <a class="menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
             href="{{ route('server.docker-cleanup', ['server_uuid' => $server->uuid]) }}">Docker Cleanup
         </a>

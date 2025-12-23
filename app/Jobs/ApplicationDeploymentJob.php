@@ -1168,13 +1168,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $envs = collect([]);
         $sort = $this->application->settings->is_env_sorting_enabled;
+        
+        // Get server-level environment variables first
+        $server_environment_variables = $this->server->environment_variables;
         if ($sort) {
+            $sorted_server_environment_variables = $server_environment_variables->sortBy('key');
             $sorted_environment_variables = $this->application->environment_variables->sortBy('key');
             $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('key');
         } else {
+            $sorted_server_environment_variables = $server_environment_variables->sortBy('id');
             $sorted_environment_variables = $this->application->environment_variables->sortBy('id');
             $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('id');
         }
+        
         if ($this->build_pack === 'dockercompose') {
             $sorted_environment_variables = $sorted_environment_variables->filter(function ($env) {
                 return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_') && ! str($env->key)->startsWith('SERVICE_NAME_');
@@ -1183,11 +1189,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_') && ! str($env->key)->startsWith('SERVICE_NAME_');
             });
         }
+        
         $ports = $this->application->main_port();
         $coolify_envs = $this->generate_coolify_env_variables();
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+        
+        // Add automatic server identity variables
+        $this->add_server_identity_variables($envs);
+        
+        // Add server-level environment variables (runtime only)
+        $runtime_server_environment_variables = $sorted_server_environment_variables->filter(function ($env) {
+            return $env->is_runtime;
+        });
+        foreach ($runtime_server_environment_variables as $env) {
+            $envs->push($env->key.'='.$env->real_value);
+        }
+        
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
@@ -1462,13 +1481,33 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // 2. Add COOLIFY variables (can override nixpacks, but shouldn't happen in practice)
+        // 2. Add server identity variables (can override nixpacks, but shouldn't happen in practice)
+        $this->add_server_identity_variables_to_dict($envs_dict);
+        
+        // 3. Add server-level build-time environment variables
+        $server_buildtime_variables = $this->server->environment_variables()
+            ->where('is_buildtime', true)
+            ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+            ->get();
+            
+        foreach ($server_buildtime_variables as $env) {
+            if ($env->is_literal || $env->is_multiline) {
+                $value = trim($env->real_value, "'");
+                $escapedValue = escapeBashEnvValue($value);
+                $envs_dict[$env->key] = $escapedValue;
+            } else {
+                $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                $envs_dict[$env->key] = $escapedValue;
+            }
+        }
+        
+        // 4. Add COOLIFY variables (can override nixpacks, but shouldn't happen in practice)
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         foreach ($coolify_envs as $key => $item) {
             $envs_dict[$key] = escapeBashEnvValue($item);
         }
 
-        // 3. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
+        // 5. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
         if ($this->build_pack === 'dockercompose') {
             if ($this->pull_request_id === 0) {
                 // Generate SERVICE_NAME for dockercompose services from processed compose
@@ -1521,7 +1560,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
+        // 6. Add user-defined build-time variables LAST (highest priority - can override everything)
         if ($this->pull_request_id === 0) {
             $sorted_environment_variables = $this->application->environment_variables()
                 ->where('is_buildtime', true)  // ONLY build-time variables
@@ -4111,5 +4150,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
         }
+    }
+
+    private function add_server_identity_variables($envs)
+    {
+        // Add automatic server identity variables (read-only, not overrideable)
+        $envs->push('COOLIFY_SERVER_ID='.$this->server->id);
+        $envs->push('COOLIFY_SERVER_NAME='.$this->server->name);
+        $envs->push('COOLIFY_SERVER_HOSTNAME='.$this->server->ip);
+        $envs->push('COOLIFY_SERVER_IP='.$this->server->ip);
+    }
+
+    private function add_server_identity_variables_to_dict(&$envs_dict)
+    {
+        // Add automatic server identity variables (read-only, not overrideable)
+        $envs_dict['COOLIFY_SERVER_ID'] = escapeBashEnvValue($this->server->id);
+        $envs_dict['COOLIFY_SERVER_NAME'] = escapeBashEnvValue($this->server->name);
+        $envs_dict['COOLIFY_SERVER_HOSTNAME'] = escapeBashEnvValue($this->server->ip);
+        $envs_dict['COOLIFY_SERVER_IP'] = escapeBashEnvValue($this->server->ip);
     }
 }

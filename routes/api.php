@@ -82,6 +82,10 @@ Route::group([
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/domains', [ServersController::class, 'domains_by_server'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
+    Route::get('/servers/{uuid}/environment-variables', [ServersController::class, 'environment_variables_index'])->middleware(['api.ability:read']);
+    Route::post('/servers/{uuid}/environment-variables', [ServersController::class, 'environment_variables_store'])->middleware(['api.ability:write']);
+    Route::put('/servers/{uuid}/environment-variables/{envUuid}', [ServersController::class, 'environment_variables_update'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/environment-variables/{envUuid}', [ServersController::class, 'environment_variables_destroy'])->middleware(['api.ability:write']);
 
     Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:read']);
 

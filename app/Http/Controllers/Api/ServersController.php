@@ -11,6 +11,7 @@ use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Models\ServerEnvironmentVariable;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -832,5 +833,328 @@ class ServersController extends Controller
         ValidateServer::dispatch($server);
 
         return response()->json(['message' => 'Validation started.'], 201);
+    }
+
+    #[OA\Get(
+        summary: 'List Server Environment Variables',
+        description: 'List all environment variables for a server.',
+        path: '/servers/{uuid}/environment-variables',
+        operationId: 'list-server-environment-variables',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Server UUID'
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Success',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: [
+                            'type' => 'array',
+                            'items' => new OA\Items(ref: '#/components/schemas/ServerEnvironmentVariable')
+                        ]
+                    )
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function environment_variables_index(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $environmentVariables = $server->environment_variables()->get();
+        return response()->json($environmentVariables);
+    }
+
+    #[OA\Post(
+        summary: 'Create Server Environment Variable',
+        description: 'Create a new environment variable for a server.',
+        path: '/servers/{uuid}/environment-variables',
+        operationId: 'create-server-environment-variable',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Server UUID'
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['key'],
+                        properties: [
+                            'key' => ['type' => 'string', 'description' => 'Environment variable key'],
+                            'value' => ['type' => 'string', 'description' => 'Environment variable value'],
+                            'is_literal' => ['type' => 'boolean', 'description' => 'Whether the value should be treated as literal'],
+                            'is_multiline' => ['type' => 'boolean', 'description' => 'Whether the value is multiline'],
+                            'is_buildtime' => ['type' => 'boolean', 'description' => 'Whether the variable is available at build time'],
+                            'is_runtime' => ['type' => 'boolean', 'description' => 'Whether the variable is available at runtime'],
+                        ]
+                    )
+                )
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Success',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Items(ref: '#/components/schemas/ServerEnvironmentVariable')
+                    )
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function environment_variables_store(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'key' => 'required|string',
+            'value' => 'nullable|string',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_buildtime' => 'boolean',
+            'is_runtime' => 'boolean',
+        ]);
+
+        // Check if key already exists for this server
+        $existing = $server->environment_variables()->where('key', $validated['key'])->first();
+        if ($existing) {
+            return response()->json(['message' => 'Environment variable with this key already exists.'], 422);
+        }
+
+        $environmentVariable = $server->environment_variables()->create($validated);
+        return response()->json($environmentVariable, 201);
+    }
+
+    #[OA\Put(
+        summary: 'Update Server Environment Variable',
+        description: 'Update an existing environment variable for a server.',
+        path: '/servers/{uuid}/environment-variables/{envUuid}',
+        operationId: 'update-server-environment-variable',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Server UUID'
+            ),
+            new OA\Parameter(
+                name: 'envUuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Environment Variable UUID'
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'key' => ['type' => 'string', 'description' => 'Environment variable key'],
+                            'value' => ['type' => 'string', 'description' => 'Environment variable value'],
+                            'is_literal' => ['type' => 'boolean', 'description' => 'Whether the value should be treated as literal'],
+                            'is_multiline' => ['type' => 'boolean', 'description' => 'Whether the value is multiline'],
+                            'is_buildtime' => ['type' => 'boolean', 'description' => 'Whether the variable is available at build time'],
+                            'is_runtime' => ['type' => 'boolean', 'description' => 'Whether the variable is available at runtime'],
+                        ]
+                    )
+                )
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Success',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Items(ref: '#/components/schemas/ServerEnvironmentVariable')
+                    )
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function environment_variables_update(Request $request, $uuid, $envUuid)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $environmentVariable = $server->environment_variables()->where('uuid', $envUuid)->first();
+        if (! $environmentVariable) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'key' => 'string',
+            'value' => 'nullable|string',
+            'is_literal' => 'boolean',
+            'is_multiline' => 'boolean',
+            'is_buildtime' => 'boolean',
+            'is_runtime' => 'boolean',
+        ]);
+
+        // Check if key already exists for another environment variable
+        if (isset($validated['key'])) {
+            $existing = $server->environment_variables()
+                ->where('key', $validated['key'])
+                ->where('id', '!=', $environmentVariable->id)
+                ->first();
+            if ($existing) {
+                return response()->json(['message' => 'Environment variable with this key already exists.'], 422);
+            }
+        }
+
+        $environmentVariable->update($validated);
+        return response()->json($environmentVariable);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Server Environment Variable',
+        description: 'Delete an environment variable from a server.',
+        path: '/servers/{uuid}/environment-variables/{envUuid}',
+        operationId: 'delete-server-environment-variable',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Server UUID'
+            ),
+            new OA\Parameter(
+                name: 'envUuid',
+                in: 'path',
+                required: true,
+                schema: ['type' => 'string'],
+                description: 'Environment Variable UUID'
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 204,
+                description: 'Success'
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function environment_variables_destroy(Request $request, $uuid, $envUuid)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $environmentVariable = $server->environment_variables()->where('uuid', $envUuid)->first();
+        if (! $environmentVariable) {
+            return response()->json(['message' => 'Environment variable not found.'], 404);
+        }
+
+        $environmentVariable->delete();
+        return response()->json(null, 204);
     }
 }

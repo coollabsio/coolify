@@ -283,6 +283,11 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function environment_variables()
+    {
+        return $this->hasMany(ServerEnvironmentVariable::class);
+    }
+
     public function dockerCleanupExecutions()
     {
         return $this->hasMany(DockerCleanupExecution::class);
