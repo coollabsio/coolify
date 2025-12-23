@@ -31,6 +31,8 @@ class Database extends Component
 
     public ?int $publicPort = null;
 
+    public ?int $proxyTimeout = null;
+
     public bool $isPublic = false;
 
     public bool $isLogDrainEnabled = false;
@@ -43,6 +45,7 @@ class Database extends Component
         'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer',
+        'proxyTimeout' => 'nullable|integer|min:0|max:86400',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
     ];
@@ -75,6 +78,7 @@ class Database extends Component
             $this->database->image = $this->image;
             $this->database->exclude_from_status = $this->excludeFromStatus;
             $this->database->public_port = $this->publicPort;
+            $this->database->proxy_timeout = $this->proxyTimeout;
             $this->database->is_public = $this->isPublic;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
         } else {
@@ -83,6 +87,7 @@ class Database extends Component
             $this->image = $this->database->image;
             $this->excludeFromStatus = $this->database->exclude_from_status ?? false;
             $this->publicPort = $this->database->public_port;
+            $this->proxyTimeout = $this->database->proxy_timeout;
             $this->isPublic = $this->database->is_public ?? false;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled ?? false;
         }

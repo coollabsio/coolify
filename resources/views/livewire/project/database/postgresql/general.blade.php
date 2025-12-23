@@ -163,8 +163,14 @@
                         <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                             canGate="update" :canResource="$database" />
                     </div>
-                    <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
-                        label="Public Port" canGate="update" :canResource="$database" />
+                    <div class="flex items-end gap-2">
+                        <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                            label="Public Port" canGate="update" :canResource="$database" />
+                        <x-forms.input value="1800" id="proxyTimeout"
+                            label="Proxy Timeout (seconds)"
+                            helper="Maximum time in seconds to keep connections open. Default is 1800 seconds (30 minutes) and max is 86400 seconds (24 hours)"
+                            canGate="update" :canResource="$database" />
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-2">

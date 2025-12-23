@@ -32,6 +32,9 @@
             <div class="flex items-end gap-2">
                 <x-forms.input canGate="update" :canResource="$database" placeholder="5432" disabled="{{ $database->is_public }}" id="publicPort"
                     label="Public Port" />
+                <x-forms.input canGate="update" :canResource="$database" value="1800" id="proxyTimeout"
+                    label="Proxy Timeout (seconds)"
+                    helper="Maximum time in seconds to keep connections open. Default is 1800 seconds (30 minutes) and max is 86400 seconds (24 hours)" />
                 <x-forms.checkbox canGate="update" :canResource="$database" instantSave id="isPublic" label="Make it publicly available" />
             </div>
             @if ($db_url_public)

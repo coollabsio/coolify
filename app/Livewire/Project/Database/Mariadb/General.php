@@ -44,6 +44,8 @@ class General extends Component
 
     public ?int $publicPort = null;
 
+    public ?int $proxyTimeout = null;
+
     public bool $isLogDrainEnabled = false;
 
     public ?string $customDockerRunOptions = null;
@@ -79,6 +81,8 @@ class General extends Component
             'portsMappings' => 'nullable',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
+            'proxyTimeout' => 'nullable|integer|min:0|max:86400',
+            'proxyTimeout' => 'nullable|integer|min:0|max:86400',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
             'enableSsl' => 'boolean',
@@ -115,6 +119,8 @@ class General extends Component
         'portsMappings' => 'Port Mapping',
         'isPublic' => 'Is Public',
         'publicPort' => 'Public Port',
+        'proxyTimeout' => 'Proxy Timeout',
+        'proxyTimeout' => 'Proxy Timeout',
         'customDockerRunOptions' => 'Custom Docker Options',
         'enableSsl' => 'Enable SSL',
     ];
@@ -156,6 +162,7 @@ class General extends Component
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort;
+            $this->database->proxy_timeout = $this->proxyTimeout;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->enable_ssl = $this->enableSsl;
@@ -175,6 +182,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->proxyTimeout = $this->database->proxy_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->enableSsl = $this->database->enable_ssl;
