@@ -81,6 +81,7 @@ class StartDatabaseProxy
         server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_socket_keepalive on;
             {$timeoutDirective}
         }
     }
