@@ -22,6 +22,17 @@ class StartDatabaseProxy
 
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
+        // Validate proxy timeout
+        if (!isset($database->proxy_timeout) || $database->proxy_timeout === null) {
+            throw new \Exception('Proxy timeout is required.');
+        }
+        if ($database->proxy_timeout <= 0) {
+            throw new \Exception('Proxy timeout must be greater than 0.');
+        }
+        if ($database->proxy_timeout > 86400) {
+            throw new \Exception('Proxy timeout must not exceed 86400 seconds (24 hours).');
+        }
+
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
         $server = data_get($database, 'destination.server');
@@ -56,7 +67,7 @@ class StartDatabaseProxy
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
         $proxyTimeout = $database->proxy_timeout ?? 1800; // Default to 30 minutes if not set
-        $timeoutDirective = $proxyTimeout > 0 ? "proxy_timeout {$proxyTimeout}s;" : "";
+        $timeoutDirective = "proxy_timeout {$proxyTimeout}s;";
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
