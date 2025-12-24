@@ -14,10 +14,10 @@ class ValidationPatterns
     public const NAME_PATTERN = '/^[a-zA-Z0-9\s\-_.:\/()]+$/';
 
     /**
-     * Pattern for descriptions (allows more characters including quotes, commas, etc.)
-     * More permissive than names but still restricts dangerous characters
+     * Pattern for descriptions (allows Unicode letters/numbers including quotes, commas, etc.)
+     * Uses Unicode character classes to support non-ASCII characters (Japanese, Turkish, Chinese, etc.)
      */
-    public const DESCRIPTION_PATTERN = '/^[a-zA-Z0-9\s\-_.:\/()\'\",.!?@#%&+=\[\]{}|~`*]+$/';
+    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{N}\s\-_.:\/()\'\",.!?@#%&+=\[\]{}|~`*]+$/u';
 
     /**
      * Get validation rules for name fields
@@ -78,7 +78,7 @@ class ValidationPatterns
     public static function descriptionMessages(): array
     {
         return [
-            'description.regex' => 'The description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+            'description.regex' => 'The description contains invalid characters. Letters (including Unicode), numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
             'description.max' => 'The description may not be greater than :max characters.',
         ];
     }
