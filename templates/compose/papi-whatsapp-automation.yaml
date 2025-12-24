@@ -2,14 +2,10 @@
 # slogan: WhatsApp API powered by Baileys for automation and messaging
 # category: backend
 # tags: pastorini-api,whatsapp,api,baileys,postgres,redis,automation,messaging
-# logo: svgs/pastorini-api.svg
-# port: 3000
 
-version: '3.8'
 services:
   pastorini-api:
-    image: 'mgpastorini/pastorini-api:latest'
-    restart: always
+    image: 'mgpastorini/pastorini-api:1.4.3'
     depends_on:
       - redis
       - postgres
@@ -38,14 +34,12 @@ services:
       - 3000
   redis:
     image: 'redis:alpine'
-    restart: always
     volumes:
       - 'redis_data:/data'
     expose:
       - 6379
   postgres:
     image: 'postgres:13-alpine'
-    restart: always
     environment:
       - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
       - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
@@ -54,8 +48,3 @@ services:
       - 'postgres_data:/var/lib/postgresql/data'
     expose:
       - 5432
-volumes:
-  pastorini_sessions: null
-  pastorini_media: null
-  redis_data: null
-  postgres_data: null
