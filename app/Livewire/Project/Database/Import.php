@@ -236,7 +236,11 @@ EOD;
         $this->authorize('view', $resource);
         $this->resource = $resource;
         $this->server = $this->resource->destination->server;
-        $this->container = $this->resource->uuid;
+        if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $this->container = data_get($this->resource, 'service.uuid') . '-' . $this->resource->name;
+        } else {
+            $this->container = $this->resource->uuid;
+        }
         if (str(data_get($this, 'resource.status'))->startsWith('running')) {
             $this->containers->push($this->container);
         }
@@ -606,6 +610,20 @@ EOD;
                     $restoreCommand .= "{$tmpPath}";
                 }
                 break;
+
+            case \App\Models\ServiceDatabase::class:
+                $databaseType = $this->resource->type;
+                if (str($databaseType)->contains('postgres')) {
+                    $restoreCommand = "pg_restore -U \$POSTGRES_USER -d \$POSTGRES_DB {$tmpPath}";
+                } elseif (str($databaseType)->contains('mysql')) {
+                    $restoreCommand = "mysql -u \$MYSQL_USER -p\$MYSQL_PASSWORD \$MYSQL_DATABASE < {$tmpPath}";
+                } elseif (str($databaseType)->contains('mariadb')) {
+                    $restoreCommand = "mariadb -u \$MARIADB_USER -p\$MARIADB_PASSWORD \$MARIADB_DATABASE < {$tmpPath}";
+                } else {
+                    $restoreCommand = '';
+                }
+                break;
+                    
             default:
                 $restoreCommand = '';
         }
