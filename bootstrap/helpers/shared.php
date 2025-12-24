@@ -2076,6 +2076,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $topLevelSecrets = collect(data_get($yaml, 'secrets', []));
         $services = data_get($yaml, 'services');
 
+        $shouldManageDatabases = $pull_request_id === 0;
+        [$companionService, $potentialDatabaseServices] = prepareDockerComposeApplicationDatabases($resource, $services, $shouldManageDatabases);
+        $createdDatabaseServices = collect([]);
+
         $generatedServiceFQDNS = collect([]);
         if (is_null($resource->destination)) {
             $destination = $server->destinations()->first();
@@ -2088,7 +2092,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $companionService, $shouldManageDatabases, &$createdDatabaseServices) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2391,6 +2395,20 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+
+            if ($shouldManageDatabases && $companionService && $isDatabase) {
+                $serviceDatabase = ServiceDatabase::firstOrCreate([
+                    'name' => $serviceName,
+                    'service_id' => $companionService->id,
+                ], [
+                    'image' => $image,
+                ]);
+                if ($serviceDatabase->image !== $image) {
+                    $serviceDatabase->image = $image;
+                    $serviceDatabase->save();
+                }
+                $createdDatabaseServices->push($serviceName);
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -2775,6 +2793,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_forget($services, $serviceName);
             });
         }
+
         $finalServices = [
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),
@@ -2784,6 +2803,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         ];
         $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
         $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+
+        if ($shouldManageDatabases && $companionService) {
+            $namesToKeep = $createdDatabaseServices->unique();
+            if ($namesToKeep->isEmpty()) {
+                ServiceDatabase::where('service_id', $companionService->id)->delete();
+            } else {
+                ServiceDatabase::where('service_id', $companionService->id)
+                    ->whereNotIn('name', $namesToKeep)
+                    ->delete();
+            }
+            $companionService->docker_compose_raw = $resource->docker_compose_raw;
+            $companionService->docker_compose = $resource->docker_compose;
+            $companionService->save();
+        }
+
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
@@ -2987,6 +3021,55 @@ function loggy($message = null, array $context = [])
     }
 
     return app('log')->debug($message, $context);
+}
+
+function prepareDockerComposeApplicationDatabases(Application $resource, $services, bool $shouldManageDatabases): array
+{
+    $companionService = null;
+    $databaseServiceNames = collect([]);
+
+    if (! $shouldManageDatabases) {
+        return [$companionService, $databaseServiceNames];
+    }
+
+    $servicesCollection = collect($services);
+    $databaseServiceNames = $servicesCollection->filter(function ($service) {
+        $image = data_get_str($service, 'image');
+
+        return isDatabaseImage($image, $service);
+    })->keys()->values();
+
+    $companionService = Service::withTrashed()->where('uuid', $resource->uuid)->first();
+    if ($companionService?->trashed()) {
+        $companionService->restore();
+    }
+
+    if ($databaseServiceNames->isNotEmpty() || $companionService) {
+        if ($databaseServiceNames->isNotEmpty() && ! data_get($resource, 'settings.is_consistent_container_name_enabled')) {
+            $resource->settings->is_consistent_container_name_enabled = true;
+            $resource->settings->save();
+        }
+        if (! $companionService) {
+            $companionService = new Service([
+                'uuid' => $resource->uuid,
+            ]);
+        }
+
+        $companionService->name = $resource->name;
+        $companionService->environment_id = $resource->environment_id;
+        $companionService->server_id = data_get($resource, 'destination.server.id');
+        $companionService->service_type = $companionService->service_type ?? 'dockercompose';
+        $companionService->docker_compose_raw = $resource->docker_compose_raw ?? '';
+        $companionService->docker_compose = $resource->docker_compose ?? null;
+
+        if ($resource->destination) {
+            $companionService->destination()->associate($resource->destination);
+        }
+
+        $companionService->save();
+    }
+
+    return [$companionService, $databaseServiceNames];
 }
 function sslipDomainWarning(string $domains)
 {

@@ -404,6 +404,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $parsedServices = collect([]);
 
+    $shouldManageDatabases = ! $isPullRequest;
+    [$companionService, $potentialDatabaseServices] = prepareDockerComposeApplicationDatabases($resource, $services, $shouldManageDatabases);
+    $createdDatabaseServices = collect([]);
+
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
         // Validate service name for command injection
@@ -1171,6 +1175,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         );
 
         $isDatabase = isDatabaseImage($image, $service);
+        if ($shouldManageDatabases && $companionService && $isDatabase) {
+            $serviceDatabase = ServiceDatabase::firstOrCreate([
+                'name' => $serviceName,
+                'service_id' => $companionService->id,
+            ], [
+                'image' => $image,
+            ]);
+
+            if ($serviceDatabase->image !== $image) {
+                $serviceDatabase->image = $image;
+                $serviceDatabase->save();
+            }
+
+            $createdDatabaseServices->push($serviceName);
+        }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
@@ -1392,6 +1411,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     } catch (\Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
         ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
+    }
+
+    if ($shouldManageDatabases && $companionService) {
+        $namesToKeep = $createdDatabaseServices->unique();
+        if ($namesToKeep->isEmpty()) {
+            ServiceDatabase::where('service_id', $companionService->id)->delete();
+        } else {
+            ServiceDatabase::where('service_id', $companionService->id)
+                ->whereNotIn('name', $namesToKeep)
+                ->delete();
+        }
+        $companionService->docker_compose_raw = $resource->docker_compose_raw;
+        $companionService->docker_compose = $resource->docker_compose;
+        $companionService->save();
     }
 
     data_forget($resource, 'environment_variables');
