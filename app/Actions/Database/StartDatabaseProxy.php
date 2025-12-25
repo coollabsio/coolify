@@ -56,11 +56,16 @@ class StartDatabaseProxy
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
 
-        // Get timeout from database config (default to "0" which means no timeout)
-        $timeout = $database->public_proxy_timeout ?? '0';
-        // If timeout is 0 or empty, set to 7 days (effectively unlimited)
-        // Otherwise use the user-specified value
-        $timeoutValue = ($timeout === '0' || empty($timeout)) ? '7d' : $timeout;
+        // Get timeout from database config (in seconds, 0 = unlimited)
+        $timeoutSeconds = $database->public_proxy_timeout ?? 0;
+        
+        // Convert seconds to nginx time format
+        // 0 = unlimited (use 7 days)
+        if ($timeoutSeconds === 0 || $timeoutSeconds === null) {
+            $timeoutValue = '604800s'; // 7 days in seconds
+        } else {
+            $timeoutValue = $timeoutSeconds.'s';
+        }
 
         $nginxconf = <<<EOF
     user  nginx;

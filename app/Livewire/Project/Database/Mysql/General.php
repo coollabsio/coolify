@@ -44,7 +44,7 @@ class General extends Component
 
     public ?int $publicPort = null;
 
-    public ?string $publicProxyTimeout = null;
+    public ?int $publicProxyTimeout = null;
 
     public bool $isLogDrainEnabled = false;
 
@@ -83,7 +83,7 @@ class General extends Component
             'portsMappings' => 'nullable',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
-            'publicProxyTimeout' => 'nullable|string',
+            'publicProxyTimeout' => 'nullable|integer|min:0',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
             'enableSsl' => 'boolean',

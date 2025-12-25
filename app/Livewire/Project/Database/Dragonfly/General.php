@@ -36,7 +36,7 @@ class General extends Component
 
     public ?int $publicPort = null;
 
-    public ?string $publicProxyTimeout = null;
+    public ?int $publicProxyTimeout = null;
 
     public ?string $customDockerRunOptions = null;
 
@@ -93,7 +93,7 @@ class General extends Component
             'portsMappings' => 'nullable|string',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
-            'publicProxyTimeout' => 'nullable|string',
+            'publicProxyTimeout' => 'nullable|integer|min:0',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',
