@@ -60,42 +60,44 @@
         </div>
         @if (str(data_get($resource, 'status'))->startsWith('running'))
             {{-- Restore Command Configuration --}}
-            @if ($resource->type() === 'standalone-postgresql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
-                    <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
-                    </div>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
-                </div>
-            @elseif ($resource->type() === 'standalone-mysql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
-                </div>
-            @elseif ($resource->type() === 'standalone-mariadb')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
-                </div>
-            @endif
+            
+        @if (str($resource->type())->contains('postgres'))
+    @if ($dumpAll)
+        <x-forms.textarea rows="6" readonly label="Custom Import Command"
+            wire:model='restoreCommandText'></x-forms.textarea>
+    @else
+        <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
+        <div class="flex flex-col gap-1 pt-1">
+            <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding conflicts.</span>
+            <span class="text-xs">You can add "--verbose" to log more things.</span>
+        </div>
+    @endif
+    <div class="w-64 pt-2">
+        <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+    </div>
+
+@elseif (str($resource->type())->contains('mysql'))
+    @if ($dumpAll)
+        <x-forms.textarea rows="14" readonly label="Custom Import Command"
+            wire:model='restoreCommandText'></x-forms.textarea>
+    @else
+        <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
+    @endif
+    <div class="w-64 pt-2">
+        <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+    </div>
+
+@elseif (str($resource->type())->contains('mariadb'))
+    @if ($dumpAll)
+        <x-forms.textarea rows="14" readonly label="Custom Import Command"
+            wire:model='restoreCommandText'></x-forms.textarea>
+    @else
+        <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
+    @endif
+    <div class="w-64 pt-2">
+        <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+    </div>
+@endif
 
             {{-- Restore Type Selection Boxes --}}
             <h3 class="pt-6">Choose Restore Method</h3>

@@ -223,28 +223,47 @@ EOD;
 
     }
 
-    public function getContainers()
-    {
-        $this->containers = collect();
-        if (! data_get($this->parameters, 'database_uuid')) {
-            abort(404);
-        }
-        $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
-        if (is_null($resource)) {
-            abort(404);
-        }
-        $this->authorize('view', $resource);
-        $this->resource = $resource;
-        $this->server = $this->resource->destination->server;
-        if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $this->container = data_get($this->resource, 'service.uuid') . '-' . $this->resource->name;
-        } else {
-            $this->container = $this->resource->uuid;
-        }
-        if (str(data_get($this, 'resource.status'))->startsWith('running')) {
-            $this->containers->push($this->container);
-        }
+public function getContainers()
+{
+    $this->containers = collect();
+    
+    if (! data_get($this->parameters, 'database_uuid')) {
+        abort(404);
+    }
 
+    $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
+    
+    if (is_null($resource)) {
+        abort(404);
+    }
+
+    $this->authorize('view', $resource);
+    $this->resource = $resource;
+    $this->server = $this->resource->destination->server;
+
+    // Handle container naming for Service Databases vs Standalone
+    if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        $this->container = data_get($this->resource, 'service.uuid') . '-' . $this->resource->name;
+    } else {
+        $this->container = $this->resource->uuid;
+    }
+
+    // Only allow import if the container is actually running
+    if (str(data_get($this, 'resource.status'))->startsWith('running')) {
+        $this->containers->push($this->container);
+    }
+
+    // Determine if the database type is supported for restore/import
+    $isService = $this->resource->getMorphClass() === \App\Models\ServiceDatabase::class;
+
+    if ($isService) {
+        $databaseType = $this->resource->type;
+        // If it's a service, we only support postgres, mysql, mariadb, and mongodb
+        if (!str($databaseType)->contains(['postgres', 'mysql', 'mariadb', 'mongo'])) {
+            $this->unsupported = true;
+        }
+    } else {
+        // For Standalone databases, check against the known unsupported types
         if (
             $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
@@ -254,6 +273,7 @@ EOD;
             $this->unsupported = true;
         }
     }
+}
 
     public function checkFile()
     {
