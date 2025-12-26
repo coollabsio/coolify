@@ -337,12 +337,6 @@ $ ./vendor/bin/pint --test
   PASS  No style issues found.
 \`\`\`
 
-### Static Analysis (PHPStan)
-\`\`\`
-$ ./vendor/bin/phpstan analyse
- [OK] No errors
-\`\`\`
-
 ### Manual Testing
 - [x] Created S3 storage with path prefix "instance-1"
 - [x] Validated connection successfully
