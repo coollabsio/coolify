@@ -660,7 +660,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedSecret = escapeshellarg($secret);
 
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+
+            // Build S3 path with optional prefix
+            $s3Path = $bucket;
+            if (filled($this->s3->path)) {
+                $pathPrefix = ltrim($this->s3->path, '/');
+                $s3Path .= '/'.$pathPrefix;
+            }
+            $s3Path .= $this->backup_dir.'/';
+
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/{$s3Path}";
             instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
