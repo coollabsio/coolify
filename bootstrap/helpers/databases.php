@@ -209,6 +209,18 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         $filenames = [$filenames];
     }
 
+    // Apply path prefix if configured
+    if (filled($s3->path)) {
+        $pathPrefix = ltrim($s3->path, '/');
+        $filenames = array_map(function ($filename) use ($pathPrefix) {
+            // The filename is the local path (e.g., /var/lib/coolify/backups/databases/...)
+            // We need to prepend the path prefix to match the S3 key structure
+            $cleanFilename = ltrim($filename, '/');
+
+            return $pathPrefix.'/'.$cleanFilename;
+        }, $filenames);
+    }
+
     $disk = Storage::build([
         'driver' => 's3',
         'key' => $s3->key,
