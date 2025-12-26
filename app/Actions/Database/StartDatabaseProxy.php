@@ -11,6 +11,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Rules\ValidNginxTimeFormat;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -56,15 +57,15 @@ class StartDatabaseProxy
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
 
-        // Get timeout from database config (in seconds, 0 = unlimited)
-        $timeoutSeconds = $database->public_proxy_timeout ?? 0;
+        // Get timeout from database config (supports nginx time format like '30s', '5m', '2h', '7d', or plain seconds)
+        $timeoutConfig = $database->public_proxy_timeout ?? '0';
         
-        // Convert seconds to nginx time format
-        // 0 = unlimited (use 7 days)
-        if ($timeoutSeconds === 0 || $timeoutSeconds === null) {
+        // Normalize the timeout value to nginx time format
+        $timeoutValue = ValidNginxTimeFormat::normalizeFormat($timeoutConfig);
+        
+        // If timeout is '0' or null, use a long default timeout (7 days)
+        if ($timeoutValue === '0' || empty($timeoutValue)) {
             $timeoutValue = '604800s'; // 7 days in seconds
-        } else {
-            $timeoutValue = $timeoutSeconds.'s';
         }
 
         $nginxconf = <<<EOF

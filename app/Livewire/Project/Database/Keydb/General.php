@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneKeydb;
+use App\Rules\ValidNginxTimeFormat;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
@@ -38,7 +39,7 @@ class General extends Component
 
     public ?int $publicPort = null;
 
-    public ?int $publicProxyTimeout = null;
+    public ?string $publicProxyTimeout = null;
 
     public ?string $customDockerRunOptions = null;
 
@@ -96,7 +97,7 @@ class General extends Component
             'portsMappings' => 'nullable|string',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
-            'publicProxyTimeout' => 'nullable|integer|min:0',
+            'publicProxyTimeout' => ['nullable', new ValidNginxTimeFormat],
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',

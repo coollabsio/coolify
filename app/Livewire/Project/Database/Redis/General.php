@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
+use App\Rules\ValidNginxTimeFormat;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
@@ -36,7 +37,7 @@ class General extends Component
 
     public ?int $publicPort = null;
 
-    public ?int $publicProxyTimeout = null;
+    public ?string $publicProxyTimeout = null;
 
     public bool $isLogDrainEnabled = false;
 
@@ -76,7 +77,7 @@ class General extends Component
             'portsMappings' => 'nullable',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
-            'publicProxyTimeout' => 'nullable|integer|min:0',
+            'publicProxyTimeout' => ['nullable', new ValidNginxTimeFormat],
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
             'redisUsername' => 'required',

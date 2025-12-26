@@ -37,8 +37,8 @@
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
+                <x-forms.input placeholder="3000:9000" id="portsMappings" label="Ports Mappings"
+                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:9000,3002:9000"
                     canGate="update" :canResource="$database" />
             </div>
             <x-forms.input label="Clickhouse URL (internal)"
@@ -76,11 +76,11 @@
                 <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
                     :canResource="$database" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
+            <x-forms.input placeholder="9000" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
-            <x-forms.input placeholder="0" type="number" min="0" id="publicProxyTimeout"
-                label="Public Proxy Timeout (seconds)"
-                helper="Timeout in seconds for TCP proxy connections. 0 = unlimited (recommended for long queries). Requires proxy restart to apply."
+            <x-forms.input placeholder="0" id="publicProxyTimeout"
+                label="Public Proxy Timeout"
+                helper="Timeout for TCP proxy connections. Accepts nginx time format (e.g., '30s', '5m', '2h', '7d') or plain seconds. 0 = unlimited (recommended for long queries). Requires proxy restart to apply."
                 canGate="update" :canResource="$database" />
         </div>
     </form>
