@@ -1314,10 +1314,10 @@ class GlobalSearch extends Component
                 'server_id' => $this->selectedServerId,
             ];
 
-            $this->redirect(route('project.resource.create', [
+            redirectRoute($this, 'project.resource.create', [
                 'project_uuid' => $this->selectedProjectUuid,
                 'environment_uuid' => $this->selectedEnvironmentUuid,
-            ] + $queryParams));
+            ] + $queryParams);
         }
     }
 
