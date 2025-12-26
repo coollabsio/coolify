@@ -91,3 +91,23 @@ test('S3Storage path attribute handles various path formats', function () {
     $s3Storage->path = 'my-instance_2024.backups';
     expect($s3Storage->path)->toBe('/my-instance_2024.backups');
 });
+
+test('S3Storage path attribute handles edge cases', function () {
+    $s3Storage = new S3Storage;
+
+    // Multiple consecutive slashes are preserved (validation should catch this)
+    $s3Storage->path = 'path//to///backup';
+    expect($s3Storage->path)->toBe('/path//to///backup');
+
+    // Path ending with slash
+    $s3Storage->path = 'backups/coolify/';
+    expect($s3Storage->path)->toBe('/backups/coolify/');
+
+    // Only whitespace should return null
+    $s3Storage->path = '   ';
+    expect($s3Storage->path)->toBeNull();
+
+    // Path with dots (valid single dots)
+    $s3Storage->path = 'path.with.dots';
+    expect($s3Storage->path)->toBe('/path.with.dots');
+});

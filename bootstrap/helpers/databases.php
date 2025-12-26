@@ -213,7 +213,7 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
     if (filled($s3->path)) {
         $pathPrefix = ltrim($s3->path, '/');
         $filenames = array_map(function ($filename) use ($pathPrefix) {
-            // The filename is the local path (e.g., /var/lib/coolify/backups/databases/...)
+            // The filename is the backup path (e.g., /data/coolify/backups/databases/...)
             // We need to prepend the path prefix to match the S3 key structure
             $cleanFilename = ltrim($filename, '/');
 
