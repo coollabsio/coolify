@@ -29,7 +29,8 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
         $server->proxy->set('status', $status);
         $server->save();
 
-        ProxyStatusChangedUI::dispatch($server->team_id);
+        $versionCheckDispatched = false;
+
         if ($status === 'running') {
             $server->setupDefaultRedirect();
             $server->setupDynamicProxyConfiguration();
@@ -40,7 +41,9 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
             if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
                 $traefikVersions = get_traefik_versions();
                 if ($traefikVersions !== null) {
+                    // Version check job will dispatch ProxyStatusChangedUI when complete
                     CheckTraefikVersionForServerJob::dispatch($server, $traefikVersions);
+                    $versionCheckDispatched = true;
                 } else {
                     Log::warning('Traefik version check skipped after proxy status change: versions.json data unavailable', [
                         'server_id' => $server->id,
@@ -49,6 +52,13 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
                 }
             }
         }
+
+        // Only dispatch UI refresh if version check wasn't dispatched
+        // (version check job handles its own UI refresh with updated version data)
+        if (! $versionCheckDispatched) {
+            ProxyStatusChangedUI::dispatch($server->team_id);
+        }
+
         if ($status === 'created') {
             instant_remote_process([
                 'docker rm -f coolify-proxy',
