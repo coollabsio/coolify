@@ -28,58 +28,75 @@
     <div wire:target='loadDeployments' wire:loading.remove>
         <div class="flex flex-col gap-2">
             @forelse ($deployments as $deployment)
-                <div class="bg-white border rounded-sm dark:border-coolgray-300 dark:bg-coolgray-100 border-neutral-200 p-4">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2">
-                                @if (data_get($deployment, 'is_current'))
-                                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                        CURRENT
-                                    </span>
-                                @endif
-                                <span class="font-mono text-sm">
-                                    {{ Str::limit(data_get($deployment, 'commit'), 12) }}
-                                </span>
-                                <span class="text-xs text-gray-400 dark:text-gray-500 font-mono">
-                                    ({{ data_get($deployment, 'deployment_uuid') }})
-                                </span>
-                            </div>
-                            @php
-                                $date = data_get($deployment, 'created_at');
-                                $interval = \Illuminate\Support\Carbon::parse($date);
-                            @endphp
-                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {{ $interval->diffForHumans() }} ({{ $interval->format('Y-m-d H:i:s') }})
-                            </div>
-                            @if (data_get($deployment, 'image_name'))
-                                <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
-                                    Image: {{ data_get($deployment, 'image_name') }}
-                                </div>
-                            @endif
+                <div @class([
+                    'bg-white border rounded-sm dark:bg-coolgray-100 p-4 border-l-2',
+                    'border-l-green-500' => data_get($deployment, 'is_current'),
+                    'border-neutral-200 dark:border-coolgray-300' => !data_get($deployment, 'is_current'),
+                ])>
+                    <div class="flex flex-col gap-2">
+                        {{-- Row 1: Deployment path --}}
+                        <div class="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                            /data/coolify/applications/{{ $application->uuid }}/deployments/{{ data_get($deployment, 'deployment_uuid') }}
                         </div>
-                        <div class="flex flex-col items-end gap-2">
-                            @if (data_get($deployment, 'image_exists'))
-                                <span class="text-xs text-green-600 dark:text-green-400">Image available</span>
+
+                        {{-- Row 3: Date --}}
+                        @php
+                            $date = data_get($deployment, 'created_at');
+                            $interval = \Illuminate\Support\Carbon::parse($date);
+                        @endphp
+                        <div class="text-sm text-neutral-500 dark:text-neutral-400">
+                            {{ $interval->format('Y-m-d H:i:s') }}
+                        </div>
+
+                        {{-- Row 4: Image name (if available) --}}
+                        @if (data_get($deployment, 'image_name'))
+                            <div class="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                                Image: {{ data_get($deployment, 'image_name') }}
+                            </div>
+                        @endif
+
+                        {{-- Row 5: Commit info (git-based) OR Deployment time (pure Dockerfile) + Rollback button --}}
+                        <div class="flex items-center gap-2 flex-wrap">
+                            @if ($application->dockerfile && data_get($deployment, 'commit') === 'HEAD')
+                                {{-- Pure Dockerfile deployment - show deployment timestamp --}}
+                                <span class="text-sm text-neutral-500 dark:text-neutral-400">Deployed:</span>
+                                <span class="text-sm">{{ data_get($deployment, 'created_at')->format('Y-m-d H:i:s') }}</span>
                             @else
-                                <span class="text-xs text-yellow-600 dark:text-yellow-400">Rebuild required</span>
+                                {{-- Git-based deployment - show commit info --}}
+                                <span class="text-sm text-neutral-500 dark:text-neutral-400">Commit:</span>
+                                <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                   target="_blank"
+                                   class="underline text-sm">
+                                    {{ substr(data_get($deployment, 'commit'), 0, 7) }}
+                                </a>
+                                @if (data_get($deployment, 'commit_message'))
+                                    <span class="text-neutral-500 dark:text-neutral-400">-</span>
+                                    <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                       target="_blank"
+                                       class="text-neutral-500 dark:text-neutral-400 underline text-sm truncate max-w-md">
+                                        {{ Str::before(data_get($deployment, 'commit_message'), "\n") }}
+                                    </a>
+                                @endif
+                            @endif
+
+                            @if (!data_get($deployment, 'image_exists'))
+                                <span class="text-xs text-yellow-600 dark:text-yellow-400">(Rebuild required)</span>
                             @endif
 
                             @can('deploy', $application)
-                                @if (data_get($deployment, 'is_current'))
-                                    <x-forms.button disabled tooltip="This deployment is currently running.">
-                                        Current
-                                    </x-forms.button>
-                                @elseif (data_get($deployment, 'can_instant_rollback'))
+                                @if (data_get($deployment, 'can_instant_rollback'))
                                     <x-forms.button
                                         wire:click="rollbackToDeployment('{{ data_get($deployment, 'deployment_uuid') }}')"
+                                        class="ml-auto"
                                         isHighlighted>
-                                        Instant Rollback
+                                        Rollback
                                     </x-forms.button>
                                 @elseif (data_get($deployment, 'can_rebuild_rollback'))
                                     <x-forms.button
                                         wire:click="rollbackToDeployment('{{ data_get($deployment, 'deployment_uuid') }}')"
-                                        class="bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600">
-                                        Rollback (Rebuild)
+                                        class="ml-auto"
+                                        isHighlighted>
+                                        Rollback
                                     </x-forms.button>
                                 @endif
                             @endcan
@@ -87,7 +104,7 @@
                     </div>
                 </div>
             @empty
-                <div class="text-gray-500 dark:text-gray-400">
+                <div class="text-neutral-500 dark:text-neutral-400">
                     No deployment history found. Deploy your application to enable rollback functionality.
                 </div>
             @endforelse

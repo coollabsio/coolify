@@ -34,6 +34,7 @@ use OpenApi\Attributes as OA;
         'destination_id' => ['type' => 'string'],
         'only_this_server' => ['type' => 'boolean'],
         'rollback' => ['type' => 'boolean'],
+        'rollback_deployment_uuid' => ['type' => 'string', 'nullable' => true],
         'commit_message' => ['type' => 'string'],
     ],
 )]

@@ -69,6 +69,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $rollback;
 
+    private ?string $rollback_deployment_uuid = null;
+
+    private ?array $rollback_snapshot = null;
+
     private bool $force_rebuild;
 
     private bool $restart_only;
@@ -124,6 +128,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * (for image tagging, docker-compose, and metadata).
      */
     private ?string $cachedConfigHash = null;
+
+    /**
+     * Cached deployment timestamp computed once at the start of deployment.
+     * Used for image tagging in pure Dockerfile deployments where no git commit exists.
+     * Format: YmdHis (e.g., 20251219143025)
+     */
+    private ?string $cachedDeploymentTimestamp = null;
 
     private bool $is_debug_enabled;
 
@@ -209,6 +220,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
         $this->rollback = $this->application_deployment_queue->rollback;
+        $this->rollback_deployment_uuid = $this->application_deployment_queue->rollback_deployment_uuid;
         $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         if ($this->disableBuildCache) {
@@ -292,6 +304,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
+
+            // Load and apply rollback snapshot if this is a rollback rebuild
+            if ($this->rollback && $this->rollback_deployment_uuid) {
+                $this->rollback_snapshot = $this->loadRollbackSnapshot();
+                if ($this->rollback_snapshot) {
+                    $this->applyRollbackConfiguration();
+                }
+            }
+
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
 
@@ -498,6 +519,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Mark deployment as complete FIRST, before any other operations
         // This ensures the deployment status is FINISHED even if subsequent operations fail
         $this->completeDeployment();
+
+        // Save versioned deployment snapshot for rollback functionality
+        // This must be called AFTER completeDeployment() sets status to FINISHED
+        $this->save_deployment_snapshot();
 
         // Then handle side effects - these should not fail the deployment
         try {
@@ -1004,8 +1029,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Save versioned deployment snapshot for rollback functionality
-        $this->save_deployment_snapshot();
     }
 
     private function save_deployment_snapshot()
@@ -1013,11 +1036,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Only save snapshots for successful deployments (non-PR)
             if ($this->pull_request_id !== 0) {
-                return;
-            }
-
-            // Skip if deployment failed or is not finished
-            if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::FINISHED->value) {
                 return;
             }
 
@@ -1058,7 +1076,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $dockerComposeContent,
                 $envContent,
                 $dockerfileContent,
-                $this->production_image_name
+                $this->production_image_name,
+                $this->cachedConfigHash
             );
 
             // Cleanup old deployments to maintain retention policy
@@ -1161,12 +1180,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function generate_image_names()
     {
         if ($this->application->dockerfile) {
+            // Pure Dockerfile apps have no git commit, use timestamp for unique tags
+            // Include config hash for consistency (allows distinguishing same-time builds with different build args)
+            $timestamp = $this->getDeploymentTimestamp();
+            $configHash = $this->computeCurrentConfigHash();
+            $imageTag = "{$timestamp}-{$configHash}";
+
             if ($this->application->docker_registry_image_name) {
-                $this->build_image_name = "{$this->application->docker_registry_image_name}:build";
-                $this->production_image_name = "{$this->application->docker_registry_image_name}:latest";
+                $this->build_image_name = "{$this->application->docker_registry_image_name}:{$imageTag}-build";
+                $this->production_image_name = "{$this->application->docker_registry_image_name}:{$imageTag}";
             } else {
-                $this->build_image_name = "{$this->application->uuid}:build";
-                $this->production_image_name = "{$this->application->uuid}:latest";
+                $this->build_image_name = "{$this->application->uuid}:{$imageTag}-build";
+                $this->production_image_name = "{$this->application->uuid}:{$imageTag}";
             }
         } elseif ($this->application->build_pack === 'dockerimage') {
             // Check if this is an image hash deployment
@@ -1228,6 +1253,180 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->cachedConfigHash = substr($this->application->computeConfigHash(), 0, 8);
 
         return $this->cachedConfigHash;
+    }
+
+    /**
+     * Get deployment timestamp for image tagging.
+     * Returns timestamp in YmdHis format (e.g., 20251219143025).
+     *
+     * This method caches the timestamp on first computation to ensure
+     * the SAME timestamp is used throughout deployment for:
+     * - Docker image tag
+     * - docker-compose.yaml image reference
+     * - metadata.json image_name field
+     *
+     * This guarantees rollback can find the correct image for each deployment.
+     */
+    private function getDeploymentTimestamp(): string
+    {
+        if ($this->cachedDeploymentTimestamp !== null) {
+            return $this->cachedDeploymentTimestamp;
+        }
+
+        $this->cachedDeploymentTimestamp = now()->format('YmdHis');
+
+        return $this->cachedDeploymentTimestamp;
+    }
+
+    /**
+     * Load the deployment snapshot from the server for rollback rebuild.
+     * This reads the metadata.json file from the original deployment directory.
+     */
+    private function loadRollbackSnapshot(): ?array
+    {
+        if (! $this->rollback || ! $this->rollback_deployment_uuid) {
+            return null;
+        }
+
+        $deploymentDir = deployment_configuration_dir(
+            $this->application->uuid,
+            $this->rollback_deployment_uuid
+        );
+
+        $this->application_deployment_queue->addLogEntry("Loading configuration snapshot from deployment: {$this->rollback_deployment_uuid}");
+
+        $metadataJson = instant_remote_process([
+            "cat {$deploymentDir}/metadata.json 2>/dev/null || echo '{}'",
+        ], $this->server, throwError: false);
+
+        $metadata = json_decode($metadataJson, true);
+
+        if (empty($metadata) || ! isset($metadata['version'])) {
+            $this->application_deployment_queue->addLogEntry(
+                'Warning: Rollback snapshot not found or invalid. Using current configuration.',
+                'stderr'
+            );
+
+            return null;
+        }
+
+        // Check version for compatibility
+        if (version_compare($metadata['version'], '2.0', '<')) {
+            $this->application_deployment_queue->addLogEntry(
+                'Warning: Rollback snapshot is from an older version (v'.$metadata['version'].'). Some configuration may not be restored.',
+                'stderr'
+            );
+        }
+
+        $this->application_deployment_queue->addLogEntry('Snapshot loaded successfully (version '.$metadata['version'].').');
+
+        return $metadata;
+    }
+
+    /**
+     * Apply the rollback snapshot configuration to the application.
+     * This overrides application properties in memory (NOT saved to database).
+     */
+    private function applyRollbackConfiguration(): void
+    {
+        if (! $this->rollback_snapshot) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Applying configuration from rollback snapshot...');
+
+        $config = $this->rollback_snapshot['configuration_snapshot'] ?? [];
+
+        // Override application properties for this deployment
+        // These changes are NOT saved to database - only used for this build
+        $fieldsToApply = [
+            'install_command', 'build_command', 'start_command',
+            'dockerfile_location', 'base_directory', 'publish_directory',
+            'static_image', 'dockerfile', 'dockerfile_target_build',
+            'custom_docker_run_options', 'custom_labels',
+            'docker_compose_custom_build_command', 'docker_compose_custom_start_command',
+            'docker_compose_location', 'ports_exposes', 'ports_mappings',
+            'health_check_path', 'health_check_port', 'limits_memory', 'limits_cpus',
+        ];
+
+        foreach ($fieldsToApply as $field) {
+            if (array_key_exists($field, $config) && $config[$field] !== null) {
+                $this->application->setAttribute($field, $config[$field]);
+            }
+        }
+
+        // Apply settings snapshot
+        $settingsSnapshot = $this->rollback_snapshot['settings_snapshot'] ?? [];
+        if ($this->application->settings && ! empty($settingsSnapshot)) {
+            foreach ($settingsSnapshot as $key => $value) {
+                if ($value !== null) {
+                    $this->application->settings->setAttribute($key, $value);
+                }
+            }
+        }
+
+        // Store config hash from snapshot for image tagging
+        if (isset($this->rollback_snapshot['config_hash']) && $this->rollback_snapshot['config_hash']) {
+            $this->cachedConfigHash = $this->rollback_snapshot['config_hash'];
+            $this->application_deployment_queue->addLogEntry('Using config hash from snapshot: '.$this->cachedConfigHash);
+        }
+
+        // Extract timestamp from snapshot image_name for pure Dockerfile rollbacks
+        // Image format: {uuid}:{timestamp}-{configHash} (e.g., app:20251219143025-7f9e2c1a)
+        if (isset($this->rollback_snapshot['image_name'])) {
+            if (preg_match('/:(\d{14})-[a-f0-9]+$/', $this->rollback_snapshot['image_name'], $matches)) {
+                $this->cachedDeploymentTimestamp = $matches[1];
+                $this->application_deployment_queue->addLogEntry('Using timestamp from snapshot: '.$this->cachedDeploymentTimestamp);
+            }
+        }
+
+        $this->application_deployment_queue->addLogEntry('Rollback configuration applied.');
+    }
+
+    /**
+     * Get build environment variables from the rollback snapshot.
+     * Returns null if no snapshot or no build vars in snapshot.
+     */
+    private function getRollbackBuildEnvironmentVariables(): ?Collection
+    {
+        if (! $this->rollback_snapshot || ! isset($this->rollback_snapshot['build_environment_variables'])) {
+            return null;
+        }
+
+        $vars = $this->rollback_snapshot['build_environment_variables'];
+        if (empty($vars)) {
+            return null;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Using '.count($vars).' build environment variables from rollback snapshot.');
+
+        return collect($vars)->map(function ($var) {
+            $var['value'] = decrypt($var['value']); // Decrypt value from encrypted metadata
+
+            return (object) $var;
+        });
+    }
+
+    /**
+     * Get runtime environment variables from the rollback snapshot.
+     * Returns null if no snapshot or no runtime vars in snapshot.
+     */
+    private function getRollbackRuntimeEnvironmentVariables(): ?Collection
+    {
+        if (! $this->rollback_snapshot || ! isset($this->rollback_snapshot['runtime_environment_variables'])) {
+            return null;
+        }
+
+        $vars = $this->rollback_snapshot['runtime_environment_variables'];
+        if (empty($vars)) {
+            return null;
+        }
+
+        return collect($vars)->map(function ($var) {
+            $var['value'] = decrypt($var['value']); // Decrypt value from encrypted metadata
+
+            return (object) $var;
+        });
     }
 
     private function just_restart()
@@ -1308,7 +1507,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $envs = collect([]);
         $sort = $this->application->settings->is_env_sorting_enabled;
-        if ($sort) {
+
+        // For rollback rebuilds, use runtime environment variables from the snapshot if available
+        $rollbackRuntimeVars = $this->getRollbackRuntimeEnvironmentVariables();
+
+        if ($rollbackRuntimeVars !== null) {
+            $this->application_deployment_queue->addLogEntry('Using '.count($rollbackRuntimeVars).' runtime environment variables from rollback snapshot.');
+            $sorted_environment_variables = $sort ? $rollbackRuntimeVars->sortBy('key') : $rollbackRuntimeVars;
+            $sorted_environment_variables_preview = collect([]); // No preview for rollback
+        } elseif ($sort) {
             $sorted_environment_variables = $this->application->environment_variables->sortBy('key');
             $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('key');
         } else {
@@ -1374,7 +1581,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For snapshot variables, use 'value' directly (already decrypted)
+                // For DB variables, use 'real_value' which handles decryption
+                $envValue = property_exists($env, 'real_value') ? $env->real_value : ($env->value ?? '');
+                $envs->push($env->key.'='.$envValue);
             }
 
             // Check for PORT environment variable mismatch with ports_exposes
@@ -1440,7 +1650,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
-                $envs->push($env->key.'='.$env->real_value);
+                // For snapshot variables, use 'value' directly (already decrypted)
+                // For DB variables, use 'real_value' which handles decryption
+                $envValue = property_exists($env, 'real_value') ? $env->real_value : ($env->value ?? '');
+                $envs->push($env->key.'='.$envValue);
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
@@ -1676,8 +1889,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
+        // For rollback rebuilds, use variables from the snapshot if available
+        $rollbackBuildVars = $this->getRollbackBuildEnvironmentVariables();
+
         if ($this->pull_request_id === 0) {
-            $sorted_environment_variables = $this->application->environment_variables()
+            // Use snapshot variables if this is a rollback rebuild and snapshot has build vars
+            $sorted_environment_variables = $rollbackBuildVars ?? $this->application->environment_variables()
                 ->where('is_buildtime', true)  // ONLY build-time variables
                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
                 ->get();
@@ -1690,10 +1907,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                // For snapshot variables, use 'value' directly (already decrypted)
+                // For DB variables, use 'real_value' which handles decryption
+                $rawValue = property_exists($env, 'real_value') ? $env->real_value : ($env->value ?? '');
+
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
                     // Strip outer quotes from real_value and apply proper bash escaping
-                    $value = trim($env->real_value, "'");
+                    $value = trim($rawValue, "'");
                     $escapedValue = escapeBashEnvValue($value);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
@@ -1705,13 +1926,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$env->real_value}");
                         $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
                         $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
                     }
                 } else {
                     // For normal vars, use double quotes to allow $VAR expansion
-                    $escapedValue = escapeBashDoubleQuoted($env->real_value);
+                    $escapedValue = escapeBashDoubleQuoted($rawValue);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
@@ -1722,7 +1942,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$env->real_value}");
                         $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
                     }
                 }

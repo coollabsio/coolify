@@ -113,6 +113,7 @@ class Rollback extends Component
                 return [
                     'deployment_uuid' => $deployment->deployment_uuid,
                     'commit' => $deployment->commit,
+                    'commit_message' => $deployment->commitMessage(),
                     'created_at' => $deployment->created_at,
                     'has_config' => $hasConfig,
                     'image_name' => $imageName,
@@ -261,6 +262,7 @@ class Rollback extends Component
             commit: $commit,
             rollback: true,
             force_rebuild: true,
+            rollback_deployment_uuid: $deploymentUuid,
         );
 
         if ($result['status'] === 'queue_full') {
