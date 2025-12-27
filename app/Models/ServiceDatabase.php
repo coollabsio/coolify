@@ -45,7 +45,7 @@ class ServiceDatabase extends BaseModel
             $server = $this->service->server;
         } elseif ($this->application) {
             $uuid = $this->application->uuid;
-            $server = $this->application->destination->server;
+            $server = data_get($this->application, 'destination.server');
         }
 
         if ($uuid && $server) {
@@ -113,7 +113,7 @@ class ServiceDatabase extends BaseModel
         if ($this->service) {
             $server = $this->service->server;
         } elseif ($this->application) {
-            $server = $this->application->destination->server;
+            $server = data_get($this->application, 'destination.server');
         }
 
         if (! $server) {
