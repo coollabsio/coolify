@@ -297,7 +297,8 @@ class User extends Authenticatable implements SendsEmail
     {
         $found_root_team = Auth::user()->teams->filter(function ($team) {
             if ($team->id == 0) {
-                if (! Auth::user()->isAdmin()) {
+                $role = $team->pivot->role;
+                if ($role !== 'admin' && $role !== 'owner') {
                     return false;
                 }
 

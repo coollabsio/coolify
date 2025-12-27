@@ -384,7 +384,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive();
 }
 
 function isProduction(): bool

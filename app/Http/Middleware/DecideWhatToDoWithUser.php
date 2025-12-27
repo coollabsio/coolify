@@ -19,11 +19,15 @@ class DecideWhatToDoWithUser
         if (auth()?->user()?->currentTeam()) {
             refreshSession(auth()->user()->currentTeam());
         }
-        if (! auth()->user() || ! isCloud() || isInstanceAdmin()) {
+        if (! auth()->user() || ! isCloud()) {
             if (! isCloud() && showBoarding() && ! in_array($request->path(), allowedPathsForBoardingAccounts())) {
                 return redirect()->route('onboarding');
             }
 
+            return $next($request);
+        }
+        // Instance admins can access settings and admin routes regardless of subscription
+        if (isInstanceAdmin() && (Str::startsWith($request->path(), 'settings') || $request->path() === 'admin')) {
             return $next($request);
         }
         if (! auth()->user()->hasVerifiedEmail()) {

@@ -10,8 +10,7 @@ use Livewire\Component;
 
 class Advanced extends Component
 {
-    #[Validate('required')]
-    public Server $server;
+    public ?Server $server = null;
 
     public InstanceSettings $settings;
 
@@ -44,7 +43,6 @@ class Advanced extends Component
     public function rules()
     {
         return [
-            'server' => 'required',
             'is_registration_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
@@ -62,7 +60,9 @@ class Advanced extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
-        $this->server = Server::findOrFail(0);
+        if (! isCloud()) {
+            $this->server = Server::findOrFail(0);
+        }
         $this->settings = instanceSettings();
         $this->custom_dns_servers = $this->settings->custom_dns_servers;
         $this->allowed_ips = $this->settings->allowed_ips;
