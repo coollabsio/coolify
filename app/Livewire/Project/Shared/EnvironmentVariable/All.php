@@ -6,6 +6,7 @@ use App\Models\EnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class All extends Component
 {
@@ -310,5 +311,172 @@ class All extends Component
         unset($this->environmentVariables);
         unset($this->environmentVariablesPreview);
         $this->getDevView();
+    }
+
+    public function loadFromEnvExample()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resourceClass !== 'App\Models\Application') {
+                throw new \RuntimeException('This feature is only available for applications.');
+            }
+
+            if (! $this->canLoadEnvExample) {
+                throw new \RuntimeException('This feature requires a git repository source.');
+            }
+
+            $envExampleContent = $this->fetchEnvExampleFromGit();
+
+            if ($envExampleContent === null) {
+                $this->dispatch('error', 'No .env.example file found in the repository.');
+
+                return;
+            }
+
+            $variables = parseEnvFormatToArray($envExampleContent);
+
+            if (empty($variables)) {
+                $this->dispatch('warning', 'The .env.example file is empty or contains no valid variables.');
+
+                return;
+            }
+
+            $addedCount = 0;
+            $skippedCount = 0;
+            $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
+
+            foreach ($variables as $key => $value) {
+                if (str($key)->startsWith('SERVICE_FQDN') ||
+                    str($key)->startsWith('SERVICE_URL') ||
+                    str($key)->startsWith('SERVICE_NAME')) {
+                    $skippedCount++;
+
+                    continue;
+                }
+
+                $exists = $this->resource->environment_variables()->where('key', $key)->exists();
+                if ($exists) {
+                    $skippedCount++;
+
+                    continue;
+                }
+
+                $environment = new EnvironmentVariable;
+                $environment->key = $key;
+                $environment->value = $value;
+                $environment->is_multiline = false;
+                $environment->is_preview = false;
+                $environment->is_runtime = true;
+                $environment->is_buildtime = true;
+                $environment->resourceable_id = $this->resource->id;
+                $environment->resourceable_type = $this->resource->getMorphClass();
+                $environment->order = ++$maxOrder;
+                $environment->save();
+
+                $addedCount++;
+            }
+
+            $this->refreshEnvs();
+
+            if ($addedCount > 0) {
+                $message = "Added {$addedCount} environment variable(s)";
+                if ($skippedCount > 0) {
+                    $message .= ", skipped {$skippedCount} existing";
+                }
+                $this->dispatch('success', $message.'.');
+            } else {
+                $this->dispatch('warning', 'All variables from .env.example already exist.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function fetchEnvExampleFromGit(): ?string
+    {
+        $uuid = (string) new Cuid2;
+
+        ['commands' => $cloneCommand] = $this->resource->generateGitImportCommands(
+            deployment_uuid: $uuid,
+            only_checkout: true,
+            exec_in_docker: false,
+            custom_base_dir: '.'
+        );
+
+        $workdir = rtrim($this->resource->base_directory ?? '', '/');
+        $envFile = '.env.example';
+        $fileList = collect([".$workdir/$envFile"]);
+
+        $server = $this->resource->destination->server;
+
+        $getGitVersion = instant_remote_process(['git --version'], $server, false);
+        $gitVersion = str($getGitVersion)->explode(' ')->last();
+
+        if (version_compare($gitVersion, '2.35.1', '<')) {
+            $fileList = $fileList->map(function ($file) {
+                $parts = explode('/', trim($file, '.'));
+                $paths = collect();
+                $currentPath = '';
+                foreach ($parts as $part) {
+                    $currentPath .= ($currentPath ? '/' : '').$part;
+                    if (str($currentPath)->isNotEmpty()) {
+                        $paths->push($currentPath);
+                    }
+                }
+
+                return $paths;
+            })->flatten()->unique()->values();
+
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir/$envFile",
+            ]);
+        } else {
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init --cone',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir/$envFile",
+            ]);
+        }
+
+        try {
+            $content = instant_remote_process($commands, $server);
+
+            return $content;
+        } catch (\Exception $e) {
+            if (str($e->getMessage())->contains('No such file')) {
+                return null;
+            }
+            throw $e;
+        } finally {
+            instant_remote_process(["rm -rf /tmp/{$uuid}"], $server, false);
+        }
+    }
+
+    public function getCanLoadEnvExampleProperty(): bool
+    {
+        if ($this->resourceClass !== 'App\Models\Application') {
+            return false;
+        }
+
+        if (filled(data_get($this->resource, 'dockerfile'))) {
+            return false;
+        }
+
+        $deploymentType = $this->resource->deploymentType();
+
+        return in_array($deploymentType, ['source', 'deploy_key']);
     }
 }

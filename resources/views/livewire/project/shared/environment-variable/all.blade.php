@@ -8,6 +8,12 @@
                         <livewire:project.shared.environment-variable.add />
                     </x-modal-input>
                 </div>
+                @if ($this->canLoadEnvExample)
+                    <x-forms.button wire:click='loadFromEnvExample'
+                        title="Import variables from .env.example in your repository">
+                        Load from .env.example
+                    </x-forms.button>
+                @endif
                 <x-forms.button
                     wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
             @endcan
