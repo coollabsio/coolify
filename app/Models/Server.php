@@ -682,9 +682,16 @@ $schema://$host {
             }
             $cpu = json_decode($cpu, true);
 
-            return collect($cpu)->map(function ($metric) {
+            $metrics = collect($cpu)->map(function ($metric) {
                 return [(int) $metric['time'], (float) $metric['percent']];
-            });
+            })->toArray();
+
+            // Downsample for intervals > 60 minutes to prevent browser freeze
+            if ($mins > 60 && count($metrics) > 1000) {
+                $metrics = $this->downsampleLTTB($metrics, 1000);
+            }
+
+            return $metrics;
         }
     }
 
@@ -702,14 +709,95 @@ $schema://$host {
                 throw new \Exception($error);
             }
             $memory = json_decode($memory, true);
-            $parsedCollection = collect($memory)->map(function ($metric) {
+            $metrics = collect($memory)->map(function ($metric) {
                 $usedPercent = $metric['usedPercent'] ?? 0.0;
 
                 return [(int) $metric['time'], (float) $usedPercent];
-            });
+            })->toArray();
 
-            return $parsedCollection->toArray();
+            // Downsample for intervals > 60 minutes to prevent browser freeze
+            if ($mins > 60 && count($metrics) > 1000) {
+                $metrics = $this->downsampleLTTB($metrics, 1000);
+            }
+
+            return $metrics;
         }
+    }
+
+    /**
+     * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
+     * This preserves the visual shape of the data better than simple averaging.
+     *
+     * @param  array  $data  Array of [timestamp, value] pairs
+     * @param  int  $threshold  Target number of points
+     * @return array Downsampled data
+     */
+    private function downsampleLTTB(array $data, int $threshold): array
+    {
+        $dataLength = count($data);
+
+        if ($threshold >= $dataLength || $threshold <= 2) {
+            return $data;
+        }
+
+        $sampled = [];
+        $sampled[] = $data[0]; // Always keep first point
+
+        $bucketSize = ($dataLength - 2) / ($threshold - 2);
+
+        $a = 0; // Index of previous selected point
+
+        for ($i = 0; $i < $threshold - 2; $i++) {
+            // Calculate bucket range
+            $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
+            $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
+            $bucketEnd = min($bucketEnd, $dataLength - 1);
+
+            // Calculate average point for next bucket (used as reference)
+            $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
+            $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
+            $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
+
+            $avgX = 0;
+            $avgY = 0;
+            $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
+
+            if ($nextBucketCount > 0) {
+                for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
+                    $avgX += $data[$j][0];
+                    $avgY += $data[$j][1];
+                }
+                $avgX /= $nextBucketCount;
+                $avgY /= $nextBucketCount;
+            }
+
+            // Find point in current bucket with largest triangle area
+            $maxArea = -1;
+            $maxAreaIndex = $bucketStart;
+
+            $pointAX = $data[$a][0];
+            $pointAY = $data[$a][1];
+
+            for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
+                // Triangle area calculation
+                $area = abs(
+                    ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
+                    ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
+                ) * 0.5;
+
+                if ($area > $maxArea) {
+                    $maxArea = $area;
+                    $maxAreaIndex = $j;
+                }
+            }
+
+            $sampled[] = $data[$maxAreaIndex];
+            $a = $maxAreaIndex;
+        }
+
+        $sampled[] = $data[$dataLength - 1]; // Always keep last point
+
+        return $sampled;
     }
 
     public function getDiskUsage(): ?string
