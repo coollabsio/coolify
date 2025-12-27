@@ -92,6 +92,7 @@ function sharedDataApplications()
         'git_commit_sha' => 'string',
         'docker_registry_image_name' => 'string|nullable',
         'docker_registry_image_tag' => 'string|nullable',
+        'docker_registry_id' => 'numeric|nullable|exists:docker_registries,id',
         'install_command' => 'string|nullable',
         'build_command' => 'string|nullable',
         'start_command' => 'string|nullable',

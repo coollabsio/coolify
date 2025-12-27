@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\DockerImageParser;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
 use Carbon\Carbon;
@@ -571,6 +572,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Save runtime environment variables (including empty .env file if no variables defined)
         $this->save_runtime_environment_variables();
+
+        $this->login_to_docker_registry_if_needed();
 
         $this->rolling_update();
     }
@@ -2778,6 +2781,37 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "docker pull {$image}"),
+                'hidden' => true,
+            ]
+        );
+    }
+
+    private function login_to_docker_registry_if_needed(): void
+    {
+        $registry = $this->application->dockerRegistry;
+        $username = $registry?->username;
+        $password = $registry?->password;
+
+        if (str($username)->isEmpty() || str($password)->isEmpty()) {
+            return;
+        }
+
+        if (str($this->application->docker_registry_image_name)->isEmpty()) {
+            return;
+        }
+
+        $imageName = str($this->application->docker_registry_image_name)->before('@sha256')->value();
+        $parser = new DockerImageParser;
+        $parser->parse($imageName.':latest');
+        $registryUrl = $registry?->registry_url ?: $parser->getRegistryUrl();
+        $registryArg = $registryUrl ? ' '.escapeshellarg($registryUrl) : '';
+        $usernameArg = escapeshellarg($username);
+        $passwordArg = escapeshellarg($password);
+
+        $this->application_deployment_queue->addLogEntry('Logging in to Docker registry for image pull.');
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo {$passwordArg} | docker login{$registryArg} -u {$usernameArg} --password-stdin"),
                 'hidden' => true,
             ]
         );
