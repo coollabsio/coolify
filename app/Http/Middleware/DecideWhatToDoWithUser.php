@@ -27,7 +27,7 @@ class DecideWhatToDoWithUser
             return $next($request);
         }
         // Instance admins can access settings and admin routes regardless of subscription
-        if (isInstanceAdmin() && (Str::startsWith($request->path(), 'settings') || $request->path() === 'admin')) {
+        if (isInstanceAdmin() && ($request->routeIs('settings.*') || $request->routeIs('settings.index') || $request->path() === 'admin')) {
             return $next($request);
         }
         if (! auth()->user()->hasVerifiedEmail()) {

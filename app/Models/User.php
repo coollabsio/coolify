@@ -295,7 +295,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function isInstanceAdmin()
     {
-        $found_root_team = Auth::user()->teams->filter(function ($team) {
+        $found_root_team = $this->teams->filter(function ($team) {
             if ($team->id == 0) {
                 $role = $team->pivot->role;
                 if ($role !== 'admin' && $role !== 'owner') {
@@ -313,9 +313,9 @@ class User extends Authenticatable implements SendsEmail
 
     public function currentTeam()
     {
-        return Cache::remember('team:'.Auth::id(), 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
-                return Auth::user()->teams[0];
+        return Cache::remember('team:'.$this->id, 3600, function () {
+            if (is_null(data_get(session('currentTeam'), 'id')) && $this->teams->count() > 0) {
+                return $this->teams[0];
             }
 
             return Team::find(session('currentTeam')->id);
@@ -324,7 +324,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function otherTeams()
     {
-        return Auth::user()->teams->filter(function ($team) {
+        return $this->teams->filter(function ($team) {
             return $team->id != currentTeam()->id;
         });
     }
@@ -334,9 +334,9 @@ class User extends Authenticatable implements SendsEmail
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
+        $team = $this->teams->where('id', currentTeam()->id)->first();
 
-        return data_get($user, 'pivot.role');
+        return data_get($team, 'pivot.role');
     }
 
     /**
