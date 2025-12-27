@@ -37,10 +37,21 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $uuid = $this->service ? $this->service->uuid : $this->application->uuid;
-        $server = $this->service ? $this->service->server : $this->application->destination->server;
-        $container_id = $this->name.'-'.$uuid;
-        remote_process(["docker restart {$container_id}"], $server);
+        $uuid = null;
+        $server = null;
+
+        if ($this->service) {
+            $uuid = $this->service->uuid;
+            $server = $this->service->server;
+        } elseif ($this->application) {
+            $uuid = $this->application->uuid;
+            $server = $this->application->destination->server;
+        }
+
+        if ($uuid && $server) {
+            $container_id = $this->name.'-'.$uuid;
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
 
     public function isRunning()

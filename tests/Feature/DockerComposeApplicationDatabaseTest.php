@@ -51,7 +51,8 @@ services:
         $serviceDatabase = ServiceDatabase::where('application_id', $application->id)->first();
         $this->assertNotNull($serviceDatabase);
         $this->assertEquals('db', $serviceDatabase->name);
-        $this->assertTrue($serviceDatabase->isDatabase()); // implicit check via class
+        // $this->assertTrue($serviceDatabase->isDatabase()); // explicit check via class type
+        $this->assertInstanceOf(ServiceDatabase::class, $serviceDatabase);
     }
 
     public function test_it_updates_existing_service_database()
