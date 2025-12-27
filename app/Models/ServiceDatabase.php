@@ -37,8 +37,10 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $uuid = $this->service ? $this->service->uuid : $this->application->uuid;
+        $server = $this->service ? $this->service->server : $this->application->destination->server;
+        $container_id = $this->name.'-'.$uuid;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -96,8 +98,10 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $port = $this->public_port;
+        $server = $this->service ? $this->service->server : $this->application->destination->server;
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -106,17 +110,34 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->service) {
+            return data_get($this, 'service.environment.project.team');
+        } elseif ($this->application) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
+        return null;
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        } elseif ($this->application) {
+            return service_configuration_dir()."/{$this->application->uuid}";
+        }
+
+        return null;
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

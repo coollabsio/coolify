@@ -2349,6 +2349,34 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create new serviceDatabase
+            if ($isDatabase) {
+                if ($isNew) {
+                    $savedService = ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } else {
+                    $savedService = ServiceDatabase::where([
+                        'name' => $serviceName,
+                        'application_id' => $resource->id,
+                    ])->first();
+                    if (is_null($savedService)) {
+                        $savedService = ServiceDatabase::create([
+                            'name' => $serviceName,
+                            'image' => $image,
+                            'application_id' => $resource->id,
+                        ]);
+                    }
+                }
+                 // Check if image changed
+                if ($savedService->image !== $image) {
+                    $savedService->image = $image;
+                    $savedService->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
