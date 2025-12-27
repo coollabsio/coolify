@@ -13,8 +13,11 @@ class DockerComposeApplicationDatabaseTest extends TestCase
 {
     use RefreshDatabase;
 
+    use RefreshDatabase;
+
     public function test_it_detects_database_services_in_application_docker_compose()
     {
+        \Illuminate\Support\Facades\Bus::fake();
         $server = Server::factory()->create();
         $project = Project::factory()->create();
         $environment = $project->environments()->first();
@@ -57,6 +60,7 @@ services:
 
     public function test_it_updates_existing_service_database()
     {
+        \Illuminate\Support\Facades\Bus::fake();
         $server = Server::factory()->create();
         $project = Project::factory()->create();
         $environment = $project->environments()->first();

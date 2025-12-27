@@ -109,8 +109,17 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $port = $this->public_port;
-        $server = $this->service ? $this->service->server : $this->application->destination->server;
+        $server = null;
+        if ($this->service) {
+            $server = $this->service->server;
+        } elseif ($this->application) {
+            $server = $this->application->destination->server;
+        }
+
+        if (! $server) {
+            return null;
+        }
+
         $realIp = $server->ip;
         if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
