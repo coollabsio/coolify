@@ -50,6 +50,9 @@ class AuthServiceProvider extends ServiceProvider
         // API Token policy
         \Laravel\Sanctum\PersonalAccessToken::class => \App\Policies\ApiTokenPolicy::class,
 
+        // Instance settings policy
+        \App\Models\InstanceSettings::class => \App\Policies\InstanceSettingsPolicy::class,
+
         // Team policy
         \App\Models\Team::class => \App\Policies\TeamPolicy::class,
 

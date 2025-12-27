@@ -22,7 +22,7 @@ class RestartDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
-        StopDatabase::run($database);
+        StopDatabase::run($database, dockerCleanup: false);
 
         return StartDatabase::run($database);
     }

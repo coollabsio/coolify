@@ -521,7 +521,7 @@ class General extends Component
         }
     }
 
-    public function loadComposeFile($isInit = false, $showToast = true)
+    public function loadComposeFile($isInit = false, $showToast = true, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         try {
             $this->authorize('update', $this->application);
@@ -530,7 +530,7 @@ class General extends Component
                 return;
             }
 
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit, $restoreBaseDirectory, $restoreDockerComposeLocation);
             if (is_null($this->parsedServices)) {
                 $showToast && $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -606,13 +606,6 @@ class General extends Component
         }
     }
 
-    public function updatedBaseDirectory()
-    {
-        if ($this->buildPack === 'dockercompose') {
-            $this->loadComposeFile();
-        }
-    }
-
     public function updatedIsStatic($value)
     {
         if ($value) {
@@ -641,8 +634,6 @@ class General extends Component
             $this->application->settings->is_static = false;
             $this->application->settings->save();
         } else {
-            $this->portsExposes = '3000';
-            $this->application->ports_exposes = '3000';
             $this->resetDefaultLabels(false);
         }
         if ($this->buildPack === 'dockercompose') {
@@ -654,18 +645,6 @@ class General extends Component
                 $this->application->settings->save();
             } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
-            }
-        } else {
-            // Clear Docker Compose specific data when switching away from dockercompose
-            if ($this->application->getOriginal('build_pack') === 'dockercompose') {
-                $this->application->docker_compose_domains = null;
-                $this->application->docker_compose_raw = null;
-
-                // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
             }
         }
         if ($this->buildPack === 'static') {
@@ -800,11 +779,13 @@ class General extends Component
         try {
             $this->authorize('update', $this->application);
 
+            $this->resetErrorBag();
             $this->validate();
 
             $oldPortsExposes = $this->application->ports_exposes;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
+            $oldBaseDirectory = $this->application->base_directory;
 
             // Process FQDN with intermediate variable to avoid Collection/string confusion
             $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
@@ -835,18 +816,47 @@ class General extends Component
                 return; // Stop if there are conflicts and user hasn't confirmed
             }
 
+            // Normalize paths BEFORE validation
+            if ($this->baseDirectory && $this->baseDirectory !== '/') {
+                $this->baseDirectory = rtrim($this->baseDirectory, '/');
+                $this->application->base_directory = $this->baseDirectory;
+            }
+            if ($this->publishDirectory && $this->publishDirectory !== '/') {
+                $this->publishDirectory = rtrim($this->publishDirectory, '/');
+                $this->application->publish_directory = $this->publishDirectory;
+            }
+
+            // Validate docker compose file path BEFORE saving to database
+            // This prevents invalid paths from being persisted when validation fails
+            if ($this->buildPack === 'dockercompose' &&
+                ($oldDockerComposeLocation !== $this->dockerComposeLocation ||
+                 $oldBaseDirectory !== $this->baseDirectory)) {
+                // Pass original values to loadComposeFile so it can restore them on failure
+                // The finally block in Application::loadComposeFile will save these original
+                // values if validation fails, preventing invalid paths from being persisted
+                $compose_return = $this->loadComposeFile(
+                    isInit: false,
+                    showToast: false,
+                    restoreBaseDirectory: $oldBaseDirectory,
+                    restoreDockerComposeLocation: $oldDockerComposeLocation
+                );
+                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                    // Validation failed - restore original values to component properties
+                    $this->baseDirectory = $oldBaseDirectory;
+                    $this->dockerComposeLocation = $oldDockerComposeLocation;
+                    // The model was saved by loadComposeFile's finally block with original values
+                    // Refresh to sync component with database state
+                    $this->application->refresh();
+
+                    return;
+                }
+            }
+
             $this->application->save();
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
-            }
-
-            if ($this->buildPack === 'dockercompose' && $oldDockerComposeLocation !== $this->dockerComposeLocation) {
-                $compose_return = $this->loadComposeFile(showToast: false);
-                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
-                    return;
-                }
             }
 
             if ($oldPortsExposes !== $this->portsExposes || $oldIsContainerLabelEscapeEnabled !== $this->isContainerLabelEscapeEnabled) {
@@ -868,14 +878,6 @@ class General extends Component
                     $this->portsExposes = $port;
                     $this->application->ports_exposes = $port;
                 }
-            }
-            if ($this->baseDirectory && $this->baseDirectory !== '/') {
-                $this->baseDirectory = rtrim($this->baseDirectory, '/');
-                $this->application->base_directory = $this->baseDirectory;
-            }
-            if ($this->publishDirectory && $this->publishDirectory !== '/') {
-                $this->publishDirectory = rtrim($this->publishDirectory, '/');
-                $this->application->publish_directory = $this->publishDirectory;
             }
             if ($this->buildPack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
@@ -999,5 +1001,77 @@ class General extends Component
                 }
             }
         }
+    }
+
+    public function getDetectedPortInfoProperty(): ?array
+    {
+        $detectedPort = $this->application->detectPortFromEnvironment();
+
+        if (! $detectedPort) {
+            return null;
+        }
+
+        $portsExposesArray = $this->application->ports_exposes_array;
+        $isMatch = in_array($detectedPort, $portsExposesArray);
+        $isEmpty = empty($portsExposesArray);
+
+        return [
+            'port' => $detectedPort,
+            'matches' => $isMatch,
+            'isEmpty' => $isEmpty,
+        ];
+    }
+
+    public function getDockerComposeBuildCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomBuildCommand) {
+            return '';
+        }
+
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
+        // Build-time env path references ApplicationDeploymentJob::BUILD_TIME_ENV_PATH as source of truth
+        $command = injectDockerComposeFlags(
+            $this->dockerComposeCustomBuildCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            \App\Jobs\ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+        );
+
+        // Inject build args if not using build secrets
+        if (! $this->application->settings->use_build_secrets) {
+            $buildTimeEnvs = $this->application->environment_variables()
+                ->where('is_buildtime', true)
+                ->get();
+
+            if ($buildTimeEnvs->isNotEmpty()) {
+                $buildArgs = generateDockerBuildArgs($buildTimeEnvs);
+                $buildArgsString = $buildArgs->implode(' ');
+
+                $command = injectDockerComposeBuildArgs($command, $buildArgsString);
+            }
+        }
+
+        return $command;
+    }
+
+    public function getDockerComposeStartCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomStartCommand) {
+            return '';
+        }
+
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Placeholder {workdir}/.env shows it's the workdir .env file (runtime env, not build-time)
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomStartCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            '{workdir}/.env'
+        );
     }
 }

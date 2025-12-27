@@ -44,6 +44,8 @@ class Index extends Component
 
     public bool $forceSaveDomains = false;
 
+    public $buildActivityId = null;
+
     public function render()
     {
         return view('livewire.settings.index');
@@ -147,6 +149,39 @@ class Index extends Component
             if (! $error_show) {
                 $this->dispatch('success', 'Instance settings updated successfully!');
             }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function buildHelperImage()
+    {
+        try {
+            if (! isDev()) {
+                $this->dispatch('error', 'Building helper image is only available in development mode.');
+
+                return;
+            }
+
+            $version = $this->dev_helper_version ?: config('constants.coolify.helper_version');
+            if (empty($version)) {
+                $this->dispatch('error', 'Please specify a version to build.');
+
+                return;
+            }
+
+            $buildCommand = "docker build -t ghcr.io/coollabsio/coolify-helper:{$version} -f docker/coolify-helper/Dockerfile .";
+
+            $activity = remote_process(
+                command: [$buildCommand],
+                server: $this->server,
+                type: 'build-helper-image'
+            );
+
+            $this->buildActivityId = $activity->id;
+            $this->dispatch('activityMonitor', $activity->id);
+
+            $this->dispatch('success', "Building coolify-helper:{$version}...");
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

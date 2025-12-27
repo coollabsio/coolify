@@ -16,6 +16,12 @@ class StandaloneRedis extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    protected $casts = [
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
+    ];
+
     protected static function booted()
     {
         static::created(function ($database) {
@@ -46,9 +52,23 @@ class StandaloneRedis extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for Redis databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneRedis::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all Redis databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneRedis::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute

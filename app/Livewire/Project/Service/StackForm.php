@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class StackForm extends Component
@@ -22,7 +23,7 @@ class StackForm extends Component
 
     public string $dockerComposeRaw;
 
-    public string $dockerCompose;
+    public ?string $dockerCompose = null;
 
     public ?bool $connectToDockerNetwork = null;
 
@@ -30,7 +31,7 @@ class StackForm extends Component
     {
         $baseRules = [
             'dockerComposeRaw' => 'required',
-            'dockerCompose' => 'required',
+            'dockerCompose' => 'nullable',
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'connectToDockerNetwork' => 'nullable',
@@ -140,18 +141,27 @@ class StackForm extends Component
             $this->validate();
             $this->syncData(true);
 
-            // Validate for command injection BEFORE saving to database
+            // Validate for command injection BEFORE any database operations
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            $this->service->save();
-            $this->service->saveExtraFields($this->fields);
-            $this->service->parse();
+            // Use transaction to ensure atomicity - if parse fails, save is rolled back
+            DB::transaction(function () {
+                $this->service->save();
+                $this->service->saveExtraFields($this->fields);
+                $this->service->parse();
+            });
+            // Refresh and write files after a successful commit
             $this->service->refresh();
             $this->service->saveComposeConfigs();
+
             $this->dispatch('refreshEnvs');
             $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
+            // On error, refresh from database to restore clean state
+            $this->service->refresh();
+            $this->syncData(false);
+
             return handleError($e, $this);
         } finally {
             if (is_null($this->service->config_hash)) {

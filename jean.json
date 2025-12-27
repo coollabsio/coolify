@@ -1,6 +1,5 @@
 {
   "scripts": {
-    "onWorktreeCreate": "cp $JEAN_ROOT_PATH/.env . && mkdir -p .claude && cp $JEAN_ROOT_PATH/.claude/settings.local.json .claude/settings.local.json",
-    "run": "docker rm -f coolify coolify-realtime coolify-minio coolify-testing-host coolify-redis coolify-db coolify-mail coolify-vite && spin up"
+    "setup": "cp $JEAN_ROOT_PATH/.env . && mkdir -p .claude && cp $JEAN_ROOT_PATH/.claude/settings.local.json .claude/settings.local.json"
   }
 }

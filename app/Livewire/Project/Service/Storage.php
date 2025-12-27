@@ -67,7 +67,7 @@ class Storage extends Component
     public function refreshStorages()
     {
         $this->fileStorage = $this->resource->fileStorages()->get();
-        $this->resource->refresh();
+        $this->resource->load('persistentStorages.resource');
     }
 
     public function getFilesProperty()
@@ -178,6 +178,10 @@ class Storage extends Component
             $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
             $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
             $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
+
+            // Validate paths to prevent command injection
+            validateShellSafePath($this->file_storage_directory_source, 'storage source path');
+            validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
 
             \App\Models\LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,

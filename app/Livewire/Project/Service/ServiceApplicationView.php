@@ -2,12 +2,9 @@
 
 namespace App\Livewire\Project\Service;
 
-use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -82,6 +79,21 @@ class ServiceApplicationView extends Component
         }
     }
 
+    public function instantSaveSettings()
+    {
+        try {
+            $this->authorize('update', $this->application);
+            // Save checkbox states without port validation
+            $this->application->is_gzip_enabled = $this->isGzipEnabled;
+            $this->application->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            $this->application->exclude_from_status = $this->excludeFromStatus;
+            $this->application->save();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function instantSaveAdvanced()
     {
         try {
@@ -113,12 +125,8 @@ class ServiceApplicationView extends Component
         try {
             $this->authorize('delete', $this->application);
 
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-                if (! Hash::check($password, Auth::user()->password)) {
-                    $this->addError('password', 'The provided password is incorrect.');
-
-                    return;
-                }
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return;
             }
 
             $this->application->delete();
@@ -135,7 +143,7 @@ class ServiceApplicationView extends Component
         try {
             $this->parameters = get_route_parameters();
             $this->authorize('view', $this->application);
-            $this->requiredPort = $this->application->service->getRequiredPort();
+            $this->requiredPort = $this->application->getRequiredPort();
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -268,8 +276,7 @@ class ServiceApplicationView extends Component
 
             // Check for required port
             if (! $this->forceRemovePort) {
-                $service = $this->application->service;
-                $requiredPort = $service->getRequiredPort();
+                $requiredPort = $this->application->getRequiredPort();
 
                 if ($requiredPort !== null) {
                     // Check if all FQDNs have a port

@@ -63,8 +63,6 @@ class CleanupNames extends Command
 
     public function handle(): int
     {
-        $this->info('🔍 Scanning for invalid characters in name fields...');
-
         if ($this->option('backup') && ! $this->option('dry-run')) {
             $this->createBackup();
         }
@@ -75,7 +73,7 @@ class CleanupNames extends Command
             : $this->modelsToClean;
 
         if ($modelFilter && ! isset($this->modelsToClean[$modelFilter])) {
-            $this->error("❌ Unknown model: {$modelFilter}");
+            $this->error("Unknown model: {$modelFilter}");
             $this->info('Available models: '.implode(', ', array_keys($this->modelsToClean)));
 
             return self::FAILURE;
@@ -88,10 +86,14 @@ class CleanupNames extends Command
             $this->processModel($modelName, $modelClass);
         }
 
-        $this->displaySummary();
-
         if (! $this->option('dry-run') && $this->totalCleaned > 0) {
             $this->logChanges();
+        }
+
+        if ($this->option('dry-run')) {
+            $this->info("Name cleanup: would sanitize {$this->totalCleaned} records");
+        } else {
+            $this->info("Name cleanup: sanitized {$this->totalCleaned} records");
         }
 
         return self::SUCCESS;
@@ -99,8 +101,6 @@ class CleanupNames extends Command
 
     protected function processModel(string $modelName, string $modelClass): void
     {
-        $this->info("\n📋 Processing {$modelName}...");
-
         try {
             $records = $modelClass::all(['id', 'name']);
             $cleaned = 0;
@@ -128,21 +128,17 @@ class CleanupNames extends Command
                     $cleaned++;
                     $this->totalCleaned++;
 
-                    $this->warn("  🧹 {$modelName} #{$record->id}:");
-                    $this->line('    From: '.$this->truncate($originalName, 80));
-                    $this->line('    To:   '.$this->truncate($sanitizedName, 80));
+                    // Only log in dry-run mode to preview changes
+                    if ($this->option('dry-run')) {
+                        $this->warn("  🧹 {$modelName} #{$record->id}:");
+                        $this->line('    From: '.$this->truncate($originalName, 80));
+                        $this->line('    To:   '.$this->truncate($sanitizedName, 80));
+                    }
                 }
             }
 
-            if ($cleaned > 0) {
-                $action = $this->option('dry-run') ? 'would be sanitized' : 'sanitized';
-                $this->info("  ✅ {$cleaned}/{$records->count()} records {$action}");
-            } else {
-                $this->info('  ✨ No invalid characters found');
-            }
-
         } catch (\Exception $e) {
-            $this->error("  ❌ Error processing {$modelName}: ".$e->getMessage());
+            $this->error("Error processing {$modelName}: ".$e->getMessage());
         }
     }
 
@@ -163,28 +159,6 @@ class CleanupNames extends Command
         }
 
         return $sanitized;
-    }
-
-    protected function displaySummary(): void
-    {
-        $this->info("\n".str_repeat('=', 60));
-        $this->info('📊 CLEANUP SUMMARY');
-        $this->info(str_repeat('=', 60));
-
-        $this->line("Records processed: {$this->totalProcessed}");
-        $this->line("Records with invalid characters: {$this->totalCleaned}");
-
-        if ($this->option('dry-run')) {
-            $this->warn("\n🔍 DRY RUN - No changes were made to the database");
-            $this->info('Run without --dry-run to apply these changes');
-        } else {
-            if ($this->totalCleaned > 0) {
-                $this->info("\n✅ Database successfully sanitized!");
-                $this->info('Changes logged to storage/logs/name-cleanup.log');
-            } else {
-                $this->info("\n✨ No cleanup needed - all names are valid!");
-            }
-        }
     }
 
     protected function logChanges(): void
@@ -208,8 +182,6 @@ class CleanupNames extends Command
 
     protected function createBackup(): void
     {
-        $this->info('💾 Creating database backup...');
-
         try {
             $backupFile = storage_path('backups/name-cleanup-backup-'.now()->format('Y-m-d-H-i-s').'.sql');
 
@@ -229,15 +201,9 @@ class CleanupNames extends Command
             );
 
             exec($command, $output, $returnCode);
-
-            if ($returnCode === 0) {
-                $this->info("✅ Backup created: {$backupFile}");
-            } else {
-                $this->warn('⚠️  Backup creation may have failed. Proceeding anyway...');
-            }
         } catch (\Exception $e) {
-            $this->warn('⚠️  Could not create backup: '.$e->getMessage());
-            $this->warn('Proceeding without backup...');
+            // Log failure but continue - backup is optional safeguard
+            Log::warning('Name cleanup backup failed', ['error' => $e->getMessage()]);
         }
     }
 

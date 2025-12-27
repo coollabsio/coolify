@@ -5,12 +5,19 @@
 ])
 @if (str($resource->status)->startsWith('running'))
     <x-status.running :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
-@elseif(str($resource->status)->startsWith('restarting') ||
-        str($resource->status)->startsWith('starting') ||
-        str($resource->status)->startsWith('degraded'))
+@elseif(str($resource->status)->startsWith('degraded'))
+    <x-status.degraded :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
+@elseif(str($resource->status)->startsWith('restarting') || str($resource->status)->startsWith('starting'))
     <x-status.restarting :status="$resource->status" :title="$title" :lastDeploymentLink="$lastDeploymentLink" />
 @else
     <x-status.stopped :status="$resource->status" />
+@endif
+@if (isset($resource->restart_count) && $resource->restart_count > 0 && !str($resource->status)->startsWith('exited'))
+    <div class="flex items-center pl-2">
+        <span class="text-xs dark:text-warning" title="Container has restarted {{ $resource->restart_count }} time{{ $resource->restart_count > 1 ? 's' : '' }}. Last restart: {{ $resource->last_restart_at?->diffForHumans() }}">
+            ({{ $resource->restart_count }}x restarts)
+        </span>
+    </div>
 @endif
 @if (!str($resource->status)->contains('exited') && $showRefreshButton)
     <button wire:loading.remove.delay.shortest wire:target="manualCheckStatus" title="Refresh Status" wire:click='manualCheckStatus'
