@@ -39,6 +39,7 @@ use Visus\Cuid2\Cuid2;
         'git_full_url' => ['type' => 'string', 'nullable' => true, 'description' => 'Git full URL.'],
         'docker_registry_image_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image name.'],
         'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image tag.'],
+        'docker_registry_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Docker registry credentials identifier.'],
         'build_pack' => ['type' => 'string', 'description' => 'Build pack.', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose']],
         'static_image' => ['type' => 'string', 'description' => 'Static image used when static site is deployed.'],
         'install_command' => ['type' => 'string', 'description' => 'Install command.'],
@@ -898,6 +899,11 @@ class Application extends BaseModel
     public function private_key()
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function dockerRegistry()
+    {
+        return $this->belongsTo(DockerRegistry::class);
     }
 
     public function environment()

@@ -6,6 +6,11 @@
             <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
                 <button>Private Keys</button>
             </a>
+            @can('viewAny', App\Models\DockerRegistry::class)
+                <a href="{{ route('security.docker-registry.index') }}" {{ wireNavigate() }}>
+                    <button>Docker Registries</button>
+                </a>
+            @endcan
             @can('viewAny', App\Models\CloudProviderToken::class)
                 <a href="{{ route('security.cloud-tokens') }}" {{ wireNavigate() }}>
                     <button>Cloud Tokens</button>
