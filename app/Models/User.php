@@ -311,30 +311,41 @@ class User extends Authenticatable implements SendsEmail
         return $found_root_team->count() > 0;
     }
 
-    public function currentTeam()
+    public function currentTeam(): ?Team
     {
-        return Cache::remember('team:'.$this->id, 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && $this->teams->count() > 0) {
-                return $this->teams[0];
-            }
+        $sessionTeamId = data_get(session('currentTeam'), 'id');
 
-            return Team::find(session('currentTeam')->id);
+        if (is_null($sessionTeamId)) {
+            return null;
+        }
+
+        return Cache::remember('team:'.$this->id, 3600, function () use ($sessionTeamId) {
+            return Team::find($sessionTeamId);
         });
     }
 
-    public function otherTeams()
-    {
-        return $this->teams->filter(function ($team) {
-            return $team->id != currentTeam()->id;
-        });
-    }
-
-    public function role()
+    public function role(): ?string
     {
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        $team = $this->teams->where('id', currentTeam()->id)->first();
+
+        $current = $this->currentTeam();
+        if (is_null($current)) {
+            return null;
+        }
+
+        $team = $this->teams->where('id', $current->id)->first();
+
+        return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Get the user's role in a specific team
+     */
+    public function roleInTeam(int $teamId): ?string
+    {
+        $team = $this->teams->where('id', $teamId)->first();
 
         return data_get($team, 'pivot.role');
     }
@@ -416,9 +427,10 @@ class User extends Authenticatable implements SendsEmail
         ]);
 
         // For cloud users, dispatch job to update Stripe customer email asynchronously
-        if (isCloud() && $this->currentTeam()->subscription) {
+        $currentTeam = $this->currentTeam();
+        if (isCloud() && $currentTeam?->subscription) {
             dispatch(new \App\Jobs\UpdateStripeCustomerEmailJob(
-                $this->currentTeam(),
+                $currentTeam,
                 $this->id,
                 $newEmail,
                 $oldEmail
