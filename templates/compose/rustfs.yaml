@@ -1,35 +1,39 @@
-# ignore: true
-# documentation: https://docs.rustfs.com/installation/docker/
-# slogan: RustFS is a high-performance distributed storage system built with Rust, compatible with Amazon S3 APIs.
+# documentation: https://github.com/rustfs/rustfs
+# slogan: RustFS is a high-performance, S3-compatible object storage system built in Rust.
 # category: storage
-# tags: object, storage, server, s3, api, rust
-# logo: svgs/rustfs.png
+# tags: object, storage, server, s3, api, rust, minio-alternative
+# logo: svgs/rustfs.svg
+# port: 9001
+# minversion: 4.0.0
+# note: Port 9001 serves both the web console (/rustfs/console/) and proxies S3 API requests
 
 services:
   rustfs:
     image: rustfs/rustfs:latest
-    command: /data
     environment:
-      - RUSTFS_SERVER_URL=$RUSTFS_SERVER_URL
-      - RUSTFS_BROWSER_REDIRECT_URL=$RUSTFS_BROWSER_REDIRECT_URL
-      - RUSTFS_ADDRESS=${RUSTFS_ADDRESS:-0.0.0.0:9000}
-      - RUSTFS_CONSOLE_ADDRESS=${RUSTFS_CONSOLE_ADDRESS:-0.0.0.0:9001}
-      - RUSTFS_CORS_ALLOWED_ORIGINS=${RUSTFS_CORS_ALLOWED_ORIGINS:-*}
-      - RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS=${RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS:-*}
+      # Core Authentication
       - RUSTFS_ACCESS_KEY=$SERVICE_USER_RUSTFS
       - RUSTFS_SECRET_KEY=$SERVICE_PASSWORD_RUSTFS
-      - RUSTFS_CONSOLE_ENABLE=${RUSTFS_CONSOLE_ENABLE:-true}
-      - RUSTFS_SERVER_DOMAINS=${RUSTFS_SERVER_DOMAINS}
+      # Network Binding
+      - RUSTFS_ADDRESS=${RUSTFS_ADDRESS:-0.0.0.0:9000}
+      - RUSTFS_CONSOLE_ADDRESS=${RUSTFS_CONSOLE_ADDRESS:-0.0.0.0:9001}
+      # URL Configuration (for proxy/external access)
+      - RUSTFS_SERVER_URL=$RUSTFS_SERVER_URL
+      - RUSTFS_BROWSER_REDIRECT_URL=$RUSTFS_BROWSER_REDIRECT_URL
       - RUSTFS_EXTERNAL_ADDRESS=${RUSTFS_EXTERNAL_ADDRESS}
+      - RUSTFS_SERVER_DOMAINS=${RUSTFS_SERVER_DOMAINS}
+      # CORS Settings
+      - RUSTFS_CORS_ALLOWED_ORIGINS=${RUSTFS_CORS_ALLOWED_ORIGINS:-*}
+      - RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS=${RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS:-*}
+      # Feature Toggles
+      - RUSTFS_CONSOLE_ENABLE=${RUSTFS_CONSOLE_ENABLE:-true}
     volumes:
       - rustfs-data:/data
     healthcheck:
-      test:
-        [
-          "CMD",
-          "sh", "-c",
-          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
-        ]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  rustfs-data:
