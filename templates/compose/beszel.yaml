@@ -1,29 +1,69 @@
-# documentation: https://github.com/henrygd/beszel?tab=readme-ov-file#getting-started
+# documentation: https://beszel.dev
 # slogan: A lightweight server resource monitoring hub with historical data, docker stats, and alerts.
 # category: monitoring
-# tags: beszel,monitoring,server,stats,alerts
+# tags: beszel,monitoring,server,stats,alerts,docker
 # logo: svgs/beszel.svg
 # port: 8090
+#
+# ============================================================================
+# SETUP INSTRUCTIONS (Order of Operations)
+# ============================================================================
+#
+# 1. DEPLOY this service in Coolify (hub + agent will start)
+#
+# 2. OPEN the Beszel UI at your configured domain
+#
+# 3. CREATE an admin account on first visit
+#
+# 4. ADD A SYSTEM in the Beszel UI:
+#    - Click "Add System"
+#    - For "Host / IP", enter: /beszel_socket/beszel.sock
+#      (This is the Unix socket shared between hub and agent)
+#    - Click "Add" - the UI will show you a KEY and TOKEN
+#
+# 5. COPY the KEY and TOKEN from the Beszel UI
+#
+# 6. UPDATE Coolify environment variables:
+#    - Go to your Beszel service in Coolify
+#    - Click on Environment Variables
+#    - Set KEY = (the ssh-ed25519 key from step 5)
+#    - Set TOKEN = (the UUID token from step 5)
+#
+# 7. RESTART the beszel-agent container in Coolify
+#
+# The agent will now connect and you'll see metrics in the Beszel UI.
+# ============================================================================
 
-# When adding a System in the UI, the Host/IP must be beszel-agent (or the container name, ex: beszel-agent-pswog4s8wks4o8osw44cw0k8)
-# Add the public Key in "Key" env variable and token in the "Token" variable below (These are obtained from Beszel UI)
 services:
   beszel:
-    image: 'henrygd/beszel:0.16.1' # Released on 14 Nov 2025
+    image: henrygd/beszel:0.17.0
     environment:
       - SERVICE_URL_BESZEL_8090
     volumes:
-      - 'beszel_data:/beszel_data'
-      - 'beszel_socket:/beszel_socket'
-  beszel-agent:
-    image: 'henrygd/beszel-agent:0.16.1' # Released on 14 Nov 2025
-    environment:
-      - LISTEN=/beszel_socket/beszel.sock
-      - HUB_URL=http://beszel:8090
-      - 'TOKEN=${TOKEN}'
-      - 'KEY=${KEY}'
-    volumes:
-      - beszel_agent_data:/var/lib/beszel-agent
-      - beszel_socket:/beszel_socket
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - beszel-data:/beszel_data
+      - beszel-socket:/beszel_socket
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  beszel-agent:
+    image: henrygd/beszel-agent:0.17.0
+    environment:
+      # Socket path for hub-agent communication
+      - LISTEN=/beszel_socket/beszel.sock
+      # Internal hub URL (container-to-container)
+      - HUB_URL=http://beszel:8090
+      # Get these from Beszel UI after adding a system (see instructions above)
+      - KEY=${KEY}
+      - TOKEN=${TOKEN}
+    volumes:
+      - beszel-agent-data:/var/lib/beszel-agent
+      - beszel-socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  beszel-data:
+  beszel-socket:
+  beszel-agent-data:
