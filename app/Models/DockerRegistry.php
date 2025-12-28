@@ -62,4 +62,15 @@ class DockerRegistry extends BaseModel
     {
         return $this->applications()->exists();
     }
+
+    public function safeDelete()
+    {
+        if (! $this->isInUse()) {
+            $this->delete();
+
+            return true;
+        }
+
+        return false;
+    }
 }

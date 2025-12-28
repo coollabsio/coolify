@@ -95,3 +95,42 @@ it('requires both username and password when changing credentials', function () 
         ->assertHasErrors('username')
         ->assertHasErrors('password');
 });
+
+it('can delete a docker registry that is not in use', function () {
+    $registry = DockerRegistry::create([
+        'name' => 'Registry to Delete',
+        'registry_url' => 'ghcr.io',
+        'username' => 'registry-user',
+        'password' => 'registry-token',
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::withQueryParams(['registry_uuid' => $registry->uuid])
+        ->test(Show::class)
+        ->call('delete')
+        ->assertRedirect(route('security.docker-registry.index'));
+
+    expect(DockerRegistry::find($registry->id))->toBeNull();
+});
+
+it('cannot delete a docker registry that is in use by an application', function () {
+    $registry = DockerRegistry::create([
+        'name' => 'Registry in Use',
+        'registry_url' => 'ghcr.io',
+        'username' => 'registry-user',
+        'password' => 'registry-token',
+        'team_id' => $this->team->id,
+    ]);
+
+    // Create an application using this registry
+    $application = \App\Models\Application::factory()->create([
+        'docker_registry_id' => $registry->id,
+    ]);
+
+    Livewire::withQueryParams(['registry_uuid' => $registry->uuid])
+        ->test(Show::class)
+        ->call('delete');
+
+    // Registry should still exist because it's in use
+    expect(DockerRegistry::find($registry->id))->not->toBeNull();
+});
