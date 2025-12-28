@@ -319,6 +319,14 @@ class User extends Authenticatable implements SendsEmail
             return null;
         }
 
+        // Check if user actually belongs to this team
+        if (! $this->teams->contains('id', $sessionTeamId)) {
+            session()->forget('currentTeam');
+            Cache::forget('user:'.$this->id.':team:'.$sessionTeamId);
+
+            return null;
+        }
+
         return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
             return Team::find($sessionTeamId);
         });
