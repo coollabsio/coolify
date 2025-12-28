@@ -319,7 +319,7 @@ class User extends Authenticatable implements SendsEmail
             return null;
         }
 
-        return Cache::remember('team:'.$this->id, 3600, function () use ($sessionTeamId) {
+        return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
             return Team::find($sessionTeamId);
         });
     }

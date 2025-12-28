@@ -182,8 +182,11 @@ function refreshSession(?Team $team = null): void
             $team = User::find(Auth::id())->teams->first();
         }
     }
+    // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
-    Cache::remember('team:'.Auth::id(), 3600, function () use ($team) {
+    // Use new cache key format that includes team ID
+    Cache::forget('user:'.Auth::id().':team:'.$team->id);
+    Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
