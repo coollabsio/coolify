@@ -691,7 +691,7 @@ $schema://$host {
                 $metrics = $this->downsampleLTTB($metrics, 1000);
             }
 
-            return $metrics;
+            return collect($metrics);
         }
     }
 
@@ -720,7 +720,7 @@ $schema://$host {
                 $metrics = $this->downsampleLTTB($metrics, 1000);
             }
 
-            return $metrics;
+            return collect($metrics);
         }
     }
 
@@ -736,6 +736,8 @@ $schema://$host {
     {
         $dataLength = count($data);
 
+        // Return unchanged if threshold >= data length, or if threshold <= 2
+        // (threshold <= 2 would cause division by zero in bucket calculation)
         if ($threshold >= $dataLength || $threshold <= 2) {
             return $data;
         }
