@@ -85,15 +85,12 @@ class Show extends Component
             $changingUsername = $username !== $this->originalUsername;
             $clearingCredentials = $this->originalUsername !== null && $username === null && $password === null;
 
+            // If changing username or setting password (but not clearing both), require both fields
             if (! $clearingCredentials && ($password !== null || $changingUsername)) {
-                if ($username === null) {
+                if ($username === null || $password === null) {
                     $this->addError('username', 'Please provide a username for the registry.');
-                }
-                if ($password === null) {
                     $this->addError('password', 'Please provide a password or token for the registry.');
-                }
 
-                if ($this->getErrorBag()->isNotEmpty()) {
                     return;
                 }
             }

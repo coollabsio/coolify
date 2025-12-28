@@ -27,8 +27,8 @@ class Create extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'registryUrl' => 'nullable|string',
-            'username' => 'nullable|string|required_with:password',
-            'password' => 'nullable|string|required_with:username',
+            'username' => 'nullable|string',
+            'password' => 'nullable|string',
         ];
     }
 
@@ -52,7 +52,8 @@ class Create extends Component
             $registryUrl = null;
         }
 
-        if (($username && ! $password) || ($password && ! $username)) {
+        // Validate that both username and password are provided together
+        if (($username !== null && $password === null) || ($password !== null && $username === null)) {
             $this->addError('username', 'Please provide both username and password for the registry.');
             $this->addError('password', 'Please provide both username and password for the registry.');
 
