@@ -15,7 +15,7 @@ class SshMultiplexingHelper
     {
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
         $sshKeyLocation = $privateKey->getKeyLocation();
-        $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_'.$server->uuid;
+        $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_' . $server->uuid;
 
         return [
             'sshKeyLocation' => $sshKeyLocation,
@@ -25,7 +25,7 @@ class SshMultiplexingHelper
 
     public static function ensureMultiplexedConnection(Server $server): bool
     {
-        if (! self::isMultiplexingEnabled()) {
+        if (!self::isMultiplexingEnabled()) {
             return false;
         }
 
@@ -57,7 +57,7 @@ class SshMultiplexingHelper
 
         // Perform health check if enabled
         if (config('constants.ssh.mux_health_check_enabled')) {
-            if (! self::isConnectionHealthy($server)) {
+            if (!self::isConnectionHealthy($server)) {
                 return self::refreshMultiplexedConnection($server);
             }
         }
@@ -108,13 +108,13 @@ class SshMultiplexingHelper
         self::clearConnectionMetadata($server);
     }
 
-    public static function generateScpCommand(Server $server, string $source, string $dest)
+    public static function generateScpCommand(Server $server, string $source, string $dest, ?int $timeout = null)
     {
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
         $muxSocket = $sshConfig['muxFilename'];
 
-        $timeout = config('constants.ssh.command_timeout');
+        $timeout = $timeout ?? config('constants.ssh.command_timeout');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $scp_command = "timeout $timeout scp ";
@@ -149,7 +149,7 @@ class SshMultiplexingHelper
         return $scp_command;
     }
 
-    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false)
+    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $timeout = null)
     {
         if ($server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
@@ -162,13 +162,13 @@ class SshMultiplexingHelper
 
         $muxSocket = $sshConfig['muxFilename'];
 
-        $timeout = config('constants.ssh.command_timeout');
+        $timeout = $timeout ?? config('constants.ssh.command_timeout');
         $muxPersistTime = config('constants.ssh.mux_persist_time');
 
         $ssh_command = "timeout $timeout ssh ";
 
         $multiplexingSuccessful = false;
-        if (! $disableMultiplexing && self::isMultiplexingEnabled()) {
+        if (!$disableMultiplexing && self::isMultiplexingEnabled()) {
             try {
                 $multiplexingSuccessful = self::ensureMultiplexedConnection($server);
                 if ($multiplexingSuccessful) {
@@ -189,16 +189,16 @@ class SshMultiplexingHelper
         $delimiter = base64_encode($delimiter);
         $command = str_replace($delimiter, '', $command);
 
-        $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL
-            .$command.PHP_EOL
-            .$delimiter;
+        $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter" . PHP_EOL
+            . $command . PHP_EOL
+            . $delimiter;
 
         return $ssh_command;
     }
 
     private static function isMultiplexingEnabled(): bool
     {
-        return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
+        return config('constants.ssh.mux_enabled') && !config('constants.coolify.is_windows_docker_desktop');
     }
 
     private static function validateSshKey(PrivateKey $privateKey): void
@@ -215,12 +215,12 @@ class SshMultiplexingHelper
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
         $options = "-i {$sshKeyLocation} "
-            .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-            .'-o PasswordAuthentication=no '
-            ."-o ConnectTimeout=$connectionTimeout "
-            ."-o ServerAliveInterval=$serverInterval "
-            .'-o RequestTTY=no '
-            .'-o LogLevel=ERROR ';
+            . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+            . '-o PasswordAuthentication=no '
+            . "-o ConnectTimeout=$connectionTimeout "
+            . "-o ServerAliveInterval=$serverInterval "
+            . '-o RequestTTY=no '
+            . '-o LogLevel=ERROR ';
 
         // Bruh
         if ($isScp) {

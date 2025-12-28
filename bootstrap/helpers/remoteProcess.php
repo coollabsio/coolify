@@ -37,7 +37,7 @@ function remote_process(
 
     if (Auth::check()) {
         $teams = Auth::user()->teams->pluck('id');
-        if (! $teams->contains($server->team_id) && ! $teams->contains(0)) {
+        if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
             throw new \Exception('User is not part of the team that owns this server');
         }
     }
@@ -87,7 +87,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
-    if ($server->isNonRoot() && ! $no_sudo) {
+    if ($server->isNonRoot() && !$no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
@@ -122,7 +122,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
-    if ($server->isNonRoot() && ! $no_sudo) {
+    if ($server->isNonRoot() && !$no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
@@ -130,7 +130,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return \App\Helpers\SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, $effectiveTimeout);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
@@ -160,7 +160,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
         'Permission denied (publickey',
         'Could not resolve hostname',
     ]);
-    $ignored = $ignoredErrors->contains(fn ($error) => Str::contains($errorOutput, $error));
+    $ignored = $ignoredErrors->contains(fn($error) => Str::contains($errorOutput, $error));
 
     // Ensure we always have a meaningful error message
     $errorMessage = trim($errorOutput);
@@ -210,18 +210,18 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         }
     }
 
-    if (! is_array($decoded)) {
+    if (!is_array($decoded)) {
         return collect([]);
     }
 
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (! $is_debug_enabled) {
-        $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
+    if (!$is_debug_enabled) {
+        $formatted = $formatted->filter(fn($i) => $i['hidden'] === false ?? false);
     }
 
     return $formatted
-        ->sortBy(fn ($i) => data_get($i, 'order'))
+        ->sortBy(fn($i) => data_get($i, 'order'))
         ->map(function ($i) {
             data_set($i, 'timestamp', Carbon::parse(data_get($i, 'timestamp'))->format('Y-M-d H:i:s.u'));
 
@@ -230,7 +230,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
             $command = data_get($logItem, 'command');
             $isStderr = data_get($logItem, 'type') === 'stderr';
-            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+            $isNewCommand = !is_null($command) && !$seenCommands->first(function ($seenCommand) use ($logItem) {
                 return data_get($seenCommand, 'command') === data_get($logItem, 'command') && data_get($seenCommand, 'batch') === data_get($logItem, 'batch');
             });
 
@@ -270,20 +270,20 @@ function remove_iip($text)
     $text = sanitize_utf8_text($text);
 
     // Git access tokens
-    $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
+    $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:' . REDACTED, $text);
 
     // ANSI color codes
     $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 
     // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, etc.)
     // (protocol://user:password@host → protocol://user:<REDACTED>@host)
-    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
+    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1' . REDACTED . '$2', $text);
 
     // Email addresses
     $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
 
     // Bearer/JWT tokens
-    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
+    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer ' . REDACTED, $text);
 
     // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
     $text = preg_replace('/\b(gh[pousr]_[A-Za-z0-9_]{36,})\b/', REDACTED, $text);
@@ -295,10 +295,10 @@ function remove_iip($text)
     $text = preg_replace('/\b(A(?:KIA|BIA|CCA|SIA)[A-Z0-9]{16})\b/', REDACTED, $text);
 
     // AWS Secret Access Key (40 character base64-ish string, typically follows access key)
-    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1='.REDACTED, $text);
+    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1=' . REDACTED, $text);
 
     // API keys (common patterns)
-    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
+    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1=' . REDACTED, $text);
 
     // Private key blocks
     $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
@@ -326,7 +326,7 @@ function sanitize_utf8_text(?string $text): string
     $sanitized = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
 
     // Additional fallback: use SUBSTITUTE flag to replace invalid sequences with substitution character
-    if (! mb_check_encoding($sanitized, 'UTF-8')) {
+    if (!mb_check_encoding($sanitized, 'UTF-8')) {
         $sanitized = mb_convert_encoding($text, 'UTF-8', mb_detect_encoding($text, mb_detect_order(), true) ?: 'UTF-8');
     }
 
@@ -357,7 +357,7 @@ function checkRequiredCommands(Server $server)
             break;
         }
         $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
-        if (! $commandFound) {
+        if (!$commandFound) {
             break;
         }
     }
