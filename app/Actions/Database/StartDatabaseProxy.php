@@ -68,6 +68,8 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_connect_timeout 60s;
+            proxy_timeout 0;
        }
     }
     EOF;
