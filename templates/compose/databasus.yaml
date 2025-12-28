@@ -2,7 +2,7 @@
 # slogan: Databasus is a free, open source and self-hosted tool to backup PostgreSQL, MySQL, and MongoDB.
 # category: devtools
 # tags: postgres,mysql,mongo,backup
-# logo: svgs/postgresus.svg
+# logo: svgs/databasus.svg
 # port: 4005
 
 services:
@@ -14,7 +14,7 @@ services:
       - 'databasus-data:/databasus-data'
     healthcheck:
       test:
-        ["CMD", "wget", "-qO-", "http://localhost:4005/api/v1/system/health"]
+        ['CMD', 'wget', '-qO-', 'http://localhost:4005/api/v1/system/health']
       interval: 5s
       timeout: 10s
       retries: 5
