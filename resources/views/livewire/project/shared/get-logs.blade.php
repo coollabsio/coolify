@@ -246,8 +246,8 @@
                         <form wire:submit="getLogs(true)" class="relative flex items-center">
                             <span
                                 class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
-                            <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
-                                title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
+                            <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
+                                title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
                                 class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
                         </form>
                         <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
@@ -369,19 +369,9 @@
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
                         @php
-                            // Limit rendered lines to prevent memory exhaustion
-                            $maxDisplayLines = 2000;
-                            $allLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
-                            $totalLines = $allLines->count();
-                            $hasMoreLines = $totalLines > $maxDisplayLines;
-                            $displayLines = $hasMoreLines ? $allLines->slice(-$maxDisplayLines)->values() : $allLines;
+                            $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
                         @endphp
                         <div id="logs" class="font-mono max-w-full cursor-default">
-                            @if ($hasMoreLines)
-                                <div class="text-center py-2 text-gray-500 dark:text-gray-400 text-sm border-b dark:border-coolgray-300 mb-2">
-                                    Showing last {{ number_format($maxDisplayLines) }} of {{ number_format($totalLines) }} lines
-                                </div>
-                            @endif
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.

@@ -21,6 +21,8 @@ use Livewire\Component;
 
 class GetLogs extends Component
 {
+    public const MAX_LOG_LINES = 50000;
+
     public string $outputs = '';
 
     public string $errors = '';
@@ -122,6 +124,9 @@ class GetLogs extends Component
         }
         if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
             $this->numberOfLines = 1000;
+        }
+        if ($this->numberOfLines > self::MAX_LOG_LINES) {
+            $this->numberOfLines = self::MAX_LOG_LINES;
         }
         if ($this->container) {
             if ($this->showTimeStamps) {
