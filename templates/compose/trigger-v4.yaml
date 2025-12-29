@@ -206,7 +206,6 @@ services:
     environment:
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?sslmode=disable
       - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
-      - ELECTRIC_INSECURE=true
       - ELECTRIC_USAGE_REPORTING=false
     healthcheck:
       test:
