@@ -1,0 +1,276 @@
+# documentation: https://trigger.dev/docs/v4/open-source-self-hosting
+# slogan: The open source background jobs platform for developers
+# category: automation
+# tags: background-jobs, typescript, javascript, scheduling, workflows, automation, tasks, queues
+# logo: svgs/trigger.png
+# port: 3000
+
+services:
+  trigger:
+    image: 'ghcr.io/triggerdotdev/trigger.dev:v4-beta'
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    user: root
+    command: |
+      sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      electric:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_TRIGGER_3000
+      - REMIX_APP_PORT=3000
+      - APP_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - API_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - SESSION_SECRET=${SERVICE_PASSWORD_32_SESSION}
+      - MAGIC_LINK_SECRET=${SERVICE_PASSWORD_32_MAGIC}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_32_ENCRYPTION}
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_MANAGEDWORKER}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable
+      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_TLS_DISABLED=true
+      - ELECTRIC_ORIGIN=http://electric:3000
+      - DEV_OTEL_EXPORTER_OTLP_ENDPOINT=${DEV_OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - DEPLOY_REGISTRY_HOST=${DEPLOY_REGISTRY_HOST:-ghcr.io}
+      - DEPLOY_REGISTRY_PROTOCOL=${DEPLOY_REGISTRY_PROTOCOL:-https}
+      - DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE}
+      - V4_DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE}
+      - OBJECT_STORE_BASE_URL=http://minio:9000
+      - OBJECT_STORE_ACCESS_KEY_ID=admin
+      - OBJECT_STORE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - CLICKHOUSE_URL=http://default:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123?secure=false
+      - CLICKHOUSE_LOG_LEVEL=info
+      - RUN_REPLICATION_ENABLED=1
+      - RUN_REPLICATION_CLICKHOUSE_URL=http://default:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123
+      - RUN_REPLICATION_LOG_LEVEL=info
+      - TRIGGER_BOOTSTRAP_ENABLED=1
+      - TRIGGER_BOOTSTRAP_WORKER_GROUP_NAME=bootstrap
+      - TRIGGER_BOOTSTRAP_WORKER_TOKEN_PATH=/home/node/shared/worker_token
+      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN:-}
+      - DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT:-300}
+      - DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT:-100}
+      - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID:-}
+      - AUTH_GITHUB_CLIENT_SECRET=${AUTH_GITHUB_CLIENT_SECRET:-}
+      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-resend}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
+      - REPLY_TO_EMAIL=${REPLY_TO_EMAIL:-}
+      - WHITELISTED_EMAILS=${WHITELISTED_EMAILS:-}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
+      - NODE_ENV=production
+      - APP_LOG_LEVEL=info
+      - GRACEFUL_SHUTDOWN_TIMEOUT=1000
+      - INTERNAL_OTEL_TRACE_LOGGING_ENABLED=0
+      - TRIGGER_TELEMETRY_DISABLED=${TRIGGER_TELEMETRY_DISABLED:-0}
+    volumes:
+      - shared-data:/home/node/shared
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:3000/healthcheck',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  supervisor:
+    image: 'ghcr.io/triggerdotdev/supervisor:main'
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    user: root
+    command: |
+      sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
+    depends_on:
+      trigger:
+        condition: service_healthy
+      docker-proxy:
+        condition: service_healthy
+    environment:
+      - TRIGGER_API_URL=http://trigger:3000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://trigger:3000/otel
+      - TRIGGER_WORKER_TOKEN=file:///home/node/shared/worker_token
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_MANAGEDWORKER}
+      - TRIGGER_WORKLOAD_API_DOMAIN=${TRIGGER_WORKLOAD_API_DOMAIN:-supervisor}
+      - TRIGGER_WORKLOAD_API_PORT_EXTERNAL=8020
+      - DOCKER_HOST=tcp://docker-proxy:2375
+      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS:-trigger-net}
+      - DOCKER_AUTOREMOVE_EXITED_CONTAINERS=1
+      - DOCKER_REGISTRY_URL=https://${DEPLOY_REGISTRY_HOST:-ghcr.io}
+      - DOCKER_REGISTRY_USERNAME=${DEPLOY_REGISTRY_USERNAME:-}
+      - DOCKER_REGISTRY_PASSWORD=${DEPLOY_REGISTRY_PASSWORD:-}
+      - ENFORCE_MACHINE_PRESETS=1
+      - TRIGGER_DEQUEUE_INTERVAL_MS=1000
+      - DEBUG=${SUPERVISOR_DEBUG:-0}
+    volumes:
+      - shared-data:/home/node/shared
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:8020/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LOG_LEVEL=info
+      - POST=1
+      - CONTAINERS=1
+      - IMAGES=1
+      - INFO=1
+      - NETWORKS=1
+      - AUTH=1
+      - DISTRIBUTION=1
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z 127.0.0.1 2375 || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  postgresql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    command:
+      - '-c'
+      - wal_level=logical
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-trigger}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  electric:
+    image: electricsql/electric:1.0.24
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?sslmode=disable
+      - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
+      - ELECTRIC_INSECURE=true
+      - ELECTRIC_USAGE_REPORTING=false
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:3000/v1/health'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - trigger-net
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - MINIO_DEFAULT_BUCKETS=packets
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - http://localhost:9000/minio/health/live
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgresql-data:
+  redis-data:
+  clickhouse-data:
+  clickhouse-logs:
+  minio-data:
+  shared-data:
+
+networks:
+  trigger-net:
+    driver: bridge
