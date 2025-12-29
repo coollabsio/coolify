@@ -10,6 +10,9 @@ services:
       - PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-https://pangolin.domain.tld}
       - NEWT_ID=${NEWT_ID:?}
       - NEWT_SECRET=${NEWT_SECRET:?}
+      - DOCKER_SOCKET=${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
     healthcheck:
       test: ["CMD", "newt", "--version"]
       interval: 5s
