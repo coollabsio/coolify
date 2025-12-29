@@ -66,7 +66,7 @@ class Rollback extends Component
             return;
         }
 
-        return redirect()->route('project.application.deployment.show', [
+        return redirectRoute($this, 'project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,
