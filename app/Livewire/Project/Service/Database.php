@@ -100,7 +100,7 @@ class Database extends Component
             $this->database->delete();
             $this->dispatch('success', 'Database deleted.');
 
-            return redirect()->route('project.service.configuration', $this->parameters);
+            return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -164,7 +164,7 @@ class Database extends Component
                 $serviceDatabase->delete();
             });
 
-            return redirect()->route('project.service.configuration', $redirectParams);
+            return redirectRoute($this, 'project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

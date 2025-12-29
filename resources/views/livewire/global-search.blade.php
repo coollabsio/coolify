@@ -323,7 +323,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -398,7 +398,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -467,7 +467,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -542,7 +542,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">

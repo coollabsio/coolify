@@ -1314,10 +1314,10 @@ class GlobalSearch extends Component
                 'server_id' => $this->selectedServerId,
             ];
 
-            $this->redirect(route('project.resource.create', [
+            redirectRoute($this, 'project.resource.create', [
                 'project_uuid' => $this->selectedProjectUuid,
                 'environment_uuid' => $this->selectedEnvironmentUuid,
-            ] + $queryParams));
+            ] + $queryParams);
         }
     }
 
@@ -1334,6 +1334,42 @@ class GlobalSearch extends Component
         $this->availableProjects = [];
         $this->availableEnvironments = [];
         $this->autoOpenResource = null;
+    }
+
+    public function goBack()
+    {
+        // From Environment Selection → go back to Project (if multiple) or further
+        if ($this->selectedProjectUuid !== null) {
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableProjects) > 1) {
+                return; // Stop here - user can choose a project
+            }
+        }
+
+        // From Project Selection → go back to Destination (if multiple) or further
+        if ($this->selectedDestinationUuid !== null) {
+            $this->selectedDestinationUuid = null;
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableDestinations) > 1) {
+                return; // Stop here - user can choose a destination
+            }
+        }
+
+        // From Destination Selection → go back to Server (if multiple) or cancel
+        if ($this->selectedServerId !== null) {
+            $this->selectedServerId = null;
+            $this->selectedDestinationUuid = null;
+            $this->selectedProjectUuid = null;
+            $this->selectedEnvironmentUuid = null;
+            if (count($this->availableServers) > 1) {
+                return; // Stop here - user can choose a server
+            }
+        }
+
+        // All previous steps were auto-selected, cancel entirely
+        $this->cancelResourceSelection();
     }
 
     public function getFilteredCreatableItemsProperty()

@@ -12,7 +12,7 @@
                 <div>{{ $application->compose_parsing_version }}</div>
             @endif
             <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
-            @if ($application->build_pack === 'dockercompose')
+            @if ($buildPack === 'dockercompose')
                 <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
                     x-on:click="$wire.dispatch('loadCompose', false)">
                     {{ $application->docker_compose_raw ? 'Reload Compose File' : 'Load Compose File' }}
@@ -36,7 +36,7 @@
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockercompose">Docker Compose</option>
                         </x-forms.select>
-                        @if ($application->settings->is_static || $application->build_pack === 'static')
+                        @if ($isStatic || $buildPack === 'static')
                             <x-forms.select x-bind:disabled="!canUpdate" id="staticImage" label="Static Image" required>
                                 <option value="nginx:alpine">nginx:alpine</option>
                                 <option disabled value="apache:alpine">apache:alpine</option>
@@ -44,7 +44,7 @@
                         @endif
                     </div>
 
-                    @if ($application->build_pack === 'dockercompose')
+                    @if ($buildPack === 'dockercompose')
                         @if (
                                 !is_null($parsedServices) &&
                                 count($parsedServices) > 0 &&
@@ -71,7 +71,7 @@
 
                 </div>
             @endif
-            @if ($application->settings->is_static || $application->build_pack === 'static')
+            @if ($isStatic || $buildPack === 'static')
                 <x-forms.textarea id="customNginxConfiguration"
                     placeholder="Empty means default configuration will be used." label="Custom Nginx Configuration"
                     helper="You can add custom Nginx configuration here." x-bind:disabled="!canUpdate" />
@@ -93,13 +93,13 @@
                         helper="If your application is a static site or the final build assets should be served as a static site, enable this."
                         x-bind:disabled="!canUpdate" />
                 @endif
-                @if ($application->settings->is_static && $application->build_pack !== 'static')
+                @if ($isStatic && $buildPack !== 'static')
                     <x-forms.checkbox label="Is it a SPA (Single Page Application)?"
                         helper="If your application is a SPA, enable this." id="isSpa" instantSave
                         x-bind:disabled="!canUpdate"></x-forms.checkbox>
                 @endif
             </div>
-            @if ($application->build_pack !== 'dockercompose')
+            @if ($buildPack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
                         <x-forms.input placeholder="https://coolify.io" wire:model="fqdn" label="Domains" readonly
@@ -156,7 +156,7 @@
                 </div>
             @endif
 
-            @if ($application->build_pack !== 'dockercompose')
+            @if ($buildPack !== 'dockercompose')
                 <div class="flex items-center gap-2 pt-8">
                     <h3>Docker Registry</h3>
                     @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
@@ -217,7 +217,7 @@
                         id="customDockerRunOptions" label="Custom Docker Options" x-bind:disabled="!canUpdate" />
                 @else
                     @if ($application->could_set_build_commands())
-                        @if ($application->build_pack === 'nixpacks')
+                        @if ($buildPack === 'nixpacks')
                             <div class="flex flex-col gap-2 xl:flex-row">
                                 <x-forms.input helper="If you modify this, you probably need to have a nixpacks.toml"
                                     id="installCommand" label="Install Command" x-bind:disabled="!canUpdate" />
@@ -235,7 +235,7 @@
 
                     @endif
                     <div class="flex flex-col gap-2 pt-6 pb-10">
-                        @if ($application->build_pack === 'dockercompose')
+                        @if ($buildPack === 'dockercompose')
                                 <div class="flex flex-col gap-2" @can('update', $application) x-init="$wire.dispatch('loadCompose', true)" @endcan>
                                     <div x-data="{
                                         baseDir: '{{ $application->base_directory }}',
@@ -331,13 +331,13 @@
                                     <x-forms.input placeholder="/" wire:model.defer="baseDirectory" label="Base Directory"
                                         helper="Directory to use as root. Useful for monorepos." x-bind:disabled="!canUpdate"
                                         x-model="baseDir" @blur="normalizeBaseDir()" />
-                                    @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
+                                    @if ($buildPack === 'dockerfile' && !$application->dockerfile)
                                         <x-forms.input placeholder="/Dockerfile" wire:model.defer="dockerfileLocation" label="Dockerfile Location"
                                             helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>"
                                             x-bind:disabled="!canUpdate" x-model="dockerfileLocation" @blur="normalizeDockerfileLocation()" />
                                     @endif
 
-                                    @if ($application->build_pack === 'dockerfile')
+                                    @if ($buildPack === 'dockerfile')
                                         <x-forms.input id="dockerfileTargetBuild" label="Docker Build Stage Target"
                                             helper="Useful if you have multi-staged dockerfile." x-bind:disabled="!canUpdate" />
                                     @endif
@@ -365,7 +365,7 @@
                                     placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                                     id="customDockerRunOptions" label="Custom Docker Options" x-bind:disabled="!canUpdate" />
 
-                                @if ($application->build_pack !== 'dockercompose')
+                                @if ($buildPack !== 'dockercompose')
                                     <div class="pt-2 w-96">
                                         <x-forms.checkbox
                                             helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
@@ -377,7 +377,7 @@
                         </div>
                 @endif
                 </div>
-                @if ($application->build_pack === 'dockercompose')
+                @if ($buildPack === 'dockercompose')
                     <div x-data="{ showRaw: true }">
                         <div class="flex items-center gap-2">
                             <h3>Docker Compose</h3>
@@ -416,7 +416,7 @@
                     <x-forms.textarea label="Dockerfile" id="dockerfile" monacoEditorLanguage="dockerfile" useMonacoEditor
                         rows="6" x-bind:disabled="!canUpdate"> </x-forms.textarea>
                 @endif
-                @if ($application->build_pack !== 'dockercompose')
+                @if ($buildPack !== 'dockercompose')
                     <h3 class="pt-8">Network</h3>
                     @if ($this->detectedPortInfo)
                         @if ($this->detectedPortInfo['isEmpty'])
@@ -467,7 +467,7 @@
                         @endif
                     @endif
                     <div class="flex flex-col gap-2 xl:flex-row">
-                        @if ($application->settings->is_static || $application->build_pack === 'static')
+                        @if ($isStatic || $buildPack === 'static')
                             <x-forms.input id="portsExposes" label="Ports Exposes" readonly x-bind:disabled="!canUpdate" />
                         @else
                             @if ($application->settings->is_container_label_readonly_enabled === false)
@@ -542,7 +542,7 @@
                     <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
                         id="preDeploymentCommand" label="Pre-deployment "
                         helper="An optional script or command to execute in the existing container before the deployment begins.<br>It is always executed with 'sh -c', so you do not need add it manually." />
-                    @if ($application->build_pack === 'dockercompose')
+                    @if ($buildPack === 'dockercompose')
                         <x-forms.input x-bind:disabled="shouldDisable()" id="preDeploymentCommandContainer"
                             label="Container Name"
                             helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
@@ -552,7 +552,7 @@
                     <x-forms.input x-bind:disabled="shouldDisable()" placeholder="php artisan migrate"
                         id="postDeploymentCommand" label="Post-deployment "
                         helper="An optional script or command to execute in the newly built container after the deployment completes.<br>It is always executed with 'sh -c', so you do not need add it manually." />
-                    @if ($application->build_pack === 'dockercompose')
+                    @if ($buildPack === 'dockercompose')
                         <x-forms.input x-bind:disabled="shouldDisable()" id="postDeploymentCommandContainer"
                             label="Container Name"
                             helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
