@@ -202,7 +202,7 @@ class StartMongodb
                 [
                     [
                         'type' => 'bind',
-                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'source' => base_configuration_dir().'/ssl/coolify-ca.crt',
                         'target' => '/etc/mongo/certs/ca.pem',
                         'read_only' => true,
                     ],

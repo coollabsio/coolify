@@ -127,7 +127,7 @@
                                     <template x-if="upgradeError">
                                         <div class="flex flex-col items-center gap-4">
                                             <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                                                Check the logs on the server at /data/coolify/source/upgrade*.
+                                                Check the logs on the server at {{ base_configuration_dir() }}/source/upgrade*.
                                             </p>
                                             <x-forms.button @click="closeErrorModal()" type="button">
                                                 Close
@@ -152,7 +152,7 @@
                                         If something goes wrong, check the
                                         <a class="font-medium underline dark:text-white hover:text-neutral-800 dark:hover:text-neutral-300"
                                             href="https://coolify.io/docs/upgrade" target="_blank">upgrade guide</a> or the
-                                        logs on the server at /data/coolify/source/upgrade*.
+                                        logs on the server at {{ base_configuration_dir() }}/source/upgrade*.
                                     </p>
                                 </div>
                             </template>

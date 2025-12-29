@@ -304,7 +304,7 @@ class Server extends BaseModel
         $redirect_url = $this->proxy->redirect_url;
         if (isDev()) {
             if ($proxy_type === ProxyTypes::CADDY->value) {
-                $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
+                $dynamic_conf_path = base_configuration_dir().'/proxy/caddy/dynamic';
             }
         }
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {

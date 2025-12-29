@@ -133,7 +133,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         } else {
             if (isDev() && $proxyType === ProxyTypes::CADDY->value) {
-                $proxy_path = '/data/coolify/proxy/caddy';
+                $proxy_path = base_configuration_dir().'/proxy/caddy';
             }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
