@@ -188,6 +188,50 @@ class GetLogs extends Component
         return sanitizeLogsForExport($this->outputs);
     }
 
+    public function downloadAllLogs(): string
+    {
+        if (! $this->server->isFunctional() || ! $this->container) {
+            return '';
+        }
+
+        if ($this->showTimeStamps) {
+            if ($this->server->isSwarm()) {
+                $command = "docker service logs -t {$this->container}";
+            } else {
+                $command = "docker logs -t {$this->container}";
+            }
+        } else {
+            if ($this->server->isSwarm()) {
+                $command = "docker service logs {$this->container}";
+            } else {
+                $command = "docker logs {$this->container}";
+            }
+        }
+
+        if ($this->server->isNonRoot()) {
+            $command = parseCommandsByLineForSudo(collect($command), $this->server);
+            $command = $command[0];
+        }
+
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+
+        $allLogs = '';
+        Process::run($sshCommand, function (string $type, string $output) use (&$allLogs) {
+            $allLogs .= removeAnsiColors($output);
+        });
+
+        if ($this->showTimeStamps) {
+            $allLogs = str($allLogs)->split('/\n/')->sort(function ($a, $b) {
+                $a = explode(' ', $a);
+                $b = explode(' ', $b);
+
+                return $a[0] <=> $b[0];
+            })->join("\n");
+        }
+
+        return sanitizeLogsForExport($allLogs);
+    }
+
     public function render()
     {
         return view('livewire.project.shared.get-logs');
