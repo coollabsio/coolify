@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
-use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -316,9 +315,8 @@ class StartRedis
             return;
         }
         $filename = 'redis.conf';
-        Storage::disk('local')->put("tmp/redis.conf_{$this->database->uuid}", $this->database->redis_conf);
-        $path = Storage::path("tmp/redis.conf_{$this->database->uuid}");
-        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
-        Storage::disk('local')->delete("tmp/redis.conf_{$this->database->uuid}");
+        $content = $this->database->redis_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 }
