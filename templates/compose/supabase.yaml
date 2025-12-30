@@ -8,14 +8,11 @@
 
 services:
   supabase-kong:
-    image: kong:2.8.1
-    # https://unix.stackexchange.com/a/294837
-    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
-    depends_on:
-      supabase-analytics:
-        condition: service_healthy
+    image: kong:3.9.1
+    user: root
+    entrypoint: bash -c 'eval "echo \"$$(cat /home/kong/temp.yml)\"" > /home/kong/kong.yml && /docker-entrypoint.sh kong docker-start'
     environment:
-      - SERVICE_URL_SUPABASEKONG_8000
+      - SERVICE_URL_SUPABASE_KONG_8000
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
@@ -29,6 +26,13 @@ services:
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - DASHBOARD_USERNAME=${SERVICE_USER_ADMIN}
       - DASHBOARD_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      # adding proxy logging
+      - KONG_PREFIX=/home/kong/
+      - TMPDIR=/tmp
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - type: bind
@@ -304,22 +308,26 @@ services:
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
       - 'SUPABASE_URL=http://supabase-kong:8000'
-      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASE_KONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-
-      - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
+      # API key is depricated
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}'
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
+      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64-PRIVATE-ACCESS-LOGFLARE}
+      - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASE_KONG}'
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
+      - POSTGRES_PORT=
+      - POSTGRES_HOST=supabase-db
+      - POSTGRES_DB=postgres
   supabase-db:
-    image: supabase/postgres:15.8.1.048
+    image: supabase/postgres:15.8.1.085
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -330,22 +338,29 @@ services:
         condition: service_healthy
     command:
       - postgres
-      - -c
-      - config_file=/etc/postgresql/postgresql.conf
-      - -c
+      - '-c' 
+      - config_file=/etc/postgresql/postgresql.conf 
+      # un comment those for ssl on db direct connection
+      # - '-c'
+      # - ssl=on
+      # - '-c'
+      # - ssl_cert_file=/etc/postcerts/server.crt
+      # - '-c'
+      # - ssl_key_file=/etc/postcerts/server.key
+      - '-c' 
       - log_min_messages=fatal
     environment:
       - POSTGRES_HOST=/var/run/postgresql
-      - PGPORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - PGDATABASE=${POSTGRES_DB:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - JWT_EXP=${JWT_EXPIRY:-3600}
+      - 'PGPORT=${POSTGRES_PORT:-5432}'
+      - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
+      - 'PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'PGDATABASE=${POSTGRES_DB:-postgres}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - 'JWT_EXP=${JWT_EXPIRY:-3600}'
     volumes:
-      - supabase-db-data:/var/lib/postgresql/data
+      - 'supabase-db-data:/var/lib/postgresql/data'
       - type: bind
         source: ./volumes/db/realtime.sql
         target: /docker-entrypoint-initdb.d/migrations/99-realtime.sql
@@ -614,15 +629,19 @@ services:
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
           \c postgres
+      # add your certs here if you want direct connection ( shouldn't be done here)
+      # - ./server.key:/etc/postcerts/server.key
+      # - ./server.crt:/etc/postcerts/server.crt
       # Use named volume to persist pgsodium decryption key between restarts
       - supabase-db-config:/etc/postgresql-custom
-
+      # un comment this after first deployment to force ssl (if you are forcing connection to DB directly btw you should be use the supabase service supavisor)
+      #- './supabase-db-config/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf'
   supabase-analytics:
     image: supabase/logflare:1.4.0
     healthcheck:
       test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
-      timeout: 5s
-      interval: 5s
+      timeout: 20s
+      interval: 21s
       retries: 10
     depends_on:
       supabase-db:
@@ -640,14 +659,16 @@ services:
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_SCHEMA=_analytics
-      - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
+      # LOGFLARE API KEY is depricated use this
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
+      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64-PRIVATE-ACCESS-LOGFLARE}
       - LOGFLARE_SINGLE_TENANT=true
       - LOGFLARE_SINGLE_TENANT_MODE=true
       - LOGFLARE_SUPABASE_MODE=true
       - LOGFLARE_MIN_CLUSTER_SIZE=1
 
       # Comment variables to use Big Query backend for analytics
-      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase
+      - 'POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase'
       - POSTGRES_BACKEND_SCHEMA=_analytics
       - LOGFLARE_FEATURE_FLAG_OVERRIDE=multibackend=true
 
@@ -712,7 +733,7 @@ services:
                 rest: 'starts_with(string!(.appname), "supabase-rest")'
                 realtime: 'starts_with(string!(.appname), "realtime-dev")'
                 storage: 'starts_with(string!(.appname), "supabase-storage")'
-                functions: 'starts_with(string!(.appname), "supabase-functions")'
+                functions: 'starts_with(string!(.appname), "supabase-edge-functions")'
                 db: 'starts_with(string!(.appname), "supabase-db")'
             # Ignores non nginx errors since they are related with kong booting up
             kong_logs:
@@ -794,6 +815,13 @@ services:
                     .event_message = parsed.msg
                     .metadata.level = parsed.level
                 }
+            # Function logs are unstructured messages on stderr
+            functions_logs:
+              type: remap
+              inputs:
+                - router.functions
+              source: |-
+                .metadata.project_ref = del(.project)
             # Storage logs may contain json objects so we parse them for completeness
             storage_logs:
               type: remap
@@ -842,7 +870,9 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod'
             logflare_realtime:
               type: 'http'
               inputs:
@@ -852,7 +882,9 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod'
             logflare_rest:
               type: 'http'
               inputs:
@@ -862,7 +894,9 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod'
             logflare_db:
               type: 'http'
               inputs:
@@ -872,20 +906,24 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
               # We must route the sink through kong because ingesting logs before logflare is fully initialised will
               # lead to broken queries from studio. This works by the assumption that containers are started in the
               # following order: vector > db > logflare > kong
-              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs'
             logflare_functions:
               type: 'http'
               inputs:
-                - router.functions
+                - functions_logs
               encoding:
                 codec: 'json'
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs'
             logflare_storage:
               type: 'http'
               inputs:
@@ -895,7 +933,9 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2'
             logflare_kong:
               type: 'http'
               inputs:
@@ -906,15 +946,17 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+                headers:
+                  x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod'
 
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
-    image: postgrest/postgrest:v12.2.12
+    image: postgrest/postgrest:v14.1
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -932,7 +974,7 @@ services:
     command: "postgrest"
     exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.174.0
+    image: supabase/gotrue:v2.184.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -960,7 +1002,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
-      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASEKONG}
+      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASE_KONG}
       # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
@@ -974,8 +1016,8 @@ services:
       - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
       - GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=${ENABLE_ANONYMOUS_USERS:-false}
       - GOTRUE_MAILER_AUTOCONFIRM=${ENABLE_EMAIL_AUTOCONFIRM:-false}
-      # GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true
-      # GOTRUE_SMTP_MAX_FREQUENCY=1s
+      # - GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true
+      # - GOTRUE_SMTP_MAX_FREQUENCY=1s
       - GOTRUE_SMTP_ADMIN_EMAIL=${SMTP_ADMIN_EMAIL}
       - GOTRUE_SMTP_HOST=${SMTP_HOST}
       - GOTRUE_SMTP_PORT=${SMTP_PORT:-587}
@@ -1023,7 +1065,7 @@ services:
 
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.34.47
+    image: supabase/realtime:v2.68.0
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -1069,8 +1111,7 @@ services:
       - LOG_LEVEL=error
       - RUN_JANITOR=true
       - JANITOR_INTERVAL=60000
-    command: >
-      sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
+    command: "sh -c \"/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server\"\n"
   supabase-minio:
     image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     environment:
@@ -1088,6 +1129,7 @@ services:
   minio-createbucket:
     image: minio/mc
     restart: "no"
+    exclude_from_hc: true
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
@@ -1106,7 +1148,7 @@ services:
           exit 0
 
   supabase-storage:
-    image: supabase/storage-api:v1.14.6
+    image: supabase/storage-api:v1.33.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1154,6 +1196,7 @@ services:
       - NODE_ENV=production
       - REQUEST_ALLOW_X_FORWARDED_PATH=true
 
+      # idk why is this left here but am not deleting it 
       # - ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
       # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
       # - POSTGREST_URL=http://supabase-rest:3000
@@ -1192,7 +1235,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.89.3
+    image: supabase/postgres-meta:v0.95.1
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1206,9 +1249,8 @@ services:
       - PG_META_DB_NAME=${POSTGRES_DB:-postgres}
       - PG_META_DB_USER=supabase_admin
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.67.4
+    image: supabase/edge-runtime:v1.69.28
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -1219,11 +1261,10 @@ services:
       retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_URL=${SERVICE_URL_SUPABASE_KONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      # TODO: Allow configuring VERIFY_JWT per function. This PR might help: https://github.com/supabase/cli/pull/786
       - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
     volumes:
       - ./volumes/functions:/home/deno/functions
@@ -1352,7 +1393,8 @@ services:
       - /home/deno/functions/main
 
   supabase-supavisor:
-    image: 'supabase/supavisor:2.5.1'
+  # you should connect to your database through this.
+    image: supabase/supavisor:2.7.4
     healthcheck:
       test:
         - CMD
@@ -1375,6 +1417,7 @@ services:
       - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-20}
       - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-100}
       - PORT=4000
+      - POOLER_PROXY_PORT_TRANSACTION=6543
       - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
       - 'POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}'
       - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
@@ -1387,10 +1430,17 @@ services:
       - 'METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
       - REGION=local
       - 'ERL_AFLAGS=-proto_dist inet_tcp'
+      # for ssl add your keys here
+      - GLOBAL_DOWNSTREAM_CERT_PATH=/etc/postcerts/server.crt
+      - GLOBAL_DOWNSTREAM_KEY_PATH=/etc/postcerts/server.key
     command:
       - /bin/sh
       - "-c"
       - '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server'
+      # open ports to be accessed externally (note that you have to access this by your IP if you are behind cloud flare as this is a tcp connection and not http (not sure if paid CF will allow you to do it thoruhg your domain or not))
+    ports:
+      - ${POSTGRES_PORT}:5432
+      - ${POOLER_PROXY_PORT_TRANSACTION}:6543
     volumes:
       - type: bind
         source: ./volumes/pooler/pooler.exs
@@ -1428,3 +1478,15 @@ services:
           else
             {:ok, _} = Supavisor.Tenants.create_tenant(params)
           end
+      # mount the keys 
+      - type: bind
+        source: ./server.key
+        target: /etc/postcerts/server.key
+        content: |
+
+      - type: bind
+        source: ./server.crt
+        target: /etc/postcerts/server.crt
+        content: |
+
+
