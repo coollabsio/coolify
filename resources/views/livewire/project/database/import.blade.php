@@ -222,7 +222,7 @@
             @endif
 
             {{-- Slide-over for activity monitor (all restore operations) --}}
-            <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>
+            <x-slide-over @databaserestore.window="if ($wire.activityId !== null) slideOverOpen = true" closeWithX fullScreen>
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
                     <div wire:ignore>
