@@ -64,7 +64,9 @@ class All extends Component
     public function getEnvironmentVariablesProperty()
     {
         if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables()->orderBy('order')->get();
+            // Use reorder() to remove the model's default alphabetical ordering
+            // and replace it with manual order
+            return $this->resource->environment_variables()->reorder('order', 'asc')->get();
         }
 
         return $this->resource->environment_variables;
@@ -73,7 +75,9 @@ class All extends Component
     public function getEnvironmentVariablesPreviewProperty()
     {
         if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables_preview()->orderBy('order')->get();
+            // Use reorder() to remove the model's default alphabetical ordering
+            // and replace it with manual order
+            return $this->resource->environment_variables_preview()->reorder('order', 'asc')->get();
         }
 
         return $this->resource->environment_variables_preview;
