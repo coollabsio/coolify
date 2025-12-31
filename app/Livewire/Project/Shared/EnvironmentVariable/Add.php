@@ -33,6 +33,10 @@ class Add extends Component
 
     public array $problematicVariables = [];
 
+    public bool $bulk_mode = false;
+
+    public ?string $bulk_content = null;
+
     protected $listeners = ['clearAddEnv' => 'clear'];
 
     protected $rules = [
@@ -127,6 +131,12 @@ class Add extends Component
 
     public function submit()
     {
+        if ($this->bulk_mode) {
+            $this->submitBulk();
+
+            return;
+        }
+
         $this->validate();
         $this->dispatch('saveKey', [
             'key' => $this->key,
@@ -140,10 +150,44 @@ class Add extends Component
         $this->clear();
     }
 
+    public function submitBulk()
+    {
+        if (empty($this->bulk_content)) {
+            $this->dispatch('error', 'Please paste your environment variables.');
+
+            return;
+        }
+
+        $variables = parseEnvFormatToArray($this->bulk_content);
+
+        if (empty($variables)) {
+            $this->dispatch('error', 'No valid environment variables found. Use KEY=value format.');
+
+            return;
+        }
+
+        foreach ($variables as $key => $value) {
+            $this->dispatch('saveKey', [
+                'key' => $key,
+                'value' => $value,
+                'is_multiline' => false,
+                'is_literal' => $this->is_literal,
+                'is_runtime' => $this->is_runtime,
+                'is_buildtime' => $this->is_buildtime,
+                'is_preview' => $this->is_preview,
+            ]);
+        }
+
+        $count = count($variables);
+        $this->dispatch('success', "Added {$count} environment variable(s).");
+        $this->clear();
+    }
+
     public function clear()
     {
         $this->key = '';
         $this->value = '';
+        $this->bulk_content = '';
         $this->is_multiline = false;
         $this->is_literal = false;
         $this->is_runtime = true;
