@@ -1336,6 +1336,27 @@ class GlobalSearch extends Component
         $this->autoOpenResource = null;
     }
 
+    public function goBackInSelection()
+    {
+        // Navigate back through selection steps: environment → project → destination → server → cancel
+        if ($this->selectedProjectUuid !== null && $this->selectedEnvironmentUuid === null) {
+            // Currently selecting environment, go back to project selection
+            $this->selectedProjectUuid = null;
+            $this->availableEnvironments = [];
+        } elseif ($this->selectedDestinationUuid !== null && $this->selectedProjectUuid === null) {
+            // Currently selecting project, go back to destination selection
+            $this->selectedDestinationUuid = null;
+            $this->availableProjects = [];
+        } elseif ($this->selectedServerId !== null && $this->selectedDestinationUuid === null) {
+            // Currently selecting destination, go back to server selection
+            $this->selectedServerId = null;
+            $this->availableDestinations = [];
+        } else {
+            // At server selection or initial state, cancel the whole selection
+            $this->cancelResourceSelection();
+        }
+    }
+
     public function getFilteredCreatableItemsProperty()
     {
         $query = strtolower(trim($this->searchQuery));
