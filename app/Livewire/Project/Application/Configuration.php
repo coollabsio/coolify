@@ -58,6 +58,17 @@ class Configuration extends Component
         if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
         }
+
+        // Check for flash messages from redirect and dispatch as Livewire events
+        if (session('success')) {
+            $this->dispatch('success', session('success'));
+        }
+        if (session('warning')) {
+            $this->dispatch('warning', session('warning'));
+        }
+        if (session('error')) {
+            $this->dispatch('error', session('error'));
+        }
     }
 
     public function render()

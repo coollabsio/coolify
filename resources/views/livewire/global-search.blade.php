@@ -145,6 +145,7 @@
                 'new public', 'new public git', 'new public repo', 'new public repository',
                 'new private github', 'new private gh', 'new private deploy', 'new deploy key',
                 'new dockerfile', 'new docker compose', 'new compose', 'new docker image', 'new image',
+                'new coolify json', 'new json', 'new import',
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
                 'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse'
             ];

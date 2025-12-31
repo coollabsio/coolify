@@ -188,6 +188,12 @@ class Select extends Component
                 'logo' => asset('svgs/docker.svg'),
             ],
         ];
+        $coolifyJsonImport = [
+            'id' => 'coolify-json',
+            'name' => 'Import from coolify.json (Beta)',
+            'description' => 'Paste a coolify.json configuration to quickly create and configure an application. This feature is in beta and may change.',
+            'logo' => asset('svgs/coolify-logo.svg'),
+        ];
         $databases = [
             [
                 'id' => 'postgresql',
@@ -251,6 +257,7 @@ class Select extends Component
             'categories' => $categories,
             'gitBasedApplications' => $gitBasedApplications,
             'dockerBasedApplications' => $dockerBasedApplications,
+            'coolifyJsonImport' => $coolifyJsonImport,
             'databases' => $databases,
         ];
     }

@@ -31,11 +31,6 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 ->pluck('deployment_uuid')
                 ->toArray();
 
-            \Log::info('CleanupHelperContainersJob - Active deployments', [
-                'server' => $this->server->name,
-                'active_deployment_uuids' => $activeDeployments,
-            ]);
-
             $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.config('constants.coolify.registry_url').'/coollabsio/coolify-helper")))\''], $this->server, false);
             $helperContainers = collect(json_decode($containers));
 
@@ -54,18 +49,9 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                     }
 
                     if ($isActiveDeployment) {
-                        \Log::info('CleanupHelperContainersJob - Skipping active deployment container', [
-                            'container' => $containerName,
-                            'id' => $containerId,
-                        ]);
 
                         continue;
                     }
-
-                    \Log::info('CleanupHelperContainersJob - Removing orphaned helper container', [
-                        'container' => $containerName,
-                        'id' => $containerId,
-                    ]);
 
                     instant_remote_process_with_timeout(['docker container rm -f '.$containerId], $this->server, false);
                 }

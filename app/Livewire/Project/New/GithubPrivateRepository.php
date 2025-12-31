@@ -66,6 +66,8 @@ class GithubPrivateRepository extends Component
 
     public bool $show_is_static = true;
 
+    public bool $checkCoolifyConfig = true;
+
     public function mount()
     {
         $this->currentRoute = Route::currentRouteName();
@@ -210,6 +212,27 @@ class GithubPrivateRepository extends Component
 
             $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
+
+            // Check for coolify.json configuration
+            if ($this->checkCoolifyConfig) {
+                try {
+                    $gitRepository = 'https://github.com/'.$this->selected_repository_owner.'/'.$this->selected_repository_repo.'.git';
+                    $config = loadConfigFromGit(
+                        $gitRepository,
+                        $this->selected_branch_name,
+                        $this->base_directory ?? '/',
+                        $destination->server->id,
+                        auth()->user()->currentTeam()->id
+                    );
+                    if ($config) {
+                        $application->setConfig($config, fromRepository: true);
+                        session()->flash('success', 'coolify.json configuration detected and applied.');
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('coolify.json: Failed to apply config - '.$e->getMessage());
+                    session()->flash('warning', 'coolify.json found but failed to apply: '.$e->getMessage());
+                }
+            }
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

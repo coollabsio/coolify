@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
@@ -2963,31 +2964,103 @@ function getHelperVersion(): string
     return config('constants.coolify.helper_version');
 }
 
-function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
+function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id): ?array
 {
-    $server = Server::find($server_id)->where('team_id', $team_id)->first();
+    $server = Server::where('id', $server_id)->where('team_id', $team_id)->first();
     if (! $server) {
-        return;
+        Log::warning("coolify.json: Server not found - server_id: {$server_id}, team_id: {$team_id}");
+
+        return null;
     }
+
     $uuid = new Cuid2;
-    $cloneCommand = "git clone --no-checkout -b $branch $repository .";
+
+    // Escape shell arguments for safety to prevent command injection
+    $escapedBranch = escapeshellarg($branch);
+    $escapedRepository = escapeshellarg($repository);
+    $cloneCommand = "git clone --no-checkout -b {$escapedBranch} {$escapedRepository} .";
     $workdir = rtrim($base_directory, '/');
-    $fileList = collect([".$workdir/coolify.json"]);
+
+    // Build paths to check: base_directory/coolify.json first, then repo root
+    $pathsToCheck = [];
+    if ($workdir !== '' && $workdir !== '/') {
+        $pathsToCheck[] = ltrim($workdir, '/').'/coolify.json';
+    }
+    $pathsToCheck[] = 'coolify.json';
+
+    // Build sparse-checkout file list (escaped for shell safety)
+    $fileList = collect($pathsToCheck)->map(fn ($path) => escapeshellarg("./{$path}"))->implode(' ');
+
     $commands = collect([
         "rm -rf /tmp/{$uuid}",
         "mkdir -p /tmp/{$uuid}",
         "cd /tmp/{$uuid}",
         $cloneCommand,
         'git sparse-checkout init --cone',
-        "git sparse-checkout set {$fileList->implode(' ')}",
+        "git sparse-checkout set {$fileList}",
         'git read-tree -mu HEAD',
-        "cat .$workdir/coolify.json",
-        'rm -rf /tmp/{$uuid}',
     ]);
+
+    // Add cat commands for each path, trying base_directory first
+    // Use subshell to capture output before cleanup (paths escaped for shell safety)
+    $catCommands = collect($pathsToCheck)->map(fn ($path) => 'cat '.escapeshellarg("./{$path}").' 2>/dev/null')->implode(' || ');
+    $commands->push("({$catCommands}) || true");
+    $commands->push("cd / && rm -rf /tmp/{$uuid}");
+
     try {
-        return instant_remote_process($commands, $server);
-    } catch (\Exception) {
-        // continue
+        $output = instant_remote_process($commands, $server);
+
+        if (empty($output)) {
+            return null;
+        }
+
+        $config = json_decode($output, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::warning('coolify.json: Invalid JSON format - '.json_last_error_msg().' - output was: '.substr($output, 0, 200));
+
+            return null;
+        }
+
+        // Validate schema version
+        $version = data_get($config, 'version', '1.0');
+        $supportedVersions = ['1.0'];
+        if (! in_array($version, $supportedVersions)) {
+            Log::warning('coolify.json: Unsupported schema version - '.$version);
+
+            return null;
+        }
+
+        // Warn about unknown top-level fields
+        $knownFields = [
+            'version',
+            'name',
+            'description',
+            'source',
+            'build',
+            'domains',
+            'network_aliases',
+            'http_basic_auth',
+            'health_check',
+            'limits',
+            'settings',
+            'deployment_commands',
+            'preview',
+            'swarm',
+            'docker_registry',
+            'persistent_storages',
+            'file_mounts',
+            'directory_mounts',
+            'scheduled_tasks',
+            'environment_variables',
+        ];
+        $unknownFields = array_diff(array_keys($config), $knownFields);
+
+        return $config;
+    } catch (\Exception $e) {
+        Log::warning('coolify.json: Exception during detection - '.$e->getMessage());
+
+        return null;
     }
 }
 

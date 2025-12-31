@@ -18,6 +18,16 @@
                     {{ $application->docker_compose_raw ? 'Reload Compose File' : 'Load Compose File' }}
                 </x-forms.button>
             @endif
+            @can('view', $application)
+                <x-forms.button wire:click="downloadRepositoryConfig"
+                    title="Download coolify.json for your repository (Beta feature)">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    coolify.json
+                    <span class="ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-warning/20 text-warning-600 dark:text-warning">Beta</span>
+                </x-forms.button>
+            @endcan
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
