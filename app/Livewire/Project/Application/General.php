@@ -558,8 +558,11 @@ class General extends Component
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
-            $this->application->docker_compose_location = $this->initialDockerComposeLocation;
-            $this->application->save();
+            // Refresh model to get restored values from Application::loadComposeFile
+            $this->application->refresh();
+            // Sync restored values back to component properties for UI update
+
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {

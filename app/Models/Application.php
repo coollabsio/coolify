@@ -1584,6 +1584,11 @@ class Application extends BaseModel
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
         } catch (\Exception $e) {
+            // Restore original values on failure only
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
             if (str($e->getMessage())->contains('No such file')) {
                 throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
             }
@@ -1595,9 +1600,7 @@ class Application extends BaseModel
             }
             throw new \RuntimeException($e->getMessage());
         } finally {
-            $this->docker_compose_location = $initialDockerComposeLocation;
-            $this->base_directory = $initialBaseDirectory;
-            $this->save();
+            // Cleanup only - restoration happens in catch block
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
             ]);
@@ -1643,6 +1646,11 @@ class Application extends BaseModel
                 'initialDockerComposeLocation' => $this->docker_compose_location,
             ];
         } else {
+            // Restore original values before throwing
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
             throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
     }
