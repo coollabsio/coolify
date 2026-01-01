@@ -80,7 +80,7 @@ class Index extends Component
     public function instantSave($isSave = true)
     {
         $this->validate();
-        $this->settings->fqdn = $this->fqdn;
+        $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -120,6 +120,11 @@ class Index extends Component
                 return;
             }
             $this->validate();
+
+            // Trim FQDN to remove leading/trailing whitespace
+            if ($this->fqdn) {
+                $this->fqdn = trim($this->fqdn);
+            }
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
