@@ -41,8 +41,8 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # When triggered by Claude label, provide default prompt to work on the issue
+          prompt: ${{ github.event.action == 'labeled' && 'Please analyze this issue and implement a solution. Follow the project guidelines in CLAUDE.md.' || '' }}
 
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
