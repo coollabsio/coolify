@@ -14,6 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         // Create table if it doesn't exist
+        // Note: This check ensures idempotency for users who may have partial migrations
         if (! Schema::hasTable('webhook_notification_settings')) {
             Schema::create('webhook_notification_settings', function (Blueprint $table) {
                 $table->id();
@@ -39,6 +40,14 @@ return new class extends Migration
 
                 $table->unique(['team_id']);
             });
+        }
+
+        // Safety check: only populate if the table exists
+        // This prevents errors if the table creation failed for some reason
+        if (! Schema::hasTable('webhook_notification_settings')) {
+            Log::error('webhook_notification_settings table does not exist after migration attempt');
+
+            return;
         }
 
         // Populate webhook notification settings for existing teams (only if they don't already have settings)

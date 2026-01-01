@@ -4041,12 +4041,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     /**
      * Send deployment status notification to the team.
+     * Notification failures are logged but don't affect deployment status.
      */
     private function sendDeploymentNotification(string $notificationClass): void
     {
-        $this->application->environment->project->team?->notify(
-            new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
-        );
+        try {
+            $this->application->environment->project->team?->notify(
+                new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
+            );
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send deployment notification: '.$e->getMessage(), [
+                'deployment_uuid' => $this->deployment_uuid,
+                'notification_class' => $notificationClass,
+                'exception' => get_class($e),
+            ]);
+        }
     }
 
     /**

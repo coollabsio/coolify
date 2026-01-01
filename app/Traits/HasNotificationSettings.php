@@ -22,19 +22,30 @@ trait HasNotificationSettings
     ];
 
     /**
-     * Get settings model for specific channel
+     * Get settings model for specific channel.
+     * Returns null if the settings table doesn't exist (graceful degradation).
      */
     public function getNotificationSettings(string $channel): ?Model
     {
-        return match ($channel) {
-            'email' => $this->emailNotificationSettings,
-            'discord' => $this->discordNotificationSettings,
-            'telegram' => $this->telegramNotificationSettings,
-            'slack' => $this->slackNotificationSettings,
-            'pushover' => $this->pushoverNotificationSettings,
-            'webhook' => $this->webhookNotificationSettings,
-            default => null,
-        };
+        try {
+            return match ($channel) {
+                'email' => $this->emailNotificationSettings,
+                'discord' => $this->discordNotificationSettings,
+                'telegram' => $this->telegramNotificationSettings,
+                'slack' => $this->slackNotificationSettings,
+                'pushover' => $this->pushoverNotificationSettings,
+                'webhook' => $this->webhookNotificationSettings,
+                default => null,
+            };
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle missing notification settings tables gracefully
+            // This can happen if a migration was recorded but failed to create the table
+            \Log::warning("Notification settings table missing for channel: {$channel}", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
