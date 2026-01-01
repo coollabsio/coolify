@@ -1,0 +1,64 @@
+# documentation: https://booklore.org/docs/getting-started
+# slogan: Booklore is an open-source library management system for your digital book collection. It supports Kobo, KOReader and OPDS and automatic meta-data fetching.
+# tags: media,books,kobo,epub,ebook,KOreader
+# logo: svgs/booklore.svg
+# port: 80
+
+services:
+  booklore:
+    image: "booklore/booklore:latest"
+    container_name: booklore
+    environment:
+      - SERVICE_URL_BOOKLORE
+      - USER_ID=${BOOKLORE_USER_ID:-0}
+      - GROUP_ID=${BOOKLORE_GROUP_ID:-0}
+      - TZ=${TZ:-FR}
+      - DATABASE_URL=${DATABASE_URL:?jdbc:mariadb://mariadb:3306/booklore}
+      - DATABASE_USERNAME=${SERVICE_USER_DB}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_DB}
+      - BOOKLORE_PORT=80
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - "booklore-data:/app/data"
+      - "booklore-books:/books"
+      - type: bind
+        source: ~/booklore
+        target: /bookdrop
+        is_directory: true
+    restart: unless-stopped
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --spider http://localhost/login || exit 1"
+      interval: 1m
+      timeout: 30s
+      retries: 10
+      start_period: 1m
+  mariadb:
+    image: "lscr.io/linuxserver/mariadb:11.4.5"
+    container_name: mariadb
+    environment:
+      - "PUID=${DB_PUID:-1000}"
+      - "PGID=${DB_GUID:-1000}"
+      - "TZ=${TZ}"
+      - "MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_DBROOT}"
+      - "MYSQL_DATABASE=booklore"
+      - "MYSQL_USER=${SERVICE_USER_DB}"
+      - "MYSQL_PASSWORD=${SERVICE_PASSWORD_DB}"
+    volumes:
+      - "db-data:/config"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - mariadb-admin
+        - ping
+        - "-h"
+        - localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  db-data: null
+  booklore-books: null
+  booklore-data: null
