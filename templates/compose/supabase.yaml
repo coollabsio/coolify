@@ -12,7 +12,7 @@ services:
     user: root
     entrypoint: bash -c 'eval "echo \"$$(cat /home/kong/temp.yml)\"" > /home/kong/kong.yml && /docker-entrypoint.sh kong docker-start'
     environment:
-      - SERVICE_URL_SUPABASEKONG_8000=${SERVICE_URL_SUPABASEKONG}
+      - SERVICE_URL_SUPABASEKONG_8000
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
