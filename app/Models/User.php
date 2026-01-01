@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
 use App\Traits\DeletesUserSessions;
@@ -437,7 +438,7 @@ class User extends Authenticatable implements SendsEmail
         // For cloud users, dispatch job to update Stripe customer email asynchronously
         $currentTeam = $this->currentTeam();
         if (isCloud() && $currentTeam?->subscription) {
-            dispatch(new \App\Jobs\UpdateStripeCustomerEmailJob(
+            dispatch(new UpdateStripeCustomerEmailJob(
                 $currentTeam,
                 $this->id,
                 $newEmail,

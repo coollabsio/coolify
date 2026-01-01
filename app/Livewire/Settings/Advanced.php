@@ -3,15 +3,12 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
-use App\Models\Server;
 use App\Rules\ValidIpOrCidr;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
 {
-    public ?Server $server = null;
-
     public InstanceSettings $settings;
 
     #[Validate('boolean')]
@@ -59,9 +56,6 @@ class Advanced extends Component
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
-        }
-        if (! isCloud()) {
-            $this->server = Server::findOrFail(0);
         }
         $this->settings = instanceSettings();
         $this->custom_dns_servers = $this->settings->custom_dns_servers;
