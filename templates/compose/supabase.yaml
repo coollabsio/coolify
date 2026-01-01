@@ -12,7 +12,7 @@ services:
     user: root
     entrypoint: bash -c 'eval "echo \"$$(cat /home/kong/temp.yml)\"" > /home/kong/kong.yml && /docker-entrypoint.sh kong docker-start'
     environment:
-      - SERVICE_URL_SUPABASE_KONG_8000
+      - SERVICE_URL_SUPABASEKONG_8000=${SERVICE_URL_SUPABASEKONG}
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
@@ -308,7 +308,7 @@ services:
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
       - 'SUPABASE_URL=http://supabase-kong:8000'
-      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASE_KONG}
+      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -316,7 +316,7 @@ services:
       - LOGFLARE_URL=http://supabase-analytics:4000
       - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
       - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64-PRIVATE-ACCESS-LOGFLARE}
-      - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASE_KONG}'
+      - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}'
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
@@ -1002,7 +1002,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
-      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASE_KONG}
+      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASEKONG}
       # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
@@ -1261,7 +1261,7 @@ services:
       retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - SUPABASE_URL=${SERVICE_URL_SUPABASE_KONG}
+      - SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
@@ -1488,5 +1488,4 @@ services:
         source: ./server.crt
         target: /etc/postcerts/server.crt
         content: |
-
 
