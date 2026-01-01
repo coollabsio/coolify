@@ -36,7 +36,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          model: opus
+          claude_args: '--model opus --dangerously-skip-permissions'
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
@@ -44,9 +44,4 @@ jobs:
 
           # When triggered by Claude label, provide default prompt to work on the issue
           prompt: ${{ github.event.action == 'labeled' && 'ultrathink Please analyze this issue and implement a solution. Follow the project guidelines in CLAUDE.md.' || '' }}
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
 
