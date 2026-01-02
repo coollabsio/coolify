@@ -23,145 +23,16 @@
                     <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
                     <script>
-                        checkTheme();
-                        const optionsServerCpu = {
-                            stroke: {
-                                curve: 'straight',
-                                width: 2,
-                            },
-                            chart: {
-                                height: '150px',
-                                id: '{!! $chartId !!}-cpu',
-                                type: 'area',
-                                toolbar: {
-                                    show: true,
-                                    tools: {
-                                        download: false,
-                                        selection: false,
-                                        zoom: true,
-                                        zoomin: false,
-                                        zoomout: false,
-                                        pan: false,
-                                        reset: true
-                                    },
-                                },
-                                animations: {
-                                    enabled: true,
-                                },
-                            },
-                            fill: {
-                                type: 'gradient',
-                            },
-                            dataLabels: {
-                                enabled: false,
-                                offsetY: -10,
-                                style: {
-                                    colors: ['#FCD452'],
-                                },
-                                background: {
-                                    enabled: false,
-                                }
-                            },
-                             grid: {
-                                 show: true,
-                                 borderColor: '',
-                             },
-                             colors: [cpuColor],
-                             xaxis: {
-                                 type: 'datetime',
-                             },
-                             series: [{
-                                 name: 'CPU %',
-                                data: []
-                            }],
-                            noData: {
-                                text: 'Loading...',
-                                style: {
-                                    color: textColor,
-                                }
-                            },
-                             tooltip: {
-                                 enabled: true,
-                                 marker: {
-                                     show: false,
-                                 },
-                                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                                     const value = series[seriesIndex][dataPointIndex];
-                                     const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
-                                     const date = new Date(timestamp);
-                                     const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
-                                         String(date.getUTCMinutes()).padStart(2, '0') + ':' +
-                                         String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
-                                         date.getUTCFullYear() + '-' +
-                                         String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
-                                         String(date.getUTCDate()).padStart(2, '0');
-                                     return '<div class="apexcharts-tooltip-custom">' +
-                                         '<div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
-                                         '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
-                                         '</div>';
-                                 }
-                             },
-                            legend: {
-                                show: false
-                            }
-                        }
-                        const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
-                            optionsServerCpu);
-                        serverCpuChart.render();
-                        document.addEventListener('livewire:init', () => {
-                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
-                                checkTheme();
-                                 serverCpuChart.updateOptions({
-                                     series: [{
-                                         data: chartData[0].seriesData,
-                                     }],
-                                     colors: [cpuColor],
-                                    xaxis: {
-                                        type: 'datetime',
-                                        labels: {
-                                            show: true,
-                                            style: {
-                                                colors: textColor,
-                                            }
-                                        }
-                                    },
-                                     yaxis: {
-                                         show: true,
-                                         labels: {
-                                             show: true,
-                                             style: {
-                                                 colors: textColor,
-                                             },
-                                             formatter: function(value) {
-                                                 return Math.round(value) + ' %';
-                                             }
-                                         }
-                                     },
-                                    noData: {
-                                        text: 'Loading...',
-                                        style: {
-                                            color: textColor,
-                                        }
-                                    }
-                                });
-                            });
-                        });
-                    </script>
-
-                    <div>
-                        <h4>Memory Usage</h4>
-                        <div wire:ignore id="{!! $chartId !!}-memory"></div>
-
-                        <script>
+                        (function() {
                             checkTheme();
-                            const optionsServerMemory = {
+                            const optionsServerCpu = {
                                 stroke: {
                                     curve: 'straight',
                                     width: 2,
                                 },
                                 chart: {
                                     height: '150px',
-                                    id: '{!! $chartId !!}-memory',
+                                    id: '{!! $chartId !!}-cpu',
                                     type: 'area',
                                     toolbar: {
                                         show: true,
@@ -196,18 +67,12 @@
                                      show: true,
                                      borderColor: '',
                                  },
-                                 colors: [ramColor],
+                                 colors: [cpuColor],
                                  xaxis: {
                                      type: 'datetime',
-                                     labels: {
-                                         show: true,
-                                        style: {
-                                            colors: textColor,
-                                        }
-                                    }
-                                },
-                                series: [{
-                                    name: "Memory (%)",
+                                 },
+                                 series: [{
+                                     name: 'CPU %',
                                     data: []
                                 }],
                                 noData: {
@@ -232,7 +97,7 @@
                                              String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
                                              String(date.getUTCDate()).padStart(2, '0');
                                          return '<div class="apexcharts-tooltip-custom">' +
-                                             '<div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                             '<div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
                                              '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
                                              '</div>';
                                      }
@@ -241,17 +106,17 @@
                                     show: false
                                 }
                             }
-                            const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
-                                optionsServerMemory);
-                            serverMemoryChart.render();
+                            const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
+                                optionsServerCpu);
+                            serverCpuChart.render();
                             document.addEventListener('livewire:init', () => {
-                                Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
+                                Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
                                     checkTheme();
-                                     serverMemoryChart.updateOptions({
+                                     serverCpuChart.updateOptions({
                                          series: [{
                                              data: chartData[0].seriesData,
                                          }],
-                                         colors: [ramColor],
+                                         colors: [cpuColor],
                                         xaxis: {
                                             type: 'datetime',
                                             labels: {
@@ -262,16 +127,15 @@
                                             }
                                         },
                                          yaxis: {
-                                             min: 0,
                                              show: true,
                                              labels: {
                                                  show: true,
                                                  style: {
                                                      colors: textColor,
                                                  },
-                                                  formatter: function(value) {
-                                                      return Math.round(value) + ' %';
-                                                  }
+                                                 formatter: function(value) {
+                                                     return Math.round(value) + ' %';
+                                                 }
                                              }
                                          },
                                         noData: {
@@ -283,6 +147,146 @@
                                     });
                                 });
                             });
+                        })();
+                    </script>
+
+                    <div>
+                        <h4>Memory Usage</h4>
+                        <div wire:ignore id="{!! $chartId !!}-memory"></div>
+
+                        <script>
+                            (function() {
+                                checkTheme();
+                                const optionsServerMemory = {
+                                    stroke: {
+                                        curve: 'straight',
+                                        width: 2,
+                                    },
+                                    chart: {
+                                        height: '150px',
+                                        id: '{!! $chartId !!}-memory',
+                                        type: 'area',
+                                        toolbar: {
+                                            show: true,
+                                            tools: {
+                                                download: false,
+                                                selection: false,
+                                                zoom: true,
+                                                zoomin: false,
+                                                zoomout: false,
+                                                pan: false,
+                                                reset: true
+                                            },
+                                        },
+                                        animations: {
+                                            enabled: true,
+                                        },
+                                    },
+                                    fill: {
+                                        type: 'gradient',
+                                    },
+                                    dataLabels: {
+                                        enabled: false,
+                                        offsetY: -10,
+                                        style: {
+                                            colors: ['#FCD452'],
+                                        },
+                                        background: {
+                                            enabled: false,
+                                        }
+                                    },
+                                     grid: {
+                                         show: true,
+                                         borderColor: '',
+                                     },
+                                     colors: [ramColor],
+                                     xaxis: {
+                                         type: 'datetime',
+                                         labels: {
+                                             show: true,
+                                            style: {
+                                                colors: textColor,
+                                            }
+                                        }
+                                    },
+                                    series: [{
+                                        name: "Memory (%)",
+                                        data: []
+                                    }],
+                                    noData: {
+                                        text: 'Loading...',
+                                        style: {
+                                            color: textColor,
+                                        }
+                                    },
+                                     tooltip: {
+                                         enabled: true,
+                                         marker: {
+                                             show: false,
+                                         },
+                                         custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                             const value = series[seriesIndex][dataPointIndex];
+                                             const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                             const date = new Date(timestamp);
+                                             const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
+                                                 String(date.getUTCMinutes()).padStart(2, '0') + ':' +
+                                                 String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
+                                                 date.getUTCFullYear() + '-' +
+                                                 String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                                                 String(date.getUTCDate()).padStart(2, '0');
+                                             return '<div class="apexcharts-tooltip-custom">' +
+                                                 '<div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                                 '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
+                                                 '</div>';
+                                         }
+                                     },
+                                    legend: {
+                                        show: false
+                                    }
+                                }
+                                const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
+                                    optionsServerMemory);
+                                serverMemoryChart.render();
+                                document.addEventListener('livewire:init', () => {
+                                    Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
+                                        checkTheme();
+                                         serverMemoryChart.updateOptions({
+                                             series: [{
+                                                 data: chartData[0].seriesData,
+                                             }],
+                                             colors: [ramColor],
+                                            xaxis: {
+                                                type: 'datetime',
+                                                labels: {
+                                                    show: true,
+                                                    style: {
+                                                        colors: textColor,
+                                                    }
+                                                }
+                                            },
+                                             yaxis: {
+                                                 min: 0,
+                                                 show: true,
+                                                 labels: {
+                                                     show: true,
+                                                     style: {
+                                                         colors: textColor,
+                                                     },
+                                                      formatter: function(value) {
+                                                          return Math.round(value) + ' %';
+                                                      }
+                                                 }
+                                             },
+                                            noData: {
+                                                text: 'Loading...',
+                                                style: {
+                                                    color: textColor,
+                                                }
+                                            }
+                                        });
+                                    });
+                                });
+                            })();
                         </script>
 
                     </div>
