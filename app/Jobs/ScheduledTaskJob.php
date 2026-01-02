@@ -112,7 +112,10 @@ class ScheduledTaskJob implements ShouldQueue
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
                 if ($containers->count() > 0) {
                     $containers->each(function ($container) {
-                        $this->containers[] = str_replace('/', '', $container['Names']);
+                        // Only include running containers to avoid issues during rolling deployments
+                        if (data_get($container, 'State') === 'running') {
+                            $this->containers[] = str_replace('/', '', $container['Names']);
+                        }
                     });
                 }
             } elseif ($this->resource->type() === 'service') {
@@ -131,12 +134,41 @@ class ScheduledTaskJob implements ShouldQueue
                 throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }
 
+            // For non-dockercompose Applications without a specified container, select the most recent one
+            // This handles rolling deployments where both old and new containers may briefly exist
             if (count($this->containers) > 1 && empty($this->task->container)) {
-                throw new \Exception('ScheduledTaskJob failed: More than one container exists but no container name was provided.');
+                if ($this->resource->type() === 'application') {
+                    // Sort containers by name descending to get the newest (highest timestamp suffix)
+                    // Container names are {uuid}-{timestamp}, so sorting descending gives us the newest
+                    rsort($this->containers);
+                    $this->containers = [reset($this->containers)];
+                } else {
+                    throw new \Exception('ScheduledTaskJob failed: More than one container exists but no container name was provided.');
+                }
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                // Container matching logic differs between Applications and Services:
+                // - Applications: container names are {uuid} or {uuid}-{timestamp}
+                // - Services: container names are {service_name}-{service_uuid}
+                $isMatch = false;
+                if (count($this->containers) == 1) {
+                    $isMatch = true;
+                } elseif ($this->resource->type() === 'application') {
+                    // For applications with dockercompose, match {container}-{uuid} format
+                    if (! empty($this->task->container)) {
+                        $isMatch = str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid);
+                    } else {
+                        // For non-dockercompose apps, match if container starts with the app UUID
+                        // This handles both consistent naming ({uuid}) and non-consistent ({uuid}-{timestamp})
+                        $isMatch = str_starts_with($containerName, $this->resource->uuid);
+                    }
+                } else {
+                    // For services, match {service_name}-{service_uuid} format
+                    $isMatch = str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid);
+                }
+
+                if ($isMatch) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $exec = "docker exec {$containerName} {$cmd}";
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
