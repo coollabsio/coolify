@@ -109,10 +109,9 @@
                             const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
                                 optionsServerCpu);
                             serverCpuChart.render();
-                            document.addEventListener('livewire:init', () => {
-                                Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
-                                    checkTheme();
-                                     serverCpuChart.updateOptions({
+                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
+                                checkTheme();
+                                 serverCpuChart.updateOptions({
                                          series: [{
                                              data: chartData[0].seriesData,
                                          }],
@@ -146,7 +145,6 @@
                                         }
                                     });
                                 });
-                            });
                         })();
                     </script>
 
@@ -247,10 +245,9 @@
                                 const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
                                     optionsServerMemory);
                                 serverMemoryChart.render();
-                                document.addEventListener('livewire:init', () => {
-                                    Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
-                                        checkTheme();
-                                         serverMemoryChart.updateOptions({
+                                Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
+                                    checkTheme();
+                                     serverMemoryChart.updateOptions({
                                              series: [{
                                                  data: chartData[0].seriesData,
                                              }],
@@ -285,7 +282,6 @@
                                             }
                                         });
                                     });
-                                });
                             })();
                         </script>
 
