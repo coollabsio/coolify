@@ -99,7 +99,7 @@
                         <x-loading wire:loading wire:target="instantSave" />
                     </div>
                     @if ($isPublic)
-                        <x-slide-over fullScreen>
+                        <x-slide-over fullScreen wire:key="proxy-logs-{{ $database->uuid }}">
                             <x-slot:title>Proxy Logs</x-slot:title>
                             <x-slot:content>
                                 <livewire:project.shared.get-logs :server="$server" :resource="$database"

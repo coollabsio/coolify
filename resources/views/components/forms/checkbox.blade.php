@@ -29,17 +29,17 @@
             @endif
         </span>
         @if ($instantSave)
-            <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
+            <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass])->except(['wire:model', 'wire:model.live', 'wire:model.blur', 'wire:model.change']) }}
                 wire:loading.attr="disabled"
                 wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
-                wire:model={{ $modelBinding }} id="{{ $htmlId }}" @if ($checked) checked @endif />
+                @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model={{ $modelBinding }} @endif id="{{ $htmlId }}" @if ($checked) checked @endif />
         @else
             @if ($domValue)
-                <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
+                <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass])->except(['wire:model', 'wire:model.live', 'wire:model.blur', 'wire:model.change']) }}
                     value={{ $domValue }} id="{{ $htmlId }}" @if ($checked) checked @endif />
             @else
-                <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
-                    wire:model={{ $value ?? $modelBinding }} id="{{ $htmlId }}" @if ($checked) checked @endif />
+                <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass])->except(['wire:model', 'wire:model.live', 'wire:model.blur', 'wire:model.change']) }}
+                    @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model={{ $value ?? $modelBinding }} @endif id="{{ $htmlId }}" @if ($checked) checked @endif />
             @endif
         @endif
     </label>
