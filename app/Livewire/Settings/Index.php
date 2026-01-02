@@ -119,12 +119,13 @@ class Index extends Component
 
                 return;
             }
-            $this->validate();
 
-            // Trim FQDN to remove leading/trailing whitespace
+            // Trim FQDN to remove leading/trailing whitespace before validation
             if ($this->fqdn) {
                 $this->fqdn = trim($this->fqdn);
             }
+
+            $this->validate();
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
