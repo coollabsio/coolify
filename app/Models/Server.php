@@ -272,7 +272,7 @@ class Server extends BaseModel
 
     public static function destinationsByServer(string $server_id)
     {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
+        $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
         $standaloneDocker = collect($server->standaloneDockers->all());
         $swarmDocker = collect($server->swarmDockers->all());
 
