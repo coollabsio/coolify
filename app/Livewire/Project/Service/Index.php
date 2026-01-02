@@ -298,7 +298,6 @@ class Index extends Component
                 $this->db_url_public = null;
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->submitDatabase();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
