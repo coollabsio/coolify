@@ -121,6 +121,25 @@ class Show extends Component
         return sanitizeLogsForExport($logs);
     }
 
+    public function downloadAllLogs(): string
+    {
+        $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)
+            ->map(function ($line) {
+                $prefix = '';
+                if ($line['hidden']) {
+                    $prefix = '[DEBUG] ';
+                }
+                if (isset($line['command']) && $line['command']) {
+                    $prefix .= '[CMD]: ';
+                }
+
+                return $line['timestamp'].' '.$prefix.trim($line['line']);
+            })
+            ->join("\n");
+
+        return sanitizeLogsForExport($logs);
+    }
+
     public function render()
     {
         return view('livewire.project.application.deployment.show');
