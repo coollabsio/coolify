@@ -46,6 +46,13 @@ class Index extends Component
                 $this->serviceApplication->getFilesFromServer();
             } else {
                 $this->serviceDatabase = $this->service->databases()->whereUuid($this->parameters['stack_service_uuid'])->first();
+                if (! $this->serviceDatabase) {
+                    return redirect()->route('project.service.configuration', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'service_uuid' => $this->parameters['service_uuid'],
+                    ]);
+                }
                 $this->serviceDatabase->getFilesFromServer();
             }
             $this->s3s = currentTeam()->s3s;
