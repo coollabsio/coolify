@@ -1437,10 +1437,10 @@ services:
       - /bin/sh
       - "-c"
       - '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server'
-      # open ports to be accessed externally (note that you have to access this by your IP if you are behind cloud flare as this is a tcp connection and not http (not sure if paid CF will allow you to do it thoruhg your domain or not))
-    ports:
-      - ${POSTGRES_PORT}:5432
-      - ${POOLER_PROXY_PORT_TRANSACTION}:6543
+    # open ports to be accessed externally (note that you have to access this by your IP if you are behind cloud flare as this is a tcp connection and not http (not sure if paid CF will allow you to do it thoruhg your domain or not))
+    # ports:
+    #   - ${POSTGRES_PORT}:5432
+    #   - ${POOLER_PROXY_PORT_TRANSACTION}:6543
     volumes:
       - type: bind
         source: ./volumes/pooler/pooler.exs
