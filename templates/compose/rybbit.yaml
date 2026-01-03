@@ -6,7 +6,7 @@
 
 services:
   rybbit_backend:
-    image: ghcr.io/rybbit-io/rybbit-backend:v1.5.1
+    image: ghcr.io/rybbit-io/rybbit-backend:v2.3.1
     environment:
       - NODE_ENV=production
       - CLICKHOUSE_HOST=http://rybbit_clickhouse:8123
