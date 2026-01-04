@@ -1360,7 +1360,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get application by UUID.'
@@ -1391,7 +1390,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -1456,7 +1454,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Application updated.'
         required: true
@@ -1705,7 +1702,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: lines
           in: query
@@ -1748,7 +1744,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by application UUID.'
@@ -1781,7 +1776,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -1840,7 +1834,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -1903,7 +1896,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -1950,7 +1942,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -1958,7 +1949,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -1992,7 +1982,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: force
           in: query
@@ -2041,7 +2030,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop application.'
@@ -2075,7 +2063,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart application.'
@@ -2219,7 +2206,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Cloud provider token deleted.'
@@ -2350,7 +2336,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all backups for a database'
@@ -2382,7 +2367,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Backup configuration data'
         required: true
@@ -2471,7 +2455,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all databases'
@@ -2503,7 +2486,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -2568,7 +2550,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database data'
         required: true
@@ -2730,7 +2711,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -2773,7 +2753,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: scheduled_backup_uuid
           in: path
@@ -2781,7 +2760,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database backup configuration data'
         required: true
@@ -3628,7 +3606,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: execution_uuid
           in: path
@@ -3636,7 +3613,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -3687,7 +3663,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'List of backup executions'
@@ -3717,7 +3692,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start database.'
@@ -3751,7 +3725,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop database.'
@@ -3785,7 +3758,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart database.'
@@ -3970,7 +3942,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: skip
           in: query
@@ -4777,7 +4748,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Project deleted.'
@@ -4812,7 +4782,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Project updated.'
         required: true
@@ -5348,7 +5317,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Server deleted.'
@@ -5739,7 +5707,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Service updated.'
         required: true
@@ -5815,7 +5782,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by service UUID.'
@@ -5848,7 +5814,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -5909,7 +5874,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -5974,7 +5938,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -6023,7 +5986,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -6031,7 +5993,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -6065,7 +6026,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start service.'
@@ -6099,7 +6059,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop service.'
@@ -6133,7 +6092,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: latest
           in: query

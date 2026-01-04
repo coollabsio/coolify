@@ -128,7 +128,7 @@ class ByIp extends Component
             $server->settings->is_build_server = $this->is_build_server;
             $server->settings->save();
 
-            return redirect()->route('server.show', $server->uuid);
+            return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

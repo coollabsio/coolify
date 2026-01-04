@@ -105,16 +105,7 @@ class Show extends Component
 
     public function getLogLinesProperty()
     {
-        return decode_remote_command_output($this->application_deployment_queue)->map(function ($logLine) {
-            $logLine['line'] = e($logLine['line']);
-            $logLine['line'] = preg_replace(
-                '/(https?:\/\/[^\s]+)/',
-                '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline text-neutral-400">$1</a>',
-                $logLine['line'],
-            );
-
-            return $logLine;
-        });
+        return decode_remote_command_output($this->application_deployment_queue);
     }
 
     public function copyLogs(): string
@@ -124,6 +115,25 @@ class Show extends Component
                 return $line['timestamp'].' '.
                        (isset($line['command']) && $line['command'] ? '[CMD]: ' : '').
                        trim($line['line']);
+            })
+            ->join("\n");
+
+        return sanitizeLogsForExport($logs);
+    }
+
+    public function downloadAllLogs(): string
+    {
+        $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)
+            ->map(function ($line) {
+                $prefix = '';
+                if ($line['hidden']) {
+                    $prefix = '[DEBUG] ';
+                }
+                if (isset($line['command']) && $line['command']) {
+                    $prefix .= '[CMD]: ';
+                }
+
+                return $line['timestamp'].' '.$prefix.trim($line['line']);
             })
             ->join("\n");
 

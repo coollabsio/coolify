@@ -558,8 +558,11 @@ class General extends Component
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
-            $this->application->docker_compose_location = $this->initialDockerComposeLocation;
-            $this->application->save();
+            // Refresh model to get restored values from Application::loadComposeFile
+            $this->application->refresh();
+            // Sync restored values back to component properties for UI update
+
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {
@@ -934,73 +937,6 @@ class General extends Component
             'Content-Type' => 'application/json',
             'Content-Disposition' => 'attachment; filename='.$fileName,
         ]);
-    }
-
-    private function updateServiceEnvironmentVariables()
-    {
-        $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);
-
-        foreach ($domains as $serviceName => $service) {
-            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
-            $domain = data_get($service, 'domain');
-            // Delete SERVICE_FQDN_ and SERVICE_URL_ variables if domain is removed
-            $this->application->environment_variables()->where('resourceable_type', Application::class)
-                ->where('resourceable_id', $this->application->id)
-                ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
-                ->delete();
-
-            $this->application->environment_variables()->where('resourceable_type', Application::class)
-                ->where('resourceable_id', $this->application->id)
-                ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
-                ->delete();
-
-            if ($domain) {
-                // Create or update SERVICE_FQDN_ and SERVICE_URL_ variables
-                $fqdn = Url::fromString($domain);
-                $port = $fqdn->getPort();
-                $path = $fqdn->getPath();
-                $urlValue = $fqdn->getScheme().'://'.$fqdn->getHost();
-                if ($path !== '/') {
-                    $urlValue = $urlValue.$path;
-                }
-                $fqdnValue = str($domain)->after('://');
-                if ($path !== '/') {
-                    $fqdnValue = $fqdnValue.$path;
-                }
-
-                // Create/update SERVICE_FQDN_
-                $this->application->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_FQDN_{$serviceNameFormatted}",
-                ], [
-                    'value' => $fqdnValue,
-                    'is_preview' => false,
-                ]);
-
-                // Create/update SERVICE_URL_
-                $this->application->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_URL_{$serviceNameFormatted}",
-                ], [
-                    'value' => $urlValue,
-                    'is_preview' => false,
-                ]);
-                // Create/update port-specific variables if port exists
-                if (filled($port)) {
-                    $this->application->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceNameFormatted}_{$port}",
-                    ], [
-                        'value' => $fqdnValue,
-                        'is_preview' => false,
-                    ]);
-
-                    $this->application->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_URL_{$serviceNameFormatted}_{$port}",
-                    ], [
-                        'value' => $urlValue,
-                        'is_preview' => false,
-                    ]);
-                }
-            }
-        }
     }
 
     public function getDetectedPortInfoProperty(): ?array
