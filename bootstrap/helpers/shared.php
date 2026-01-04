@@ -989,6 +989,9 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
         case 'SUPABASEANON':
             $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
             if (is_null($signingKey)) {
