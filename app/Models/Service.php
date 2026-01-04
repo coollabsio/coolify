@@ -1044,6 +1044,31 @@ class Service extends BaseModel
 
                     $fields->put('Strapi', $data->toArray());
                     break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();

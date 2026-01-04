@@ -21,6 +21,10 @@ use Livewire\Component;
 
 class GetLogs extends Component
 {
+    public const MAX_LOG_LINES = 50000;
+
+    public const MAX_DOWNLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
     public string $outputs = '';
 
     public string $errors = '';
@@ -123,6 +127,9 @@ class GetLogs extends Component
         if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
             $this->numberOfLines = 1000;
         }
+        if ($this->numberOfLines > self::MAX_LOG_LINES) {
+            $this->numberOfLines = self::MAX_LOG_LINES;
+        }
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
@@ -159,10 +166,12 @@ class GetLogs extends Component
             }
             // Collect new logs into temporary variable first to prevent flickering
             // (avoids clearing output before new data is ready)
-            $newOutputs = '';
-            Process::run($sshCommand, function (string $type, string $output) use (&$newOutputs) {
-                $newOutputs .= removeAnsiColors($output);
+            // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
+            $logChunks = [];
+            Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks) {
+                $logChunks[] = removeAnsiColors($output);
             });
+            $newOutputs = implode('', $logChunks);
 
             if ($this->showTimeStamps) {
                 $newOutputs = str($newOutputs)->split('/\n/')->sort(function ($a, $b) {
@@ -181,6 +190,79 @@ class GetLogs extends Component
     public function copyLogs(): string
     {
         return sanitizeLogsForExport($this->outputs);
+    }
+
+    public function downloadAllLogs(): string
+    {
+        if (! $this->server->isFunctional() || ! $this->container) {
+            return '';
+        }
+
+        if ($this->showTimeStamps) {
+            if ($this->server->isSwarm()) {
+                $command = "docker service logs -t {$this->container}";
+            } else {
+                $command = "docker logs -t {$this->container}";
+            }
+        } else {
+            if ($this->server->isSwarm()) {
+                $command = "docker service logs {$this->container}";
+            } else {
+                $command = "docker logs {$this->container}";
+            }
+        }
+
+        if ($this->server->isNonRoot()) {
+            $command = parseCommandsByLineForSudo(collect($command), $this->server);
+            $command = $command[0];
+        }
+
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+
+        // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
+        // Enforce 50MB size limit to prevent memory exhaustion from large logs
+        $logChunks = [];
+        $accumulatedBytes = 0;
+        $truncated = false;
+
+        Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
+            if ($truncated) {
+                return;
+            }
+
+            $output = removeAnsiColors($output);
+            $outputBytes = strlen($output);
+
+            if ($accumulatedBytes + $outputBytes > self::MAX_DOWNLOAD_SIZE_BYTES) {
+                $remaining = self::MAX_DOWNLOAD_SIZE_BYTES - $accumulatedBytes;
+                if ($remaining > 0) {
+                    $logChunks[] = substr($output, 0, $remaining);
+                }
+                $truncated = true;
+
+                return;
+            }
+
+            $logChunks[] = $output;
+            $accumulatedBytes += $outputBytes;
+        });
+
+        $allLogs = implode('', $logChunks);
+
+        if ($truncated) {
+            $allLogs .= "\n\n[... Output truncated at 50MB limit ...]";
+        }
+
+        if ($this->showTimeStamps) {
+            $allLogs = str($allLogs)->split('/\n/')->sort(function ($a, $b) {
+                $a = explode(' ', $a);
+                $b = explode(' ', $b);
+
+                return $a[0] <=> $b[0];
+            })->join("\n");
+        }
+
+        return sanitizeLogsForExport($allLogs);
     }
 
     public function render()
