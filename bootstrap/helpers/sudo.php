@@ -23,24 +23,56 @@ function shouldChangeOwnership(string $path): bool
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
-        if (
-            ! str(trim($line))->startsWith([
-                'cd',
-                'command',
-                'echo',
-                'true',
-                'if',
-                'fi',
-            ])
-        ) {
-            return "sudo $line";
+        $trimmedLine = trim($line);
+
+        // All bash keywords that should not receive sudo prefix
+        // Using word boundary matching to avoid prefix collisions (e.g., 'do' vs 'docker', 'if' vs 'ifconfig', 'fi' vs 'find')
+        $bashKeywords = [
+            'cd',
+            'command',
+            'declare',
+            'echo',
+            'export',
+            'local',
+            'readonly',
+            'return',
+            'true',
+            'if',
+            'fi',
+            'for',
+            'done',
+            'while',
+            'until',
+            'case',
+            'esac',
+            'select',
+            'then',
+            'else',
+            'elif',
+            'break',
+            'continue',
+            'do',
+        ];
+
+        // Special case: comments (no collision risk with '#')
+        if (str_starts_with($trimmedLine, '#')) {
+            return $line;
         }
 
-        if (str(trim($line))->startsWith('if')) {
-            return str_replace('if', 'if sudo', $line);
+        // Check all keywords with word boundary matching
+        // Match keyword followed by space, semicolon, or end of line
+        foreach ($bashKeywords as $keyword) {
+            if (preg_match('/^'.preg_quote($keyword, '/').'(\s|;|$)/', $trimmedLine)) {
+                // Special handling for 'if' - insert sudo after 'if '
+                if ($keyword === 'if') {
+                    return preg_replace('/^(\s*)if\s+/', '$1if sudo ', $line);
+                }
+
+                return $line;
+            }
         }
 
-        return $line;
+        return "sudo $line";
     });
 
     $commands = $commands->map(function ($line) use ($server) {
@@ -58,16 +90,35 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
     $commands = $commands->map(function ($line) {
         $line = str($line);
+
+        // Detect complex piped commands that should be wrapped in bash -c
+        $isComplexPipeCommand = (
+            $line->contains(' | sh') ||
+            $line->contains(' | bash') ||
+            ($line->contains(' | ') && ($line->contains('||') || $line->contains('&&')))
+        );
+
+        // If it's a complex pipe command and starts with sudo, wrap it in bash -c
+        if ($isComplexPipeCommand && $line->startsWith('sudo ')) {
+            $commandWithoutSudo = $line->after('sudo ')->value();
+            // Escape single quotes for bash -c by replacing ' with '\''
+            $escapedCommand = str_replace("'", "'\\''", $commandWithoutSudo);
+
+            return "sudo bash -c '$escapedCommand'";
+        }
+
+        // For non-complex commands, apply the original logic
         if (str($line)->contains('$(')) {
             $line = $line->replace('$(', '$(sudo ');
         }
-        if (str($line)->contains('||')) {
+        if (! $isComplexPipeCommand && str($line)->contains('||')) {
             $line = $line->replace('||', '|| sudo');
         }
-        if (str($line)->contains('&&')) {
+        if (! $isComplexPipeCommand && str($line)->contains('&&')) {
             $line = $line->replace('&&', '&& sudo');
         }
-        if (str($line)->contains(' | ')) {
+        // Don't insert sudo into pipes for complex commands
+        if (! $isComplexPipeCommand && str($line)->contains(' | ')) {
             $line = $line->replace(' | ', ' | sudo ');
         }
 

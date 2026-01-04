@@ -120,7 +120,7 @@
                             <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
                         </div>
                         <div class="relative flex justify-center text-sm">
-                            <span class="px-2 dark:bg-base text-neutral-500 dark:text-neutral-400">
+                            <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">
                                 Need help?
                             </span>
                         </div>

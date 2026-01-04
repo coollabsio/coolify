@@ -1,0 +1,166 @@
+# documentation: https://help.penpot.app/technical-guide/getting-started/#install-with-docker
+# slogan: Penpot is the first Open Source design and prototyping platform for product teams.
+# category: productivity
+# tags: penpot,design,prototyping,figma,open,source
+# logo: svgs/penpot.svg
+# port: 8080
+
+services:
+  frontend:
+    image: penpotapp/frontend:2.11.1 # Release on 13 Nov 2025
+    depends_on:
+      penpot-backend:
+        condition: service_healthy
+      penpot-exporter:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_FRONTEND_8080
+      - 'PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS:-enable-login-with-password}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  penpot-backend:
+    image: penpotapp/backend:2.11.1 # Release on 13 Nov 2025
+    depends_on:
+      postgres:
+        condition: service_healthy
+      penpot-valkey:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      - 'PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS:-enable-login-with-password}'
+
+      # Backend & URIs
+      - PENPOT_HTTP_SERVER_PORT=6060
+      - PENPOT_SECRET_KEY=${SERVICE_REALBASE64_64_PENPOT}
+      - PENPOT_PUBLIC_URI=${SERVICE_URL_FRONTEND_8080}
+      - PENPOT_BACKEND_URI=http://penpot-backend
+      - PENPOT_EXPORTER_URI=http://penpot-exporter
+
+      # Database
+      - PENPOT_DATABASE_URI=postgresql://postgres/${POSTGRES_DB:-penpot}
+      - PENPOT_DATABASE_USERNAME=${SERVICE_USER_POSTGRES}
+      - PENPOT_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+
+      # Valkey
+      - 'PENPOT_REDIS_URI=redis://penpot-valkey/0'
+
+      # Telemetry
+      - PENPOT_TELEMETRY_ENABLED=${PENPOT_TELEMETRY_ENABLED:-false}
+
+      # S3 Storage Configuration (MinIO)
+      - PENPOT_OBJECTS_STORAGE_BACKEND=s3
+      - PENPOT_OBJECTS_STORAGE_S3_REGION=us-east-1
+      - PENPOT_OBJECTS_STORAGE_S3_BUCKET=penpot
+      - PENPOT_OBJECTS_STORAGE_S3_ENDPOINT=http://minio:9000
+
+      # S3 Credentials (MinIO)
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      
+      # Email Configuration
+      - PENPOT_SMTP_DEFAULT_FROM=${PENPOT_SMTP_DEFAULT_FROM:-no-reply@example.com}
+      - PENPOT_SMTP_DEFAULT_REPLY_TO=${PENPOT_SMTP_DEFAULT_REPLY_TO:-no-reply@example.com}
+      - PENPOT_SMTP_HOST=${PENPOT_SMTP_HOST:-mailpit}
+      - PENPOT_SMTP_PORT=${PENPOT_SMTP_PORT:-1025}
+      - PENPOT_SMTP_USERNAME=${PENPOT_SMTP_USERNAME:-penpot}
+      - PENPOT_SMTP_PASSWORD=${PENPOT_SMTP_PASSWORD:-penpot}
+      - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
+      - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get({host:'127.0.0.1', port:6060, path:'/readyz'}, res => process.exit(res.statusCode===200 ? 0 : 1)).on('error', () => process.exit(1));"
+        ]
+      interval: 10s
+      timeout: 30s
+      retries: 15
+
+  penpot-exporter:
+    image: penpotapp/exporter:2.11.1 # Release on 13 Nov 2025
+    environment:
+      - PENPOT_PUBLIC_URI=${SERVICE_URL_FRONTEND_8080}
+      - 'PENPOT_REDIS_URI=redis://penpot-valkey/0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:6061/readyz"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  # MinIO S3 Local server
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    command: server /data
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      
+  # S3 Bucket initialization
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        mc alias set local http://minio:9000 ${SERVICE_USER_MINIO} ${SERVICE_PASSWORD_MINIO} &&
+        mc mb -p local/penpot || true &&
+        mc anonymous set private local/penpot
+      "
+    restart: "no"
+    exclude_from_hc: true
+
+  postgres:
+    image: postgres:15
+    volumes:
+      - penpot-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_INITDB_ARGS=--data-checksums
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-penpot}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  penpot-valkey:
+    image: 'valkey/valkey:8.1'
+    volumes:
+      - 'penpot-valkey-data:/data'
+    environment:
+      - 'VALKEY_EXTRA_FLAGS=--maxmemory 128mb --maxmemory-policy volatile-lfu'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'valkey-cli ping | grep PONG'
+      interval: 1s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+ 
+  mailpit:
+    image: axllent/mailpit:v1.28 # Released on 26 Nov 2025
+    environment:
+      - SERVICE_URL_MAILPIT_8025
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 20s
+      retries: 10

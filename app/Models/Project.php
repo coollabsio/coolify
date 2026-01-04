@@ -30,9 +30,23 @@ class Project extends BaseModel
 
     protected $guarded = [];
 
+    /**
+     * Get query builder for projects owned by current team.
+     * If you need all projects without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Project::whereTeamId(currentTeam()->id)->orderByRaw('LOWER(name)');
+    }
+
+    /**
+     * Get all projects owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Project::ownedByCurrentTeam()->get();
+        });
     }
 
     protected static function booted()

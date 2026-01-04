@@ -29,6 +29,7 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications',
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
+        'traefik_outdated_discord_notifications',
         'discord_ping_enabled',
     ];
 
@@ -48,6 +49,7 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications' => 'boolean',
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
+        'traefik_outdated_discord_notifications' => 'boolean',
         'discord_ping_enabled' => 'boolean',
     ];
 

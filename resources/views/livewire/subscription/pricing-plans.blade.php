@@ -152,7 +152,7 @@
                             </svg>
 
                             Do you require official support for your self-hosted instance?<a class="underline"
-                                href="https://coolify.io/docs/contact">Contact Us</a>
+                                href="https://coolify.io/docs/contact" target="_blank">Contact Us</a>
                         </li>
                     </ul>
                 </div>

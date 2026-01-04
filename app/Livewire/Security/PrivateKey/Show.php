@@ -107,7 +107,7 @@ class Show extends Component
             $this->private_key->safeDelete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
-            return redirect()->route('security.private-key.index');
+            return redirectRoute($this, 'security.private-key.index');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {

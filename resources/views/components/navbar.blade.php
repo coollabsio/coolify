@@ -79,7 +79,7 @@
     }">
     <div class="flex lg:pt-6 pt-4 pb-4 pl-2">
         <div class="flex flex-col w-full">
-            <a href="/" class="text-2xl font-bold tracking-wide dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
+            <a href="/" {{ wireNavigate() }} class="text-2xl font-bold tracking-wide dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
             <x-version />
         </div>
         <div>
@@ -105,7 +105,7 @@
             <ul role="list" class="flex flex-col h-full space-y-1.5">
                 @if (isSubscribed() || !isCloud())
                     <li>
-                        <a title="Dashboard" href="/"
+                        <a title="Dashboard" href="/" {{ wireNavigate() }}
                             class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
@@ -116,7 +116,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Projects"
+                        <a title="Projects" {{ wireNavigate() }}
                             class="{{ request()->is('project/*') || request()->is('projects') ? 'menu-item menu-item-active' : 'menu-item' }}"
                             href="/projects">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
@@ -131,7 +131,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Servers"
+                        <a title="Servers" {{ wireNavigate() }}
                             class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
                             href="/servers">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
@@ -150,7 +150,7 @@
                     </li>
 
                     <li>
-                        <a title="Sources"
+                        <a title="Sources" {{ wireNavigate() }}
                             class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('source.all') }}">
                             <svg class="icon" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
@@ -161,7 +161,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Destinations"
+                        <a title="Destinations" {{ wireNavigate() }}
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('destination.index') }}">
 
@@ -174,7 +174,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="S3 Storages"
+                        <a title="S3 Storages" {{ wireNavigate() }}
                             class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('storage.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
@@ -189,7 +189,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Shared variables"
+                        <a title="Shared variables" {{ wireNavigate() }}
                             class="{{ request()->is('shared-variables*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('shared-variables.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
@@ -204,7 +204,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Notifications"
+                        <a title="Notifications" {{ wireNavigate() }}
                             class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('notifications.email') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -216,7 +216,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Keys & Tokens"
+                        <a title="Keys & Tokens" {{ wireNavigate() }}
                             class="{{ request()->is('security*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('security.private-key.index') }}">
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -228,7 +228,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Tags"
+                        <a title="Tags" {{ wireNavigate() }}
                             class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('tags.show') }}">
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -259,7 +259,7 @@
                         </li>
                     @endcan
                     <li>
-                        <a title="Profile"
+                        <a title="Profile" {{ wireNavigate() }}
                             class="{{ request()->is('profile*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('profile') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -274,7 +274,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Teams"
+                        <a title="Teams" {{ wireNavigate() }}
                             class="{{ request()->is('team*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('team.index') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -293,7 +293,7 @@
                     </li>
                     @if (isCloud() && auth()->user()->isAdmin())
                         <li>
-                            <a title="Subscription"
+                            <a title="Subscription" {{ wireNavigate() }}
                                 class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                                 href="{{ route('subscription.show') }}">
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -308,7 +308,7 @@
                     @if (isInstanceAdmin())
                         <li>
 
-                            <a title="Settings"
+                            <a title="Settings" {{ wireNavigate() }}
                                 class="{{ request()->is('settings*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                                 href="/settings">
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -327,7 +327,7 @@
                     @if (isCloud() || isDev())
                         @if (isInstanceAdmin() || session('impersonating'))
                             <li>
-                                <a title="Admin" class="menu-item" href="/admin">
+                                <a title="Admin" class="menu-item" href="/admin" {{ wireNavigate() }}>
                                     <svg class="text-pink-500 icon" viewBox="0 0 256 256"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <path fill="currentColor"

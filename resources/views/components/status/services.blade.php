@@ -1,13 +1,16 @@
-@if (str($complexStatus)->contains('running'))
-    <x-status.running :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('starting'))
-    <x-status.restarting :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('restarting'))
-    <x-status.restarting :status="$complexStatus" />
-@elseif(str($complexStatus)->contains('degraded'))
-    <x-status.degraded :status="$complexStatus" />
+@php
+    $displayStatus = formatContainerStatus($complexStatus);
+@endphp
+@if (str($displayStatus)->lower()->contains('running'))
+    <x-status.running :status="$displayStatus" />
+@elseif(str($displayStatus)->lower()->contains('starting'))
+    <x-status.restarting :status="$displayStatus" />
+@elseif(str($displayStatus)->lower()->contains('restarting'))
+    <x-status.restarting :status="$displayStatus" />
+@elseif(str($displayStatus)->lower()->contains('degraded'))
+    <x-status.degraded :status="$displayStatus" />
 @else
-    <x-status.stopped :status="$complexStatus" />
+    <x-status.stopped :status="$displayStatus" />
 @endif
 @if (!str($complexStatus)->contains('exited') && $showRefreshButton)
     <button wire:loading.remove.delay.shortest wire:target="manualCheckStatus" title="Refresh Status" wire:click='manualCheckStatus'

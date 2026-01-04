@@ -62,6 +62,9 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $serverPatchWebhookNotifications = false;
 
+    #[Validate(['boolean'])]
+    public bool $traefikOutdatedWebhookNotifications = true;
+
     public function mount()
     {
         try {
@@ -95,6 +98,7 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
 
             $this->settings->save();
             refreshSession();
@@ -115,6 +119,7 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
         }
     }
 
