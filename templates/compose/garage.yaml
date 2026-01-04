@@ -1,0 +1,58 @@
+# documentation: https://garagehq.deuxfleurs.fr/documentation/
+# slogan: Garage is an S3-compatible distributed object storage service designed for self-hosting.
+# category: storage
+# tags: object, storage, server, s3, api, distributed
+# logo: svgs/garage.svg
+# port: 3900
+
+services:
+  garage:
+    image: dxflrs/garage:v2.1.0
+    environment:
+      - GARAGE_S3_API_URL=$GARAGE_S3_API_URL
+      - GARAGE_WEB_URL=$GARAGE_WEB_URL
+      - GARAGE_ADMIN_URL=$GARAGE_ADMIN_URL
+      - GARAGE_RPC_SECRET=${SERVICE_HEX_32_RPCSECRET}
+      - GARAGE_ADMIN_TOKEN=$SERVICE_PASSWORD_GARAGE
+      - GARAGE_METRICS_TOKEN=$SERVICE_PASSWORD_GARAGEMETRICS
+      - GARAGE_ALLOW_WORLD_READABLE_SECRETS=true
+      - RUST_LOG=${RUST_LOG:-garage=info}
+    volumes:
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+      - type: bind
+        source: ./garage.toml
+        target: /etc/garage.toml
+        content: |
+          metadata_dir = "/var/lib/garage/meta"
+          data_dir = "/var/lib/garage/data"
+          db_engine = "lmdb"
+
+          replication_factor = 1
+          consistency_mode = "consistent"
+
+          compression_level = 1
+          block_size = "1M"
+
+          rpc_bind_addr = "[::]:3901"
+          rpc_secret_file = "env:GARAGE_RPC_SECRET"
+          bootstrap_peers = []
+
+          [s3_api]
+          s3_region = "garage"
+          api_bind_addr = "[::]:3900"
+          root_domain = ".s3.garage.localhost"
+
+          [s3_web]
+          bind_addr = "[::]:3902"
+          root_domain = ".web.garage.localhost"
+
+          [admin]
+          api_bind_addr = "[::]:3903"
+          admin_token_file = "env:GARAGE_ADMIN_TOKEN"
+          metrics_token_file = "env:GARAGE_METRICS_TOKEN"
+    healthcheck:
+      test: ["CMD", "/garage", "stats", "-a"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

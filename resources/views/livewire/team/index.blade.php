@@ -11,8 +11,8 @@
         </div>
 
         <div class="flex items-end gap-2 pb-6">
-            <x-forms.input id="team.name" label="Name" required canGate="update" :canResource="$team" />
-            <x-forms.input id="team.description" label="Description" canGate="update" :canResource="$team" />
+            <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
+            <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
             @can('update', $team)
                 <x-forms.button type="submit">
                     Save
@@ -32,6 +32,7 @@
                 <div>You can't delete your last / personal team.</div>
             @elseif(currentTeam()->subscription)
                 <div>Please cancel your subscription <a class="underline dark:text-white"
+                        {{ wireNavigate() }}
                         href="{{ route('subscription.show') }}">here</a> before deleting this team.</div>
             @else
                 @if (currentTeam()->isEmpty())

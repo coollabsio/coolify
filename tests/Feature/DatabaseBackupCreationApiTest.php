@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\PersonalAccessToken;
-use App\Models\ScheduledDatabaseBackup;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;

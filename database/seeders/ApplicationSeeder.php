@@ -15,6 +15,7 @@ class ApplicationSeeder extends Seeder
     public function run(): void
     {
         Application::create([
+            'uuid' => 'docker-compose',
             'name' => 'Docker Compose Example',
             'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
@@ -30,6 +31,7 @@ class ApplicationSeeder extends Seeder
             'source_type' => GithubApp::class,
         ]);
         Application::create([
+            'uuid' => 'nodejs',
             'name' => 'NodeJS Fastify Example',
             'fqdn' => 'http://nodejs.127.0.0.1.sslip.io',
             'repository_project_id' => 603035348,
@@ -45,6 +47,7 @@ class ApplicationSeeder extends Seeder
             'source_type' => GithubApp::class,
         ]);
         Application::create([
+            'uuid' => 'dockerfile',
             'name' => 'Dockerfile Example',
             'fqdn' => 'http://dockerfile.127.0.0.1.sslip.io',
             'repository_project_id' => 603035348,
@@ -60,6 +63,7 @@ class ApplicationSeeder extends Seeder
             'source_type' => GithubApp::class,
         ]);
         Application::create([
+            'uuid' => 'dockerfile-pure',
             'name' => 'Pure Dockerfile Example',
             'fqdn' => 'http://pure-dockerfile.127.0.0.1.sslip.io',
             'git_repository' => 'coollabsio/coolify',
@@ -75,6 +79,23 @@ class ApplicationSeeder extends Seeder
             'dockerfile' => 'FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+',
+        ]);
+        Application::create([
+            'uuid' => 'crashloop',
+            'name' => 'Crash Loop Example',
+            'git_repository' => 'coollabsio/coolify',
+            'git_branch' => 'v4.x',
+            'git_commit_sha' => 'HEAD',
+            'build_pack' => 'dockerfile',
+            'ports_exposes' => '80',
+            'environment_id' => 1,
+            'destination_id' => 0,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => 0,
+            'source_type' => GithubApp::class,
+            'dockerfile' => 'FROM alpine
+CMD ["sh", "-c", "echo Crashing in 5 seconds... && sleep 5 && exit 1"]
 ',
         ]);
     }

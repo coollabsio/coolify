@@ -1,0 +1,42 @@
+# documentation: https://www.rivet.dev/docs
+# slogan: Build and scale stateful workloads with long-lived processes
+# category: development
+# tags: stateful, actors, realtime, backend, serverless, postgresql
+# logo: svgs/rivet.svg
+# port: 6420
+
+services:
+  rivet-engine:
+    image: rivetkit/engine:25.8.0
+    environment:
+      - SERVICE_URL_RIVET_6420
+      - 'RIVET__AUTH__ADMIN_TOKEN=${SERVICE_PASSWORD_RIVET}'
+      - RIVET__POSTGRES__URL=postgresql://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE-rivet}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - http://127.0.0.1:6420/health
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  postgresql:
+    image: postgres:17-alpine
+    volumes:
+      - rivet-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE-rivet}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+

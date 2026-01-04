@@ -95,7 +95,7 @@ class Docker extends Component
                     ]);
                 }
             }
-            $this->redirect(route('destination.show', $docker->uuid));
+            redirectRoute($this, 'destination.show', [$docker->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

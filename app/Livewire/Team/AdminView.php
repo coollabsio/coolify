@@ -2,10 +2,7 @@
 
 namespace App\Livewire\Team;
 
-use App\Models\InstanceSettings;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class AdminView extends Component
@@ -58,12 +55,8 @@ class AdminView extends Component
             return redirect()->route('dashboard');
         }
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         if (! auth()->user()->isInstanceAdmin()) {

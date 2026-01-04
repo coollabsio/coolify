@@ -1,7 +1,13 @@
 @props(['closeWithX' => false, 'fullScreen' => false])
 <div x-data="{
     slideOverOpen: false
-}" {{ $attributes->merge(['class' => 'relative w-auto h-auto']) }}>
+}"
+x-init="$watch('slideOverOpen', value => {
+    if (!value) {
+        $dispatch('slideOverClosed')
+    }
+})"
+{{ $attributes->merge(['class' => 'relative w-auto h-auto']) }}>
     {{ $slot }}
     <template x-teleport="body">
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
