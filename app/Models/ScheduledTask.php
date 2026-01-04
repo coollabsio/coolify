@@ -12,6 +12,14 @@ class ScheduledTask extends BaseModel
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'enabled' => 'boolean',
+            'timeout' => 'integer',
+        ];
+    }
+
     public function service()
     {
         return $this->belongsTo(Service::class);

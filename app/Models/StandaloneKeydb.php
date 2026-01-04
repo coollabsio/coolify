@@ -18,6 +18,9 @@ class StandaloneKeydb extends BaseModel
 
     protected $casts = [
         'keydb_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()
@@ -44,9 +47,23 @@ class StandaloneKeydb extends BaseModel
         });
     }
 
+    /**
+     * Get query builder for KeyDB databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return StandaloneKeydb::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all KeyDB databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneKeydb::ownedByCurrentTeam()->get();
+        });
     }
 
     protected function serverStatus(): Attribute
@@ -249,9 +266,13 @@ class StandaloneKeydb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $encodedPass = rawurlencode($this->keydb_password);
-                    $url = "{$scheme}://:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

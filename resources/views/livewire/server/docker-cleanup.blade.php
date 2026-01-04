@@ -78,6 +78,10 @@
                                 <li>Networks not attached to running containers will be permanently deleted (networks used by stopped containers are affected).</li>
                                 <li>Containers may lose connectivity if required networks are removed.</li>
                             </ul>" />
+                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave
+                            id="disableApplicationImageRetention"
+                            label="Disable Application Image Retention"
+                            helper="When enabled, Docker cleanup will delete all old application images regardless of per-application retention settings. Only the currently running image will be kept.<br><br><strong>Warning: This disables rollback capabilities for all applications on this server.</strong>" />
                     </div>
                 </div>
             </form>

@@ -6,7 +6,6 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use App\Models\StandaloneMysql;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -19,11 +18,39 @@ class General extends Component
 {
     use AuthorizesRequests;
 
-    protected $listeners = ['refresh'];
-
     public StandaloneMysql $database;
 
-    public Server $server;
+    public ?Server $server = null;
+
+    public string $name;
+
+    public ?string $description = null;
+
+    public string $mysqlRootPassword;
+
+    public string $mysqlUser;
+
+    public string $mysqlPassword;
+
+    public string $mysqlDatabase;
+
+    public ?string $mysqlConf = null;
+
+    public string $image;
+
+    public ?string $portsMappings = null;
+
+    public ?bool $isPublic = null;
+
+    public ?int $publicPort = null;
+
+    public bool $isLogDrainEnabled = false;
+
+    public ?string $customDockerRunOptions = null;
+
+    public bool $enableSsl = false;
+
+    public ?string $sslMode = null;
 
     public ?string $db_url = null;
 
@@ -37,28 +64,27 @@ class General extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'refresh' => '$refresh',
         ];
     }
 
     protected function rules(): array
     {
         return [
-            'database.name' => ValidationPatterns::nameRules(),
-            'database.description' => ValidationPatterns::descriptionRules(),
-            'database.mysql_root_password' => 'required',
-            'database.mysql_user' => 'required',
-            'database.mysql_password' => 'required',
-            'database.mysql_database' => 'required',
-            'database.mysql_conf' => 'nullable',
-            'database.image' => 'required',
-            'database.ports_mappings' => 'nullable',
-            'database.is_public' => 'nullable|boolean',
-            'database.public_port' => 'nullable|integer',
-            'database.is_log_drain_enabled' => 'nullable|boolean',
-            'database.custom_docker_run_options' => 'nullable',
-            'database.enable_ssl' => 'boolean',
-            'database.ssl_mode' => 'nullable|string|in:PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'mysqlRootPassword' => 'required',
+            'mysqlUser' => 'required',
+            'mysqlPassword' => 'required',
+            'mysqlDatabase' => 'required',
+            'mysqlConf' => 'nullable',
+            'image' => 'required',
+            'portsMappings' => 'nullable',
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer',
+            'isLogDrainEnabled' => 'nullable|boolean',
+            'customDockerRunOptions' => 'nullable',
+            'enableSsl' => 'boolean',
+            'sslMode' => 'nullable|string|in:PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
         ];
     }
 
@@ -67,47 +93,100 @@ class General extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'database.name.required' => 'The Name field is required.',
-                'database.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'database.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
-                'database.mysql_root_password.required' => 'The Root Password field is required.',
-                'database.mysql_user.required' => 'The MySQL User field is required.',
-                'database.mysql_password.required' => 'The MySQL Password field is required.',
-                'database.mysql_database.required' => 'The MySQL Database field is required.',
-                'database.image.required' => 'The Docker Image field is required.',
-                'database.public_port.integer' => 'The Public Port must be an integer.',
-                'database.ssl_mode.in' => 'The SSL Mode must be one of: PREFERRED, REQUIRED, VERIFY_CA, VERIFY_IDENTITY.',
+                'name.required' => 'The Name field is required.',
+                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'mysqlRootPassword.required' => 'The Root Password field is required.',
+                'mysqlUser.required' => 'The MySQL User field is required.',
+                'mysqlPassword.required' => 'The MySQL Password field is required.',
+                'mysqlDatabase.required' => 'The MySQL Database field is required.',
+                'image.required' => 'The Docker Image field is required.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+                'sslMode.in' => 'The SSL Mode must be one of: PREFERRED, REQUIRED, VERIFY_CA, VERIFY_IDENTITY.',
             ]
         );
     }
 
     protected $validationAttributes = [
-        'database.name' => 'Name',
-        'database.description' => 'Description',
-        'database.mysql_root_password' => 'Root Password',
-        'database.mysql_user' => 'User',
-        'database.mysql_password' => 'Password',
-        'database.mysql_database' => 'Database',
-        'database.mysql_conf' => 'MySQL Configuration',
-        'database.image' => 'Image',
-        'database.ports_mappings' => 'Port Mapping',
-        'database.is_public' => 'Is Public',
-        'database.public_port' => 'Public Port',
-        'database.custom_docker_run_options' => 'Custom Docker Run Options',
-        'database.enable_ssl' => 'Enable SSL',
-        'database.ssl_mode' => 'SSL Mode',
+        'name' => 'Name',
+        'description' => 'Description',
+        'mysqlRootPassword' => 'Root Password',
+        'mysqlUser' => 'User',
+        'mysqlPassword' => 'Password',
+        'mysqlDatabase' => 'Database',
+        'mysqlConf' => 'MySQL Configuration',
+        'image' => 'Image',
+        'portsMappings' => 'Port Mapping',
+        'isPublic' => 'Is Public',
+        'publicPort' => 'Public Port',
+        'customDockerRunOptions' => 'Custom Docker Run Options',
+        'enableSsl' => 'Enable SSL',
+        'sslMode' => 'SSL Mode',
     ];
 
     public function mount()
     {
-        $this->db_url = $this->database->internal_db_url;
-        $this->db_url_public = $this->database->external_db_url;
-        $this->server = data_get($this->database, 'destination.server');
+        try {
+            $this->authorize('view', $this->database);
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
 
-        $existingCert = $this->database->sslCertificates()->first();
+                return;
+            }
 
-        if ($existingCert) {
-            $this->certificateValidUntil = $existingCert->valid_until;
+            $existingCert = $this->database->sslCertificates()->first();
+
+            if ($existingCert) {
+                $this->certificateValidUntil = $existingCert->valid_until;
+            }
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            $this->database->mysql_root_password = $this->mysqlRootPassword;
+            $this->database->mysql_user = $this->mysqlUser;
+            $this->database->mysql_password = $this->mysqlPassword;
+            $this->database->mysql_database = $this->mysqlDatabase;
+            $this->database->mysql_conf = $this->mysqlConf;
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->enable_ssl = $this->enableSsl;
+            $this->database->ssl_mode = $this->sslMode;
+            $this->database->save();
+
+            $this->db_url = $this->database->internal_db_url;
+            $this->db_url_public = $this->database->external_db_url;
+        } else {
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->mysqlRootPassword = $this->database->mysql_root_password;
+            $this->mysqlUser = $this->database->mysql_user;
+            $this->mysqlPassword = $this->database->mysql_password;
+            $this->mysqlDatabase = $this->database->mysql_database;
+            $this->mysqlConf = $this->database->mysql_conf;
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->enableSsl = $this->database->enable_ssl;
+            $this->sslMode = $this->database->ssl_mode;
+            $this->db_url = $this->database->internal_db_url;
+            $this->db_url_public = $this->database->external_db_url;
         }
     }
 
@@ -117,12 +196,12 @@ class General extends Component
             $this->authorize('update', $this->database);
 
             if (! $this->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
@@ -135,11 +214,10 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            if (str($this->database->public_port)->isEmpty()) {
-                $this->database->public_port = null;
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
             }
-            $this->validate();
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -157,16 +235,16 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            if ($this->database->is_public && ! $this->database->public_port) {
+            if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
+                $this->isPublic = false;
 
                 return;
             }
-            if ($this->database->is_public) {
+            if ($this->isPublic) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->database->is_public = false;
+                    $this->isPublic = false;
 
                     return;
                 }
@@ -176,16 +254,15 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url_public = $this->database->external_db_url;
-            $this->database->save();
+            $this->syncData(true);
         } catch (\Throwable $e) {
-            $this->database->is_public = ! $this->database->is_public;
+            $this->isPublic = ! $this->isPublic;
 
             return handleError($e, $this);
         }
     }
 
-    public function updatedDatabaseSslMode()
+    public function updatedSslMode()
     {
         $this->instantSaveSSL();
     }
@@ -195,7 +272,7 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -215,7 +292,7 @@ class General extends Component
                 return;
             }
 
-            $caCert = SslCertificate::where('server_id', $existingCert->server_id)->where('is_ca_certificate', true)->first();
+            $caCert = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
 
             SslHelper::generateSslCertificate(
                 commonName: $existingCert->common_name,
@@ -239,6 +316,7 @@ class General extends Component
     public function refresh(): void
     {
         $this->database->refresh();
+        $this->syncData();
     }
 
     public function render()

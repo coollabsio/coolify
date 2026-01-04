@@ -36,6 +36,9 @@
                         <x-forms.input canGate="update" :canResource="$server" id="dynamicTimeout"
                             label="Deployment timeout (seconds)" required
                             helper="You can define the maximum duration for a deployment to run before timing it out." />
+                        <x-forms.input canGate="update" :canResource="$server" id="deploymentQueueLimit"
+                            label="Deployment queue limit" required
+                            helper="Maximum number of queued deployments allowed. New deployments will be rejected with a 429 status when the limit is reached." />
                     </div>
                 </div>
             </div>

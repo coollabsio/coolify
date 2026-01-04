@@ -1,0 +1,134 @@
+# documentation: https://rybbit.io/docs
+# slogan: Open-source, privacy-first web analytics.
+# category: analytics
+# tags: analytics, web, privacy, self-hosted, clickhouse, postgres
+# logo: svgs/rybbit.svg
+# port: 3002
+
+services:
+  rybbit:
+    image: 'ghcr.io/rybbit-io/rybbit-client:v1.6.1'
+    environment:
+      - SERVICE_URL_RYBBIT_3002
+      - NODE_ENV=production
+      - 'NEXT_PUBLIC_BACKEND_URL=${SERVICE_URL_RYBBIT}'
+      - 'NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}'
+    depends_on:
+      - rybbit_backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 3002"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  rybbit_backend:
+    image: 'ghcr.io/rybbit-io/rybbit-backend:v1.6.1'
+    environment:
+      - NODE_ENV=production
+      - TRUST_PROXY=true
+      - 'BASE_URL=${SERVICE_URL_RYBBIT}'
+      # --- Coolify-Managed Secrets ---
+      - 'CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'BETTER_AUTH_SECRET=${SERVICE_BASE64_64_BACKEND}'
+      # --- User Settings ---
+      - 'DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}'
+      - 'DISABLE_TELEMETRY=${DISABLE_TELEMETRY:-true}'
+      # --- Internal Config ---
+      - 'CLICKHOUSE_HOST=http://rybbit_clickhouse:8123'
+      - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - POSTGRES_HOST=rybbit_postgres
+      - POSTGRES_PORT=5432
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
+    depends_on:
+      rybbit_clickhouse:
+        condition: service_healthy
+      rybbit_postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  rybbit_postgres:
+    image: 'postgres:17.4'
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+    volumes:
+      - 'postgres_data:/var/lib/postgresql/data'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rybbit_clickhouse:
+    image: 'clickhouse/clickhouse-server:25.4.2'
+    environment:
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
+      - 'CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - 'clickhouse_data:/var/lib/clickhouse'
+      - type: bind
+        source: ./clickhouse_config/enable_json.xml
+        target: /etc/clickhouse-server/config.d/enable_json.xml
+        content: |
+          <clickhouse>
+              <settings>
+                  <enable_json_type>1</enable_json_type>
+              </settings>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse_config/logging_rules.xml
+        target: /etc/clickhouse-server/config.d/logging_rules.xml
+        content: |
+          <clickhouse>
+              <logger>
+                  <level>warning</level>
+                  <console>true</console>
+              </logger>
+              <query_thread_log remove="remove"/>
+              <query_log remove="remove"/>
+              <text_log remove="remove"/>
+              <trace_log remove="remove"/>
+              <metric_log remove="remove"/>
+              <asynchronous_metric_log remove="remove"/>
+              <session_log remove="remove"/>
+              <part_log remove="remove"/>
+              <latency_log remove="remove"/>
+              <processors_profile_log remove="remove"/>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse_config/network.xml
+        target: /etc/clickhouse-server/config.d/network.xml
+        content: |
+          <clickhouse>
+              <listen_host>0.0.0.0</listen_host>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse_config/user_logging.xml
+        target: /etc/clickhouse-server/config.d/user_logging.xml
+        content: |
+          <clickhouse>
+              <profiles>
+                  <default>
+                      <log_queries>0</log_queries>
+                      <log_query_threads>0</log_query_threads>
+                      <log_processors_profiles>0</log_processors_profiles>
+                  </default>
+              </profiles>
+          </clickhouse>

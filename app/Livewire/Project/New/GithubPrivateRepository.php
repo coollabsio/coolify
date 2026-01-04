@@ -55,7 +55,7 @@ class GithubPrivateRepository extends Component
     public ?string $publish_directory = null;
 
     // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
@@ -73,16 +73,6 @@ class GithubPrivateRepository extends Component
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
-    }
-
-    public function updatedBaseDirectory()
-    {
-        if ($this->base_directory) {
-            $this->base_directory = rtrim($this->base_directory, '/');
-            if (! str($this->base_directory)->startsWith('/')) {
-                $this->base_directory = '/'.$this->base_directory;
-            }
-        }
     }
 
     public function updatedBuildPack()
@@ -138,6 +128,7 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
+        $this->branches = sortBranchesByPriority($this->branches);
         $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
     }
 
@@ -198,6 +189,7 @@ class GithubPrivateRepository extends Component
                 'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
+                'base_directory' => $this->base_directory,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
@@ -212,7 +204,6 @@ class GithubPrivateRepository extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application['docker_compose_location'] = $this->docker_compose_location;
-                $application['base_directory'] = $this->base_directory;
             }
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;

@@ -94,12 +94,12 @@
                         </a>
                         @if (count($parameters) > 0)
                             |
-                            <a
+                            <a {{ wireNavigate() }}
                                 href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
                                 Deployment Logs
                             </a>
                             |
-                            <a
+                            <a {{ wireNavigate() }}
                                 href="{{ route('project.application.logs', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
                                 Application Logs
                             </a>
@@ -112,7 +112,7 @@
                                 <form wire:submit="save_preview('{{ $preview->id }}')"
                                     class="flex items-end gap-2 pt-4">
                                     <x-forms.input label="Domain" helper="One domain per preview."
-                                        id="application.previews.{{ $previewName }}.fqdn" canGate="update" :canResource="$application"></x-forms.input>
+                                        id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                                     @can('update', $application)
                                         <x-forms.button type="submit">Save</x-forms.button>
                                         <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate
@@ -130,7 +130,7 @@
                     @else
                         <form wire:submit="save_preview('{{ $preview->id }}')" class="flex items-end gap-2 pt-4">
                             <x-forms.input label="Domain" helper="One domain per preview."
-                                id="application.previews.{{ $previewName }}.fqdn" canGate="update" :canResource="$application"></x-forms.input>
+                                id="previewFqdns.{{ $previewName }}" canGate="update" :canResource="$application"></x-forms.input>
                             @can('update', $application)
                                 <x-forms.button type="submit">Save</x-forms.button>
                                 <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">Generate

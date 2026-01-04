@@ -169,6 +169,15 @@
                     <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
                         id="telegramNotificationsServerPatchThreadId" />
                 </div>
+
+                <div class="pl-1 flex gap-2">
+                    <div class="w-96">
+                        <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedTelegramNotifications"
+                            label="Traefik Proxy Outdated" />
+                    </div>
+                    <x-forms.input canGate="update" :canResource="$settings" type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsTraefikOutdatedThreadId" />
+                </div>
             </div>
         </div>
     </div>

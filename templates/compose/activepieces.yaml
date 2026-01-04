@@ -7,7 +7,7 @@
 
 services:
   activepieces:
-    image: "ghcr.io/activepieces/activepieces:latest"
+    image: "ghcr.io/activepieces/activepieces:0.21.0" # Released on March 13 2024
     environment:
       - SERVICE_URL_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
@@ -40,7 +40,7 @@ services:
       timeout: 20s
       retries: 10
   postgres:
-    image: "postgres:latest"
+    image: 'postgres:14.4'
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-activepieces}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -54,7 +54,7 @@ services:
       timeout: 20s
       retries: 10
   redis:
-    image: "redis:latest"
+    image: 'redis:7.0.7'
     volumes:
       - "redis_data:/data"
     healthcheck:

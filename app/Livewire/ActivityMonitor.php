@@ -10,7 +10,7 @@ class ActivityMonitor extends Component
 {
     public ?string $header = null;
 
-    public $activityId;
+    public $activityId = null;
 
     public $eventToDispatch = 'activityFinished';
 
@@ -28,11 +28,19 @@ class ActivityMonitor extends Component
 
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
 
-    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null)
+    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null, $header = null)
     {
+        // Reset event dispatched flag for new activity
+        self::$eventDispatched = false;
+
         $this->activityId = $activityId;
         $this->eventToDispatch = $eventToDispatch;
         $this->eventData = $eventData;
+
+        // Update header if provided
+        if ($header !== null) {
+            $this->header = $header;
+        }
 
         $this->hydrateActivity();
 
@@ -41,7 +49,22 @@ class ActivityMonitor extends Component
 
     public function hydrateActivity()
     {
+        if ($this->activityId === null) {
+            $this->activity = null;
+
+            return;
+        }
+
         $this->activity = Activity::find($this->activityId);
+    }
+
+    public function updatedActivityId($value)
+    {
+        if ($value) {
+            $this->hydrateActivity();
+            $this->isPollingActive = true;
+            self::$eventDispatched = false;
+        }
     }
 
     public function polling()

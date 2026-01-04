@@ -338,6 +338,39 @@ class User extends Authenticatable implements SendsEmail
         return data_get($user, 'pivot.role');
     }
 
+    /**
+     * Check if the user is an admin or owner of a specific team
+     */
+    public function isAdminOfTeam(int $teamId): bool
+    {
+        $team = $this->teams->where('id', $teamId)->first();
+
+        if (! $team) {
+            return false;
+        }
+
+        $role = $team->pivot->role ?? null;
+
+        return $role === 'admin' || $role === 'owner';
+    }
+
+    /**
+     * Check if the user can access system resources (team_id=0)
+     * Must be admin/owner of root team
+     */
+    public function canAccessSystemResources(): bool
+    {
+        // Check if user is member of root team
+        $rootTeam = $this->teams->where('id', 0)->first();
+
+        if (! $rootTeam) {
+            return false;
+        }
+
+        // Check if user is admin or owner of root team
+        return $this->isAdminOfTeam(0);
+    }
+
     public function requestEmailChange(string $newEmail): void
     {
         // Generate 6-digit code
@@ -409,5 +442,14 @@ class User extends Authenticatable implements SendsEmail
             && ! is_null($this->email_change_code)
             && $this->email_change_code_expires_at
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    /**
+     * Check if the user has a password set.
+     * OAuth users are created without passwords.
+     */
+    public function hasPassword(): bool
+    {
+        return ! empty($this->password);
     }
 }

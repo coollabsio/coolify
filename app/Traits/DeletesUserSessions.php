@@ -26,7 +26,7 @@ trait DeletesUserSessions
     {
         static::updated(function ($user) {
             // Check if password was changed
-            if ($user->isDirty('password')) {
+            if ($user->wasChanged('password')) {
                 $user->deleteAllSessions();
             }
         });

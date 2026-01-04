@@ -2,12 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -79,12 +76,13 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
-    #[Validate(['required', 'int', 'min:1', 'max:36000'])]
+    #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
     public function mount()
     {
         try {
+            $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
         } catch (Exception $e) {
@@ -106,6 +104,25 @@ class BackupEdit extends Component
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->disable_local_backup = $this->disableLocalBackup;
             $this->backup->s3_storage_id = $this->s3StorageId;
+
+            // Validate databases_to_backup to prevent command injection
+            if (filled($this->databasesToBackup)) {
+                $databases = str($this->databasesToBackup)->explode(',');
+                foreach ($databases as $index => $db) {
+                    $dbName = trim($db);
+                    try {
+                        validateShellSafePath($dbName, 'database name');
+                    } catch (\Exception $e) {
+                        // Provide specific error message indicating which database failed validation
+                        $position = $index + 1;
+                        throw new \Exception(
+                            "Database #{$position} ('{$dbName}') validation failed: ".
+                            $e->getMessage()
+                        );
+                    }
+                }
+            }
+
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
@@ -134,12 +151,8 @@ class BackupEdit extends Component
     {
         $this->authorize('manageBackups', $this->backup->database);
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         try {
@@ -208,7 +221,7 @@ class BackupEdit extends Component
 
         // Validate that disable_local_backup can only be true when S3 backup is enabled
         if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
-            throw new \Exception('Local backup can only be disabled when S3 backup is enabled.');
+            $this->backup->disable_local_backup = $this->disableLocalBackup = false;
         }
 
         $isValid = validate_cron_expression($this->backup->frequency);

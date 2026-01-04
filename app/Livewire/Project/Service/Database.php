@@ -4,12 +4,9 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Database extends Component
@@ -24,16 +21,30 @@ class Database extends Component
 
     public $parameters;
 
+    public ?string $humanName = null;
+
+    public ?string $description = null;
+
+    public ?string $image = null;
+
+    public bool $excludeFromStatus = false;
+
+    public ?int $publicPort = null;
+
+    public bool $isPublic = false;
+
+    public bool $isLogDrainEnabled = false;
+
     protected $listeners = ['refreshFileStorages'];
 
     protected $rules = [
-        'database.human_name' => 'nullable',
-        'database.description' => 'nullable',
-        'database.image' => 'required',
-        'database.exclude_from_status' => 'required|boolean',
-        'database.public_port' => 'nullable|integer',
-        'database.is_public' => 'required|boolean',
-        'database.is_log_drain_enabled' => 'required|boolean',
+        'humanName' => 'nullable',
+        'description' => 'nullable',
+        'image' => 'required',
+        'excludeFromStatus' => 'required|boolean',
+        'publicPort' => 'nullable|integer',
+        'isPublic' => 'required|boolean',
+        'isLogDrainEnabled' => 'required|boolean',
     ];
 
     public function render()
@@ -50,8 +61,30 @@ class Database extends Component
                 $this->db_url_public = $this->database->getServiceDatabaseUrl();
             }
             $this->refreshFileStorages();
+            $this->syncData(false);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->database->human_name = $this->humanName;
+            $this->database->description = $this->description;
+            $this->database->image = $this->image;
+            $this->database->exclude_from_status = $this->excludeFromStatus;
+            $this->database->public_port = $this->publicPort;
+            $this->database->is_public = $this->isPublic;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+        } else {
+            $this->humanName = $this->database->human_name;
+            $this->description = $this->database->description;
+            $this->image = $this->database->image;
+            $this->excludeFromStatus = $this->database->exclude_from_status ?? false;
+            $this->publicPort = $this->database->public_port;
+            $this->isPublic = $this->database->is_public ?? false;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled ?? false;
         }
     }
 
@@ -60,18 +93,14 @@ class Database extends Component
         try {
             $this->authorize('delete', $this->database);
 
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-                if (! Hash::check($password, Auth::user()->password)) {
-                    $this->addError('password', 'The provided password is incorrect.');
-
-                    return;
-                }
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return;
             }
 
             $this->database->delete();
             $this->dispatch('success', 'Database deleted.');
 
-            return redirect()->route('project.service.configuration', $this->parameters);
+            return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -92,7 +121,7 @@ class Database extends Component
         try {
             $this->authorize('update', $this->database);
             if (! $this->database->service->destination->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
@@ -135,7 +164,7 @@ class Database extends Component
                 $serviceDatabase->delete();
             });
 
-            return redirect()->route('project.service.configuration', $redirectParams);
+            return redirectRoute($this, 'project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -145,15 +174,17 @@ class Database extends Component
     {
         try {
             $this->authorize('update', $this->database);
-            if ($this->database->is_public && ! $this->database->public_port) {
+            if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
+                $this->isPublic = false;
 
                 return;
             }
+            $this->syncData(true);
             if ($this->database->is_public) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                    $this->isPublic = false;
                     $this->database->is_public = false;
 
                     return;
@@ -182,7 +213,10 @@ class Database extends Component
         try {
             $this->authorize('update', $this->database);
             $this->validate();
+            $this->syncData(true);
             $this->database->save();
+            $this->database->refresh();
+            $this->syncData(false);
             updateCompose($this->database);
             $this->dispatch('success', 'Database saved.');
         } catch (\Throwable $e) {
