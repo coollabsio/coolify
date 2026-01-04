@@ -2613,7 +2613,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
-        if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
+        if ($this->original_server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
         }
         if ($this->application->settings->is_gpu_enabled) {
