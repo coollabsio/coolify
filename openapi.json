@@ -3508,8 +3508,7 @@
                         "description": "UUID of the cloud provider token.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
