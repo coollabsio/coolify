@@ -314,8 +314,8 @@ services:
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       # API key is depricated
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
-      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64-PRIVATE-ACCESS-LOGFLARE}
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLICACCESSLOGFLARE}
+      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PRIVATEACCESSLOGFLARE}
       - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}'
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
@@ -637,7 +637,7 @@ services:
       # un comment this after first deployment to force ssl (if you are forcing connection to DB directly btw you should be use the supabase service supavisor)
       #- './supabase-db-config/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf'
   supabase-analytics:
-    image: supabase/logflare:1.4.0
+    image: supabase/logflare:1.22.6
     healthcheck:
       test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
       timeout: 20s
@@ -660,8 +660,8 @@ services:
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_SCHEMA=_analytics
       # LOGFLARE API KEY is depricated use this
-      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
-      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64-PRIVATE-ACCESS-LOGFLARE}
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLICACCESSLOGFLARE}
+      - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PRIVATEACCESSLOGFLARE}
       - LOGFLARE_SINGLE_TENANT=true
       - LOGFLARE_SINGLE_TENANT_MODE=true
       - LOGFLARE_SUPABASE_MODE=true
@@ -952,7 +952,7 @@ services:
 
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLIC-ACCESS-LOGFLARE}
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_64_PUBLICACCESSLOGFLARE}
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
