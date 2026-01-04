@@ -277,6 +277,27 @@ All notable changes to this project will be documented in this file.
 - *(stripe)* Add manual subscription sync command with dry-run support
 - Add manual Stripe subscription sync command (#7706)
 - *(redirect)* Add redirectRoute helper for SPA navigation support
+- *(logs)* Add dropdown to download displayed or all logs
+- *(logs)* Add loading indicator to download all logs buttons
+- *(logs)* Add loading indicator to download all logs buttons (#7847)
+- Add Sessy as one-click service
+- Add Sessy as one-click service (#7851)
+- Add ServiceDatabase restore/import support
+- Add import backup UI for ServiceDatabase
+- Refactor service database management and backup functionalities
+- Add ServiceDatabase restore/import support (#7540)
+- *(template)* Add mage-ai
+- *(template)* Mage-ai (#7705)
+- *(templates)* Update Postgresus to Databasus and bump Docker Image version
+- *(template)* Add databasus logo
+- *(templates)* Update Postgresus to Databasus and bump Docker Image (#7799)
+- *(lang)* Add missing chinese translation keys (#7477)
+- *(services)* Update authentik (#7380)
+- *(ui)* Show server name on resource card (#7417)
+- *(lang)* Update portuguese language keys (#7020)
+- *(magic)* Add LOWERCASEUSER as magic variable (#6942)
+- *(install)* Add postmarketos to the supported distributions (#6909)
+- *(ui)* Make git repository dropdown searchable (#7064)
 
 ### 🐛 Bug Fixes
 
@@ -790,6 +811,30 @@ All notable changes to this project will be documented in this file.
 - *(workflow)* Update permissions for Claude to write access (#7835)
 - *(workflow)* Remove 'labeled' event from issue triggers and clean up permissions
 - *(workflow)* Remove 'labeled' event from issue triggers and clean up permissions (#7836)
+- *(logs)* Remove hardcoded 2000 line display limit
+- Prevent metric charts from freezing when navigating with wire:navigate
+- Remove livewire:init wrapper from server charts event listeners
+- Prevent metric charts from freezing on page navigation (#7848)
+- *(settings)* Fix 404 on /settings for root user on cloud instance
+- *(user)* Use $this instead of Auth::user() in User model methods
+- *(user)* Complete User model fixes for non-web contexts
+- *(user)* Improve cache key and remove redundant route check
+- *(team)* Improve team retrieval and session handling for users
+- *(settings)* Fix 404 on /settings for root user on cloud (#7785)
+- *(service)* Handle missing service database and redirect to configuration
+- *(service)* Use database UUID for ServiceDatabase proxy container name
+- *(template)* Make databasus connect to predefined network
+- *(template)* Add release date of databasus image
+- *(templates)* Use FQDN instead of URL for Weblate site domain (#7827)
+- *(service)* Prevent public toggle from saving entire database form
+- Use original_server for log drain config in generate_compose_file
+- Use original_server for log drain config in generate_compose_file (#7619)
+- APP_NAME in development
+- *(docs)* Remove incorrect uuid format in openapi spec (#7419)
+- Add datetime cast to finished_at column (#7418)
+- *(service)* Correct POSTGRES_HOST in freshrss (#7759)
+- *(ui)* Change password visibility eye icon based on state (#7729)
+- *(service)* Remove command from unleash template (#7379)
 
 ### 💼 Other
 
@@ -863,6 +908,7 @@ All notable changes to this project will be documented in this file.
 - Escape key fullscreen exit for logs view (#7632)
 - CVE-2025-55182 React2shell infected supabase/studio:2025.06.02-sha-8f2993d
 - Bump superset to 6.0.0
+- Trim whitespace from domain input in instance settings (#7837)
 
 ### 🚜 Refactor
 
@@ -1029,6 +1075,7 @@ All notable changes to this project will be documented in this file.
 - Move Swarm and Sentinel to dedicated sidebar menu items (#7687)
 - *(redirect)* Replace redirect calls with redirectRoute helper for consistency
 - Remove unused updateServiceEnvironmentVariables method
+- *(server)* Remove unused destinationsByServer method
 
 ### 📚 Documentation
 
@@ -1088,6 +1135,7 @@ All notable changes to this project will be documented in this file.
 - Replace brittle line number references with maintainable method descriptions
 - Update application architecture and database patterns for request-level caching best practices
 - Update changelog
+- Update changelog
 
 ### ⚡ Performance
 
@@ -1096,6 +1144,8 @@ All notable changes to this project will be documented in this file.
 - Add request-level caching and indexes for dashboard optimization (#7533)
 - Remove dead server filtering code from Kernel scheduler
 - Remove dead server filtering code from Kernel scheduler (#7585)
+- *(server)* Optimize destinationsByServer query
+- *(server)* Optimize destinationsByServer query (#7854)
 
 ### 🎨 Styling
 
@@ -1169,6 +1219,16 @@ All notable changes to this project will be documented in this file.
 - Better structure of readme
 - Update migration timestamp to 2025_11_26_124200
 - Update version numbers to 4.0.0-beta.457 and 4.0.0-beta.458
+- Remove unused $server property and add missing import
+- Updated contributors guidelines to include more detailes for pull request submissions
+- Updated pull request template to include more details for our new contributors guideline
+- Update contributors guide (#7807)
+- Update versions.json for consistency across environments
+- *(docker)* Add healthchecks to dev services (#7856)
+- *(services)* Update service-templates.json
+- *(service)* Upgrade uptime kuma to version 2 (#7258)
+- *(git)* Remove pre-commit hooks
+- *(service)* Upgrade activepieces and postgres
 
 ## [4.0.0-beta.426] - 2025-08-28
 
