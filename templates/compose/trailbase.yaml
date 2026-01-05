@@ -7,7 +7,7 @@
 
 services:
   trailbase:
-    image: trailbase/trailbase:latest
+    image: trailbase/trailbase:0.22.6
     environment:
       - SERVICE_URL_TRAILBASE_4000
     volumes:
