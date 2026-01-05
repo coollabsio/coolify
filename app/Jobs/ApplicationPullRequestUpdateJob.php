@@ -44,10 +44,12 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $previewUrl = $this->getPreviewUrl();
+
             match ($this->status) {
                 ProcessStatus::QUEUED => $this->body = "The preview deployment for **{$serviceName}** is queued. ⏳\n\n",
                 ProcessStatus::IN_PROGRESS => $this->body = "The preview deployment for **{$serviceName}** is in progress. 🟡\n\n",
-                ProcessStatus::FINISHED => $this->body = "The preview deployment for **{$serviceName}** is ready. 🟢\n\n".($this->preview->fqdn ? "[Open Preview]({$this->preview->fqdn}) | " : ''),
+                ProcessStatus::FINISHED => $this->body = "The preview deployment for **{$serviceName}** is ready. 🟢\n\n".($previewUrl ? "[Open Preview]({$previewUrl}) | " : ''),
                 ProcessStatus::ERROR => $this->body = "The preview deployment for **{$serviceName}** failed. 🔴\n\n",
                 ProcessStatus::KILLED => $this->body = "The preview deployment for **{$serviceName}** was killed. ⚫\n\n",
                 ProcessStatus::CANCELLED => $this->body = "The preview deployment for **{$serviceName}** was cancelled. 🚫\n\n",
@@ -89,5 +91,46 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
     private function delete_comment()
     {
         githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'delete');
+    }
+
+    private function getPreviewUrl(): ?string
+    {
+        if ($this->preview->fqdn) {
+            return $this->preview->fqdn;
+        }
+
+        if (! $this->preview->docker_compose_domains) {
+            return null;
+        }
+
+        $previewDomains = collect(json_decode($this->preview->docker_compose_domains, true) ?? []);
+
+        if ($previewDomains->isEmpty()) {
+            return null;
+        }
+
+        // Identify database services by parsing the compose file and checking Docker images
+        $databaseServices = $this->getDatabaseServiceNames();
+
+        // Find first non-database service with a domain, fallback to any domain
+        return $previewDomains
+            ->reject(fn ($config, $serviceName) => in_array(strtolower($serviceName), $databaseServices, true))
+            ->pluck('domain')
+            ->filter()
+            ->first()
+            ?? $previewDomains->pluck('domain')->filter()->first();
+    }
+
+    private function getDatabaseServiceNames(): array
+    {
+        return rescue(function () {
+            $parsedCompose = $this->application->parse(pull_request_id: $this->preview->pull_request_id);
+
+            return collect(data_get($parsedCompose, 'services', []))
+                ->filter(fn ($config) => isDatabaseImage(data_get($config, 'image')))
+                ->keys()
+                ->map(fn ($name) => strtolower(str($name)->replaceLast('-pr-'.$this->preview->pull_request_id, '')->toString()))
+                ->all();
+        }, [], report: true);
     }
 }
