@@ -7,7 +7,7 @@
 
 services:
   postiz:
-    image: ghcr.io/gitroomhq/postiz-app:v1.60.1
+    image: ghcr.io/gitroomhq/postiz-app:v2.10.1
     environment:
       - SERVICE_URL_POSTIZ_5000
       - MAIN_URL=${SERVICE_URL_POSTIZ}

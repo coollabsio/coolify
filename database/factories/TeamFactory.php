@@ -20,7 +20,7 @@ class TeamFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->company() . ' Team',
+            'name' => $this->faker->company().' Team',
             'description' => $this->faker->sentence(),
             'personal_team' => false,
             'show_boarding' => false,
@@ -34,7 +34,7 @@ class TeamFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'personal_team' => true,
-            'name' => $this->faker->firstName() . "'s Team",
+            'name' => $this->faker->firstName()."'s Team",
         ]);
     }
 }

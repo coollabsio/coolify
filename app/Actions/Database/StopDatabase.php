@@ -28,6 +28,13 @@ class StopDatabase
 
             $this->stopContainer($database, $database->uuid, 30);
 
+            // Reset restart tracking when database is manually stopped
+            $database->update([
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+
             if ($dockerCleanup) {
                 CleanupDocker::dispatch($server, false, false);
             }
@@ -49,7 +56,7 @@ class StopDatabase
     {
         $server = $database->destination->server;
         instant_remote_process(command: [
-            "docker stop --time=$timeout $containerName",
+            "docker stop -t $timeout $containerName",
             "docker rm -f $containerName",
         ], server: $server, throwError: false);
     }

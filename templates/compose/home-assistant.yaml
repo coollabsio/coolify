@@ -1,0 +1,40 @@
+# documentation: https://www.home-assistant.io/installation/linux#docker-compose
+# slogan: Open source home automation that puts local control and privacy first.
+# category: automation
+# tags: home-automation,iot,smart-home,automation,domotics,mqtt,zigbee,zwave
+# logo: svgs/home-assistant.svg
+# port: 8123
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2025.10.2
+    environment:
+      - SERVICE_URL_HOMEASSISTANT_8123
+      - TZ=${TZ:-UTC}
+      - DISABLE_JEMALLOC=${DISABLE_JEMALLOC:-false}
+    volumes:
+      - homeassistant-config:/config
+      - /run/dbus:/run/dbus:ro
+      - type: bind
+        source: ./configuration.yaml
+        target: /config/configuration.yaml
+        content: |
+          # Loads default set of integrations. Do not remove.
+          default_config:
+
+          # Configuration for reverse proxy support (required for Coolify)
+          http:
+            use_x_forwarded_for: true
+            trusted_proxies:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+            ip_ban_enabled: true
+            login_attempts_threshold: 5
+    privileged: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

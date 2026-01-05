@@ -1,0 +1,31 @@
+# documentation: https://docs.mage.ai
+# slogan: Build, run, and manage data pipelines for integrating and transforming data.
+# category: automation
+# tags: data,dbt,etl,pipelines
+# logo: svgs/mage-ai.svg
+# port: 6789
+
+services:
+  mage-ai:
+    image: 'mageai/mageai:0.9.78'
+    command: 'mage start default_project'
+    environment:
+      - SERVICE_URL_MAGEAI_6789
+      - PROJECT_NAME=default_project
+      - USER_CODE_PATH=/home/src/default_project
+      - ENV=production
+    volumes:
+      - 'mageai_data:/home/src/'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-s'
+        - '-f'
+        - '-o'
+        - /dev/null
+        - 'http://127.0.0.1:6789'
+      interval: 30s
+      timeout: 10s
+      retries: 5

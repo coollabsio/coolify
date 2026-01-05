@@ -42,8 +42,7 @@ class TeamPolicy
             return false;
         }
 
-        // return $user->isAdmin() || $user->isOwner();
-        return true;
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -56,8 +55,7 @@ class TeamPolicy
             return false;
         }
 
-        // return $user->isAdmin() || $user->isOwner();
-        return true;
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -70,8 +68,7 @@ class TeamPolicy
             return false;
         }
 
-        // return $user->isAdmin() || $user->isOwner();
-        return true;
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -84,8 +81,7 @@ class TeamPolicy
             return false;
         }
 
-        //  return $user->isAdmin() || $user->isOwner();
-        return true;
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -98,7 +94,6 @@ class TeamPolicy
             return false;
         }
 
-        // return $user->isAdmin() || $user->isOwner();
-        return true;
+        return $user->isAdmin() || $user->isOwner();
     }
 }

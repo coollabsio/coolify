@@ -75,7 +75,7 @@ function get_socialite_provider(string $provider)
         $config
     );
 
-    if ($provider == 'gitlab' && !empty($oauth_setting->base_url)) {
+    if ($provider == 'gitlab' && ! empty($oauth_setting->base_url)) {
         $socialite->setHost($oauth_setting->base_url);
     }
 

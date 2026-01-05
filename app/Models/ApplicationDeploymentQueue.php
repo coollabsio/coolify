@@ -41,11 +41,13 @@ class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
 
-    public function application(): Attribute
+    protected $casts = [
+        'finished_at' => 'datetime',
+    ];
+
+    public function application()
     {
-        return Attribute::make(
-            get: fn () => Application::find($this->application_id),
-        );
+        return $this->belongsTo(Application::class);
     }
 
     public function server(): Attribute

@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "setup": "cp $JEAN_ROOT_PATH/.env . && mkdir -p .claude && cp $JEAN_ROOT_PATH/.claude/settings.local.json .claude/settings.local.json"
+  }
+}

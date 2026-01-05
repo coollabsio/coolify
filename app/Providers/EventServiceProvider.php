@@ -2,10 +2,6 @@
 
 namespace App\Providers;
 
-use App\Listeners\MaintenanceModeDisabledNotification;
-use App\Listeners\MaintenanceModeEnabledNotification;
-use Illuminate\Foundation\Events\MaintenanceModeDisabled;
-use Illuminate\Foundation\Events\MaintenanceModeEnabled;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Authentik\AuthentikExtendSocialite;
 use SocialiteProviders\Azure\AzureExtendSocialite;
@@ -19,12 +15,6 @@ use SocialiteProviders\Zitadel\ZitadelExtendSocialite;
 class EventServiceProvider extends ServiceProvider
 {
     protected $listen = [
-        MaintenanceModeEnabled::class => [
-            MaintenanceModeEnabledNotification::class,
-        ],
-        MaintenanceModeDisabled::class => [
-            MaintenanceModeDisabledNotification::class,
-        ],
         SocialiteWasCalled::class => [
             AzureExtendSocialite::class.'@handle',
             AuthentikExtendSocialite::class.'@handle',
