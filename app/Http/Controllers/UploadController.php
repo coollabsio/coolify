@@ -13,7 +13,8 @@ class UploadController extends BaseController
 {
     public function upload(Request $request)
     {
-        $resource = getResourceByUuid(request()->route('databaseUuid'), data_get(auth()->user()->currentTeam(), 'id'));
+        $databaseIdentifier = request()->route('databaseUuid');
+        $resource = getResourceByUuid($databaseIdentifier, data_get(auth()->user()->currentTeam(), 'id'));
         if (is_null($resource)) {
             return response()->json(['error' => 'You do not have permission for this database'], 500);
         }
@@ -26,7 +27,10 @@ class UploadController extends BaseController
         $save = $receiver->receive();
 
         if ($save->isFinished()) {
-            return $this->saveFile($save->getFile(), $resource);
+            // Use the original identifier from the route to maintain path consistency
+            // For ServiceDatabase: {name}-{service_uuid}
+            // For standalone databases: {uuid}
+            return $this->saveFile($save->getFile(), $databaseIdentifier);
         }
 
         $handler = $save->handler();
@@ -57,10 +61,10 @@ class UploadController extends BaseController
     //         'mime_type' => $mime
     //     ]);
     // }
-    protected function saveFile(UploadedFile $file, $resource)
+    protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
         $mime = str_replace('/', '-', $file->getMimeType());
-        $filePath = "upload/{$resource->uuid}";
+        $filePath = "upload/{$resourceIdentifier}";
         $finalPath = storage_path('app/'.$filePath);
         $file->move($finalPath, 'restore');
 

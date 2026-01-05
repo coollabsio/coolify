@@ -4,9 +4,11 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Import extends Component
@@ -101,11 +103,23 @@ class Import extends Component
 
     public bool $unsupported = false;
 
-    public $resource;
+    // Store IDs instead of models for proper Livewire serialization
+    public ?int $resourceId = null;
 
-    public $parameters;
+    public ?string $resourceType = null;
 
-    public $containers;
+    public ?int $serverId = null;
+
+    // View-friendly properties to avoid computed property access in Blade
+    public string $resourceUuid = '';
+
+    public string $resourceStatus = '';
+
+    public string $resourceDbType = '';
+
+    public array $parameters = [];
+
+    public array $containers = [];
 
     public bool $scpInProgress = false;
 
@@ -120,8 +134,6 @@ class Import extends Component
     public int $progress = 0;
 
     public bool $error = false;
-
-    public Server $server;
 
     public string $container;
 
@@ -144,13 +156,33 @@ class Import extends Component
     public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
     // S3 Restore properties
-    public $availableS3Storages = [];
+    public array $availableS3Storages = [];
 
     public ?int $s3StorageId = null;
 
     public string $s3Path = '';
 
     public ?int $s3FileSize = null;
+
+    #[Computed]
+    public function resource()
+    {
+        if ($this->resourceId === null || $this->resourceType === null) {
+            return null;
+        }
+
+        return $this->resourceType::find($this->resourceId);
+    }
+
+    #[Computed]
+    public function server()
+    {
+        if ($this->serverId === null) {
+            return null;
+        }
+
+        return Server::find($this->serverId);
+    }
 
     public function getListeners()
     {
@@ -176,8 +208,23 @@ class Import extends Component
 
     public function updatedDumpAll($value)
     {
-        switch ($this->resource->getMorphClass()) {
+        $morphClass = $this->resource->getMorphClass();
+
+        // Handle ServiceDatabase by checking the database type
+        if ($morphClass === \App\Models\ServiceDatabase::class) {
+            $dbType = $this->resource->databaseType();
+            if (str_contains($dbType, 'mysql')) {
+                $morphClass = 'mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $morphClass = 'mariadb';
+            } elseif (str_contains($dbType, 'postgres')) {
+                $morphClass = 'postgresql';
+            }
+        }
+
+        switch ($morphClass) {
             case \App\Models\StandaloneMariadb::class:
+            case 'mariadb':
                 if ($value === true) {
                     $this->mariadbRestoreCommand = <<<'EOD'
 for pid in $(mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -193,6 +240,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMysql::class:
+            case 'mysql':
                 if ($value === true) {
                     $this->mysqlRestoreCommand = <<<'EOD'
 for pid in $(mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -208,6 +256,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandalonePostgresql::class:
+            case 'postgresql':
                 if ($value === true) {
                     $this->postgresqlRestoreCommand = <<<'EOD'
 psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
@@ -225,29 +274,98 @@ EOD;
 
     public function getContainers()
     {
-        $this->containers = collect();
-        if (! data_get($this->parameters, 'database_uuid')) {
+        $this->containers = [];
+        $teamId = data_get(auth()->user()->currentTeam(), 'id');
+
+        // Try to find resource by route parameter
+        $databaseUuid = data_get($this->parameters, 'database_uuid');
+        $stackServiceUuid = data_get($this->parameters, 'stack_service_uuid');
+
+        $resource = null;
+        if ($databaseUuid) {
+            // Standalone database route
+            $resource = getResourceByUuid($databaseUuid, $teamId);
+            if (is_null($resource)) {
+                abort(404);
+            }
+        } elseif ($stackServiceUuid) {
+            // ServiceDatabase route - look up the service database
+            $serviceUuid = data_get($this->parameters, 'service_uuid');
+            $service = Service::whereUuid($serviceUuid)->first();
+            if (! $service) {
+                abort(404);
+            }
+            $resource = $service->databases()->whereUuid($stackServiceUuid)->first();
+            if (is_null($resource)) {
+                abort(404);
+            }
+        } else {
             abort(404);
         }
-        $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
-        if (is_null($resource)) {
-            abort(404);
-        }
+
         $this->authorize('view', $resource);
-        $this->resource = $resource;
-        $this->server = $this->resource->destination->server;
-        $this->container = $this->resource->uuid;
-        if (str(data_get($this, 'resource.status'))->startsWith('running')) {
-            $this->containers->push($this->container);
+
+        // Store IDs for Livewire serialization
+        $this->resourceId = $resource->id;
+        $this->resourceType = get_class($resource);
+
+        // Store view-friendly properties
+        $this->resourceStatus = $resource->status ?? '';
+
+        // Handle ServiceDatabase server access differently
+        if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $server = $resource->service?->server;
+            if (! $server) {
+                abort(404, 'Server not found for this service database.');
+            }
+            $this->serverId = $server->id;
+            $this->container = $resource->name.'-'.$resource->service->uuid;
+            $this->resourceUuid = $resource->uuid; // Use ServiceDatabase's own UUID
+
+            // Determine database type for ServiceDatabase
+            $dbType = $resource->databaseType();
+            if (str_contains($dbType, 'postgres')) {
+                $this->resourceDbType = 'standalone-postgresql';
+            } elseif (str_contains($dbType, 'mysql')) {
+                $this->resourceDbType = 'standalone-mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $this->resourceDbType = 'standalone-mariadb';
+            } elseif (str_contains($dbType, 'mongo')) {
+                $this->resourceDbType = 'standalone-mongodb';
+            } else {
+                $this->resourceDbType = $dbType;
+            }
+        } else {
+            $server = $resource->destination?->server;
+            if (! $server) {
+                abort(404, 'Server not found for this database.');
+            }
+            $this->serverId = $server->id;
+            $this->container = $resource->uuid;
+            $this->resourceUuid = $resource->uuid;
+            $this->resourceDbType = $resource->type();
+        }
+
+        if (str($resource->status)->startsWith('running')) {
+            $this->containers[] = $this->container;
         }
 
         if (
-            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
+        }
+
+        // Mark unsupported ServiceDatabase types (Redis, KeyDB, etc.)
+        if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $dbType = $resource->databaseType();
+            if (str_contains($dbType, 'redis') || str_contains($dbType, 'keydb') ||
+                str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse')) {
+                $this->unsupported = true;
+            }
         }
     }
 
@@ -257,6 +375,12 @@ EOD;
             // Validate the custom location to prevent command injection
             if (! $this->validateServerPath($this->customLocation)) {
                 $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+                return;
+            }
+
+            if (! $this->server) {
+                $this->dispatch('error', 'Server not found. Please refresh the page.');
 
                 return;
             }
@@ -286,15 +410,22 @@ EOD;
 
             return;
         }
+
+        if (! $this->server) {
+            $this->dispatch('error', 'Server not found. Please refresh the page.');
+
+            return;
+        }
+
         try {
             $this->importRunning = true;
             $this->importCommands = [];
-            $backupFileName = "upload/{$this->resource->uuid}/restore";
+            $backupFileName = "upload/{$this->resourceUuid}/restore";
 
             // Check if an uploaded file exists first (takes priority over custom location)
             if (Storage::exists($backupFileName)) {
                 $path = Storage::path($backupFileName);
-                $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
+                $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resourceUuid;
                 instant_scp($path, $tmpPath, $this->server);
                 Storage::delete($backupFileName);
                 $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
@@ -305,7 +436,7 @@ EOD;
 
                     return;
                 }
-                $tmpPath = '/tmp/restore_'.$this->resource->uuid;
+                $tmpPath = '/tmp/restore_'.$this->resourceUuid;
                 $escapedCustomLocation = escapeshellarg($this->customLocation);
                 $this->importCommands[] = "docker cp {$escapedCustomLocation} {$this->container}:{$tmpPath}";
             } else {
@@ -315,7 +446,7 @@ EOD;
             }
 
             // Copy the restore command to a script file
-            $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
+            $scriptPath = "/tmp/restore_{$this->resourceUuid}.sh";
 
             $restoreCommand = $this->buildRestoreCommand($tmpPath);
 
@@ -355,9 +486,11 @@ EOD;
         try {
             $this->availableS3Storages = S3Storage::ownedByCurrentTeam(['id', 'name', 'description'])
                 ->where('is_usable', true)
-                ->get();
+                ->get()
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])
+                ->toArray();
         } catch (\Throwable $e) {
-            $this->availableS3Storages = collect();
+            $this->availableS3Storages = [];
         }
     }
 
@@ -460,6 +593,12 @@ EOD;
             return;
         }
 
+        if (! $this->server) {
+            $this->dispatch('error', 'Server not found. Please refresh the page.');
+
+            return;
+        }
+
         try {
             $this->importRunning = true;
 
@@ -493,14 +632,18 @@ EOD;
             $fullImageName = "{$helperImage}:{$latestVersion}";
 
             // Get the database destination network
-            $destinationNetwork = $this->resource->destination->network ?? 'coolify';
+            if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
+                $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
+            } else {
+                $destinationNetwork = $this->resource->destination->network ?? 'coolify';
+            }
 
             // Generate unique names for this operation
-            $containerName = "s3-restore-{$this->resource->uuid}";
+            $containerName = "s3-restore-{$this->resourceUuid}";
             $helperTmpPath = '/tmp/'.basename($cleanPath);
-            $serverTmpPath = "/tmp/s3-restore-{$this->resource->uuid}-".basename($cleanPath);
-            $containerTmpPath = "/tmp/restore_{$this->resource->uuid}-".basename($cleanPath);
-            $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
+            $serverTmpPath = "/tmp/s3-restore-{$this->resourceUuid}-".basename($cleanPath);
+            $containerTmpPath = "/tmp/restore_{$this->resourceUuid}-".basename($cleanPath);
+            $scriptPath = "/tmp/restore_{$this->resourceUuid}.sh";
 
             // Prepare all commands in sequence
             $commands = [];
@@ -575,8 +718,25 @@ EOD;
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        switch ($this->resource->getMorphClass()) {
+        $morphClass = $this->resource->getMorphClass();
+
+        // Handle ServiceDatabase by checking the database type
+        if ($morphClass === \App\Models\ServiceDatabase::class) {
+            $dbType = $this->resource->databaseType();
+            if (str_contains($dbType, 'mysql')) {
+                $morphClass = 'mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $morphClass = 'mariadb';
+            } elseif (str_contains($dbType, 'postgres')) {
+                $morphClass = 'postgresql';
+            } elseif (str_contains($dbType, 'mongo')) {
+                $morphClass = 'mongodb';
+            }
+        }
+
+        switch ($morphClass) {
             case \App\Models\StandaloneMariadb::class:
+            case 'mariadb':
                 $restoreCommand = $this->mariadbRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
@@ -585,6 +745,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMysql::class:
+            case 'mysql':
                 $restoreCommand = $this->mysqlRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
@@ -593,6 +754,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandalonePostgresql::class:
+            case 'postgresql':
                 $restoreCommand = $this->postgresqlRestoreCommand;
                 if ($this->dumpAll) {
                     $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
@@ -601,6 +763,7 @@ EOD;
                 }
                 break;
             case \App\Models\StandaloneMongodb::class:
+            case 'mongodb':
                 $restoreCommand = $this->mongodbRestoreCommand;
                 if ($this->dumpAll === false) {
                     $restoreCommand .= "{$tmpPath}";
