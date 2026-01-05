@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Redis;
 
 class CleanupRedis extends Command
 {
-    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup} {--clear-locks : Clear stale WithoutOverlapping locks}';
+    protected $signature = 'cleanup:redis {--dry-run : Show what would be deleted without actually deleting} {--skip-overlapping : Skip overlapping queue cleanup} {--clear-locks : Clear stale WithoutOverlapping locks} {--restart : Aggressive cleanup mode for system restart (marks all processing jobs as failed)}';
 
     protected $description = 'Cleanup Redis (Horizon jobs, metrics, overlapping queues, cache locks, and related data)';
 
@@ -18,18 +18,12 @@ class CleanupRedis extends Command
         $dryRun = $this->option('dry-run');
         $skipOverlapping = $this->option('skip-overlapping');
 
-        if ($dryRun) {
-            $this->info('DRY RUN MODE - No data will be deleted');
-        }
-
         $deletedCount = 0;
         $totalKeys = 0;
 
         // Get all keys with the horizon prefix
         $keys = $redis->keys('*');
         $totalKeys = count($keys);
-
-        $this->info("Scanning {$totalKeys} keys for cleanup...");
 
         foreach ($keys as $key) {
             $keyWithoutPrefix = str_replace($prefix, '', $key);
@@ -51,22 +45,27 @@ class CleanupRedis extends Command
 
         // Clean up overlapping queues if not skipped
         if (! $skipOverlapping) {
-            $this->info('Cleaning up overlapping queues...');
             $overlappingCleaned = $this->cleanupOverlappingQueues($redis, $prefix, $dryRun);
             $deletedCount += $overlappingCleaned;
         }
 
         // Clean up stale cache locks (WithoutOverlapping middleware)
         if ($this->option('clear-locks')) {
-            $this->info('Cleaning up stale cache locks...');
             $locksCleaned = $this->cleanupCacheLocks($dryRun);
             $deletedCount += $locksCleaned;
         }
 
+        // Clean up stuck jobs (restart mode = aggressive, runtime mode = conservative)
+        $isRestart = $this->option('restart');
+        if ($isRestart || $this->option('clear-locks')) {
+            $jobsCleaned = $this->cleanupStuckJobs($redis, $prefix, $dryRun, $isRestart);
+            $deletedCount += $jobsCleaned;
+        }
+
         if ($dryRun) {
-            $this->info("DRY RUN: Would delete {$deletedCount} out of {$totalKeys} keys");
+            $this->info("Redis cleanup: would delete {$deletedCount} items");
         } else {
-            $this->info("Deleted {$deletedCount} out of {$totalKeys} keys");
+            $this->info("Redis cleanup: deleted {$deletedCount} items");
         }
     }
 
@@ -77,11 +76,8 @@ class CleanupRedis extends Command
 
         // Delete completed and failed jobs
         if (in_array($status, ['completed', 'failed'])) {
-            if ($dryRun) {
-                $this->line("Would delete job: {$keyWithoutPrefix} (status: {$status})");
-            } else {
+            if (! $dryRun) {
                 $redis->command('del', [$keyWithoutPrefix]);
-                $this->line("Deleted job: {$keyWithoutPrefix} (status: {$status})");
             }
 
             return true;
@@ -107,11 +103,8 @@ class CleanupRedis extends Command
 
         foreach ($patterns as $pattern => $description) {
             if (str_contains($keyWithoutPrefix, $pattern)) {
-                if ($dryRun) {
-                    $this->line("Would delete {$description}: {$keyWithoutPrefix}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$keyWithoutPrefix]);
-                    $this->line("Deleted {$description}: {$keyWithoutPrefix}");
                 }
 
                 return true;
@@ -124,11 +117,8 @@ class CleanupRedis extends Command
             $weekAgo = now()->subDays(7)->timestamp;
 
             if ($timestamp < $weekAgo) {
-                if ($dryRun) {
-                    $this->line("Would delete old timestamped data: {$keyWithoutPrefix}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$keyWithoutPrefix]);
-                    $this->line("Deleted old timestamped data: {$keyWithoutPrefix}");
                 }
 
                 return true;
@@ -151,8 +141,6 @@ class CleanupRedis extends Command
                 $queueKeys[] = $keyWithoutPrefix;
             }
         }
-
-        $this->info('Found '.count($queueKeys).' queue-related keys');
 
         // Group queues by name pattern to find duplicates
         $queueGroups = [];
@@ -185,7 +173,6 @@ class CleanupRedis extends Command
     private function deduplicateQueueGroup($redis, $baseName, $keys, $dryRun)
     {
         $cleanedCount = 0;
-        $this->line("Processing queue group: {$baseName} (".count($keys).' keys)');
 
         // Sort keys to keep the most recent one
         usort($keys, function ($a, $b) {
@@ -236,11 +223,8 @@ class CleanupRedis extends Command
             }
 
             if ($shouldDelete) {
-                if ($dryRun) {
-                    $this->line("  Would delete empty queue: {$redundantKey}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$redundantKey]);
-                    $this->line("  Deleted empty queue: {$redundantKey}");
                 }
                 $cleanedCount++;
             }
@@ -263,15 +247,12 @@ class CleanupRedis extends Command
                 if (count($uniqueItems) < count($items)) {
                     $duplicates = count($items) - count($uniqueItems);
 
-                    if ($dryRun) {
-                        $this->line("  Would remove {$duplicates} duplicate jobs from queue: {$queueKey}");
-                    } else {
+                    if (! $dryRun) {
                         // Rebuild the list with unique items
                         $redis->command('del', [$queueKey]);
                         foreach (array_reverse($uniqueItems) as $item) {
                             $redis->command('lpush', [$queueKey, $item]);
                         }
-                        $this->line("  Removed {$duplicates} duplicate jobs from queue: {$queueKey}");
                     }
                     $cleanedCount += $duplicates;
                 }
@@ -299,12 +280,8 @@ class CleanupRedis extends Command
             }
         }
         if (empty($lockKeys)) {
-            $this->info('  No cache locks found.');
-
             return 0;
         }
-
-        $this->info('  Found '.count($lockKeys).' cache lock(s)');
 
         foreach ($lockKeys as $lockKey) {
             // Check TTL to identify stale locks
@@ -318,16 +295,129 @@ class CleanupRedis extends Command
                     $this->warn("  Would delete STALE lock (no expiration): {$lockKey}");
                 } else {
                     $redis->del($lockKey);
-                    $this->info("  ✓ Deleted STALE lock: {$lockKey}");
                 }
                 $cleanedCount++;
-            } elseif ($ttl > 0) {
-                $this->line("  Skipping active lock (expires in {$ttl}s): {$lockKey}");
             }
         }
 
-        if ($cleanedCount === 0) {
-            $this->info('  No stale locks found (all locks have expiration set)');
+        return $cleanedCount;
+    }
+
+    /**
+     * Clean up stuck jobs based on mode (restart vs runtime).
+     *
+     * @param  mixed  $redis  Redis connection
+     * @param  string  $prefix  Horizon prefix
+     * @param  bool  $dryRun  Dry run mode
+     * @param  bool  $isRestart  Restart mode (aggressive) vs runtime mode (conservative)
+     * @return int Number of jobs cleaned
+     */
+    private function cleanupStuckJobs($redis, string $prefix, bool $dryRun, bool $isRestart): int
+    {
+        $cleanedCount = 0;
+        $now = time();
+
+        // Get all keys with the horizon prefix
+        $cursor = 0;
+        $keys = [];
+        do {
+            $result = $redis->scan($cursor, ['match' => '*', 'count' => 100]);
+
+            // Guard against scan() returning false
+            if ($result === false) {
+                $this->error('Redis scan failed, stopping key retrieval');
+                break;
+            }
+
+            $cursor = $result[0];
+            $keys = array_merge($keys, $result[1]);
+        } while ($cursor !== 0);
+
+        foreach ($keys as $key) {
+            $keyWithoutPrefix = str_replace($prefix, '', $key);
+            $type = $redis->command('type', [$keyWithoutPrefix]);
+
+            // Only process hash-type keys (individual jobs)
+            if ($type !== 5) {
+                continue;
+            }
+
+            $data = $redis->command('hgetall', [$keyWithoutPrefix]);
+            $status = data_get($data, 'status');
+            $payload = data_get($data, 'payload');
+
+            // Only process jobs in "processing" or "reserved" state
+            if (! in_array($status, ['processing', 'reserved'])) {
+                continue;
+            }
+
+            // Parse job payload to get job class and started time
+            $payloadData = json_decode($payload, true);
+
+            // Check for JSON decode errors
+            if ($payloadData === null || json_last_error() !== JSON_ERROR_NONE) {
+                $errorMsg = json_last_error_msg();
+                $truncatedPayload = is_string($payload) ? substr($payload, 0, 200) : 'non-string payload';
+                $this->error("Failed to decode job payload for {$keyWithoutPrefix}: {$errorMsg}. Payload: {$truncatedPayload}");
+
+                continue;
+            }
+
+            $jobClass = data_get($payloadData, 'displayName', 'Unknown');
+
+            // Prefer reserved_at (when job started processing), fallback to created_at
+            $reservedAt = (int) data_get($data, 'reserved_at', 0);
+            $createdAt = (int) data_get($data, 'created_at', 0);
+            $startTime = $reservedAt ?: $createdAt;
+
+            // If we can't determine when the job started, skip it
+            if (! $startTime) {
+                continue;
+            }
+
+            // Calculate how long the job has been processing
+            $processingTime = $now - $startTime;
+
+            $shouldFail = false;
+            $reason = '';
+
+            if ($isRestart) {
+                // RESTART MODE: Mark ALL processing/reserved jobs as failed
+                // Safe because all workers are dead on restart
+                $shouldFail = true;
+                $reason = 'System restart - all workers terminated';
+            } else {
+                // RUNTIME MODE: Only mark truly stuck jobs as failed
+                // Be conservative to avoid killing legitimate long-running jobs
+
+                // Skip ApplicationDeploymentJob entirely (has dynamic_timeout, can run 2+ hours)
+                if (str_contains($jobClass, 'ApplicationDeploymentJob')) {
+                    continue;
+                }
+
+                // Skip DatabaseBackupJob (large backups can take hours)
+                if (str_contains($jobClass, 'DatabaseBackupJob')) {
+                    continue;
+                }
+
+                // For other jobs, only fail if processing > 12 hours
+                if ($processingTime > 43200) { // 12 hours
+                    $shouldFail = true;
+                    $reason = 'Processing for more than 12 hours';
+                }
+            }
+
+            if ($shouldFail) {
+                if ($dryRun) {
+                    $this->warn("  Would mark as FAILED: {$jobClass} (processing for ".round($processingTime / 60, 1)." min) - {$reason}");
+                } else {
+                    // Mark job as failed
+                    $redis->command('hset', [$keyWithoutPrefix, 'status', 'failed']);
+                    $redis->command('hset', [$keyWithoutPrefix, 'failed_at', $now]);
+                    $redis->command('hset', [$keyWithoutPrefix, 'exception', "Job cleaned up by cleanup:redis - {$reason}"]);
+                }
+                $cleanedCount++;
+            }
         }
 
         return $cleanedCount;

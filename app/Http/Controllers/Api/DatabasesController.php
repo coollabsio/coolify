@@ -117,7 +117,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -182,7 +181,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -245,7 +243,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -614,7 +611,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -832,7 +828,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -842,7 +837,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1619,6 +1613,18 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
+        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+            if (! $destination) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                    ],
+                ], 422);
+            }
+        }
+
         if ($request->has('public_port') && $request->is_public) {
             if (isPublicPortAlreadyUsed($server, $request->public_port)) {
                 return response()->json(['message' => 'Public port already used by another database.'], 400);
@@ -2092,7 +2098,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
@@ -2181,7 +2186,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2298,14 +2303,14 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'execution_uuid',
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup execution to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2418,7 +2423,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -2515,7 +2520,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2596,7 +2600,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2677,7 +2680,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],

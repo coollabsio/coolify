@@ -10,9 +10,12 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
@@ -73,7 +76,7 @@ class Init extends Command
         $this->cleanupUnusedNetworkFromCoolifyProxy();
 
         try {
-            $this->call('cleanup:redis', ['--clear-locks' => true]);
+            $this->call('cleanup:redis', ['--restart' => true, '--clear-locks' => true]);
         } catch (\Throwable $e) {
             echo "Error in cleanup:redis command: {$e->getMessage()}\n";
         }
@@ -86,6 +89,7 @@ class Init extends Command
             $this->call('cleanup:stucked-resources');
         } catch (\Throwable $e) {
             echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
             $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
@@ -100,6 +104,34 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedTaskCount = ScheduledTaskExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedTaskCount > 0) {
+                echo "Marked {$updatedTaskCount} stuck scheduled task executions as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup stuck scheduled task executions: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedBackupCount = ScheduledDatabaseBackupExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedBackupCount > 0) {
+                echo "Marked {$updatedBackupCount} stuck database backup executions as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup stuck database backup executions: {$e->getMessage()}\n";
         }
 
         try {

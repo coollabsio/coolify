@@ -91,8 +91,6 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'mariadbRootPassword.required' => 'The Root Password field is required.',
                 'mariadbUser.required' => 'The MariaDB User field is required.',
                 'mariadbPassword.required' => 'The MariaDB Password field is required.',

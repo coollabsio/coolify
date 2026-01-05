@@ -16,6 +16,6 @@ class EmptyProject extends Component
             'uuid' => (string) new Cuid2,
         ]);
 
-        return redirect()->route('project.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $project->environments->first()->uuid]);
+        return redirectRoute($this, 'project.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $project->environments->first()->uuid]);
     }
 }
