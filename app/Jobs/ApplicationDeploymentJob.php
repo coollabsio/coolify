@@ -175,6 +175,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
+    private ?string $github_access_token = null;
+
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -211,6 +213,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $source = data_get($this->application, 'source');
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
+        }
+
+        // Pre-generate GitHub installation token once to avoid multiple API calls during deployment
+        if ($this->source instanceof GithubApp && ! $this->source->is_public) {
+            try {
+                $this->github_access_token = generateGithubInstallationToken($this->source);
+            } catch (\Exception $e) {
+                // Token generation will be retried later if needed
+                $this->github_access_token = null;
+            }
         }
         $this->server = Server::find($this->application_deployment_queue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
@@ -2065,7 +2077,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function check_git_if_build_needed()
     {
         if (is_object($this->source) && $this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
-            $repository = githubApi($this->source, "repos/{$this->customRepository}");
+            $repository = githubApi($this->source, "repos/{$this->customRepository}", token: $this->github_access_token);
             $data = data_get($repository, 'data');
             $repository_project_id = data_get($data, 'id');
             if (isset($repository_project_id)) {
@@ -2190,7 +2202,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             deployment_uuid: $this->deployment_uuid,
             pull_request_id: $this->pull_request_id,
             git_type: $this->git_type,
-            commit: $this->commit
+            commit: $this->commit,
+            github_access_token: $this->github_access_token
         );
 
         return $commands;

@@ -59,6 +59,10 @@ return [
         'minimum_required_version' => '24.0',
     ],
 
+    'github' => [
+        'api_timeout' => env('GITHUB_API_TIMEOUT', 30),
+    ],
+
     'ssh' => [
         'mux_enabled' => env('MUX_ENABLED', env('SSH_MUX_ENABLED', true)),
         'mux_persist_time' => env('SSH_MUX_PERSIST_TIME', 3600),

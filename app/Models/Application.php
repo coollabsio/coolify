@@ -1143,7 +1143,7 @@ class Application extends BaseModel
         }
     }
 
-    public function generateGitLsRemoteCommands(string $deployment_uuid, bool $exec_in_docker = true)
+    public function generateGitLsRemoteCommands(string $deployment_uuid, bool $exec_in_docker = true, ?string $github_access_token = null)
     {
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
@@ -1163,7 +1163,8 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $base_command = "{$base_command} {$escapedRepoUrl}";
                 } else {
-                    $github_access_token = generateGithubInstallationToken($this->source);
+                    // Use provided token or generate a new one
+                    $github_access_token = $github_access_token ?? generateGithubInstallationToken($this->source);
 
                     if ($exec_in_docker) {
                         $repoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1250,7 +1251,7 @@ class Application extends BaseModel
         }
     }
 
-    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null, ?string $github_access_token = null)
     {
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
@@ -1301,7 +1302,8 @@ class Application extends BaseModel
                         $commands->push($git_clone_command);
                     }
                 } else {
-                    $github_access_token = generateGithubInstallationToken($this->source);
+                    // Use provided token or generate a new one
+                    $github_access_token = $github_access_token ?? generateGithubInstallationToken($this->source);
                     if ($exec_in_docker) {
                         $repoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
                         $escapedRepoUrl = escapeshellarg($repoUrl);

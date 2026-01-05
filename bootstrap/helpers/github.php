@@ -14,7 +14,19 @@ use Lcobucci\JWT\Token\Builder;
 
 function generateGithubToken(GithubApp $source, string $type)
 {
-    $response = Http::get("{$source->api_url}/zen");
+    $timeout = config('constants.github.api_timeout', 30);
+
+    $response = Http::timeout($timeout)
+        ->retry(3, 200, throw: false)
+        ->get("{$source->api_url}/zen");
+
+    if (! $response->successful()) {
+        throw new \Exception(
+            'Failed to connect to GitHub API to sync time. '.
+            'Please check your network connection and try again.'
+        );
+    }
+
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
@@ -44,11 +56,13 @@ function generateGithubToken(GithubApp $source, string $type)
 
     return match ($type) {
         'jwt' => $jwt,
-        'installation' => (function () use ($source, $jwt) {
+        'installation' => (function () use ($source, $jwt, $timeout) {
             $response = Http::withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->timeout($timeout)
+                ->retry(3, 200, throw: false)
+                ->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
                 $error = data_get($response->json(), 'message', 'no error message found');
@@ -74,7 +88,7 @@ function generateGithubJwt(GithubApp $source)
     return generateGithubToken($source, 'jwt');
 }
 
-function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
+function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true, ?string $token = null)
 {
     if (is_null($source)) {
         throw new \Exception('Source is required for API calls');
@@ -87,7 +101,8 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     if ($source->is_public) {
         $response = Http::GitHub($source->api_url)->$method($endpoint);
     } else {
-        $token = generateGithubInstallationToken($source);
+        // Use provided token or generate a new one
+        $token = $token ?? generateGithubInstallationToken($source);
         if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
             $response = Http::GitHub($source->api_url, $token)->$method($endpoint, $data);
         } else {
