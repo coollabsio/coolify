@@ -30,7 +30,7 @@ class CancelSubscription
         $subscriptions = collect();
 
         // Get all teams the user belongs to
-        $teams = $this->user->teams;
+        $teams = $this->user->teams()->get();
 
         foreach ($teams as $team) {
             // Only include subscriptions from teams where user is owner
@@ -47,6 +47,64 @@ class CancelSubscription
         }
 
         return $subscriptions;
+    }
+
+    /**
+     * Verify subscriptions exist and are active in Stripe API
+     *
+     * @return array ['verified' => Collection, 'not_found' => Collection, 'errors' => array]
+     */
+    public function verifySubscriptionsInStripe(): array
+    {
+        if (! isCloud()) {
+            return [
+                'verified' => collect(),
+                'not_found' => collect(),
+                'errors' => [],
+            ];
+        }
+
+        $stripe = new StripeClient(config('subscription.stripe_api_key'));
+        $subscriptions = $this->getSubscriptionsPreview();
+
+        $verified = collect();
+        $notFound = collect();
+        $errors = [];
+
+        foreach ($subscriptions as $subscription) {
+            try {
+                $stripeSubscription = $stripe->subscriptions->retrieve($subscription->stripe_subscription_id);
+
+                // Check if subscription is actually active in Stripe
+                if (in_array($stripeSubscription->status, ['active', 'trialing', 'past_due'])) {
+                    $verified->push([
+                        'subscription' => $subscription,
+                        'stripe_status' => $stripeSubscription->status,
+                        'current_period_end' => $stripeSubscription->current_period_end,
+                    ]);
+                } else {
+                    $notFound->push([
+                        'subscription' => $subscription,
+                        'reason' => "Status in Stripe: {$stripeSubscription->status}",
+                    ]);
+                }
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                // Subscription doesn't exist in Stripe
+                $notFound->push([
+                    'subscription' => $subscription,
+                    'reason' => 'Not found in Stripe',
+                ]);
+            } catch (\Exception $e) {
+                $errors[] = "Error verifying subscription {$subscription->stripe_subscription_id}: ".$e->getMessage();
+                \Log::error("Error verifying subscription {$subscription->stripe_subscription_id}: ".$e->getMessage());
+            }
+        }
+
+        return [
+            'verified' => $verified,
+            'not_found' => $notFound,
+            'errors' => $errors,
+        ];
     }
 
     public function execute(): array

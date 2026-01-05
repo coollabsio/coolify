@@ -54,6 +54,11 @@ class Heading extends Component
         }
     }
 
+    public function manualCheckStatus()
+    {
+        $this->checkStatus();
+    }
+
     public function serviceChecked()
     {
         try {

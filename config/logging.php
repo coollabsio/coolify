@@ -129,8 +129,8 @@ return [
         'scheduled-errors' => [
             'driver' => 'daily',
             'path' => storage_path('logs/scheduled-errors.log'),
-            'level' => 'debug',
-            'days' => 7,
+            'level' => 'warning',
+            'days' => 14,
         ],
     ],
 

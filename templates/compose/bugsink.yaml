@@ -35,6 +35,7 @@ services:
       - SERVICE_URL_BUGSINK_8000
       - BASE_URL=$SERVICE_URL_BUGSINK_8000
       - DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}
+      - BEHIND_HTTPS_PROXY=True
     depends_on:
       mysql:
         condition: service_healthy

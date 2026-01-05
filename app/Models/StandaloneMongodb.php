@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,11 +11,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMongodb extends BaseModel
 {
-    use HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
     protected $guarded = [];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    protected $casts = [
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
+    ];
 
     protected static function booted()
     {
@@ -43,6 +51,25 @@ class StandaloneMongodb extends BaseModel
             if ($database->isDirty('status')) {
                 $database->forceFill(['last_online_at' => now()]);
             }
+        });
+    }
+
+    /**
+     * Get query builder for MongoDB databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
+    public static function ownedByCurrentTeam()
+    {
+        return StandaloneMongodb::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all MongoDB databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneMongodb::ownedByCurrentTeam()->get();
         });
     }
 
@@ -263,9 +290,13 @@ class StandaloneMongodb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
@@ -309,50 +340,6 @@ class StandaloneMongodb extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['percent']];
-        });
-
-        return $parsedCollection->toArray();
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['used']];
-        });
-
-        return $parsedCollection->toArray();
     }
 
     public function isBackupSolutionAvailable()

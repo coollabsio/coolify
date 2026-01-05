@@ -25,6 +25,7 @@ class MonacoEditor extends Component
         public bool $readonly,
         public bool $allowTab,
         public bool $spellcheck,
+        public bool $autofocus,
         public ?string $helper,
         public bool $realtimeValidation,
         public bool $allowToPeak,

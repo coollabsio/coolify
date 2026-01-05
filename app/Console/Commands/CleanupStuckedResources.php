@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -57,6 +58,15 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+        }
+        try {
+            $servers = Server::onlyTrashed()->get();
+            foreach ($servers as $server) {
+                echo "Force deleting stuck server: {$server->name}\n";
+                $server->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
         }
         try {
             $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
@@ -212,9 +222,14 @@ class CleanupStuckedResources extends Command
         try {
             $scheduled_backups = ScheduledDatabaseBackup::all();
             foreach ($scheduled_backups as $scheduled_backup) {
-                if (! $scheduled_backup->server()) {
-                    echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
-                    $scheduled_backup->delete();
+                try {
+                    $server = $scheduled_backup->server();
+                    if (! $server) {
+                        echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                        $scheduled_backup->delete();
+                    }
+                } catch (\Throwable $e) {
+                    echo "Error checking server for scheduledbackup {$scheduled_backup->id}: {$e->getMessage()}\n";
                 }
             }
         } catch (\Throwable $e) {
@@ -406,7 +421,7 @@ class CleanupStuckedResources extends Command
             foreach ($serviceApplications as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceApplication without service: '.$service->name.'\n';
-                    DeleteResourceJob::dispatch($service);
+                    $service->forceDelete();
 
                     continue;
                 }
@@ -419,13 +434,26 @@ class CleanupStuckedResources extends Command
             foreach ($serviceDatabases as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceDatabase without service: '.$service->name.'\n';
-                    DeleteResourceJob::dispatch($service);
+                    $service->forceDelete();
 
                     continue;
                 }
             }
         } catch (\Throwable $e) {
             echo "Error in ServiceDatabases: {$e->getMessage()}\n";
+        }
+
+        try {
+            $orphanedCerts = SslCertificate::whereNotIn('server_id', function ($query) {
+                $query->select('id')->from('servers');
+            })->get();
+
+            foreach ($orphanedCerts as $cert) {
+                echo "Deleting orphaned SSL certificate: {$cert->id} (server_id: {$cert->server_id})\n";
+                $cert->delete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning orphaned SSL certificates: {$e->getMessage()}\n";
         }
     }
 }

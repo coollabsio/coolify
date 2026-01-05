@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
+use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
+use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
@@ -13,6 +15,8 @@ use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -30,6 +34,51 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * @property array{
+ *     current: string,
+ *     latest: string,
+ *     type: 'patch_update'|'minor_upgrade',
+ *     checked_at: string,
+ *     newer_branch_target?: string,
+ *     newer_branch_latest?: string,
+ *     upgrade_target?: string
+ * }|null $traefik_outdated_info Traefik version tracking information.
+ *
+ * This JSON column stores information about outdated Traefik proxy versions on this server.
+ * The structure varies depending on the type of update available:
+ *
+ * **For patch updates** (e.g., 3.5.0 → 3.5.2):
+ * ```php
+ * [
+ *     'current' => '3.5.0',              // Current version (without 'v' prefix)
+ *     'latest' => '3.5.2',               // Latest patch version available
+ *     'type' => 'patch_update',          // Update type identifier
+ *     'checked_at' => '2025-11-14T10:00:00Z',  // ISO8601 timestamp
+ *     'newer_branch_target' => 'v3.6',   // (Optional) Available major/minor version
+ *     'newer_branch_latest' => '3.6.2'   // (Optional) Latest version in that branch
+ * ]
+ * ```
+ *
+ * **For minor/major upgrades** (e.g., 3.5.6 → 3.6.2):
+ * ```php
+ * [
+ *     'current' => '3.5.6',              // Current version
+ *     'latest' => '3.6.2',               // Latest version in target branch
+ *     'type' => 'minor_upgrade',         // Update type identifier
+ *     'upgrade_target' => 'v3.6',        // Target branch (with 'v' prefix)
+ *     'checked_at' => '2025-11-14T10:00:00Z'  // ISO8601 timestamp
+ * ]
+ * ```
+ *
+ * **Null value**: Set to null when:
+ * - Server is fully up-to-date with the latest version
+ * - Traefik image uses the 'latest' tag (no fixed version tracking)
+ * - No Traefik version detected on the server
+ *
+ * @see \App\Jobs\CheckTraefikVersionForServerJob Where this data is populated
+ * @see \App\Livewire\Server\Proxy Where this data is read and displayed
+ */
 #[OA\Schema(
     description: 'Server model',
     type: 'object',
@@ -55,7 +104,7 @@ use Visus\Cuid2\Cuid2;
 
 class Server extends BaseModel
 {
-    use HasFactory, SchemalessAttributesTrait, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -135,11 +184,13 @@ class Server extends BaseModel
                 $destination->delete();
             });
             $server->settings()->delete();
+            $server->sslCertificates()->delete();
         });
     }
 
     protected $casts = [
         'proxy' => SchemalessAttributes::class,
+        'traefik_outdated_info' => 'array',
         'logdrain_axiom_api_key' => 'encrypted',
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
@@ -160,7 +211,13 @@ class Server extends BaseModel
         'user',
         'description',
         'private_key_id',
+        'cloud_provider_token_id',
         'team_id',
+        'hetzner_server_id',
+        'hetzner_server_status',
+        'is_validating',
+        'detected_traefik_version',
+        'traefik_outdated_info',
     ];
 
     protected $guarded = [];
@@ -186,6 +243,10 @@ class Server extends BaseModel
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
     }
 
+    /**
+     * Get query builder for servers owned by current team.
+     * If you need all servers without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $teamId = currentTeam()->id;
@@ -194,18 +255,19 @@ class Server extends BaseModel
         return Server::whereTeamId($teamId)->with('settings', 'swarmDockers', 'standaloneDockers')->select($selectArray->all())->orderBy('name');
     }
 
+    /**
+     * Get all servers owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Server::ownedByCurrentTeam()->get();
+        });
+    }
+
     public static function isUsable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
-    }
-
-    public static function destinationsByServer(string $server_id)
-    {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
-        $standaloneDocker = collect($server->standaloneDockers->all());
-        $swarmDocker = collect($server->swarmDockers->all());
-
-        return $standaloneDocker->concat($swarmDocker);
     }
 
     public function settings()
@@ -516,6 +578,11 @@ $schema://$host {
         return $this->proxy->modelScope();
     }
 
+    public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
+    {
+        return $query->where('proxy->type', $proxyType);
+    }
+
     public function isLocalhost()
     {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
@@ -590,51 +657,6 @@ $schema://$host {
     public function checkSentinel()
     {
         CheckAndStartSentinelJob::dispatch($this);
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            if (str($cpu)->contains('error')) {
-                $error = json_decode($cpu, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $cpu = json_decode($cpu, true);
-
-            return collect($cpu)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            });
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            if (str($memory)->contains('error')) {
-                $error = json_decode($memory, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $memory = json_decode($memory, true);
-            $parsedCollection = collect($memory)->map(function ($metric) {
-                $usedPercent = $metric['usedPercent'] ?? 0.0;
-
-                return [(int) $metric['time'], (float) $usedPercent];
-            });
-
-            return $parsedCollection->toArray();
-        }
     }
 
     public function getDiskUsage(): ?string
@@ -756,34 +778,67 @@ $schema://$host {
 
     public function databases()
     {
-        return $this->destinations()->map(function ($standaloneDocker) {
-            $postgresqls = data_get($standaloneDocker, 'postgresqls', collect([]));
-            $redis = data_get($standaloneDocker, 'redis', collect([]));
-            $mongodbs = data_get($standaloneDocker, 'mongodbs', collect([]));
-            $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
-            $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
-            $keydbs = data_get($standaloneDocker, 'keydbs', collect([]));
-            $dragonflies = data_get($standaloneDocker, 'dragonflies', collect([]));
-            $clickhouses = data_get($standaloneDocker, 'clickhouses', collect([]));
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
 
-            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
-        })->flatten()->filter(function ($item) {
-            return data_get($item, 'name') !== 'coolify-db';
-        });
+        $destinationCondition = function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        };
+
+        // Query each database type with the destination condition
+        $postgresqls = StandalonePostgresql::where($destinationCondition)->get();
+        $redis = StandaloneRedis::where($destinationCondition)->get();
+        $mongodbs = StandaloneMongodb::where($destinationCondition)->get();
+        $mysqls = StandaloneMysql::where($destinationCondition)->get();
+        $mariadbs = StandaloneMariadb::where($destinationCondition)->get();
+        $keydbs = StandaloneKeydb::where($destinationCondition)->get();
+        $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
+        $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+
+        return $postgresqls
+            ->concat($redis)
+            ->concat($mongodbs)
+            ->concat($mysqls)
+            ->concat($mariadbs)
+            ->concat($keydbs)
+            ->concat($dragonflies)
+            ->concat($clickhouses)
+            ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
     }
 
     public function applications()
     {
-        $applications = $this->destinations()->map(function ($standaloneDocker) {
-            return $standaloneDocker->applications;
-        })->flatten();
-        $additionalApplicationIds = DB::table('additional_destinations')->where('server_id', $this->id)->get('application_id');
-        $additionalApplicationIds = collect($additionalApplicationIds)->map(function ($item) {
-            return $item->application_id;
-        });
-        Application::whereIn('id', $additionalApplicationIds)->get()->each(function ($application) use ($applications) {
-            $applications->push($application);
-        });
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
+
+        // Query all applications in a single query using polymorphic conditions
+        $applications = Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        })->get();
+
+        // Get additional server applications
+        $additionalApplicationIds = DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->pluck('application_id');
+
+        if ($additionalApplicationIds->isNotEmpty()) {
+            $additionalApps = Application::whereIn('id', $additionalApplicationIds)->get();
+            $applications = $applications->concat($additionalApps);
+        }
 
         return $applications;
     }
@@ -886,6 +941,16 @@ $schema://$host {
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function cloudProviderToken()
+    {
+        return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function sslCertificates()
+    {
+        return $this->hasMany(SslCertificate::class);
     }
 
     public function muxFilename()
@@ -1082,7 +1147,6 @@ $schema://$host {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        ray('validateConnection', $this->id);
         $this->disableSshMux();
 
         if ($this->skipServer()) {
@@ -1114,6 +1178,21 @@ $schema://$host {
     public function installDocker()
     {
         return InstallDocker::run($this);
+    }
+
+    /**
+     * Validate that required commands are available on the server.
+     *
+     * @return array{success: bool, missing: array<string>, found: array<string>}
+     */
+    public function validatePrerequisites(): array
+    {
+        return ValidatePrerequisites::run($this);
+    }
+
+    public function installPrerequisites()
+    {
+        return InstallPrerequisites::run($this);
     }
 
     public function validateDockerEngine($throwError = false)
@@ -1327,7 +1406,7 @@ $schema://$host {
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;

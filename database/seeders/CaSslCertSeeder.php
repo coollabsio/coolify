@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use Illuminate\Database\Seeder;
 
 class CaSslCertSeeder extends Seeder
@@ -13,7 +12,7 @@ class CaSslCertSeeder extends Seeder
     {
         Server::chunk(200, function ($servers) {
             foreach ($servers as $server) {
-                $existingCaCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+                $existingCaCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
 
                 if (! $existingCaCert) {
                     $caCert = SslHelper::generateSslCertificate(
