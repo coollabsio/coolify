@@ -1170,6 +1170,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Upgrade docker registry template (#7034)
 - *(service)* Add esphome template (#6532)
 - *(service)* Add hatchet template (#6711)
+- *(service)* Improve sftpgo
 
 ### 🐛 Bug Fixes
 
@@ -5588,6 +5589,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Replace brittle line number references with maintainable method descriptions
 - Update application architecture and database patterns for request-level caching best practices
+- Update changelog
 
 ### ⚡ Performance
 
