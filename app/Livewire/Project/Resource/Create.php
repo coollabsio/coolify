@@ -35,6 +35,13 @@ class Create extends Component
 
             if (in_array($type, DATABASE_TYPES)) {
                 if ($type->value() === 'postgresql') {
+                    // PostgreSQL requires database_image to be explicitly set
+                    // If not provided, fall through to Select component for version selection
+                    if (! $database_image) {
+                        $this->type = $type->value();
+
+                        return;
+                    }
                     $database = create_standalone_postgresql(
                         environmentId: $environment->id,
                         destinationUuid: $destination_uuid,
@@ -81,7 +88,7 @@ class Create extends Component
                         'destination_id' => $destination->id,
                         'destination_type' => $destination->getMorphClass(),
                     ];
-                    if ($oneClickServiceName === 'cloudflared') {
+                    if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
                     $service = Service::create($service_payload);
@@ -97,13 +104,15 @@ class Create extends Component
                                     'value' => $value,
                                     'resourceable_id' => $service->id,
                                     'resourceable_type' => $service->getMorphClass(),
-                                    'is_build_time' => false,
                                     'is_preview' => false,
                                 ]);
                             }
                         });
                     }
                     $service->parse(isNew: true);
+
+                    // Apply service-specific application prerequisites
+                    applyServiceApplicationPrerequisites($service);
 
                     return redirect()->route('project.service.configuration', [
                         'service_uuid' => $service->uuid,

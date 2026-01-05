@@ -129,7 +129,6 @@ class ConfigurationGenerator
             $variables->push([
                 'key' => $env->key,
                 'value' => $env->value,
-                'is_build_time' => $env->is_build_time,
                 'is_preview' => $env->is_preview,
                 'is_multiline' => $env->is_multiline,
             ]);
@@ -145,7 +144,6 @@ class ConfigurationGenerator
             $variables->push([
                 'key' => $env->key,
                 'value' => $env->value,
-                'is_build_time' => $env->is_build_time,
                 'is_preview' => $env->is_preview,
                 'is_multiline' => $env->is_multiline,
             ]);

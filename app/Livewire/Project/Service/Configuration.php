@@ -33,6 +33,8 @@ class Configuration extends Component
 
         return [
             "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
+            'refreshServices' => 'refreshServices',
+            'refresh' => 'refreshServices',
         ];
     }
 

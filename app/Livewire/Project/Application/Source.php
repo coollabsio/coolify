@@ -47,6 +47,21 @@ class Source extends Component
         }
     }
 
+    public function updatedGitRepository()
+    {
+        $this->gitRepository = trim($this->gitRepository);
+    }
+
+    public function updatedGitBranch()
+    {
+        $this->gitBranch = trim($this->gitBranch);
+    }
+
+    public function updatedGitCommitSha()
+    {
+        $this->gitCommitSha = trim($this->gitCommitSha);
+    }
+
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
@@ -57,6 +72,9 @@ class Source extends Component
                 'git_commit_sha' => $this->gitCommitSha,
                 'private_key_id' => $this->privateKeyId,
             ]);
+            // Refresh to get the trimmed values from the model
+            $this->application->refresh();
+            $this->syncData(false);
         } else {
             $this->gitRepository = $this->application->git_repository;
             $this->gitBranch = $this->application->git_branch;

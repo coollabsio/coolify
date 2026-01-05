@@ -15,16 +15,15 @@
                 </div>
                 @if ($server->definedResources()->count() > 0)
                     <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
-                    <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                        shortConfirmationLabel="Server Name" />
-                @else
-                    <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                        shortConfirmationLabel="Server Name" />
                 @endif
+
+                <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete"
+                    :actions="['This server will be permanently deleted from Coolify.']"
+                    :checkboxes="$checkboxes"
+                    confirmationText="{{ $server->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
+                    shortConfirmationLabel="Server Name" />
             @endif
         </div>
     </div>

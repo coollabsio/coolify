@@ -1,0 +1,17 @@
+# documentation: https://docs.digpangolin.com/manage/sites/install-site
+# slogan: Pangolin tunnels your services to the internet so you can access anything from anywhere.
+# tags: wireguard, reverse-proxy, zero-trust-network-access, open source
+# logo: svgs/pangolin-logo.png
+
+services:
+  newt:
+    image: fosrl/newt:latest
+    environment:
+      - PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-https://pangolin.domain.tld}
+      - NEWT_ID=${NEWT_ID:?}
+      - NEWT_SECRET=${NEWT_SECRET:?}
+    healthcheck:
+      test: ["CMD", "newt", "--version"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

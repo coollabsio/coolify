@@ -6,7 +6,7 @@
                 <div class="subtitle">{{ $storage->name }}</div>
                 <div class="flex items-center gap-2 pb-4">
                     <div>Current Status:</div>
-                    @if ($storage->is_usable)
+                    @if ($isUsable)
                         <span
                             class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded dark:text-green-100 dark:bg-green-800">
                             Usable
@@ -32,19 +32,19 @@
             @endcan
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$storage" label="Name" id="storage.name" />
-            <x-forms.input canGate="update" :canResource="$storage" label="Description" id="storage.description" />
+            <x-forms.input canGate="update" :canResource="$storage" label="Name" id="name" />
+            <x-forms.input canGate="update" :canResource="$storage" label="Description" id="description" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$storage" required label="Endpoint" id="storage.endpoint" />
-            <x-forms.input canGate="update" :canResource="$storage" required label="Bucket" id="storage.bucket" />
-            <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="storage.region" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Endpoint" id="endpoint" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Bucket" id="bucket" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="region" />
         </div>
         <div class="flex gap-2">
             <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
-                id="storage.key" />
+                id="key" />
             <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"
-                id="storage.secret" />
+                id="secret" />
         </div>
         @can('validateConnection', $storage)
             <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">

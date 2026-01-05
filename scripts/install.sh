@@ -20,7 +20,6 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
-VERSION="21"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -30,9 +29,14 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
-echo -e "Welcome to Coolify Installer!"
-echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+echo ""
+echo "=========================================="
+echo "   Coolify Installation - ${DATE}"
+echo "=========================================="
+echo ""
+echo "Welcome to Coolify Installer!"
+echo "This script will install everything for you. Sit back and relax."
+echo "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
 
 # Predefined root user
 ROOT_USERNAME=${ROOT_USERNAME:-}
@@ -224,7 +228,7 @@ if [ "$WARNING_SPACE" = true ]; then
     sleep 5
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
@@ -241,6 +245,29 @@ getAJoke() {
         echo -e " - Until then, here's a joke for you:\n"
         echo -e "$JOKES\n"
     fi
+}
+
+# Helper function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Helper function to log section headers
+log_section() {
+    echo ""
+    echo "============================================================"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "============================================================"
+}
+
+# Helper function to check if all required packages are installed
+all_packages_installed() {
+    for pkg in curl wget git jq openssl; do
+        if ! command -v "$pkg" >/dev/null 2>&1; then
+            return 1
+        fi
+    done
+    return 0
 }
 
 # Check if the OS is manjaro, if so, change it to arch
@@ -289,9 +316,11 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
-LATEST_REALTIME_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $8}' | tr -d ',')
+# Fetch versions.json once and parse all values from it
+VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
+LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+LATEST_REALTIME_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $8}' | tr -d ',')
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -302,7 +331,7 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
     exit
@@ -316,7 +345,7 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "---------------------------------------------"
+echo "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
 echo "| Coolify           | $LATEST_VERSION"
@@ -324,46 +353,61 @@ echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
 echo "| Registry URL      | $REGISTRY_URL"
-echo -e "---------------------------------------------\n"
-echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
+echo "---------------------------------------------"
+echo ""
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
-    ;;
-alpine)
-    sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
-    apk update >/dev/null
-    apk add curl wget git jq openssl >/dev/null
-    ;;
-ubuntu | debian | raspbian)
-    apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq openssl >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq openssl >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
-        fi
-        if ! command -v curl >/dev/null; then
-            dnf install -y curl >/dev/null
-        fi
-        dnf install -y wget git jq openssl >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq openssl >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+log_section "Step 1/9: Installing required packages"
+echo "1/9 Installing required packages (curl, wget, git, jq, openssl)..."
 
-echo -e "2. Check OpenSSH server configuration. "
+# Track if apt-get update was run to avoid redundant calls later
+APT_UPDATED=false
+
+if all_packages_installed; then
+    log "All required packages already installed, skipping installation"
+    echo " - All required packages already installed."
+else
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
+        ;;
+    alpine | postmarketos)
+        sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+        apk update >/dev/null
+        apk add curl wget git jq openssl >/dev/null
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        APT_UPDATED=true
+        apt-get install -y curl wget git jq openssl >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq openssl >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            if ! command -v curl >/dev/null; then
+                dnf install -y curl >/dev/null
+            fi
+            dnf install -y wget git jq openssl >/dev/null
+        fi
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq openssl >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+    log "Required packages installed successfully"
+fi
+echo "     Done."
+
+log_section "Step 2/9: Checking OpenSSH server configuration"
+echo "2/9 Checking OpenSSH server configuration..."
 
 # Detect OpenSSH server
 SSH_DETECTED=false
@@ -393,13 +437,16 @@ if [ "$SSH_DETECTED" = "false" ]; then
         systemctl enable sshd >/dev/null 2>&1
         systemctl start sshd >/dev/null 2>&1
         ;;
-    alpine)
+    alpine | postmarketos)
         apk add openssh >/dev/null
         rc-update add sshd default >/dev/null 2>&1
         service sshd start >/dev/null 2>&1
         ;;
     ubuntu | debian | raspbian)
-        apt-get update -y >/dev/null
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update -y >/dev/null
+            APT_UPDATED=true
+        fi
         apt-get install -y openssh-server >/dev/null
         systemctl enable ssh >/dev/null 2>&1
         systemctl start ssh >/dev/null 2>&1
@@ -466,7 +513,10 @@ install_docker() {
 install_docker_manually() {
     case "$OS_TYPE" in
     "ubuntu" | "debian" | "raspbian")
-        apt-get update
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update
+            APT_UPDATED=true
+        fi
         apt-get install -y ca-certificates curl
         install -m 0755 -d /etc/apt/keyrings
         curl -fsSL https://download.docker.com/linux/$OS_TYPE/gpg -o /etc/apt/keyrings/docker.asc
@@ -492,7 +542,8 @@ install_docker_manually() {
         echo "Docker installed successfully."
     fi
 }
-echo -e "3. Check Docker Installation. "
+log_section "Step 3/9: Checking Docker installation"
+echo "3/9 Checking Docker installation..."
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
     getAJoke
@@ -507,7 +558,7 @@ if ! [ -x "$(command -v docker)" ]; then
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
         ;;
-    "alpine")
+    "alpine" | "postmarketos")
         apk add docker docker-cli-compose >/dev/null 2>&1
         rc-update add docker default >/dev/null 2>&1
         service docker start >/dev/null 2>&1
@@ -576,7 +627,8 @@ else
     echo " - Docker is installed."
 fi
 
-echo -e "4. Check Docker Configuration. "
+log_section "Step 4/9: Checking Docker configuration"
+echo "4/9 Checking Docker configuration..."
 
 echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
 echo " - To override existing configuration: DOCKER_POOL_FORCE_OVERRIDE=true"
@@ -705,94 +757,121 @@ else
     fi
 fi
 
-echo -e "5. Download required files from CDN. "
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+log_section "Step 5/9: Downloading required files from CDN"
+echo "5/9 Downloading required files from CDN..."
+log "Downloading configuration files in parallel..."
 
-echo -e "6. Make backup of .env to .env-$DATE"
+# Download files in parallel for faster installation
+curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml &
+PID1=$!
+curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml &
+PID2=$!
+curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production &
+PID3=$!
+curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh &
+PID4=$!
 
-# Copy .env.example if .env does not exist
-if [ -f $ENV_FILE ]; then
-    cp $ENV_FILE $ENV_FILE-$DATE
-else
-    echo " - File does not exist: $ENV_FILE"
-    echo " - Copying .env.production to .env-$DATE"
-    cp /data/coolify/source/.env.production $ENV_FILE-$DATE
-    # Generate a secure APP_ID and APP_KEY
-    sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
-    sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
+# Wait for all downloads to complete and check for errors
+DOWNLOAD_FAILED=false
+for PID in $PID1 $PID2 $PID3 $PID4; do
+    if ! wait $PID; then
+        DOWNLOAD_FAILED=true
+    fi
+done
 
-    # Generate a secure Postgres DB username and password
-    # Causes issues: database "random-user" does not exist
-    # sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
-    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
-
-    # Generate a secure Redis password
-    sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
-
-    # Generate secure Pusher credentials
-    sed -i "s|^PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
-    sed -i "s|^PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
-    sed -i "s|^PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
+if [ "$DOWNLOAD_FAILED" = true ]; then
+    echo " - ERROR: One or more downloads failed. Please check your network connection."
+    exit 1
 fi
+
+log "All configuration files downloaded successfully"
+echo "     Done."
+
+log_section "Step 6/9: Setting up environment variable file"
+echo "6/9 Setting up environment variable file..."
+
+if [ -f "$ENV_FILE" ]; then
+    # If .env exists, create backup
+    echo " - Creating backup of existing .env file to .env-$DATE"
+    cp "$ENV_FILE" "$ENV_FILE-$DATE"
+    # Merge .env.production values into .env
+    echo " - Merging .env.production values into .env"
+    awk -F '=' '!seen[$1]++' "$ENV_FILE" "/data/coolify/source/.env.production" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+    echo " - .env file merged successfully"
+else
+    # If no .env exists, copy .env.production to .env
+    echo " - No .env file found, copying .env.production to .env"
+    cp "/data/coolify/source/.env.production" "$ENV_FILE"
+fi
+log "Environment file setup completed"
+echo "     Done."
+
+log_section "Step 7/9: Checking and updating environment variables"
+echo "7/9 Checking and updating environment variables..."
+
+update_env_var() {
+    local key="$1"
+    local value="$2"
+
+    # If variable "key=" exists but has no value, update the value of the existing line
+    if grep -q "^${key}=$" "$ENV_FILE"; then
+        sed -i "s|^${key}=$|${key}=${value}|" "$ENV_FILE"
+        echo " - Updated value of ${key} as the current value was empty"
+    # If variable "key=" doesn't exist, append it to the file with value
+    elif ! grep -q "^${key}=" "$ENV_FILE"; then
+        printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+        echo " - Added ${key} and it's value as the variable was missing"
+    fi
+}
+
+update_env_var "APP_ID" "$(openssl rand -hex 16)"
+update_env_var "APP_KEY" "base64:$(openssl rand -base64 32)"
+# update_env_var "DB_USERNAME" "$(openssl rand -hex 16)" # Causes issues: database "random-user" does not exist
+update_env_var "DB_PASSWORD" "$(openssl rand -base64 32)"
+update_env_var "REDIS_PASSWORD" "$(openssl rand -base64 32)"
+update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
 
 # Add default root user credentials from environment variables
 if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
-    if grep -q "^ROOT_USERNAME=" "$ENV_FILE-$DATE"; then
-        sed -i "s|^ROOT_USERNAME=.*|ROOT_USERNAME=$ROOT_USERNAME|" "$ENV_FILE-$DATE"
-    fi
-    if grep -q "^ROOT_USER_EMAIL=" "$ENV_FILE-$DATE"; then
-        sed -i "s|^ROOT_USER_EMAIL=.*|ROOT_USER_EMAIL=$ROOT_USER_EMAIL|" "$ENV_FILE-$DATE"
-    fi
-    if grep -q "^ROOT_USER_PASSWORD=" "$ENV_FILE-$DATE"; then
-        sed -i "s|^ROOT_USER_PASSWORD=.*|ROOT_USER_PASSWORD=$ROOT_USER_PASSWORD|" "$ENV_FILE-$DATE"
-    fi
+    echo " - Setting predefined root user credentials from environment"
+    update_env_var "ROOT_USERNAME" "$ROOT_USERNAME"
+    update_env_var "ROOT_USER_EMAIL" "$ROOT_USER_EMAIL"
+    update_env_var "ROOT_USER_PASSWORD" "$ROOT_USER_PASSWORD"
 fi
 
-# Add registry URL to .env file
 if [ -n "${REGISTRY_URL+x}" ]; then
     # Only update if REGISTRY_URL was explicitly provided
-    if grep -q "^REGISTRY_URL=" "$ENV_FILE-$DATE"; then
-        sed -i "s|^REGISTRY_URL=.*|REGISTRY_URL=$REGISTRY_URL|" "$ENV_FILE-$DATE"
-    else
-        echo "REGISTRY_URL=$REGISTRY_URL" >>"$ENV_FILE-$DATE"
-    fi
+    update_env_var "REGISTRY_URL" "$REGISTRY_URL"
 fi
-
-# Merge .env and .env.production. New values will be added to .env
-echo -e "7. Propagating .env with new values - if necessary."
-awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
-    else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
-    fi
+    update_env_var "AUTOUPDATE" "false"
 fi
 
-# Save Docker address pool configuration to .env file
-if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>/data/coolify/source/.env
+if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
+    update_env_var "DOCKER_ADDRESS_POOL_BASE" "$DOCKER_ADDRESS_POOL_BASE"
 else
-    # Only update if explicitly provided
-    if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" /data/coolify/source/.env
+    # Add with default value if missing
+    if ! grep -q "^DOCKER_ADDRESS_POOL_BASE=" "$ENV_FILE"; then
+        update_env_var "DOCKER_ADDRESS_POOL_BASE" "$DOCKER_ADDRESS_POOL_BASE"
     fi
 fi
 
-if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>/data/coolify/source/.env
+if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
+    update_env_var "DOCKER_ADDRESS_POOL_SIZE" "$DOCKER_ADDRESS_POOL_SIZE"
 else
-    # Only update if explicitly provided
-    if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" /data/coolify/source/.env
+    # Add with default value if missing
+    if ! grep -q "^DOCKER_ADDRESS_POOL_SIZE=" "$ENV_FILE"; then
+        update_env_var "DOCKER_ADDRESS_POOL_SIZE" "$DOCKER_ADDRESS_POOL_SIZE"
     fi
 fi
+log "Environment variables check completed"
+echo "     Done."
 
-echo -e "8. Checking for SSH key for localhost access."
+log_section "Step 8/9: Checking SSH key for localhost access"
+echo "8/9 Checking SSH key for localhost access..."
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
@@ -817,24 +896,100 @@ fi
 
 chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify
+log "SSH key check completed"
+echo "     Done."
 
-echo -e "9. Installing Coolify ($LATEST_VERSION)"
+log_section "Step 9/9: Installing Coolify"
+echo "9/9 Installing Coolify ($LATEST_VERSION)..."
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
 echo -e " - Please wait."
 getAJoke
 
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}" "true"
 fi
 echo " - Coolify installed successfully."
-rm -f $ENV_FILE-$DATE
+echo " - Waiting for Coolify to be ready..."
 
-echo " - Waiting for 20 seconds for Coolify (database migrations) to be ready."
-getAJoke
+# Wait for upgrade.sh background process to complete
+# upgrade.sh writes status to /data/coolify/source/.upgrade-status
+# Status file format: step|message|timestamp
+# Step 6 = "Upgrade complete", file deleted 10 seconds after
+UPGRADE_STATUS_FILE="/data/coolify/source/.upgrade-status"
+MAX_WAIT=180
+WAITED=0
+SEEN_STATUS_FILE=false
 
-sleep 20
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if [ -f "$UPGRADE_STATUS_FILE" ]; then
+        SEEN_STATUS_FILE=true
+        STATUS=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f1)
+        MESSAGE=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f2)
+        if [ "$STATUS" = "6" ]; then
+            log "Upgrade completed: $MESSAGE"
+            echo " - Upgrade complete!"
+            break
+        elif [ "$STATUS" = "error" ]; then
+            echo " - ERROR: Upgrade failed: $MESSAGE"
+            echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+            exit 1
+        else
+            if [ $((WAITED % 10)) -eq 0 ]; then
+                echo " - Upgrade in progress: $MESSAGE (${WAITED}s)"
+            fi
+        fi
+    else
+        # Status file doesn't exist
+        if [ "$SEEN_STATUS_FILE" = true ]; then
+            # We saw the file before, now it's gone = upgrade completed and cleaned up
+            log "Upgrade status file cleaned up - upgrade complete"
+            echo " - Upgrade complete!"
+            break
+        fi
+        # Haven't seen status file yet - either very early or upgrade.sh hasn't started
+        if [ $((WAITED % 10)) -eq 0 ] && [ $WAITED -gt 0 ]; then
+            echo " - Waiting for upgrade process to start... (${WAITED}s)"
+        fi
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    if [ "$SEEN_STATUS_FILE" = false ]; then
+        # Never saw status file - fallback to old behavior (wait 20s + health check)
+        log "Status file not found, using fallback wait"
+        echo " - Status file not found, waiting 20 seconds..."
+        sleep 20
+    else
+        echo " - ERROR: Upgrade timed out after ${MAX_WAIT}s"
+        echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+        exit 1
+    fi
+fi
+
+# Final health verification - wait for container to be healthy
+echo " - Verifying Coolify is healthy..."
+HEALTH_WAIT=60
+HEALTH_WAITED=0
+while [ $HEALTH_WAITED -lt $HEALTH_WAIT ]; do
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' coolify 2>/dev/null || echo "unknown")
+    if [ "$HEALTH" = "healthy" ]; then
+        log "Coolify container is healthy"
+        echo " - Coolify is ready!"
+        break
+    fi
+    sleep 2
+    HEALTH_WAITED=$((HEALTH_WAITED + 2))
+done
+
+if [ "$HEALTH" != "healthy" ]; then
+    echo " - ERROR: Coolify container is not healthy after ${HEALTH_WAIT}s. Status: $HEALTH"
+    echo " - Please check: docker logs coolify"
+    exit 1
+fi
 echo -e "\033[0;35m
    ____                            _         _       _   _                 _
   / ___|___  _ __   __ _ _ __ __ _| |_ _   _| | __ _| |_(_) ___  _ __  ___| |
@@ -844,8 +999,18 @@ echo -e "\033[0;35m
                    |___/
 \033[0m"
 
-IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
-IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
+# Fetch public IPs in parallel for faster completion
+IPV4_TMP=$(mktemp)
+IPV6_TMP=$(mktemp)
+curl -4s --max-time 5 https://ifconfig.io > "$IPV4_TMP" 2>/dev/null &
+IPV4_PID=$!
+curl -6s --max-time 5 https://ifconfig.io > "$IPV6_TMP" 2>/dev/null &
+IPV6_PID=$!
+wait $IPV4_PID 2>/dev/null || true
+wait $IPV6_PID 2>/dev/null || true
+IPV4_PUBLIC_IP=$(cat "$IPV4_TMP" 2>/dev/null || true)
+IPV6_PUBLIC_IP=$(cat "$IPV6_TMP" 2>/dev/null || true)
+rm -f "$IPV4_TMP" "$IPV6_TMP"
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
@@ -868,5 +1033,10 @@ if [ -n "$PRIVATE_IPS" ]; then
         fi
     done
 fi
+
 echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
-cp /data/coolify/source/.env /data/coolify/source/.env.backup
+
+log_section "Installation Complete"
+log "Coolify installation completed successfully"
+log "Version: ${LATEST_VERSION}"
+log "Log file: ${INSTALLATION_LOG_WITH_DATE}"

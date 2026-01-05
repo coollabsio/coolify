@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
@@ -104,6 +105,48 @@ function sanitize_string(?string $input = null): ?string
     return $sanitized;
 }
 
+/**
+ * Validate that a path or identifier is safe for use in shell commands.
+ *
+ * This function prevents command injection by rejecting strings that contain
+ * shell metacharacters or command substitution patterns.
+ *
+ * @param  string  $input  The path or identifier to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'volume source', 'service name')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws \Exception If dangerous characters are detected
+ */
+function validateShellSafePath(string $input, string $context = 'path'): string
+{
+    // List of dangerous shell metacharacters that enable command injection
+    $dangerousChars = [
+        '`' => 'backtick (command substitution)',
+        '$(' => 'command substitution',
+        '${' => 'variable substitution with potential command injection',
+        '|' => 'pipe operator',
+        '&' => 'background/AND operator',
+        ';' => 'command separator',
+        "\n" => 'newline (command separator)',
+        "\r" => 'carriage return',
+        "\t" => 'tab (token separator)',
+        '>' => 'output redirection',
+        '<' => 'input redirection',
+    ];
+
+    // Check for dangerous characters
+    foreach ($dangerousChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new \Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description}). ".
+                'Shell metacharacters are not allowed for security reasons.'
+            );
+        }
+    }
+
+    return $input;
+}
+
 function generate_readme_file(string $name, string $updated_at): string
 {
     $name = sanitize_string($name);
@@ -139,8 +182,11 @@ function refreshSession(?Team $team = null): void
             $team = User::find(Auth::id())->teams->first();
         }
     }
+    // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
-    Cache::remember('team:'.Auth::id(), 3600, function () use ($team) {
+    // Use new cache key format that includes team ID
+    Cache::forget('user:'.Auth::id().':team:'.$team->id);
+    Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
@@ -188,7 +234,7 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get(config('constants.coolify.versions_url'));
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
@@ -199,12 +245,10 @@ function get_latest_sentinel_version(): string
 function get_latest_version_of_coolify(): string
 {
     try {
-        $versions = File::get(base_path('versions.json'));
-        $versions = json_decode($versions, true);
+        $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.v4.version');
+        return data_get($versions, 'coolify.v4.version', '0.0.0');
     } catch (\Throwable $e) {
-        ray($e->getMessage());
 
         return '0.0.0';
     }
@@ -258,6 +302,24 @@ function generate_application_name(string $git_repository, string $git_branch, ?
     }
 
     return Str::kebab("$git_repository:$git_branch-$cuid");
+}
+
+/**
+ * Sort branches by priority: main first, master second, then alphabetically.
+ *
+ * @param  Collection  $branches  Collection of branch objects with 'name' key
+ */
+function sortBranchesByPriority(Collection $branches): Collection
+{
+    return $branches->sortBy(function ($branch) {
+        $name = data_get($branch, 'name');
+
+        return match ($name) {
+            'main' => '0_main',
+            'master' => '1_master',
+            default => '2_'.$name,
+        };
+    })->values();
 }
 
 function base_ip(): string
@@ -325,7 +387,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive();
 }
 
 function isProduction(): bool
@@ -489,7 +551,21 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
     $resource = queryResourcesByUuid($uuid);
-    if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
+    if (is_null($resource)) {
+        return null;
+    }
+
+    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    if ($resource instanceof \App\Models\ServiceDatabase) {
+        if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+
+        return null;
+    }
+
+    // Standard resources: environment->project->team_id
+    if ($resource->environment->project->team_id === $teamId) {
         return $resource;
     }
 
@@ -576,6 +652,12 @@ function queryResourcesByUuid(string $uuid)
         return $clickhouse;
     }
 
+    // Check for ServiceDatabase by its own UUID
+    $serviceDatabase = ServiceDatabase::whereUuid($uuid)->first();
+    if ($serviceDatabase) {
+        return $serviceDatabase;
+    }
+
     return $resource;
 }
 function generateTagDeployWebhook($tag_name)
@@ -613,6 +695,12 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
+function sanitizeLogsForExport(string $text): string
+{
+    // All sanitization is now handled by remove_iip()
+    return remove_iip($text);
+}
+
 function getTopLevelNetworks(Service|Application $resource)
 {
     if ($resource->getMorphClass() === \App\Models\Service::class) {
@@ -635,10 +723,14 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
 
-                // Only add 'networks' key if 'network_mode' is not 'host'
-                if (! $hasHostNetworkMode) {
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
+                // Only add 'networks' key if 'network_mode' is not 'host' or does not start with 'service:' or 'container:'
+                if (! $hasValidNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -897,6 +989,9 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
         case 'SUPABASEANON':
             $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
             if (is_null($signingKey)) {
@@ -962,7 +1057,7 @@ function getRealtime()
     }
 }
 
-function validate_dns_entry(string $fqdn, Server $server)
+function validateDNSEntry(string $fqdn, Server $server)
 {
     // https://www.cloudflare.com/ips-v4/#
     $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
@@ -995,7 +1090,7 @@ function validate_dns_entry(string $fqdn, Server $server)
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                        if (ipMatch($result->getData(), $cloudflare_ips->toArray(), $match)) {
                             $found_matching_ip = true;
                             break;
                         }
@@ -1013,7 +1108,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function ip_match($ip, $cidrs, &$match = null)
+function ipMatch($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
         [$subnet, $mask] = explode('/', $cidr);
@@ -1027,7 +1122,7 @@ function ip_match($ip, $cidrs, &$match = null)
     return false;
 }
 
-function check_ip_against_allowlist($ip, $allowlist)
+function checkIPAgainstAllowlist($ip, $allowlist)
 {
     if (empty($allowlist)) {
         return false;
@@ -1085,78 +1180,6 @@ function check_ip_against_allowlist($ip, $allowlist)
     return false;
 }
 
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
-{
-    $commands = $commands->map(function ($line) {
-        if (
-            ! str(trim($line))->startsWith([
-                'cd',
-                'command',
-                'echo',
-                'true',
-                'if',
-                'fi',
-            ])
-        ) {
-            return "sudo $line";
-        }
-
-        if (str(trim($line))->startsWith('if')) {
-            return str_replace('if', 'if sudo', $line);
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) {
-        $line = str($line);
-        if (str($line)->contains('$(')) {
-            $line = $line->replace('$(', '$(sudo ');
-        }
-        if (str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
-        }
-        if (str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
-        }
-        if (str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
-        }
-
-        return $line->value();
-    });
-
-    return $commands->toArray();
-}
-function parseLineForSudo(string $command, Server $server): string
-{
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
-        $command = "sudo $command";
-    }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
-    }
-    if (str($command)->contains('$(') || str($command)->contains('`')) {
-        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-    }
-    if (str($command)->contains('||')) {
-        $command = str($command)->replace('||', '|| sudo ')->value();
-    }
-    if (str($command)->contains('&&')) {
-        $command = str($command)->replace('&&', '&& sudo ')->value();
-    }
-
-    return $command;
-}
-
 function get_public_ips()
 {
     try {
@@ -1198,30 +1221,77 @@ function get_public_ips()
 function isAnyDeploymentInprogress()
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
-    $basicDetails = $runningJobs->map(function ($job) {
-        return [
-            'id' => $job->id,
-            'created_at' => $job->created_at,
-            'application_id' => $job->application_id,
-            'server_id' => $job->server_id,
-            'horizon_job_id' => $job->horizon_job_id,
-            'status' => $job->status,
-        ];
-    });
-    echo 'Running jobs: '.json_encode($basicDetails)."\n";
+
+    if ($runningJobs->isEmpty()) {
+        echo "No deployments in progress.\n";
+        exit(0);
+    }
+
     $horizonJobIds = [];
+    $deploymentDetails = [];
+
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
         if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
             $horizonJobIds[] = $runningJob->horizon_job_id;
+
+            // Get application and team information
+            $application = Application::find($runningJob->application_id);
+            $teamMembers = [];
+            $deploymentUrl = '';
+
+            if ($application) {
+                // Get team members through the application's project
+                $team = $application->team();
+                if ($team) {
+                    $teamMembers = $team->members()->pluck('email')->toArray();
+                }
+
+                // Construct the full deployment URL
+                if ($runningJob->deployment_url) {
+                    $baseUrl = base_url();
+                    $deploymentUrl = $baseUrl.$runningJob->deployment_url;
+                }
+            }
+
+            $deploymentDetails[] = [
+                'id' => $runningJob->id,
+                'application_name' => $runningJob->application_name ?? 'Unknown',
+                'server_name' => $runningJob->server_name ?? 'Unknown',
+                'deployment_url' => $deploymentUrl,
+                'team_members' => $teamMembers,
+                'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
+                'horizon_job_id' => $runningJob->horizon_job_id,
+            ];
         }
     }
+
     if (count($horizonJobIds) === 0) {
-        echo "No deployments in progress.\n";
+        echo "No active deployments in progress (all jobs completed or failed).\n";
         exit(0);
     }
-    $horizonJobIds = collect($horizonJobIds)->unique()->toArray();
-    echo 'There are '.count($horizonJobIds)." deployments in progress.\n";
+
+    // Display enhanced deployment information
+    echo "\n=== Running Deployments ===\n";
+    echo 'Total active deployments: '.count($horizonJobIds)."\n\n";
+
+    foreach ($deploymentDetails as $index => $deployment) {
+        echo 'Deployment #'.($index + 1).":\n";
+        echo '  Application: '.$deployment['application_name']."\n";
+        echo '  Server: '.$deployment['server_name']."\n";
+        echo '  Started: '.$deployment['created_at']."\n";
+        if ($deployment['deployment_url']) {
+            echo '  URL: '.$deployment['deployment_url']."\n";
+        }
+        if (! empty($deployment['team_members'])) {
+            echo '  Team members: '.implode(', ', $deployment['team_members'])."\n";
+        } else {
+            echo "  Team members: No team members found\n";
+        }
+        echo '  Horizon Job ID: '.$deployment['horizon_job_id']."\n";
+        echo "\n";
+    }
+
     exit(1);
 }
 
@@ -1298,10 +1368,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
+
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                        // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                        if (is_array($serviceLabel)) {
+                            $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                            return false;
+                        }
                         if (! str($serviceLabel)->contains('=')) {
                             $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -1311,6 +1392,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         return $serviceLabel;
                     });
                     foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                        // Convert array values to strings
+                        if (is_array($removedLabel)) {
+                            $removedLabel = (string) collect($removedLabel)->first();
+                        }
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
@@ -1318,52 +1403,70 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Decide if the service is a database
                 $image = data_get_str($service, 'image');
-                $isDatabase = isDatabaseImage($image, $service);
-                data_set($service, 'is_database', $isDatabase);
 
-                // Create new serviceApplication or serviceDatabase
-                if ($isDatabase) {
-                    if ($isNew) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceDatabase::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                    }
+                // Check for manually migrated services first (respects user's conversion choice)
+                $migratedApp = ServiceApplication::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+                $migratedDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+
+                if ($migratedApp || $migratedDb) {
+                    // Use the migrated service type, ignoring image detection
+                    $isDatabase = (bool) $migratedDb;
+                    $savedService = $migratedApp ?: $migratedDb;
                 } else {
-                    if ($isNew) {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceApplication::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                    }
-                }
-                if (is_null($savedService)) {
+                    // Use image detection for non-migrated services
+                    $isDatabase = isDatabaseImage($image, $service);
+
+                    // Create new serviceApplication or serviceDatabase
                     if ($isDatabase) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if ($isNew) {
+                            $savedService = ServiceDatabase::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        } else {
+                            $savedService = ServiceDatabase::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceDatabase::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
+                        }
                     } else {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if ($isNew) {
+                            $savedService = ServiceApplication::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        } else {
+                            $savedService = ServiceApplication::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceApplication::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
+                        }
                     }
                 }
+
+                data_set($service, 'is_database', $isDatabase);
 
                 // Check if image changed
                 if ($savedService->image !== $image) {
@@ -1409,7 +1512,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                if (! $hasHostNetworkMode) {
+                if (! $hasValidNetworkMode) {
                     // Add Coolify specific networks
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;
@@ -1637,7 +1740,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             EnvironmentVariable::create([
                                 'key' => $key,
                                 'value' => $fqdn,
-                                'is_build_time' => false,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -1717,7 +1819,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $fqdn,
-                                            'is_build_time' => false,
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
@@ -1756,7 +1857,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $generatedValue,
-                                            'is_build_time' => false,
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
@@ -1795,7 +1895,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'resourceable_id' => $resource->id,
                             ], [
                                 'value' => $defaultValue,
-                                'is_build_time' => false,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -2027,6 +2126,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                    // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                    if (is_array($serviceLabel)) {
+                        $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                        return false;
+                    }
                     if (! str($serviceLabel)->contains('=')) {
                         $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -2036,6 +2141,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     return $serviceLabel;
                 });
                 foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                    // Convert array values to strings
+                    if (is_array($removedLabel)) {
+                        $removedLabel = (string) collect($removedLabel)->first();
+                    }
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
@@ -2059,12 +2168,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -2103,7 +2212,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -2122,7 +2231,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $source = str($source)->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2131,7 +2240,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                 } else {
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2183,13 +2292,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
-                                        $name = $uuid."-$name-pr-$pull_request_id";
+                                        $name = $uuid.'-'.addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -2231,7 +2340,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -2259,7 +2368,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
                                     } else {
-                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                        $source = $uuid.'-'.addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2299,7 +2408,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
                 $serviceDependencies = $serviceDependencies->map(function ($dependency) use ($pull_request_id) {
-                    return $dependency."-pr-$pull_request_id";
+                    return addPreviewDeploymentSuffix($dependency, $pull_request_id);
                 });
                 data_set($service, 'depends_on', $serviceDependencies->toArray());
             }
@@ -2486,7 +2595,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $fqdn,
-                                        'is_build_time' => false,
                                         'resourceable_type' => get_class($resource),
                                         'resourceable_id' => $resource->id,
                                         'is_preview' => false,
@@ -2498,7 +2606,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $generatedValue,
-                                        'is_build_time' => false,
                                         'resourceable_type' => get_class($resource),
                                         'resourceable_id' => $resource->id,
                                         'is_preview' => false,
@@ -2532,20 +2639,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
-                        $isBuildTime = data_get($foundEnv, 'is_build_time', false);
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
-                                'is_build_time' => $isBuildTime,
                                 'value' => $defaultValue,
                             ]);
                         } else {
                             EnvironmentVariable::create([
                                 'key' => $key,
                                 'value' => $defaultValue,
-                                'is_build_time' => $isBuildTime,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -2693,7 +2797,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
-                $services[$serviceName."-pr-$pull_request_id"] = $service;
+                $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
                 data_forget($services, $serviceName);
             });
         }
@@ -2842,6 +2946,47 @@ function convertToKeyValueCollection($environment)
 function instanceSettings()
 {
     return InstanceSettings::get();
+}
+
+function wireNavigate(): string
+{
+    try {
+        $settings = instanceSettings();
+
+        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+    } catch (\Exception $e) {
+        return 'wire:navigate.hover';
+    }
+}
+
+/**
+ * Redirect to a named route with SPA navigation support.
+ * Automatically uses wire:navigate when is_wire_navigate_enabled is true.
+ */
+function redirectRoute(Livewire\Component $component, string $name, array $parameters = []): mixed
+{
+    $navigate = true;
+
+    try {
+        $navigate = instanceSettings()->is_wire_navigate_enabled ?? true;
+    } catch (\Exception $e) {
+        $navigate = true;
+    }
+
+    return $component->redirectRoute($name, $parameters, navigate: $navigate);
+}
+
+function getHelperVersion(): string
+{
+    $settings = instanceSettings();
+
+    // In development mode, use the dev_helper_version if set, otherwise fallback to config
+    if (isDev() && ! empty($settings->dev_helper_version)) {
+        return $settings->dev_helper_version;
+    }
+
+    return config('constants.coolify.helper_version');
 }
 
 function loadConfigFromGit(string $repository, string $branch, string $base_directory, int $server_id, int $team_id)
@@ -3072,4 +3217,306 @@ function parseDockerfileInterval(string $something)
     }
 
     return $seconds;
+}
+
+function addPreviewDeploymentSuffix(string $name, int $pull_request_id = 0): string
+{
+    return ($pull_request_id === 0) ? $name : $name.'-pr-'.$pull_request_id;
+}
+
+function generateDockerComposeServiceName(mixed $services, int $pullRequestId = 0): Collection
+{
+    $collection = collect([]);
+    foreach ($services as $serviceName => $_) {
+        $collection->put('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper(), addPreviewDeploymentSuffix($serviceName, $pullRequestId));
+    }
+
+    return $collection;
+}
+
+function formatBytes(?int $bytes, int $precision = 2): string
+{
+    if ($bytes === null || $bytes === 0) {
+        return '0 B';
+    }
+
+    // Handle negative numbers
+    if ($bytes < 0) {
+        return '0 B';
+    }
+
+    $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    $base = 1024;
+    $exponent = floor(log($bytes) / log($base));
+    $exponent = min($exponent, count($units) - 1);
+
+    $value = $bytes / pow($base, $exponent);
+
+    return round($value, $precision).' '.$units[$exponent];
+}
+
+/**
+ * Validates that a file path is safely within the /tmp/ directory.
+ * Protects against path traversal attacks by resolving the real path
+ * and verifying it stays within /tmp/.
+ *
+ * Note: On macOS, /tmp is often a symlink to /private/tmp, which is handled.
+ */
+function isSafeTmpPath(?string $path): bool
+{
+    if (blank($path)) {
+        return false;
+    }
+
+    // URL decode to catch encoded traversal attempts
+    $decodedPath = urldecode($path);
+
+    // Minimum length check - /tmp/x is 6 chars
+    if (strlen($decodedPath) < 6) {
+        return false;
+    }
+
+    // Must start with /tmp/
+    if (! str($decodedPath)->startsWith('/tmp/')) {
+        return false;
+    }
+
+    // Quick check for obvious traversal attempts
+    if (str($decodedPath)->contains('..')) {
+        return false;
+    }
+
+    // Check for null bytes (directory traversal technique)
+    if (str($decodedPath)->contains("\0")) {
+        return false;
+    }
+
+    // Remove any trailing slashes for consistent validation
+    $normalizedPath = rtrim($decodedPath, '/');
+
+    // Normalize the path by removing redundant separators and resolving . and ..
+    // We'll do this manually since realpath() requires the path to exist
+    $parts = explode('/', $normalizedPath);
+    $resolvedParts = [];
+
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            // Skip empty parts (from //) and current directory references
+            continue;
+        } elseif ($part === '..') {
+            // Parent directory - this should have been caught earlier but double-check
+            return false;
+        } else {
+            $resolvedParts[] = $part;
+        }
+    }
+
+    $resolvedPath = '/'.implode('/', $resolvedParts);
+
+    // Final check: resolved path must start with /tmp/
+    // And must have at least one component after /tmp/
+    if (! str($resolvedPath)->startsWith('/tmp/') || $resolvedPath === '/tmp') {
+        return false;
+    }
+
+    // Resolve the canonical /tmp path (handles symlinks like /tmp -> /private/tmp on macOS)
+    $canonicalTmpPath = realpath('/tmp');
+    if ($canonicalTmpPath === false) {
+        // If /tmp doesn't exist, something is very wrong, but allow non-existing paths
+        $canonicalTmpPath = '/tmp';
+    }
+
+    // Calculate dirname once to avoid redundant calls
+    $dirPath = dirname($resolvedPath);
+
+    // If the directory exists, resolve it via realpath to catch symlink attacks
+    if (is_dir($dirPath)) {
+        // For existing paths, resolve to absolute path to catch symlinks
+        $realDir = realpath($dirPath);
+        if ($realDir === false) {
+            return false;
+        }
+
+        // Check if the real directory is within /tmp (or its canonical path)
+        if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Transform colon-delimited status format to human-readable parentheses format.
+ *
+ * Handles Docker container status formats with optional health check status and exclusion modifiers.
+ *
+ * Examples:
+ * - running:healthy → Running (healthy)
+ * - running:unhealthy:excluded → Running (unhealthy, excluded)
+ * - exited:excluded → Exited (excluded)
+ * - Proxy:running → Proxy:running (preserved as-is for headline formatting)
+ * - running → Running
+ *
+ * @param  string  $status  The status string to format
+ * @return string The formatted status string
+ */
+function formatContainerStatus(string $status): string
+{
+    // Preserve Proxy statuses as-is (they follow different format)
+    if (str($status)->startsWith('Proxy')) {
+        return str($status)->headline()->value();
+    }
+
+    // Check for :excluded suffix
+    $isExcluded = str($status)->endsWith(':excluded');
+    $parts = explode(':', $status);
+
+    if ($isExcluded) {
+        if (count($parts) === 3) {
+            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+            return str($parts[0])->headline().' ('.$parts[1].', excluded)';
+        } else {
+            // No health status: exited:excluded → Exited (excluded)
+            return str($parts[0])->headline().' (excluded)';
+        }
+    } elseif (count($parts) >= 2) {
+        // Regular colon format: running:healthy → Running (healthy)
+        return str($parts[0])->headline().' ('.$parts[1].')';
+    } else {
+        // Simple status: running → Running
+        return str($status)->headline()->value();
+    }
+}
+
+/**
+ * Check if password confirmation should be skipped.
+ * Returns true if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ *
+ * @return bool True if password confirmation should be skipped
+ */
+function shouldSkipPasswordConfirmation(): bool
+{
+    // Skip if two-step confirmation is globally disabled
+    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+        return true;
+    }
+
+    // Skip if user has no password (OAuth users)
+    if (! Auth::user()?->hasPassword()) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Verify password for two-step confirmation.
+ * Skips verification if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
+ * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
+ * @return bool True if verification passed (or skipped), false if password is incorrect
+ */
+function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
+{
+    // Skip if password confirmation should be skipped
+    if (shouldSkipPasswordConfirmation()) {
+        return true;
+    }
+
+    // Verify the password
+    if (! Hash::check($password, Auth::user()->password)) {
+        if ($component) {
+            $component->addError('password', 'The provided password is incorrect.');
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
+ * This preserves the visual shape of the data better than simple averaging.
+ *
+ * @param  array  $data  Array of [timestamp, value] pairs
+ * @param  int  $threshold  Target number of points
+ * @return array Downsampled data
+ */
+function downsampleLTTB(array $data, int $threshold): array
+{
+    $dataLength = count($data);
+
+    // Return unchanged if threshold >= data length, or if threshold <= 2
+    // (threshold <= 2 would cause division by zero in bucket calculation)
+    if ($threshold >= $dataLength || $threshold <= 2) {
+        return $data;
+    }
+
+    $sampled = [];
+    $sampled[] = $data[0]; // Always keep first point
+
+    $bucketSize = ($dataLength - 2) / ($threshold - 2);
+
+    $a = 0; // Index of previous selected point
+
+    for ($i = 0; $i < $threshold - 2; $i++) {
+        // Calculate bucket range
+        $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
+        $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
+        $bucketEnd = min($bucketEnd, $dataLength - 1);
+
+        // Calculate average point for next bucket (used as reference)
+        $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
+        $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
+        $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
+
+        $avgX = 0;
+        $avgY = 0;
+        $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
+
+        if ($nextBucketCount > 0) {
+            for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
+                $avgX += $data[$j][0];
+                $avgY += $data[$j][1];
+            }
+            $avgX /= $nextBucketCount;
+            $avgY /= $nextBucketCount;
+        }
+
+        // Find point in current bucket with largest triangle area
+        $maxArea = -1;
+        $maxAreaIndex = $bucketStart;
+
+        $pointAX = $data[$a][0];
+        $pointAY = $data[$a][1];
+
+        for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
+            // Triangle area calculation
+            $area = abs(
+                ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
+                ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
+            ) * 0.5;
+
+            if ($area > $maxArea) {
+                $maxArea = $area;
+                $maxAreaIndex = $j;
+            }
+        }
+
+        $sampled[] = $data[$maxAreaIndex];
+        $a = $maxAreaIndex;
+    }
+
+    $sampled[] = $data[$dataLength - 1]; // Always keep last point
+
+    return $sampled;
 }

@@ -8,7 +8,7 @@ test('IP allowlist with single IPs', function () {
     ];
 
     foreach ($testCases as $case) {
-        $result = check_ip_against_allowlist($case['ip'], $case['allowlist']);
+        $result = checkIPAgainstAllowlist($case['ip'], $case['allowlist']);
         expect($result)->toBe($case['expected']);
     }
 });
@@ -24,7 +24,7 @@ test('IP allowlist with CIDR notation', function () {
     ];
 
     foreach ($testCases as $case) {
-        $result = check_ip_against_allowlist($case['ip'], $case['allowlist']);
+        $result = checkIPAgainstAllowlist($case['ip'], $case['allowlist']);
         expect($result)->toBe($case['expected']);
     }
 });
@@ -40,16 +40,16 @@ test('IP allowlist with 0.0.0.0 allows all', function () {
 
     // Test 0.0.0.0 without subnet
     foreach ($testIps as $ip) {
-        $result = check_ip_against_allowlist($ip, ['0.0.0.0']);
+        $result = checkIPAgainstAllowlist($ip, ['0.0.0.0']);
         expect($result)->toBeTrue();
     }
 
     // Test 0.0.0.0 with any subnet notation - should still allow all
     foreach ($testIps as $ip) {
-        expect(check_ip_against_allowlist($ip, ['0.0.0.0/0']))->toBeTrue();
-        expect(check_ip_against_allowlist($ip, ['0.0.0.0/8']))->toBeTrue();
-        expect(check_ip_against_allowlist($ip, ['0.0.0.0/24']))->toBeTrue();
-        expect(check_ip_against_allowlist($ip, ['0.0.0.0/32']))->toBeTrue();
+        expect(checkIPAgainstAllowlist($ip, ['0.0.0.0/0']))->toBeTrue();
+        expect(checkIPAgainstAllowlist($ip, ['0.0.0.0/8']))->toBeTrue();
+        expect(checkIPAgainstAllowlist($ip, ['0.0.0.0/24']))->toBeTrue();
+        expect(checkIPAgainstAllowlist($ip, ['0.0.0.0/32']))->toBeTrue();
     }
 });
 
@@ -66,44 +66,44 @@ test('IP allowlist with mixed entries', function () {
     ];
 
     foreach ($testCases as $case) {
-        $result = check_ip_against_allowlist($case['ip'], $allowlist);
+        $result = checkIPAgainstAllowlist($case['ip'], $allowlist);
         expect($result)->toBe($case['expected']);
     }
 });
 
 test('IP allowlist handles empty and invalid entries', function () {
     // Empty allowlist blocks all
-    expect(check_ip_against_allowlist('192.168.1.1', []))->toBeFalse();
-    expect(check_ip_against_allowlist('192.168.1.1', ['']))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.1', []))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['']))->toBeFalse();
 
     // Handles spaces
-    expect(check_ip_against_allowlist('192.168.1.100', [' 192.168.1.100 ']))->toBeTrue();
-    expect(check_ip_against_allowlist('10.0.0.5', [' 10.0.0.0/8 ']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('192.168.1.100', [' 192.168.1.100 ']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('10.0.0.5', [' 10.0.0.0/8 ']))->toBeTrue();
 
     // Invalid entries are skipped
-    expect(check_ip_against_allowlist('192.168.1.1', ['invalid.ip']))->toBeFalse();
-    expect(check_ip_against_allowlist('192.168.1.1', ['192.168.1.0/33']))->toBeFalse(); // Invalid mask
-    expect(check_ip_against_allowlist('192.168.1.1', ['192.168.1.0/-1']))->toBeFalse(); // Invalid mask
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['invalid.ip']))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['192.168.1.0/33']))->toBeFalse(); // Invalid mask
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['192.168.1.0/-1']))->toBeFalse(); // Invalid mask
 });
 
 test('IP allowlist with various subnet sizes', function () {
     // /32 - single host
-    expect(check_ip_against_allowlist('192.168.1.1', ['192.168.1.1/32']))->toBeTrue();
-    expect(check_ip_against_allowlist('192.168.1.2', ['192.168.1.1/32']))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['192.168.1.1/32']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('192.168.1.2', ['192.168.1.1/32']))->toBeFalse();
 
     // /31 - point-to-point link
-    expect(check_ip_against_allowlist('192.168.1.0', ['192.168.1.0/31']))->toBeTrue();
-    expect(check_ip_against_allowlist('192.168.1.1', ['192.168.1.0/31']))->toBeTrue();
-    expect(check_ip_against_allowlist('192.168.1.2', ['192.168.1.0/31']))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.0', ['192.168.1.0/31']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('192.168.1.1', ['192.168.1.0/31']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('192.168.1.2', ['192.168.1.0/31']))->toBeFalse();
 
     // /16 - class B
-    expect(check_ip_against_allowlist('172.16.0.1', ['172.16.0.0/16']))->toBeTrue();
-    expect(check_ip_against_allowlist('172.16.255.255', ['172.16.0.0/16']))->toBeTrue();
-    expect(check_ip_against_allowlist('172.17.0.1', ['172.16.0.0/16']))->toBeFalse();
+    expect(checkIPAgainstAllowlist('172.16.0.1', ['172.16.0.0/16']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('172.16.255.255', ['172.16.0.0/16']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('172.17.0.1', ['172.16.0.0/16']))->toBeFalse();
 
     // /0 - all addresses
-    expect(check_ip_against_allowlist('1.1.1.1', ['0.0.0.0/0']))->toBeTrue();
-    expect(check_ip_against_allowlist('255.255.255.255', ['0.0.0.0/0']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('1.1.1.1', ['0.0.0.0/0']))->toBeTrue();
+    expect(checkIPAgainstAllowlist('255.255.255.255', ['0.0.0.0/0']))->toBeTrue();
 });
 
 test('IP allowlist comma-separated string input', function () {
@@ -111,10 +111,10 @@ test('IP allowlist comma-separated string input', function () {
     $allowlistString = '192.168.1.100,10.0.0.0/8,172.16.0.0/16';
     $allowlist = explode(',', $allowlistString);
 
-    expect(check_ip_against_allowlist('192.168.1.100', $allowlist))->toBeTrue();
-    expect(check_ip_against_allowlist('10.5.5.5', $allowlist))->toBeTrue();
-    expect(check_ip_against_allowlist('172.16.10.10', $allowlist))->toBeTrue();
-    expect(check_ip_against_allowlist('8.8.8.8', $allowlist))->toBeFalse();
+    expect(checkIPAgainstAllowlist('192.168.1.100', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('10.5.5.5', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('172.16.10.10', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('8.8.8.8', $allowlist))->toBeFalse();
 });
 
 test('ValidIpOrCidr validation rule', function () {

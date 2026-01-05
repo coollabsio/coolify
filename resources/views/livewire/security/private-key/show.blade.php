@@ -27,8 +27,8 @@
             </div>
             <div class="flex flex-col gap-2">
                 <div class="flex gap-2">
-                    <x-forms.input canGate="update" :canResource="$private_key" id="private_key.name" label="Name" required />
-                    <x-forms.input canGate="update" :canResource="$private_key" id="private_key.description" label="Description" />
+                    <x-forms.input canGate="update" :canResource="$private_key" id="name" label="Name" required />
+                    <x-forms.input canGate="update" :canResource="$private_key" id="description" label="Description" />
                 </div>
                 <div>
                     <div class="flex items-end gap-2 py-2 ">
@@ -46,17 +46,17 @@
                             Hide
                         </div>
                     </div>
-                    @if (data_get($private_key, 'is_git_related'))
+                    @if ($isGitRelated)
                         <div class="w-48">
-                            <x-forms.checkbox id="private_key.is_git_related" disabled label="Is used by a Git App?" />
+                            <x-forms.checkbox id="isGitRelated" disabled label="Is used by a Git App?" />
                         </div>
                     @endif
                     <div x-cloak x-show="!showPrivateKey">
-                        <x-forms.input canGate="update" :canResource="$private_key" allowToPeak="false" type="password" rows="10" id="private_key.private_key"
+                        <x-forms.input canGate="update" :canResource="$private_key" allowToPeak="false" type="password" rows="10" id="privateKeyValue"
                             required disabled />
                     </div>
                     <div x-cloak x-show="showPrivateKey">
-                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="10" id="private_key.private_key" required />
+                        <x-forms.textarea canGate="update" :canResource="$private_key" rows="10" id="privateKeyValue" required />
                     </div>
                 </div>
             </div>

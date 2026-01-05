@@ -26,7 +26,7 @@ class StopApplicationOneServer
                     if ($containerName) {
                         instant_remote_process(
                             [
-                                "docker stop --time=30 $containerName",
+                                "docker stop -t 30 $containerName",
                                 "docker rm -f $containerName",
                             ],
                             $server
