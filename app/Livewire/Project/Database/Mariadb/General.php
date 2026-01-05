@@ -119,7 +119,6 @@ class General extends Component
         'isPublic' => 'Is Public',
         'publicPort' => 'Public Port',
         'proxyTimeout' => 'Proxy Timeout',
-        'proxyTimeout' => 'Proxy Timeout',
         'customDockerRunOptions' => 'Custom Docker Options',
         'enableSsl' => 'Enable SSL',
     ];
