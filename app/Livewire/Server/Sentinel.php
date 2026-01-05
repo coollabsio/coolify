@@ -110,26 +110,6 @@ class Sentinel extends Component
         }
     }
 
-    public function updatedIsSentinelDebugEnabled($value)
-    {
-        try {
-            $this->submit();
-            $this->restartSentinel();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function updatedIsMetricsEnabled($value)
-    {
-        try {
-            $this->submit();
-            $this->restartSentinel();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function updatedIsSentinelEnabled($value)
     {
         try {
@@ -170,6 +150,16 @@ class Sentinel extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Sentinel settings updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->syncData(true);
+            $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
