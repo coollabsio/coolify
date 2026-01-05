@@ -6,7 +6,7 @@
 
 services:
   shipshipship:
-    image: nelkinsky/shipshipship:latest
+    image: nelkinsky/shipshipship:v1.3.4
     environment:
       - ADMIN_USERNAME=${SERVICE_USER_ADMIN}
       - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
