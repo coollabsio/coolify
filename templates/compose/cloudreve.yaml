@@ -7,49 +7,49 @@
 
 services:
   cloudreve:
-    image: cloudreve/cloudreve:4.8.0
-    depends_on:
-      cloudreve-db:
-        condition: service_healthy
-      cloudreve-redis:
-        condition: service_healthy
+    image: cloudreve/cloudreve:4.10.1
     environment:
       - SERVICE_URL_CLOUDREVE_5212
       - CR_CONF_Database.Type=postgres
-      - CR_CONF_Database.Host=cloudreve-db
-      - CR_CONF_Database.User=${SERVICE_USER_POSTGRESQL}
-      - CR_CONF_Database.Password=${SERVICE_PASSWORD_POSTGRESQL}
-      - CR_CONF_Database.Name=${POSTGRES_DB:-cloudreve}
+      - CR_CONF_Database.Host=postgres
+      - CR_CONF_Database.User=${SERVICE_USER_POSTGRES}
+      - CR_CONF_Database.Password=${SERVICE_PASSWORD_POSTGRES}
+      - CR_CONF_Database.Name=${POSTGRES_DB:-cloudreve-db}
       - CR_CONF_Database.Port=5432
-      - CR_CONF_Redis.Server=cloudreve-redis:6379
+      - CR_CONF_Redis.Server=redis:6379
       - CR_CONF_Redis.Password=${SERVICE_PASSWORD_REDIS}
     volumes:
-      - cloudreve_data:/cloudreve/data
+      - cloudreve-data:/cloudreve/data
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5212"]
       interval: 20s
       timeout: 10s
       retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  cloudreve-db:
-    image: postgres:17
+  postgres:
+    image: postgres:18-alpine
     environment:
-      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRES_DB:-cloudreve}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-cloudreve-db}
     volumes:
-      - cloudreve_postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  cloudreve-redis:
-    image: redis:latest
-    command: --requirepass ${SERVICE_PASSWORD_REDIS}
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
-      - cloudreve_redis_data:/data
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
       interval: 10s
