@@ -7,7 +7,7 @@
 
 services:
   esphome:
-    image: ghcr.io/esphome/esphome:latest
+    image: ghcr.io/esphome/esphome:2025.12.4
     volumes:
       - esp_config:/config
       - /etc/localtime:/etc/localtime:ro
