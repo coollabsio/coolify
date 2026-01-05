@@ -13,11 +13,11 @@ services:
       - USERNAME=${SERVICE_USER_REGISTRY}
       - PASSWORD=${SERVICE_PASSWORD_REGISTRY}
       - REGISTRY_AUTH=htpasswd
-      - REGISTRY_AUTH_HTPASSWD_REALM=Registry
+      - REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm
       - REGISTRY_AUTH_HTPASSWD_PATH=/auth/registry.password
-      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
     command: ["/entrypoint.sh"]
     volumes:
+      - registry-data:/var/lib/registry
       - type: bind
         source: ./etc/entrypoint.sh
         target: /entrypoint.sh
@@ -60,10 +60,6 @@ services:
               enabled: true
               interval: 10s
               threshold: 3
-      - type: bind
-        source: ./data
-        target: /data
-        isDirectory: true
     healthcheck:
       test:
         - CMD
