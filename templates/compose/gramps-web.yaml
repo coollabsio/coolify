@@ -1,0 +1,59 @@
+# documentation: https://www.grampsweb.org/install_setup/setup/
+# slogan: Open Source Online Genealogy System.
+# category: family
+# tags: family, genealogy, personal
+# logo: svgs/gramps-web.svg
+# port: 5000
+
+services:
+  grampsweb:
+    image: ghcr.io/gramps-project/grampsweb:25.9.0
+    environment:
+      - SERVICE_URL_GRAMPSWEB_5000
+      - GRAMPSWEB_TREE=${GRAMPSWEB_TREE:-Gramps Web} # will create a new tree if not exists
+      - GRAMPSWEB_CELERY_CONFIG__broker_url=redis://grampsweb_redis:6379/0
+      - GRAMPSWEB_CELERY_CONFIG__result_backend=redis://grampsweb_redis:6379/0
+      - GRAMPSWEB_RATELIMIT_STORAGE_URI=redis://grampsweb_redis:6379/1
+      - GUNICORN_NUM_WORKERS=${GUNICORN_NUM_WORKERS:-2}
+    depends_on:
+      - grampsweb_redis
+    volumes: &volumes
+      - gramps_users:/app/users # persist user database
+      - gramps_index:/app/indexdir # persist search index
+      - gramps_thumb_cache:/app/thumbnail_cache # persist thumbnails
+      - gramps_cache:/app/cache # persist export and report caches
+      - gramps_secret:/app/secret # persist flask secret
+      - gramps_db:/root/.gramps/grampsdb # persist Gramps database
+      - gramps_media:/app/media # persist media files
+      - gramps_tmp:/tmp
+    healthcheck:
+      test: wget -O - http://localhost:5000 > /dev/null 2>&1
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  grampsweb_celery:
+    image: ghcr.io/gramps-project/grampsweb:25.9.0
+    environment:
+      - GRAMPSWEB_TREE=${GRAMPSWEB_TREE:-Gramps Web} # will create a new tree if not exists
+      - GRAMPSWEB_CELERY_CONFIG__broker_url=redis://grampsweb_redis:6379/0
+      - GRAMPSWEB_CELERY_CONFIG__result_backend=redis://grampsweb_redis:6379/0
+      - GRAMPSWEB_RATELIMIT_STORAGE_URI=redis://grampsweb_redis:6379/1
+    depends_on:
+      - grampsweb_redis
+    volumes:
+      <<: *volumes
+    command: celery -A gramps_webapi.celery worker --loglevel=INFO --concurrency=2
+    healthcheck:
+      test: SECRET_KEY="$(cat secret/secret)" celery -A gramps_webapi.celery status || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  grampsweb_redis:
+    image: docker.io/library/redis:7.2.4-alpine
+    healthcheck:
+      test: redis-cli ping | grep PONG
+      interval: 5s
+      timeout: 10s
+      retries: 3

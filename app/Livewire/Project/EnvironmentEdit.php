@@ -63,7 +63,7 @@ class EnvironmentEdit extends Component
     {
         try {
             $this->syncData(true);
-            $this->redirectRoute('project.environment.edit', [
+            redirectRoute($this, 'project.environment.edit', [
                 'environment_uuid' => $this->environment->uuid,
                 'project_uuid' => $this->project->uuid,
             ]);

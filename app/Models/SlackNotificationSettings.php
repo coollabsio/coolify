@@ -29,6 +29,7 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications',
         'server_unreachable_slack_notifications',
         'server_patch_slack_notifications',
+        'traefik_outdated_slack_notifications',
     ];
 
     protected $casts = [
@@ -47,6 +48,7 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications' => 'boolean',
         'server_unreachable_slack_notifications' => 'boolean',
         'server_patch_slack_notifications' => 'boolean',
+        'traefik_outdated_slack_notifications' => 'boolean',
     ];
 
     public function team()

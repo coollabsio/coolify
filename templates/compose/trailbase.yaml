@@ -1,0 +1,14 @@
+# documentation: https://trailbase.io/
+# slogan: A blazingly fast Rust/SQLite/Wasmtime app server with type-safe APIs
+# category: backend
+# tags: trailbase,backend,saas,mobile,api
+# logo: svgs/trailbase.svg
+# port: 4000
+
+services:
+  trailbase:
+    image: trailbase/trailbase:0.22.6
+    environment:
+      - SERVICE_URL_TRAILBASE_4000
+    volumes:
+      - trailbase-data:/app/traildepot

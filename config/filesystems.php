@@ -35,13 +35,6 @@ return [
             'throw' => false,
         ],
 
-        'webhooks-during-maintenance' => [
-            'driver' => 'local',
-            'root' => storage_path('app/webhooks-during-maintenance'),
-            'visibility' => 'private',
-            'throw' => false,
-        ],
-
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -1,0 +1,171 @@
+# documentation: https://docs.swetrix.com/selfhosting/how-to
+# slogan: Privacy-friendly and cookieless European web analytics alternative to Google Analytics.
+# category: analytics
+# tags: analytics,privacy,monitoring,open-source,clickhouse,redis
+# logo: svgs/swetrix.svg
+# port: 3000
+
+services:
+  swetrix:
+    image: swetrix/swetrix-fe:v4.0.5
+    depends_on:
+      - swetrix-api
+    environment:
+      - SERVICE_URL_SWETRIX_3000
+      - API_URL=$SERVICE_URL_SWETRIXAPI
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider http://localhost:3000/ping || exit 1
+      timeout: 5s
+      retries: 10
+      interval: 30s
+      start_period: 15s
+
+  swetrix-api:
+    image: swetrix/swetrix-api:v4.0.5
+    environment:
+      # Required
+      - SECRET_KEY_BASE=$SERVICE_BASE64_64_SECRETKEYBASE
+      - SERVICE_URL_SWETRIXAPI
+
+      # Optional
+      - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-false}
+      - IP_GEOLOCATION_DB_PATH=${IP_GEOLOCATION_DB_PATH:-}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+      - CLOUDFLARE_PROXY_ENABLED=${CLOUDFLARE_PROXY_ENABLED:-false}
+
+      # SMTP (optional)
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - FROM_EMAIL=${FROM_EMAIL:-}
+      - SMTP_MOCK=${SMTP_MOCK:-false}
+
+      # OIDC (optional)
+      - OIDC_ENABLED=${OIDC_ENABLED:-false}
+      - OIDC_ONLY_AUTH=${OIDC_ONLY_AUTH:-false}
+      - OIDC_DISCOVERY_URL=${OIDC_DISCOVERY_URL:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+
+      # Required service endpoints
+      - REDIS_HOST=redis
+      - CLICKHOUSE_HOST=http://clickhouse
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+    depends_on:
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider http://localhost:5005/ping || exit 1
+      timeout: 5s
+      retries: 10
+      interval: 30s
+      start_period: 15s
+
+  redis:
+    image: redis:8.2-alpine
+    environment:
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_USER=${REDIS_USER:-default}
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping | grep PONG
+      timeout: 5s
+      retries: 10
+      interval: 30s
+      start_period: 1m
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.10-alpine
+    environment:
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-analytics}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-8123}
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 -O - http://127.0.0.1:8123/ping || exit 1
+      timeout: 5s
+      retries: 10
+      interval: 30s
+      start_period: 1m
+    cap_add:
+      - SYS_NICE
+    volumes:
+      # Persistent storage for ClickHouse
+      - swetrix-events-data:/var/lib/clickhouse
+
+      # Disable logging
+      - type: bind
+        source: ./disable-user-logging.xml
+        target: /etc/clickhouse-server/users.d/disable-user-logging.xml
+        read_only: true
+        content: |
+          <clickhouse>
+            <profiles>
+              <default>
+                <log_queries>0</log_queries>
+                <log_query_threads>0</log_query_threads>
+              </default>
+            </profiles>
+          </clickhouse>
+      - type: bind
+        source: ./reduce-logs.xml
+        target: /etc/clickhouse-server/config.d/reduce-logs.xml
+        read_only: true
+        content: |
+          <clickhouse>
+            <logger>
+              <level>warning</level>
+              <console>true</console>
+            </logger>
+            <query_thread_log remove="remove"/>
+            <query_log remove="remove"/>
+            <text_log remove="remove"/>
+            <trace_log remove="remove"/>
+            <metric_log remove="remove"/>
+            <asynchronous_metric_log remove="remove"/>
+            <session_log remove="remove"/>
+            <part_log remove="remove"/>
+          </clickhouse>
+
+      # Reduce RAM usage
+      - type: bind
+        source: ./preserve-ram-config.xml
+        target: /etc/clickhouse-server/config.d/preserve-ram-config.xml
+        read_only: true
+        content: |
+          <clickhouse>
+            <mark_cache_size>536870912</mark_cache_size>
+            <concurrent_threads_soft_limit_num>1</concurrent_threads_soft_limit_num>
+          </clickhouse>
+      - type: bind
+        source: ./preserve-ram-user.xml
+        target: /etc/clickhouse-server/users.d/preserve-ram-user.xml
+        read_only: true
+        content: |
+          <clickhouse>
+            <profiles>
+              <default>
+                <max_block_size>2048</max_block_size>
+                <max_download_threads>1</max_download_threads>
+                <input_format_parallel_parsing>0</input_format_parallel_parsing>
+                <output_format_parallel_formatting>0</output_format_parallel_formatting>
+              </default>
+            </profiles>
+          </clickhouse>
+
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144

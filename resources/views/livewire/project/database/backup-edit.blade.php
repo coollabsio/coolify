@@ -106,7 +106,7 @@
                         min="0"
                         helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit." />
                     <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageLocally"
-                        type="number" min="0" step="0.0000001"
+                        type="number" min="0"
                         helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage." />
                 </div>
             </div>
@@ -122,7 +122,7 @@
                             min="0"
                             helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit." />
                         <x-forms.input label="Maximum storage (GB)" id="databaseBackupRetentionMaxStorageS3"
-                            type="number" min="0" step="0.0000001"
+                            type="number" min="0"
                             helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage." />
                     </div>
                 </div>
