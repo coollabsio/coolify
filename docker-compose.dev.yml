@@ -1,5 +1,7 @@
 services:
   coolify:
+    image: coolify:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/development/Dockerfile
@@ -41,6 +43,8 @@ services:
     volumes:
       - dev_redis_data:/data
   soketi:
+    image: coolify-realtime:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/coolify-realtime/Dockerfile
@@ -59,8 +63,9 @@ services:
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:20-alpine
+    image: node:24-alpine
     pull_policy: always
+    container_name: coolify-vite
     working_dir: /var/www/html
     environment:
       VITE_HOST: "${VITE_HOST:-localhost}"
@@ -73,6 +78,8 @@ services:
     networks:
       - coolify
   testing-host:
+    image: coolify-testing-host:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
@@ -97,7 +104,7 @@ services:
     networks:
       - coolify
   minio:
-    image: minio/minio:latest
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     pull_policy: always
     container_name: coolify-minio
     command: server /data --console-address ":9001"
@@ -109,6 +116,26 @@ services:
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
       - dev_minio_data:/data
+    networks:
+      - coolify
+  minio-init:
+    image: minio/mc:latest
+    pull_policy: always
+    container_name: coolify-minio-init
+    restart: no
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      until mc alias set local http://coolify-minio:9000 minioadmin minioadmin 2>/dev/null; do
+        echo 'MinIO not ready yet, waiting...';
+        sleep 2;
+      done;
+      echo 'MinIO is ready, creating bucket if needed...';
+      mc mb local/local --ignore-existing;
+      echo 'MinIO initialization complete - bucket local is ready';
+      "
     networks:
       - coolify
 

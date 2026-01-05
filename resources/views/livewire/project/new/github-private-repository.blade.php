@@ -21,7 +21,7 @@
                 <div class="flex flex-col justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
                         <div class="flex">
-                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
+                            <div class="w-full gap-2 py-4 group coolbox"
                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
                                 wire:key="{{ $ghapp->id }}">
                                 <div class="flex mr-4">
@@ -95,14 +95,45 @@
                                     @endif
                                 </div>
                                 @if ($build_pack === 'dockercompose')
-                                    <x-forms.input placeholder="/" wire:model.blur-sm="base_directory"
-                                        label="Base Directory"
+                                    <div x-data="{
+                                        baseDir: '{{ $base_directory }}',
+                                        composeLocation: '{{ $docker_compose_location }}',
+                                        normalizePath(path) {
+                                            if (!path || path.trim() === '') return '/';
+                                            path = path.trim();
+                                            // Remove trailing slashes
+                                            path = path.replace(/\/+$/, '');
+                                            // Ensure leading slash
+                                            if (!path.startsWith('/')) {
+                                                path = '/' + path;
+                                            }
+                                            return path;
+                                        },
+                                        normalizeBaseDir() {
+                                            this.baseDir = this.normalizePath(this.baseDir);
+                                        },
+                                        normalizeComposeLocation() {
+                                            this.composeLocation = this.normalizePath(this.composeLocation);
+                                        }
+                                    }" class="gap-2 flex flex-col">
+                                        <x-forms.input placeholder="/" wire:model.defer="base_directory"
+                                            label="Base Directory"
+                                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
+                                            @blur="normalizeBaseDir()" />
+                                        <x-forms.input placeholder="/docker-compose.yaml"
+                                            wire:model.defer="docker_compose_location" label="Docker Compose Location"
+                                            helper="It is calculated together with the Base Directory."
+                                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
+                                        <div class="pt-2">
+                                            <span>
+                                                Compose file location in your repository: </span><span
+                                                class='dark:text-warning'
+                                                x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></span>
+                                        </div>
+                                    </div>
+                                @else
+                                    <x-forms.input wire:model="base_directory" label="Base Directory"
                                         helper="Directory to use as root. Useful for monorepos." />
-                                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
-                                        label="Docker Compose Location"
-                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
-                                    Compose file location in your repository:<span
-                                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
                                 @endif
                                 @if ($show_is_static)
                                     <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"

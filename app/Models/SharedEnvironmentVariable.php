@@ -12,4 +12,19 @@ class SharedEnvironmentVariable extends Model
         'key' => 'string',
         'value' => 'encrypted',
     ];
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function environment()
+    {
+        return $this->belongsTo(Environment::class);
+    }
 }

@@ -43,6 +43,10 @@ class ResourcesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+
+        // General authorization check for viewing resources - using Project as base resource type
+        $this->authorize('viewAny', Project::class);
+
         $projects = Project::where('team_id', $teamId)->get();
         $resources = collect();
         $resources->push($projects->pluck('applications')->flatten());

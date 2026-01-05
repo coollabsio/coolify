@@ -39,7 +39,7 @@ class StopApplication
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop --time=30 $containerName",
+                        "docker stop -t 30 $containerName",
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
@@ -49,12 +49,20 @@ class StopApplication
                 }
 
                 if ($dockerCleanup) {
-                    CleanupDocker::dispatch($server, true);
+                    CleanupDocker::dispatch($server, false, false);
                 }
             } catch (\Exception $e) {
                 return $e->getMessage();
             }
         }
+
+        // Reset restart tracking when application is manually stopped
+        $application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
+
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }
 }

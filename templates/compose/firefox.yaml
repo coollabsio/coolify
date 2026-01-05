@@ -1,5 +1,6 @@
 # documentation: https://github.com/jlesage/docker-firefox
 # slogan: Fast, private, and self-hosted secure browser for browsing without limits.
+# category: productivity
 # tags: browser, web, privacy
 # logo: svgs/firefox.svg
 # port: 5800
@@ -8,7 +9,7 @@ services:
   firefox:
     image: jlesage/firefox
     environment:
-      - SERVICE_FQDN_FIREFOX_5800
+      - SERVICE_URL_FIREFOX_5800
     volumes:
       - firefox_config:/config
     healthcheck:

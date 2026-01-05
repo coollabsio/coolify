@@ -6,7 +6,14 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
 
 use function Laravel\Prompts\confirm;
@@ -103,19 +110,79 @@ class ServicesDelete extends Command
 
     private function deleteDatabase()
     {
-        $databases = StandalonePostgresql::all();
-        if ($databases->count() === 0) {
+        // Collect all databases from all types with unique identifiers
+        $allDatabases = collect();
+        $databaseOptions = collect();
+
+        // Add PostgreSQL databases
+        foreach (StandalonePostgresql::all() as $db) {
+            $key = "postgresql_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (PostgreSQL)");
+        }
+
+        // Add MySQL databases
+        foreach (StandaloneMysql::all() as $db) {
+            $key = "mysql_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (MySQL)");
+        }
+
+        // Add MariaDB databases
+        foreach (StandaloneMariadb::all() as $db) {
+            $key = "mariadb_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (MariaDB)");
+        }
+
+        // Add MongoDB databases
+        foreach (StandaloneMongodb::all() as $db) {
+            $key = "mongodb_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (MongoDB)");
+        }
+
+        // Add Redis databases
+        foreach (StandaloneRedis::all() as $db) {
+            $key = "redis_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (Redis)");
+        }
+
+        // Add KeyDB databases
+        foreach (StandaloneKeydb::all() as $db) {
+            $key = "keydb_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (KeyDB)");
+        }
+
+        // Add Dragonfly databases
+        foreach (StandaloneDragonfly::all() as $db) {
+            $key = "dragonfly_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (Dragonfly)");
+        }
+
+        // Add ClickHouse databases
+        foreach (StandaloneClickhouse::all() as $db) {
+            $key = "clickhouse_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (ClickHouse)");
+        }
+
+        if ($allDatabases->count() === 0) {
             $this->error('There are no databases to delete.');
 
             return;
         }
+
         $databasesToDelete = multiselect(
             'What database do you want to delete?',
-            $databases->pluck('name', 'id')->sortKeys(),
+            $databaseOptions->sortKeys(),
         );
 
-        foreach ($databasesToDelete as $database) {
-            $toDelete = $databases->where('id', $database)->first();
+        foreach ($databasesToDelete as $databaseKey) {
+            $toDelete = $allDatabases->get($databaseKey);
             if ($toDelete) {
                 $this->info($toDelete);
                 $confirmed = confirm('Are you sure you want to delete all selected resources?');

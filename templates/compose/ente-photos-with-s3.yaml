@@ -1,0 +1,128 @@
+# documentation: https://help.ente.io/self-hosting/installation/compose
+# slogan: Ente Photos is a fully open source, End to End Encrypted alternative to Google Photos and Apple Photos.
+# category: media
+# tags: photos,gallery,backup,encryption,privacy,self-hosted,google-photos,alternative
+# logo: svgs/ente-photos.svg
+# port: 8080
+
+services:
+  museum:
+    image: 'ghcr.io/ente-io/server:613c6a96390d7a624cf30b946955705d632423cc' # Released at 2025-09-14T22:16:37-07:00
+    environment:
+      - SERVICE_URL_MUSEUM_8080
+      - ENTE_DB_HOST=postgres
+      - ENTE_DB_PORT=5432
+      - 'ENTE_DB_NAME=${POSTGRES_DB:-ente_db}'
+      - 'ENTE_DB_USER=${SERVICE_USER_POSTGRES}'
+      - 'ENTE_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'ENTE_HTTP_USE_TLS=${ENTE_HTTP_USE_TLS:-false}'
+      - ENTE_S3_ARE_LOCAL_BUCKETS=false
+      - ENTE_S3_USE_PATH_STYLE_URLS=true
+      - 'ENTE_S3_B2_EU_CEN_KEY=${SERVICE_USER_MINIO}'
+      - 'ENTE_S3_B2_EU_CEN_SECRET=${SERVICE_PASSWORD_MINIO}'
+      - 'ENTE_S3_B2_EU_CEN_ENDPOINT=${SERVICE_FQDN_MINIO_9000}'
+      - ENTE_S3_B2_EU_CEN_REGION=eu-central-2
+      - ENTE_S3_B2_EU_CEN_BUCKET=b2-eu-cen
+      - 'ENTE_KEY_ENCRYPTION=${SERVICE_REALBASE64_ENCRYPTION}'
+      - 'ENTE_KEY_HASH=${SERVICE_REALBASE64_64_HASH}'
+      - 'ENTE_JWT_SECRET=${SERVICE_REALBASE64_JWT}'
+      - 'ENTE_INTERNAL_ADMIN=${ENTE_INTERNAL_ADMIN:-1580559962386438}'
+      - 'ENTE_INTERNAL_DISABLE_REGISTRATION=${ENTE_INTERNAL_DISABLE_REGISTRATION:-false}'
+      - 'ENTE_SMTP_HOST=${ENTE_SMTP_HOST:-smtp.gmail.com}'
+      - 'ENTE_SMTP_PORT=${ENTE_SMTP_PORT:-587}'
+      - 'ENTE_SMTP_USERNAME=${ENTE_SMTP_USERNAME}'
+      - 'ENTE_SMTP_PASSWORD=${ENTE_SMTP_PASSWORD}'
+      - 'ENTE_SMTP_EMAIL=${ENTE_SMTP_EMAIL}'
+      - 'ENTE_SMTP_SENDER_NAME=${ENTE_SMTP_SENDER_NAME}'
+      - 'ENTE_SMTP_ENCRYPTION=${ENTE_SMTP_ENCRYPTION:-tls}'
+    volumes:
+      - 'museum-data:/data'
+      - 'museum-config:/config'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - 'http://127.0.0.1:8080/ping'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    image: 'ghcr.io/ente-io/web:ca03165f5e7f2a50105e6e40019c17ae6cdd934f' # Released at 2025-10-08T00:57:05-07:00
+    environment:
+      - SERVICE_URL_WEB_3000
+      - 'ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '--fail'
+        - 'http://localhost:3000'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  postgres:
+    image: 'postgres:15-alpine'
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-ente_db}'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-ente_db}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    command: 'server /data --console-address ":9001"'
+    environment:
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - 'minio-data:/data'
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      
+  minio-init:
+    image: 'minio/mc:RELEASE.2025-08-13T08-35-41Z' # Released at 2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_started
+    restart: on-failure
+    exclude_from_hc: true
+    environment:
+      - 'MINIO_ROOT_USER=${SERVICE_USER_MINIO}'
+      - 'MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}'
+      - 'MINIO_CORS_URLS=$SERVICE_URL_MUSEUM,$SERVICE_URL_WEB'
+    entrypoint: |-
+      /bin/sh -c "
+        echo \"MINIO_CORS_URLS: \$${MINIO_CORS_URLS}\";
+        sleep 5;
+        until mc alias set minio http://minio:9000 \$${MINIO_ROOT_USER} \$${MINIO_ROOT_PASSWORD}; do
+          echo 'Waiting for MinIO...';
+          sleep 2;
+        done;
+        mc admin config set minio api cors_allow_origin='$MINIO_CORS_URLS' || true;
+        mc mb minio/b2-eu-cen --ignore-existing;
+        mc mb minio/wasabi-eu-central-2-v3 --ignore-existing;
+        mc mb minio/scw-eu-fr-v3 --ignore-existing;
+        echo 'MinIO buckets and CORS configured';
+      "

@@ -1,5 +1,6 @@
 # documentation: https://docs.linuxserver.io/images/docker-transmission/
 # slogan: Fast, easy, and free BitTorrent client.
+# category: media
 # tags: bittorrent, torrent, peer-to-peer
 # logo: svgs/transmission.svg
 # port: 9091
@@ -8,7 +9,7 @@ services:
   transmission:
     image: lscr.io/linuxserver/transmission:latest
     environment:
-      - SERVICE_FQDN_TRANSMISSION_9091
+      - SERVICE_URL_TRANSMISSION_9091
       - PUID=1000
       - PGID=1000
       - USER=${SERVICE_USER_ADMIN}
@@ -19,11 +20,11 @@ services:
       - transmission-watch:/watch
     healthcheck:
       test: [
-        "CMD", 
-        "curl", 
+        "CMD",
+        "curl",
         "-sSfL",
         "-u",
-        "${SERVICE_USER_ADMIN}:${SERVICE_PASSWORD_ADMIN}", 
+        "${SERVICE_USER_ADMIN}:${SERVICE_PASSWORD_ADMIN}",
         "http://localhost:9091/"
       ]
       interval: 30s

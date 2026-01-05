@@ -41,7 +41,13 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     $database = new StandaloneRedis;
     $database->uuid = (new Cuid2);
     $database->name = 'redis-database-'.$database->uuid;
+
     $redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    if ($otherData && isset($otherData['redis_password'])) {
+        $redis_password = $otherData['redis_password'];
+        unset($otherData['redis_password']);
+    }
+
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -237,11 +243,17 @@ function removeOldBackups($backup): void
 {
     try {
         if ($backup->executions) {
-            $localBackupsToDelete = deleteOldBackupsLocally($backup);
-            if ($localBackupsToDelete->isNotEmpty()) {
-                $backup->executions()
-                    ->whereIn('id', $localBackupsToDelete->pluck('id'))
-                    ->update(['local_storage_deleted' => true]);
+            // Delete old local backups (only if local backup is NOT disabled)
+            // Note: When disable_local_backup is enabled, each execution already marks its own
+            // local_storage_deleted status at the time of backup, so we don't need to retroactively
+            // update old executions
+            if (! $backup->disable_local_backup) {
+                $localBackupsToDelete = deleteOldBackupsLocally($backup);
+                if ($localBackupsToDelete->isNotEmpty()) {
+                    $backup->executions()
+                        ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                        ->update(['local_storage_deleted' => true]);
+                }
             }
         }
 
@@ -254,9 +266,17 @@ function removeOldBackups($backup): void
             }
         }
 
+        // Delete execution records where all backup copies are gone
+        // Case 1: Both local and S3 backups are deleted
         $backup->executions()
             ->where('local_storage_deleted', true)
             ->where('s3_storage_deleted', true)
+            ->delete();
+
+        // Case 2: Local backup is deleted and S3 was never used (s3_uploaded is null)
+        $backup->executions()
+            ->where('local_storage_deleted', true)
+            ->whereNull('s3_uploaded')
             ->delete();
 
     } catch (\Exception $e) {

@@ -3,10 +3,13 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class ScheduledBackups extends Component
 {
+    use AuthorizesRequests;
+
     public $database;
 
     public $parameters;
@@ -53,6 +56,8 @@ class ScheduledBackups extends Component
 
     public function setCustomType()
     {
+        $this->authorize('update', $this->database);
+
         $this->database->custom_type = $this->custom_type;
         $this->database->save();
         $this->dispatch('success', 'Database type set.');
@@ -61,7 +66,10 @@ class ScheduledBackups extends Component
 
     public function delete($scheduled_backup_id): void
     {
-        $this->database->scheduledBackups->find($scheduled_backup_id)->delete();
+        $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
+        $this->authorize('manageBackups', $this->database);
+
+        $backup->delete();
         $this->dispatch('success', 'Scheduled backup deleted.');
         $this->refreshScheduledBackups();
     }

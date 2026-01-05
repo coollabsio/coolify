@@ -1,5 +1,6 @@
 # documentation: https://docs.browserless.io/
-# slogan: A headless Chrome browser as a service .
+# slogan: A headless Chrome browser as a service.
+# category: devtools
 # tags: chrome,headless,browser,service
 # logo: svgs/browserless.svg
 # port: 3000
@@ -8,7 +9,7 @@ services:
   browserless:
     image: ghcr.io/browserless/chromium
     environment:
-      - SERVICE_FQDN_BROWSERLESS_3000
+      - SERVICE_URL_BROWSERLESS_3000
       - TOKEN=$SERVICE_PASSWORD_BROWSERLESS
     expose:
       - 3000

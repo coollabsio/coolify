@@ -1,5 +1,6 @@
 # documentation: https://labelstud.io/guide/
 # slogan: Label Studio is a multi-type data labeling and annotation tool with standardized output format
+# category: ai
 # tags: workflow, orchestration, data-pipeline, python, labelstudio, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp, images, vision
 # logo: svgs/labelstudio.png
 # port: 8080
@@ -11,8 +12,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_LABELSTUDIO_8080
-      - CSRF_TRUSTED_ORIGINS=${SERVICE_FQDN_LABELSTUDIO}
+      - SERVICE_URL_LABELSTUDIO_8080
+      - CSRF_TRUSTED_ORIGINS=${SERVICE_URL_LABELSTUDIO}
       - EXPERIMENTAL_FEATURES=${EXPERIMENTAL_FEATURES:-false}
       - DJANGO_DB=${DJANGO_DB:-default}
       - POSTGRE_NAME=${POSTGRES_DB:-labelstudio}
@@ -20,7 +21,7 @@ services:
       - POSTGRE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRE_PORT=5432
       - POSTGRE_HOST=postgres
-      - LABEL_STUDIO_HOST=${SERVICE_FQDN_LABELSTUDIO}
+      - LABEL_STUDIO_HOST=${SERVICE_URL_LABELSTUDIO}
       - SSRF_PROTECTION_ENABLED=${SSRF_PROTECTION_ENABLED:-true}
       - LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=${LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK:-true}
       - DATA_UPLOAD_MAX_NUMBER_FILES=${DATA_UPLOAD_MAX_NUMBER_FILES:-10000}

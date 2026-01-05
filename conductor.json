@@ -1,0 +1,7 @@
+{
+    "scripts": {
+        "setup": "./scripts/conductor-setup.sh",
+        "run": "docker rm -f coolify coolify-minio-init coolify-realtime coolify-minio coolify-testing-host coolify-redis coolify-db coolify-mail coolify-vite; spin up; spin down"
+    },
+    "runScriptMode": "nonconcurrent"
+}

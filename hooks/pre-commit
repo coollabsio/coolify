@@ -4,6 +4,19 @@ if sh -c ": >/dev/tty" >/dev/null 2>/dev/null; then
     exec </dev/tty
 fi
 
+# Generate service templates and OpenAPI documentation
+echo "🔄 Generating service templates..."
+php artisan generate:services
+
+echo "📚 Generating OpenAPI documentation..."
+php artisan generate:openapi
+
+# Add the generated files to the commit
+git add templates/service-templates*.json
+git add openapi.json openapi.yaml
+
+echo "✅ Generated files have been added to the commit"
+
 # Get list of stashed PHP files
 stashed_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.php')
 

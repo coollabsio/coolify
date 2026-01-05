@@ -3,7 +3,7 @@
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item"
-                class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
+                class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
             </a>
@@ -38,9 +38,11 @@
                         <div class="flex gap-2">
                             <h2 class="pb-4">Scheduled Backups</h2>
                             @if (filled($serviceDatabase->custom_type) || !$serviceDatabase->is_migrated)
-                                <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
-                                </x-modal-input>
+                                @can('update', $serviceDatabase)
+                                    <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                                        <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
+                                    </x-modal-input>
+                                @endcan
                             @endif
                         </div>
                         <livewire:project.database.scheduled-backups :database="$serviceDatabase" />

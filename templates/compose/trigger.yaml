@@ -1,5 +1,6 @@
 # documentation: https://trigger.dev
 # slogan: The open source Background Jobs framework for TypeScript
+# category: automation
 # tags: trigger.dev, background jobs, typescript, trigger, jobs, cron, scheduler
 # logo: svgs/trigger.png
 # port: 3000
@@ -40,17 +41,17 @@ x-common-env: &common-env
   RESEND_API_KEY: ${RESEND_API_KEY}
   FROM_EMAIL: ${FROM_EMAIL}
   REPLY_TO_EMAIL: ${REPLY_TO_EMAIL}
-  LOGIN_ORIGIN: $SERVICE_FQDN_TRIGGER_3000
-  APP_ORIGIN: $SERVICE_FQDN_TRIGGER_3000
-  DEV_OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_FQDN_TRIGGER_3000/otel
-  OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_FQDN_TRIGGER_3000/otel
+  LOGIN_ORIGIN: $SERVICE_URL_TRIGGER_3000
+  APP_ORIGIN: $SERVICE_URL_TRIGGER_3000
+  DEV_OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_URL_TRIGGER_3000/otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_URL_TRIGGER_3000/otel
   ELECTRIC_ORIGIN: http://electric:3000
 
 services:
   trigger:
     image: ghcr.io/triggerdotdev/trigger.dev:v3
     environment:
-      SERVICE_FQDN_TRIGGER_3000: ""
+      SERVICE_URL_TRIGGER_3000: ""
       <<: *common-env
     depends_on:
       postgresql:

@@ -1,36 +1,57 @@
-# documentation: https://docs.convex.dev/
+# documentation: https://github.com/get-convex/convex-backend/blob/main/self-hosted/README.md
 # slogan: Convex is the open-source reactive database for app developers.
+# category: backend
 # tags: database, reactive, database, ai, agents, chatbot, api, team, bot, flows
 # logo: svgs/convex.svg
 # port: 6791
 
 services:
   backend:
-    image: ghcr.io/get-convex/convex-backend:5143fec81f146ca67495c12c6b7a15c5802c37e2
+    image: ghcr.io/get-convex/convex-backend:00bd92723422f3bff968230c94ccdeb8c1719832
     volumes:
       - data:/convex/data
     environment:
-      - SERVICE_FQDN_BACKEND_3210
+      - SERVICE_URL_BACKEND_3210
       - INSTANCE_NAME=${INSTANCE_NAME:-self-hosted-convex}
       - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_FQDN_CONVEX_3210}
-      - CONVEX_SITE_ORIGIN=${SERVICE_FQDN_CONVEX_3211}
+      # URL of the Convex API as accessed by the client/frontend.
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_DASHBOARD}
+      # URL of Convex HTTP actions as accessed by the client/frontend.
+      - CONVEX_SITE_ORIGIN=${SERVICE_URL_BACKEND}
       - DATABASE_URL=${DATABASE_URL:-}
-      - DISABLE_BEACON=${DISABLE_BEACON:-}
-      - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-}
-      - CONVEX_SELF_HOSTED_URL=${SERVICE_FQDN_CONVEX_6791}
+      - DISABLE_BEACON=${DISABLE_BEACON:?false}
+      - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:?false}
+      - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:?true}
+      - POSTGRES_URL=${POSTGRES_URL:-}
+      - MYSQL_URL=${MYSQL_URL:-}
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
+      - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
+      - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-}
+      - S3_STORAGE_EXPORTS_BUCKET=${S3_STORAGE_EXPORTS_BUCKET:-}
+      - S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET=${S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET:-}
+      - S3_STORAGE_MODULES_BUCKET=${S3_STORAGE_MODULES_BUCKET:-}
+      - S3_STORAGE_FILES_BUCKET=${S3_STORAGE_FILES_BUCKET:-}
+      - S3_STORAGE_SEARCH_BUCKET=${S3_STORAGE_SEARCH_BUCKET:-}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
     healthcheck:
       test: curl -f http://127.0.0.1:3210/version
       interval: 5s
-      start_period: 5s
+      start_period: 10s
 
   dashboard:
-    image: ghcr.io/get-convex/convex-dashboard:5143fec81f146ca67495c12c6b7a15c5802c37e2
+    image: ghcr.io/get-convex/convex-dashboard:33cef775a8a6228cbacee4a09ac2c4073d62ed13
     environment:
-      - SERVICE_FQDN_CONVEX_6791
-      - NEXT_PUBLIC_DEPLOYMENT_URL=$SERVICE_FQDN_BACKEND_3210
+      - SERVICE_URL_DASHBOARD_6791
+      # URL of the Convex API as accessed by the dashboard (browser).
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
     depends_on:
       backend:
         condition: service_healthy

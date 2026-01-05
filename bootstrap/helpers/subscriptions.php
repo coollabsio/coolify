@@ -5,39 +5,44 @@ use Stripe\Stripe;
 
 function isSubscriptionActive()
 {
-    if (! isCloud()) {
-        return false;
-    }
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
+    return once(function () {
+        if (! isCloud()) {
+            return false;
+        }
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        $subscription = $team?->subscription;
 
-    if (is_null($subscription)) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_invoice_paid === true;
-    }
+        if (is_null($subscription)) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_invoice_paid === true;
+        }
 
-    return false;
+        return false;
+    });
 }
+
 function isSubscriptionOnGracePeriod()
 {
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
-    if (! $subscription) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_cancel_at_period_end;
-    }
+    return once(function () {
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        $subscription = $team?->subscription;
+        if (! $subscription) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_cancel_at_period_end;
+        }
 
-    return false;
+        return false;
+    });
 }
 function subscriptionProvider()
 {
@@ -88,4 +93,23 @@ function allowedPathsForInvalidAccounts()
         'force-password-reset',
         'livewire/update',
     ];
+}
+
+function updateStripeCustomerEmail(Team $team, string $newEmail): void
+{
+    if (! isStripe()) {
+        return;
+    }
+
+    $stripe_customer_id = data_get($team, 'subscription.stripe_customer_id');
+    if (! $stripe_customer_id) {
+        return;
+    }
+
+    Stripe::setApiKey(config('subscription.stripe_api_key'));
+
+    \Stripe\Customer::update(
+        $stripe_customer_id,
+        ['email' => $newEmail]
+    );
 }

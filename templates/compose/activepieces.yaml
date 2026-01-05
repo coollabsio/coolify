@@ -1,20 +1,21 @@
 # documentation: https://www.activepieces.com/docs/getting-started/introduction
 # slogan: Open source no-code business automation.
+# category: automation
 # tags: workflow, automation, no code, open source
 # logo: svgs/activepieces.png
 # port: 80
 
 services:
   activepieces:
-    image: "ghcr.io/activepieces/activepieces:latest"
+    image: "ghcr.io/activepieces/activepieces:0.21.0" # Released on March 13 2024
     environment:
-      - SERVICE_FQDN_ACTIVEPIECES
+      - SERVICE_URL_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
       - AP_ENCRYPTION_KEY=$SERVICE_PASSWORD_ENCRYPTIONKEY
       - AP_ENGINE_EXECUTABLE_PATH=${AP_ENGINE_EXECUTABLE_PATH:-dist/packages/engine/main.js}
       - AP_ENVIRONMENT=${AP_ENVIRONMENT:-prod}
       - AP_EXECUTION_MODE=${AP_EXECUTION_MODE:-UNSANDBOXED}
-      - AP_FRONTEND_URL=${SERVICE_FQDN_ACTIVEPIECES}
+      - AP_FRONTEND_URL=${SERVICE_URL_ACTIVEPIECES}
       - AP_JWT_SECRET=$SERVICE_PASSWORD_64_JWT
       - AP_POSTGRES_DATABASE=${POSTGRES_DB:-activepieces}
       - AP_POSTGRES_HOST=${POSTGRES_HOST:-postgres}
@@ -39,7 +40,7 @@ services:
       timeout: 20s
       retries: 10
   postgres:
-    image: "postgres:latest"
+    image: 'postgres:14.4'
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-activepieces}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -53,7 +54,7 @@ services:
       timeout: 20s
       retries: 10
   redis:
-    image: "redis:latest"
+    image: 'redis:7.0.7'
     volumes:
       - "redis_data:/data"
     healthcheck:

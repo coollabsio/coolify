@@ -1,0 +1,88 @@
+# documentation: https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-kibana-with-docker
+# slogan: Elastic + Kibana is a Free and Open Source Search, Monitoring, and Visualization Stack
+# tags: elastic,kibana,elasticsearch,search,visualization,logging,monitoring,observability,analytics,stack,devops
+# logo: svgs/elasticsearch.svg
+# port: 5601
+
+services:
+  elasticsearch:
+    image: 'elastic/elasticsearch:9.1.2'
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - ELASTIC_PASSWORD=${SERVICE_PASSWORD_ELASTICSEARCH}
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro'
+      - 'elasticsearch-data:/usr/share/elasticsearch/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl --user elastic:${SERVICE_PASSWORD_ELASTICSEARCH} --silent --fail http://localhost:9200/_cluster/health || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 24
+
+  kibana:
+    image: 'kibana:9.1.2'
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_KIBANA_5601
+      - 'SERVER_NAME=${SERVICE_URL_KIBANA}'
+      - 'SERVER_PUBLICBASEURL=${SERVICE_URL_KIBANA}'
+      - 'ELASTICSEARCH_HOSTS=http://elasticsearch:9200'
+      - 'ELASTICSEARCH_USERNAME=kibana_system'
+      - 'ELASTICSEARCH_PASSWORD=${SERVICE_PASSWORD_KIBANA}'
+      - 'XPACK_SECURITY_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKSECURITY}'
+      - 'XPACK_REPORTING_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKREPORTING}'
+      - 'XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKENCRYPTEDSAVEDOBJECTS}'
+      - 'TELEMETRY_OPTIN=${TELEMETRY_OPTIN:-false}'
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro'
+      - 'kibana-data:/usr/share/kibana/data'
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+  setup:
+    image: 'elastic/elasticsearch:9.1.2'
+    container_name: kibana-setup
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    exclude_from_hc: true
+    environment:
+      - 'ELASTIC_PASSWORD=${SERVICE_PASSWORD_ELASTICSEARCH}'
+      - 'KIBANA_PASSWORD=${SERVICE_PASSWORD_KIBANA}'
+    entrypoint:
+      - sh
+      - '-c'
+      - |
+        echo "Setting up Kibana user password..."
+
+        until curl -s -u "elastic:${ELASTIC_PASSWORD}" http://elasticsearch:9200/_cluster/health | grep -q '"status":"green\|yellow"'; do
+          echo "Waiting for Elasticsearch..."
+          sleep 2
+        done
+
+        echo "Setting password for kibana_system user..."
+        curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}" \
+          -H "Content-Type: application/json" \
+          http://elasticsearch:9200/_security/user/kibana_system/_password \
+          -d "{\"password\":\"${KIBANA_PASSWORD}\"}" || exit 1
+
+        echo "Kibana setup completed successfully"
+    restart: 'no'
