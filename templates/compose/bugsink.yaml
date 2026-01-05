@@ -1,5 +1,6 @@
 # documentation: https://www.bugsink.com/docs/
-# slogan: Self-hosted Error Tracking
+# slogan: Self-hosted Error Tracking.
+# category: monitoring
 # tags: python, error-tracking, django, mysql
 # logo: svgs/bugsink.svg
 # port: 8000
@@ -31,9 +32,10 @@ services:
     environment:
       - SECRET_KEY=$SERVICE_PASSWORD_64_BUGSINK
       - CREATE_SUPERUSER=admin:$SERVICE_PASSWORD_BUGSINK
-      - SERVICE_FQDN_BUGSINK_8000
-      - BASE_URL=$SERVICE_FQDN_BUGSINK_8000
+      - SERVICE_URL_BUGSINK_8000
+      - BASE_URL=$SERVICE_URL_BUGSINK_8000
       - DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}
+      - BEHIND_HTTPS_PROXY=True
     depends_on:
       mysql:
         condition: service_healthy

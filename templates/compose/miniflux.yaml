@@ -1,5 +1,6 @@
 # documentation: https://miniflux.app/docs/index.html
 # slogan: Miniflux is a minimalist and opinionated feed reader.
+# category: cms
 # tags: miniflux,rss,feed,self,hosted
 # logo: svgs/miniflux.svg
 # port: 8080
@@ -8,8 +9,8 @@ services:
   miniflux:
     image: ghcr.io/miniflux/miniflux:latest
     environment:
-      - SERVICE_FQDN_MINIFLUX
-      - BASE_URL=${SERVICE_FQDN_MINIFLUX}
+      - SERVICE_URL_MINIFLUX
+      - BASE_URL=${SERVICE_URL_MINIFLUX}
       - PORT=${PORT:-8080}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-1}
       - CREATE_ADMIN=${CREATE_ADMIN:-1}

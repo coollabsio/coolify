@@ -2,18 +2,17 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Exception;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
+    use AuthorizesRequests;
+
     public ScheduledDatabaseBackup $backup;
 
     #[Locked]
@@ -64,6 +63,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $saveS3 = false;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $disableLocalBackup = false;
+
     #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = 1;
 
@@ -73,12 +75,13 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
-    #[Validate(['required', 'int', 'min:1', 'max:36000'])]
+    #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
     public function mount()
     {
         try {
+            $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
             $this->syncData();
         } catch (Exception $e) {
@@ -98,7 +101,27 @@ class BackupEdit extends Component
             $this->backup->database_backup_retention_days_s3 = $this->databaseBackupRetentionDaysS3;
             $this->backup->database_backup_retention_max_storage_s3 = $this->databaseBackupRetentionMaxStorageS3;
             $this->backup->save_s3 = $this->saveS3;
+            $this->backup->disable_local_backup = $this->disableLocalBackup;
             $this->backup->s3_storage_id = $this->s3StorageId;
+
+            // Validate databases_to_backup to prevent command injection
+            if (filled($this->databasesToBackup)) {
+                $databases = str($this->databasesToBackup)->explode(',');
+                foreach ($databases as $index => $db) {
+                    $dbName = trim($db);
+                    try {
+                        validateShellSafePath($dbName, 'database name');
+                    } catch (\Exception $e) {
+                        // Provide specific error message indicating which database failed validation
+                        $position = $index + 1;
+                        throw new \Exception(
+                            "Database #{$position} ('{$dbName}') validation failed: ".
+                            $e->getMessage()
+                        );
+                    }
+                }
+            }
+
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
@@ -115,6 +138,7 @@ class BackupEdit extends Component
             $this->databaseBackupRetentionDaysS3 = $this->backup->database_backup_retention_days_s3;
             $this->databaseBackupRetentionMaxStorageS3 = $this->backup->database_backup_retention_max_storage_s3;
             $this->saveS3 = $this->backup->save_s3;
+            $this->disableLocalBackup = $this->backup->disable_local_backup ?? false;
             $this->s3StorageId = $this->backup->s3_storage_id;
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
@@ -124,12 +148,10 @@ class BackupEdit extends Component
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
+        $this->authorize('manageBackups', $this->backup->database);
 
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         try {
@@ -161,13 +183,14 @@ class BackupEdit extends Component
             $this->backup->delete();
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $previousUrl = url()->previous();
-                $url = Url::fromString($previousUrl);
-                $url = $url->withoutQueryParameter('selectedBackupId');
-                $url = $url->withFragment('backups');
-                $url = $url->getPath()."#{$url->getFragment()}";
+                $serviceDatabase = $this->backup->database;
 
-                return redirect($url);
+                return redirect()->route('project.service.database.backups', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $serviceDatabase->service->uuid,
+                    'stack_service_uuid' => $serviceDatabase->uuid,
+                ]);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }
@@ -181,6 +204,8 @@ class BackupEdit extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('manageBackups', $this->backup->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
@@ -193,6 +218,12 @@ class BackupEdit extends Component
         if (! is_numeric($this->backup->s3_storage_id)) {
             $this->backup->s3_storage_id = null;
         }
+
+        // Validate that disable_local_backup can only be true when S3 backup is enabled
+        if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
+            $this->backup->disable_local_backup = $this->disableLocalBackup = false;
+        }
+
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
             throw new \Exception('Invalid Cron / Human expression');
@@ -203,6 +234,8 @@ class BackupEdit extends Component
     public function submit()
     {
         try {
+            $this->authorize('manageBackups', $this->backup->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {

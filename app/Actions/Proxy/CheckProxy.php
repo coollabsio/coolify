@@ -66,11 +66,11 @@ class CheckProxy
             if ($server->id === 0) {
                 $ip = 'host.docker.internal';
             }
-            $portsToCheck = ['80', '443'];
+            $portsToCheck = [];
 
             try {
                 if ($server->proxyType() !== ProxyTypes::NONE->value) {
-                    $proxyCompose = CheckConfiguration::run($server);
+                    $proxyCompose = GetProxyConfiguration::run($server);
                     if (isset($proxyCompose)) {
                         $yaml = Yaml::parse($proxyCompose);
                         $configPorts = [];

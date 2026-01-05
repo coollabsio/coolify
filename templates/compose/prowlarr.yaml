@@ -1,5 +1,6 @@
 # documentation: https://hub.docker.com/r/linuxserver/prowlarr
 # slogan: Prowlarr⁠ is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps.
+# category: media
 # tags: media, server, movies, tv, indexer, torrent, nzb, usenet
 # logo: svgs/prowlarr.svg
 # port: 9696
@@ -8,8 +9,8 @@ services:
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     environment:
-      - SERVICE_FQDN_PROWLARR_9696
-      - _APP_URL=$SERVICE_FQDN_PROWLARR
+      - SERVICE_URL_PROWLARR_9696
+      - _APP_URL=$SERVICE_URL_PROWLARR
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/Toronto}

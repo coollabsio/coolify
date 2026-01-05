@@ -25,7 +25,6 @@ services:
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
-      - ./webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     env_file:
       - .env
     environment:
@@ -75,13 +74,7 @@ services:
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME}",
-          "-d",
-          "${DB_DATABASE:-coolify}"
-        ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME}", "-d", "${DB_DATABASE:-coolify}" ]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -103,7 +96,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.0'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.10'
     pull_policy: always
     container_name: coolify-realtime
     restart: always
@@ -121,7 +114,7 @@ services:
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6001/ready && wget -qO- http://127.0.0.1:6002/ready || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:6001/ready && wget -qO- http://127.0.0.1:6002/ready || exit 1" ]
       interval: 5s
       retries: 10
       timeout: 2s

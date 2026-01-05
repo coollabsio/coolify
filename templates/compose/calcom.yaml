@@ -1,5 +1,6 @@
 # documentation: https://cal.com/docs/developing/introduction
 # slogan: Scheduling infrastructure for everyone.
+# category: productivity
 # tags: calcom,calendso,scheduling,open,source
 # logo: svgs/calcom.svg
 # port: 3000
@@ -12,14 +13,14 @@ services:
       # Some variables still uses Calcom previous name, Calendso
       #
       # Full list https://github.com/calcom/cal.com/blob/main/.env.example
-      - SERVICE_FQDN_CALCOM_3000
+      - SERVICE_URL_CALCOM_3000
       - NEXT_PUBLIC_LICENSE_CONSENT=agree
       - NODE_ENV=production
-      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_FQDN_CALCOM}
-      - NEXT_PUBLIC_API_V2_URL=${SERVICE_FQDN_CALCOM}/api/v2
+      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_URL_CALCOM}
+      - NEXT_PUBLIC_API_V2_URL=${SERVICE_URL_CALCOM}/api/v2
       # https://next-auth.js.org/configuration/options#nextauth_url
       # From https://github.com/calcom/docker?tab=readme-ov-file#important-run-time-variables, it should be ${NEXT_PUBLIC_WEBAPP_URL}/api/auth
-      - NEXTAUTH_URL=${SERVICE_FQDN_CALCOM}/api/auth
+      - NEXTAUTH_URL=${SERVICE_URL_CALCOM}/api/auth
       # It is highly recommended that the NEXTAUTH_SECRET must be overridden and very unique
       # Use `openssl rand -base64 32` to generate a key
       - NEXTAUTH_SECRET=${SERVICE_BASE64_CALCOMSECRET}
@@ -47,7 +48,7 @@ services:
       - EMAIL_SERVER_PASSWORD=${EMAIL_SERVER_PASSWORD}
       - NEXT_PUBLIC_APP_NAME="Cal.com"
       # More info on ALLOWED_HOSTNAMES https://github.com/calcom/cal.com/issues/12201
-      - ALLOWED_HOSTNAMES=["${SERVICE_FQDN_CALCOM}"]
+      - ALLOWED_HOSTNAMES=["${SERVICE_URL_CALCOM}"]
     depends_on:
       - postgresql
   postgresql:

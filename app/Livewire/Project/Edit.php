@@ -3,18 +3,29 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
-use Livewire\Attributes\Validate;
+use App\Support\ValidationPatterns;
 use Livewire\Component;
 
 class Edit extends Component
 {
     public Project $project;
 
-    #[Validate(['required', 'string', 'min:3', 'max:255'])]
     public string $name;
 
-    #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $description = null;
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return ValidationPatterns::combinedMessages();
+    }
 
     public function mount(string $project_uuid)
     {

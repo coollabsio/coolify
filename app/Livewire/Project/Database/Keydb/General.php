@@ -6,59 +6,48 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
+use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class General extends Component
 {
-    public Server $server;
+    use AuthorizesRequests;
+
+    public ?Server $server = null;
 
     public StandaloneKeydb $database;
 
-    #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $description = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $keydbConf = null;
 
-    #[Validate(['required', 'string'])]
     public string $keydbPassword;
 
-    #[Validate(['required', 'string'])]
     public string $image;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $portsMappings = null;
 
-    #[Validate(['nullable', 'boolean'])]
     public ?bool $isPublic = null;
 
-    #[Validate(['nullable', 'integer'])]
     public ?int $publicPort = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $customDockerRunOptions = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $dbUrl = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $dbUrlPublic = null;
 
-    #[Validate(['nullable', 'boolean'])]
     public bool $isLogDrainEnabled = false;
 
     public ?Carbon $certificateValidUntil = null;
 
-    #[Validate(['boolean'])]
     public bool $enable_ssl = false;
 
     public function getListeners()
@@ -69,15 +58,20 @@ class General extends Component
         return [
             "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'refresh' => '$refresh',
         ];
     }
 
     public function mount()
     {
         try {
+            $this->authorize('view', $this->database);
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
 
             $existingCert = $this->database->sslCertificates()->first();
 
@@ -87,6 +81,41 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    protected function rules(): array
+    {
+        $baseRules = [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'keydbConf' => 'nullable|string',
+            'keydbPassword' => 'required|string',
+            'image' => 'required|string',
+            'portsMappings' => 'nullable|string',
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer',
+            'customDockerRunOptions' => 'nullable|string',
+            'dbUrl' => 'nullable|string',
+            'dbUrlPublic' => 'nullable|string',
+            'isLogDrainEnabled' => 'nullable|boolean',
+            'enable_ssl' => 'boolean',
+        ];
+
+        return $baseRules;
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'keydbPassword.required' => 'The KeyDB Password field is required.',
+                'keydbPassword.string' => 'The KeyDB Password must be a string.',
+                'image.required' => 'The Docker Image field is required.',
+                'image.string' => 'The Docker Image must be a string.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+            ]
+        );
     }
 
     public function syncData(bool $toModel = false)
@@ -128,6 +157,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -146,6 +177,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
@@ -183,6 +216,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('manageEnvironment', $this->database);
+
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }
@@ -202,6 +237,8 @@ class General extends Component
     public function instantSaveSSL()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
@@ -212,6 +249,8 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $existingCert = $this->database->sslCertificates()->first();
 
             if (! $existingCert) {
@@ -220,7 +259,7 @@ class General extends Component
                 return;
             }
 
-            $caCert = SslCertificate::where('server_id', $existingCert->server_id)
+            $caCert = $this->server->sslCertificates()
                 ->where('is_ca_certificate', true)
                 ->first();
 

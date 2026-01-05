@@ -33,9 +33,6 @@ class ExecuteContainerCommand extends Component
 
     public function mount()
     {
-        if (! auth()->user()->isAdmin()) {
-            abort(403);
-        }
         $this->parameters = get_route_parameters();
         $this->containers = collect();
         $this->servers = collect();
@@ -132,6 +129,12 @@ class ExecuteContainerCommand extends Component
                 });
             }
         }
+
+        // Sort containers alphabetically by name
+        $this->containers = $this->containers->sortBy(function ($container) {
+            return data_get($container, 'container.Names');
+        });
+
         if ($this->containers->count() === 1) {
             $this->selected_container = data_get($this->containers->first(), 'container.Names');
         }
@@ -158,6 +161,9 @@ class ExecuteContainerCommand extends Component
                 data_get($server, 'name'),
                 data_get($server, 'uuid')
             );
+
+            // Dispatch a frontend event to ensure terminal gets focus after connection
+            $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
@@ -213,6 +219,9 @@ class ExecuteContainerCommand extends Component
                 data_get($container, 'container.Names'),
                 data_get($container, 'server.uuid')
             );
+
+            // Dispatch a frontend event to ensure terminal gets focus after connection
+            $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

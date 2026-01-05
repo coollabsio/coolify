@@ -4,11 +4,15 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Rules\ValidProxyConfigFilename;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
 class NewDynamicConfiguration extends Component
 {
+    use AuthorizesRequests;
+
     public string $fileName = '';
 
     public string $value = '';
@@ -23,6 +27,7 @@ class NewDynamicConfiguration extends Component
 
     public function mount()
     {
+        $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->first();
         $this->parameters = get_route_parameters();
         if ($this->fileName !== '') {
             $this->fileName = str_replace('|', '.', $this->fileName);
@@ -32,16 +37,19 @@ class NewDynamicConfiguration extends Component
     public function addDynamicConfiguration()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->validate([
-                'fileName' => 'required',
+                'fileName' => ['required', new ValidProxyConfigFilename],
                 'value' => 'required',
             ]);
+
+            // Additional security validation to prevent command injection
+            validateShellSafePath($this->fileName, 'proxy configuration filename');
+
             if (data_get($this->parameters, 'server_uuid')) {
                 $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();
             }
-            if (! is_null($this->server_id)) {
-                $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->first();
-            }
+
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
@@ -62,8 +70,10 @@ class NewDynamicConfiguration extends Component
             }
             $proxy_path = $this->server->proxyPath();
             $file = "{$proxy_path}/dynamic/{$this->fileName}";
+            $escapedFile = escapeshellarg($file);
+
             if ($this->newFile) {
-                $exists = instant_remote_process(["test -f $file && echo 1 || echo 0"], $this->server);
+                $exists = instant_remote_process(["test -f {$escapedFile} && echo 1 || echo 0"], $this->server);
                 if ($exists == 1) {
                     $this->dispatch('error', 'File already exists');
 
@@ -77,7 +87,7 @@ class NewDynamicConfiguration extends Component
             }
             $base64_value = base64_encode($this->value);
             instant_remote_process([
-                "echo '{$base64_value}' | base64 -d | tee {$file} > /dev/null",
+                "echo '{$base64_value}' | base64 -d | tee {$escapedFile} > /dev/null",
             ], $this->server);
             if ($proxy_type === 'CADDY') {
                 $this->server->reloadCaddy();

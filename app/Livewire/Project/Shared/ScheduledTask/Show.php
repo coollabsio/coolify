@@ -6,12 +6,15 @@ use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public Application|Service $resource;
 
     public ScheduledTask $task;
@@ -36,6 +39,9 @@ class Show extends Component
 
     #[Validate(['string', 'nullable'])]
     public ?string $container = null;
+
+    #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
+    public $timeout = 300;
 
     #[Locked]
     public ?string $application_uuid;
@@ -66,7 +72,7 @@ class Show extends Component
             } elseif ($service_uuid) {
                 $this->type = 'service';
                 $this->service_uuid = $service_uuid;
-                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $service_uuid)->firstOrFail();
+                $this->resource = Service::ownedByCurrentTeamCached()->where('uuid', $service_uuid)->firstOrFail();
             }
             $this->parameters = [
                 'environment_uuid' => $environment_uuid,
@@ -96,6 +102,7 @@ class Show extends Component
             $this->task->command = str($this->command)->trim()->value();
             $this->task->frequency = str($this->frequency)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
+            $this->task->timeout = (int) $this->timeout;
             $this->task->save();
         } else {
             $this->isEnabled = $this->task->enabled;
@@ -103,12 +110,14 @@ class Show extends Component
             $this->command = $this->task->command;
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
+            $this->timeout = $this->task->timeout ?? 300;
         }
     }
 
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
             $this->refreshTasks();
@@ -120,6 +129,7 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
@@ -139,6 +149,7 @@ class Show extends Component
     public function delete()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->task->delete();
 
             if ($this->type === 'application') {
@@ -154,6 +165,7 @@ class Show extends Component
     public function executeNow()
     {
         try {
+            $this->authorize('update', $this->resource);
             ScheduledTaskJob::dispatch($this->task);
             $this->dispatch('success', 'Scheduled task executed.');
         } catch (\Exception $e) {

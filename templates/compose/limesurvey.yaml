@@ -1,5 +1,6 @@
 # documentation: https://www.limesurvey.org/manual/
 # slogan: Simple, quick and anonymous online survey tool that's bursting with juicy insights.
+# category: productivity
 # tags: online survey, forms, no code, open source
 # logo: svgs/limesurvey.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   limesurvey:
     image: adamzammit/limesurvey:latest
     environment:
-      - SERVICE_FQDN_LIMESURVEY_80
+      - SERVICE_URL_LIMESURVEY_80
       - LIMESURVEY_DB_HOST=mariadb
       - LIMESURVEY_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - LIMESURVEY_DB_USER=${SERVICE_USER_MYSQL}

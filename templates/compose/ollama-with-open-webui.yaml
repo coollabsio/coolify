@@ -1,5 +1,6 @@
 # documentation: https://docs.openwebui.com
 # slogan: Ollama with Open Web UI integrates AI model deployment with a user-friendly interface.
+# category: ai
 # tags: ollama,ai,models,deployment,open-web-ui,integration
 # logo: svgs/ollama.svg
 
@@ -21,7 +22,7 @@ services:
     depends_on:
       - ollama-api
     environment:
-      - SERVICE_FQDN_OLLAMA_8080
+      - SERVICE_URL_OLLAMA_8080
       - OLLAMA_BASE_URL=http://ollama-api:11434
     healthcheck:
       test:
