@@ -22,13 +22,8 @@ services:
       - meshcentral-files:/opt/meshcentral/meshcentral-files
       - meshcentral-backups:/opt/meshcentral/meshcentral-backups
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "--eval",
-          "const http = require('http'); const options = { host: '0.0.0.0', port: 80, timeout: 2000, path: '/health.ashx' }; const healthCheck = http.request(options, (res) => { console.log('HEALTHCHECK STATUS:', res.statusCode); if (res.statusCode == 200) { process.exit(0); } else { process.exit(1); } }); healthCheck.on('error', function (err) { console.error('ERROR'); process.exit(1); }); healthCheck.end();",
-        ]
+      test: ["CMD", "curl", "-k", "--fail", "https://localhost:443/health.ashx"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
+      start_period: 5s
       retries: 3
