@@ -18,14 +18,12 @@ services:
       - "./mosquitto/config:/mosquitto/config"
       - "./certs:/certs"
     ports:
-      - "1883:1883"
       - "8883:8883"
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
       interval: 30s
       timeout: 10s
       retries: 3
-
     entrypoint: 'sh -c "
       if [ ''$REQUIRE_CERTIFICATE'' = ''true'' ]; then
       echo ''listener 8883'' > /mosquitto/config/mosquitto.conf &&
