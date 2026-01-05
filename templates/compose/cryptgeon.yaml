@@ -1,5 +1,6 @@
 # documentation: https://github.com/cupcakearmy/cryptgeon
 # slogan: Secure note / file sharing service inspired by PrivNote.
+# category: security
 # tags: cryptgeon, secure, note, sharing, privnote, file, sharing
 # logo: svgs/cryptgeon.png
 # port: 8000
@@ -8,7 +9,7 @@ services:
   app:
     image: cupcakearmy/cryptgeon:latest
     environment:
-      - SERVICE_FQDN_CRYPTGEON_8000
+      - SERVICE_URL_CRYPTGEON_8000
       - SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}
       - MAX_VIEWS=${MAX_VIEWS:-100}
       - MAX_EXPIRATION=${MAX_EXPIRATION:-360}

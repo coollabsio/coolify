@@ -17,24 +17,44 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     if (! $server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
+
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
-            if (! str($labels)->contains('coolify.pullRequestId=')) {
-                data_set($container, 'Labels', $labels.",coolify.pullRequestId={$pullRequestId}");
+            $containerName = data_get($container, 'Names');
+            $hasPrLabel = str($labels)->contains('coolify.pullRequestId=');
+            $prLabelValue = null;
 
+            if ($hasPrLabel) {
+                preg_match('/coolify\.pullRequestId=(\d+)/', $labels, $matches);
+                $prLabelValue = $matches[1] ?? null;
+            }
+
+            // Treat pullRequestId=0 or missing label as base deployment (convention: 0 = no PR)
+            $isBaseDeploy = ! $hasPrLabel || (int) $prLabelValue === 0;
+
+            // If we're looking for a specific PR and this is a base deployment, exclude it
+            if ($pullRequestId !== null && $pullRequestId !== 0 && $isBaseDeploy) {
+                return null;
+            }
+
+            // If this is a base deployment, include it when not filtering for PRs
+            if ($isBaseDeploy) {
                 return $container;
             }
+
             if ($includePullrequests) {
                 return $container;
             }
-            if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
+            if ($pullRequestId !== null && $pullRequestId !== 0 && str($labels)->contains("coolify.pullRequestId={$pullRequestId}")) {
                 return $container;
             }
 
             return null;
         });
 
-        return $containers->filter();
+        $filtered = $containers->filter();
+
+        return $filtered;
     }
 
     return $containers;
@@ -256,12 +276,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
                 $MINIO_BROWSER_REDIRECT_URL->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid, true),
+                    'value' => generateUrl(server: $server, random: 'console-'.$uuid, forceHttps: true),
                 ]);
             }
             if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
                 $MINIO_SERVER_URL->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
+                    'value' => generateUrl(server: $server, random: 'minio-'.$uuid, forceHttps: true),
                 ]);
             }
             $payload = collect([
@@ -279,17 +299,47 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ENDPOINT->update([
-                    'value' => generateFqdn($server, 'logto-'.$uuid),
+                    'value' => generateUrl(server: $server, random: 'logto-'.$uuid),
                 ]);
             }
             if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ADMIN_ENDPOINT->update([
-                    'value' => generateFqdn($server, 'logto-admin-'.$uuid),
+                    'value' => generateUrl(server: $server, random: 'logto-admin-'.$uuid),
                 ]);
             }
             $payload = collect([
                 $LOGTO_ENDPOINT->value.':3001',
                 $LOGTO_ADMIN_ENDPOINT->value.':3002',
+            ]);
+            break;
+        case $type?->contains('garage'):
+            $GARAGE_S3_API_URL = $variables->where('key', 'GARAGE_S3_API_URL')->first();
+            $GARAGE_WEB_URL = $variables->where('key', 'GARAGE_WEB_URL')->first();
+            $GARAGE_ADMIN_URL = $variables->where('key', 'GARAGE_ADMIN_URL')->first();
+
+            if (is_null($GARAGE_S3_API_URL) || is_null($GARAGE_WEB_URL) || is_null($GARAGE_ADMIN_URL)) {
+                return collect([]);
+            }
+
+            if (str($GARAGE_S3_API_URL->value ?? '')->isEmpty()) {
+                $GARAGE_S3_API_URL->update([
+                    'value' => generateUrl(server: $server, random: 's3-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_WEB_URL->value ?? '')->isEmpty()) {
+                $GARAGE_WEB_URL->update([
+                    'value' => generateUrl(server: $server, random: 'web-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_ADMIN_URL->value ?? '')->isEmpty()) {
+                $GARAGE_ADMIN_URL->update([
+                    'value' => generateUrl(server: $server, random: 'admin-'.$uuid, forceHttps: true),
+                ]);
+            }
+            $payload = collect([
+                $GARAGE_S3_API_URL->value.':3900',
+                $GARAGE_WEB_URL->value.':3902',
+                $GARAGE_ADMIN_URL->value.':3903',
             ]);
             break;
     }
@@ -378,6 +428,16 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     if ($serviceLabels) {
         $middlewares_from_labels = $serviceLabels->map(function ($item) {
+            // Handle array values from YAML parsing (e.g., "traefik.enable: true" becomes an array)
+            if (is_array($item)) {
+                // Convert array to string format "key=value"
+                $key = collect($item)->keys()->first();
+                $value = collect($item)->values()->first();
+                $item = "$key=$value";
+            }
+            if (! is_string($item)) {
+                return null;
+            }
             if (preg_match('/traefik\.http\.middlewares\.(.*?)(\.|$)/', $item, $matches)) {
                 return $matches[1];
             }
@@ -740,10 +800,26 @@ function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
     }
     $imageName = $image->before(':');
 
-    // First check if it's a known database image
+    // Extract base image name (ignore registry prefix)
+    // Examples:
+    //   docker.io/library/postgres -> postgres
+    //   ghcr.io/postgrest/postgrest -> postgrest
+    //   postgres -> postgres
+    //   postgrest/postgrest -> postgrest
+    $baseImageName = $imageName;
+    if (str($imageName)->contains('/')) {
+        $baseImageName = str($imageName)->afterLast('/');
+    }
+
+    // Check if base image name exactly matches a known database image
     $isKnownDatabase = false;
     foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
-        if (str($imageName)->contains($database_docker_image)) {
+        // Extract base name from database pattern for comparison
+        $databaseBaseName = str($database_docker_image)->contains('/')
+            ? str($database_docker_image)->afterLast('/')
+            : $database_docker_image;
+
+        if ($baseImageName == $databaseBaseName) {
             $isKnownDatabase = true;
             break;
         }
@@ -932,6 +1008,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
+        '--entrypoint' => 'entrypoint',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -951,6 +1028,38 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
             }
+        }
+        if ($option === '--entrypoint') {
+            $value = null;
+            // Match --entrypoint=value or --entrypoint value
+            // Handle quoted strings with escaped quotes: --entrypoint "python -c \"print('hi')\""
+            // Pattern matches: double-quoted (with escapes), single-quoted (with escapes), or unquoted values
+            if (preg_match(
+                '/--entrypoint(?:=|\s+)(?<raw>"(?:\\\\.|[^"])*"|\'(?:\\\\.|[^\'])*\'|[^\s]+)/',
+                $custom_docker_run_options,
+                $entrypoint_matches
+            )) {
+                $rawValue = $entrypoint_matches['raw'];
+                // Handle double-quoted strings: strip quotes and unescape special characters
+                if (str_starts_with($rawValue, '"') && str_ends_with($rawValue, '"')) {
+                    $inner = substr($rawValue, 1, -1);
+                    // Unescape backslash sequences: \" \$ \` \\
+                    $value = preg_replace('/\\\\(["$`\\\\])/', '$1', $inner);
+                } elseif (str_starts_with($rawValue, "'") && str_ends_with($rawValue, "'")) {
+                    // Handle single-quoted strings: just strip quotes (no unescaping per shell rules)
+                    $value = substr($rawValue, 1, -1);
+                } else {
+                    // Handle unquoted values
+                    $value = $rawValue;
+                }
+            }
+
+            if ($value && trim($value) !== '') {
+                $options[$option][] = $value;
+                $options[$option] = array_values(array_unique($options[$option]));
+            }
+
+            continue;
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
@@ -990,6 +1099,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--entrypoint') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                // Docker compose accepts entrypoint as either a string or an array
+                // Keep it as a string for simplicity - docker compose will handle it
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -1053,6 +1168,44 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     return $docker_compose;
 }
 
+/**
+ * Remove Coolify's custom Docker Compose fields from parsed YAML array
+ *
+ * Coolify extends Docker Compose with custom fields that are processed during
+ * parsing and deployment but must be removed before sending to Docker.
+ *
+ * Custom fields:
+ * - exclude_from_hc (service-level): Exclude service from health check monitoring
+ * - content (volume-level): Auto-create file with specified content during init
+ * - isDirectory / is_directory (volume-level): Mark bind mount as directory
+ *
+ * @param  array  $yamlCompose  Parsed Docker Compose array
+ * @return array Cleaned Docker Compose array with custom fields removed
+ */
+function stripCoolifyCustomFields(array $yamlCompose): array
+{
+    foreach ($yamlCompose['services'] ?? [] as $serviceName => $service) {
+        // Remove service-level custom fields
+        unset($yamlCompose['services'][$serviceName]['exclude_from_hc']);
+
+        // Remove volume-level custom fields (only for long syntax - arrays)
+        if (isset($service['volumes'])) {
+            foreach ($service['volumes'] as $volumeName => $volume) {
+                // Skip if volume is string (short syntax like 'db-data:/var/lib/postgresql/data')
+                if (! is_array($volume)) {
+                    continue;
+                }
+
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['content']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['isDirectory']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['is_directory']);
+            }
+        }
+    }
+
+    return $yamlCompose;
+}
+
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
     $uuid = Str::random(18);
@@ -1062,13 +1215,10 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
             throw new \Exception('Server not found');
         }
         $yaml_compose = Yaml::parse($compose);
-        foreach ($yaml_compose['services'] as $service_name => $service) {
-            foreach ($service['volumes'] as $volume_name => $volume) {
-                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
-                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
-                }
-            }
-        }
+
+        // Remove Coolify's custom fields before Docker validation
+        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
+
         $base64_compose = base64_encode(Yaml::dump($yaml_compose));
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
@@ -1093,19 +1243,18 @@ function getContainerLogs(Server $server, string $container_id, int $lines = 100
 {
     if ($server->isSwarm()) {
         $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id}",
+            "docker service logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     } else {
         $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id}",
+            "docker logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     }
 
-    $output .= removeAnsiColors($output);
+    $output = removeAnsiColors($output);
 
     return $output;
 }
-
 function escapeEnvVariables($value)
 {
     $search = ['\\', "\r", "\t", "\x0", '"', "'"];
@@ -1119,4 +1268,216 @@ function escapeDollarSign($value)
     $replace = ['$$'];
 
     return str_replace($search, $replace, $value);
+}
+
+/**
+ * Escape a value for use in a bash .env file that will be sourced with 'source' command
+ * Wraps the value in single quotes and escapes any single quotes within the value
+ *
+ * @param  string|null  $value  The value to escape
+ * @return string The escaped value wrapped in single quotes
+ */
+function escapeBashEnvValue(?string $value): string
+{
+    // Handle null or empty values
+    if ($value === null || $value === '') {
+        return "''";
+    }
+
+    // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+    // This is the standard way to escape single quotes in bash single-quoted strings
+    $escaped = str_replace("'", "'\\''", $value);
+
+    // Wrap in single quotes
+    return "'{$escaped}'";
+}
+
+/**
+ * Escape a value for bash double-quoted strings (allows $VAR expansion)
+ *
+ * This function wraps values in double quotes while escaping special characters,
+ * but preserves valid bash variable references like $VAR and ${VAR}.
+ *
+ * @param  string|null  $value  The value to escape
+ * @return string The escaped value wrapped in double quotes
+ */
+function escapeBashDoubleQuoted(?string $value): string
+{
+    // Handle null or empty values
+    if ($value === null || $value === '') {
+        return '""';
+    }
+
+    // Step 1: Escape backslashes first (must be done before other escaping)
+    $escaped = str_replace('\\', '\\\\', $value);
+
+    // Step 2: Escape double quotes
+    $escaped = str_replace('"', '\\"', $escaped);
+
+    // Step 3: Escape backticks (command substitution)
+    $escaped = str_replace('`', '\\`', $escaped);
+
+    // Step 4: Escape invalid $ patterns while preserving valid variable references
+    // Valid patterns to keep:
+    //   - $VAR_NAME (alphanumeric + underscore, starting with letter or _)
+    //   - ${VAR_NAME} (brace expansion)
+    //   - $0-$9 (positional parameters)
+    // Invalid patterns to escape: $&, $#, $$, $*, $@, $!, $(, etc.
+
+    // Match $ followed by anything that's NOT a valid variable start
+    // Valid variable starts: letter, underscore, digit (for $0-$9), or open brace
+    $escaped = preg_replace(
+        '/\$(?![a-zA-Z_0-9{])/',
+        '\\\$',
+        $escaped
+    );
+
+    // Preserve pre-escaped dollars inside double quotes: turn \\$ back into \$
+    // (keeps tests like "path\\to\\file" intact while restoring \$ semantics)
+    $escaped = preg_replace('/\\\\(?=\$)/', '\\\\', $escaped);
+
+    // Wrap in double quotes
+    return "\"{$escaped}\"";
+}
+
+/**
+ * Generate Docker build arguments from environment variables collection
+ * Returns only keys (no values) since values are sourced from environment via export
+ *
+ * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings (keys only)
+ */
+function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
+{
+    $variables = collect($variables);
+
+    return $variables->map(function ($var) {
+        $key = is_array($var) ? data_get($var, 'key') : $var->key;
+
+        // Only return the key - Docker will get the value from the environment
+        return "--build-arg {$key}";
+    });
+}
+
+/**
+ * Generate Docker environment flags from environment variables collection
+ *
+ * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return string Space-separated environment flags
+ */
+function generateDockerEnvFlags($variables): string
+{
+    $variables = collect($variables);
+
+    return $variables
+        ->map(function ($var) {
+            $key = is_array($var) ? data_get($var, 'key') : $var->key;
+            $value = is_array($var) ? data_get($var, 'value') : $var->value;
+            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
+
+            if ($isMultiline) {
+                // For multiline variables, strip surrounding quotes and escape for bash
+                $raw_value = trim($value, "'");
+                $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
+
+                return "-e {$key}=\"{$escaped_value}\"";
+            }
+
+            $escaped_value = escapeshellarg($value);
+
+            return "-e {$key}={$escaped_value}";
+        })
+        ->implode(' ');
+}
+
+/**
+ * Auto-inject -f and --env-file flags into a docker compose command if not already present
+ *
+ * @param  string  $command  The docker compose command to modify
+ * @param  string  $composeFilePath  The path to the compose file
+ * @param  string  $envFilePath  The path to the .env file
+ * @return string The modified command with injected flags
+ *
+ * @example
+ * Input:  "docker compose build"
+ * Output: "docker compose -f ./docker-compose.yml --env-file .env build"
+ */
+function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath): string
+{
+    $dockerComposeReplacement = 'docker compose';
+
+    // Add -f flag if not present (checks for both -f and --file with various formats)
+    // Detects: -f path, -f=path, -fpath (concatenated with path chars: . / ~), --file path, --file=path
+    // Note: Uses [.~/]|$ instead of \S to prevent false positives with flags like -foo, -from, -feature
+    if (! preg_match('/(?:^|\s)(?:-f(?:[=\s]|[.\/~]|$)|--file(?:=|\s))/', $command)) {
+        $dockerComposeReplacement .= " -f {$composeFilePath}";
+    }
+
+    // Add --env-file flag if not present (checks for --env-file with various formats)
+    // Detects: --env-file path, --env-file=path with any whitespace
+    if (! preg_match('/(?:^|\s)--env-file(?:=|\s)/', $command)) {
+        $dockerComposeReplacement .= " --env-file {$envFilePath}";
+    }
+
+    // Replace only first occurrence to avoid modifying comments/strings/chained commands
+    return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
+}
+
+/**
+ * Inject build arguments right after build-related subcommands in docker/docker compose commands.
+ * This ensures build args are only applied to build operations, not to push, pull, up, etc.
+ *
+ * Supports:
+ * - docker compose build
+ * - docker buildx build
+ * - docker builder build
+ * - docker build (legacy)
+ *
+ * Examples:
+ * - Input:  "docker compose -f file.yml build"
+ *   Output: "docker compose -f file.yml build --build-arg X --build-arg Y"
+ *
+ * - Input:  "docker buildx build --platform linux/amd64"
+ *   Output: "docker buildx build --build-arg X --build-arg Y --platform linux/amd64"
+ *
+ * - Input:  "docker builder build --tag myimage:latest"
+ *   Output: "docker builder build --build-arg X --build-arg Y --tag myimage:latest"
+ *
+ * - Input:  "docker compose build && docker compose push"
+ *   Output: "docker compose build --build-arg X --build-arg Y && docker compose push"
+ *
+ * - Input:  "docker compose push"
+ *   Output: "docker compose push" (unchanged - no build command found)
+ *
+ * @param  string  $command  The docker command
+ * @param  string  $buildArgsString  The build arguments to inject (e.g., "--build-arg X --build-arg Y")
+ * @return string The modified command with build args injected after build subcommand
+ */
+function injectDockerComposeBuildArgs(string $command, string $buildArgsString): string
+{
+    // Early return if no build args to inject
+    if (empty(trim($buildArgsString))) {
+        return $command;
+    }
+
+    // Match build-related commands:
+    // - ' builder build' (docker builder build)
+    // - ' buildx build' (docker buildx build)
+    // - ' build' (docker compose build, docker build)
+    // Followed by either:
+    // - whitespace (allowing service names, flags, or any valid arguments)
+    // - end of string ($)
+    // This regex ensures we match build subcommands, not "build" in other contexts
+    // IMPORTANT: Order matters - check longer patterns first (builder build, buildx build) before ' build'
+    $pattern = '/( builder build| buildx build| build)(?=\s|$)/';
+
+    // Replace the first occurrence of build command with build command + build-args
+    $modifiedCommand = preg_replace(
+        $pattern,
+        '$1 '.$buildArgsString,
+        $command,
+        1  // Only replace first occurrence
+    );
+
+    return $modifiedCommand ?? $command;
 }

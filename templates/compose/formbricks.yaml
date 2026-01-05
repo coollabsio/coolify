@@ -1,5 +1,6 @@
 # documentation: https://formbricks.com/docs/self-hosting/configuration
 # slogan: Open Source Survey Platform
+# category: analytics
 # tags: form, builder, forms, survey, open source, experience, management, self-hosted, docker
 # logo: svgs/formbricks.png
 # port: 3000
@@ -8,12 +9,12 @@ services:
   formbricks:
     image: ghcr.io/formbricks/formbricks:latest
     environment:
-      - SERVICE_FQDN_FORMBRICKS_3000
-      - WEBAPP_URL=$SERVICE_FQDN_FORMBRICKS
+      - SERVICE_URL_FORMBRICKS_3000
+      - WEBAPP_URL=$SERVICE_URL_FORMBRICKS
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - NEXTAUTH_SECRET=$SERVICE_BASE64_NEXTAUTH
-      - NEXTAUTH_URL=$SERVICE_FQDN_FORMBRICKS
+      - NEXTAUTH_URL=$SERVICE_URL_FORMBRICKS
       - ENCRYPTION_KEY=$SERVICE_BASE64_ENCRYPTION
       - CRON_SECRET=$SERVICE_BASE64_CRON
       - ENTERPRISE_LICENSE_KEY=${ENTERPRISE_LICENSE_KEY}

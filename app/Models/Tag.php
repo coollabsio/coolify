@@ -2,18 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Traits\HasSafeStringAttribute;
 
 class Tag extends BaseModel
 {
+    use HasSafeStringAttribute;
+
     protected $guarded = [];
 
-    public function name(): Attribute
+    protected function customizeName($value)
     {
-        return Attribute::make(
-            get: fn ($value) => strtolower($value),
-            set: fn ($value) => strtolower($value)
-        );
+        return strtolower($value);
     }
 
     public static function ownedByCurrentTeam()

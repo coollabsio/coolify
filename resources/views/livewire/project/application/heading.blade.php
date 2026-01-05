@@ -2,23 +2,32 @@
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
-            <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.deployment.index', $parameters) }}">
                 Deployments
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
-                Logs
+                <div class="flex items-center gap-1">
+                    Logs
+                    @if ($application->restart_count > 0 && !str($application->status)->startsWith('exited'))
+                        <svg class="w-4 h-4 dark:text-warning" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" title="Container has restarted {{ $application->restart_count }} time{{ $application->restart_count > 1 ? 's' : '' }}">
+                            <path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5v4h2v-4h-2zm0 5v2h2v-2h-2z"/>
+                        </svg>
+                    @endif
+                </div>
             </a>
             @if (!$application->destination->server->isSwarm())
-                <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.application.command', $parameters) }}">
-                    Terminal
-                </a>
+                @can('canAccessTerminal')
+                    <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
+                        href="{{ route('project.application.command', $parameters) }}">
+                        Terminal
+                    </a>
+                @endcan
             @endif
             <x-applications.links :application="$application" />
         </nav>

@@ -8,7 +8,7 @@ class Metrics extends Component
 {
     public $resource;
 
-    public $chartId = 'container-cpu';
+    public $chartId = 'metrics';
 
     public $data;
 

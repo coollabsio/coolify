@@ -1,5 +1,6 @@
 # documentation: https://invoiceninja.github.io/selfhost.html
 # slogan: The leading open-source invoicing platform
+# category: productivity
 # tags: invoicing, billing, accounting, finance, self-hosted
 # logo: svgs/invoiceninja.png
 # port: 9000
@@ -8,10 +9,10 @@ services:
   invoice-ninja:
     image: invoiceninja/invoiceninja:5
     environment:
-      - SERVICE_FQDN_INVOICENINJA
+      - SERVICE_URL_INVOICENINJA
       - APP_NAME=${APP_NAME:-"Invoice Ninja"}
       - APP_ENV=${APP_ENV:-production}
-      - APP_URL=${SERVICE_FQDN_INVOICENINJA}
+      - APP_URL=${SERVICE_URL_INVOICENINJA}
       - APP_KEY=base64:${SERVICE_REALBASE64_INVOICENINJA}
       - APP_DEBUG=${APP_DEBUG:-false}
       - REQUIRE_HTTPS=${REQUIRE_HTTPS:-false}

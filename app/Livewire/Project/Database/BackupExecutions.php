@@ -2,11 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -69,12 +67,8 @@ class BackupExecutions extends Component
 
     public function deleteBackup($executionId, $password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -202,11 +196,6 @@ class BackupExecutions extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup-executions', [
-            'checkboxes' => [
-                ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'],
-                // ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently from SFTP Storage'],
-            ],
-        ]);
+        return view('livewire.project.database.backup-executions');
     }
 }

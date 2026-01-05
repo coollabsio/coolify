@@ -1,6 +1,7 @@
 # documentation: https://docs.anythingllm.com/installation-docker/overview
 # slogan: AnythingLLM is the easiest to use, all-in-one AI application that can do RAG, AI Agents, and much more with no code or infrastructure headaches.
-# tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot
+# category: ai
+# tags: lowcode, nocode, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot
 # logo: svgs/anythingllm.svg
 # port: 3001
 
@@ -8,7 +9,7 @@ services:
   anything-llm:
     image: mintplexlabs/anythingllm
     environment:
-      - SERVICE_FQDN_ANYTHINGLLM_3001
+      - SERVICE_URL_ANYTHINGLLM_3001
       - STORAGE_DIR=/app/server/storage
       - DISABLE_TELEMETRY=${DISABLE_TELEMETRY:-true}
       - PASSWORDLOWERCASE=${PASSWORDLOWERCASE:-1}

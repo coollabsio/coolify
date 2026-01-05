@@ -68,7 +68,7 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_type' => GithubApp::class,
         ]);
 
-        $fqdn = generateFqdn($destination->server, $application->uuid);
+        $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([
             'name' => 'dockerfile-'.$application->uuid,
             'fqdn' => $fqdn,

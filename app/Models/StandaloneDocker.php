@@ -2,8 +2,13 @@
 
 namespace App\Models;
 
+use App\Jobs\ConnectProxyToNetworksJob;
+use App\Traits\HasSafeStringAttribute;
+
 class StandaloneDocker extends BaseModel
 {
+    use HasSafeStringAttribute;
+
     protected $guarded = [];
 
     protected static function boot()
@@ -14,8 +19,7 @@ class StandaloneDocker extends BaseModel
             instant_remote_process([
                 "docker network inspect $newStandaloneDocker->network >/dev/null 2>&1 || docker network create --driver overlay --attachable $newStandaloneDocker->network >/dev/null",
             ], $server, false);
-            $connectProxyToDockerNetworks = connectProxyToNetworks($server);
-            instant_remote_process($connectProxyToDockerNetworks, $server, false);
+            ConnectProxyToNetworksJob::dispatchSync($server);
         });
     }
 

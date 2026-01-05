@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Add extends Component
 {
+    use AuthorizesRequests;
+
     public $parameters;
 
     #[Locked]
@@ -20,6 +23,9 @@ class Add extends Component
     #[Locked]
     public Collection $containerNames;
 
+    #[Locked]
+    public $resource;
+
     public string $name;
 
     public string $command;
@@ -28,11 +34,14 @@ class Add extends Component
 
     public ?string $container = '';
 
+    public int $timeout = 300;
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
+        'timeout' => 'required|integer|min:60|max:36000',
     ];
 
     protected $validationAttributes = [
@@ -40,11 +49,28 @@ class Add extends Component
         'command' => 'command',
         'frequency' => 'frequency',
         'container' => 'container',
+        'timeout' => 'timeout',
     ];
 
     public function mount()
     {
         $this->parameters = get_route_parameters();
+
+        // Get the resource based on type and id
+        switch ($this->type) {
+            case 'application':
+                $this->resource = \App\Models\Application::findOrFail($this->id);
+                break;
+            case 'service':
+                $this->resource = \App\Models\Service::findOrFail($this->id);
+                break;
+            case 'standalone-postgresql':
+                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                break;
+            default:
+                throw new \Exception('Invalid resource type');
+        }
+
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();
         }
@@ -53,6 +79,7 @@ class Add extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->validate();
             $isValid = validate_cron_expression($this->frequency);
             if (! $isValid) {
@@ -80,6 +107,7 @@ class Add extends Component
             $task->command = $this->command;
             $task->frequency = $this->frequency;
             $task->container = $this->container;
+            $task->timeout = $this->timeout;
             $task->team_id = currentTeam()->id;
 
             switch ($this->type) {
@@ -107,5 +135,6 @@ class Add extends Component
         $this->command = '';
         $this->frequency = '';
         $this->container = '';
+        $this->timeout = 300;
     }
 }

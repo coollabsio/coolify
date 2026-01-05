@@ -1,5 +1,6 @@
 # documentation: https://gotenberg.dev/docs/getting-started/introduction
 # slogan: Gotenberg is a Docker-powered stateless API for PDF files.
+# category: devtools
 # tags: api,backend,pdf,tool
 # logo: svgs/gotenberg.png
 # port: 3000
@@ -8,7 +9,7 @@ services:
   gotenberg:
     image: gotenberg/gotenberg:latest
     environment:
-      - SERVICE_FQDN_GOTENBERG_3000
+      - SERVICE_URL_GOTENBERG_3000
       # NOTE: requires the --api-enable-basic-auth option in "command"
       - GOTENBERG_API_BASIC_AUTH_USERNAME=${SERVICE_USER_GOTENBERG}
       - GOTENBERG_API_BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_GOTENBERG}

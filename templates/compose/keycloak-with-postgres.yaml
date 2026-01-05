@@ -1,5 +1,6 @@
 # documentation: https://www.keycloak.org
 # slogan: Keycloak is an open-source Identity and Access Management tool.
+# category: auth
 # tags: keycloak,identity,access,management,iam,authentication,authorization,security,oauth2,openid-connect,sso,single-sign-on,saml,rbac,ldap,jwt,social-login
 # logo: svgs/keycloak.svg
 # port: 8080
@@ -10,7 +11,7 @@ services:
     command:
       - start
     environment:
-      - SERVICE_FQDN_KEYCLOAK_8080
+      - SERVICE_URL_KEYCLOAK_8080
       - TZ=${TIMEZONE:-UTC}
       - KC_BOOTSTRAP_ADMIN_USERNAME=${SERVICE_USER_ADMIN}
       - KC_BOOTSTRAP_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
@@ -19,7 +20,7 @@ services:
       - KC_DB_PASSWORD=${SERVICE_PASSWORD_64_DATABASE}
       - KC_DB_URL_PORT=5432
       - KC_DB_URL=jdbc:postgresql://postgres/${POSTGRESQL_DATABASE:-keycloak}
-      - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK}
+      - KC_HOSTNAME=${SERVICE_URL_KEYCLOAK}
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
       - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}

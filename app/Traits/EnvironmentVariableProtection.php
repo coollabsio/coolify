@@ -14,7 +14,7 @@ trait EnvironmentVariableProtection
      */
     protected function isProtectedEnvironmentVariable(string $key): bool
     {
-        return str($key)->startsWith('SERVICE_FQDN') || str($key)->startsWith('SERVICE_URL');
+        return str($key)->startsWith('SERVICE_FQDN_') || str($key)->startsWith('SERVICE_URL_') || str($key)->startsWith('SERVICE_NAME_');
     }
 
     /**

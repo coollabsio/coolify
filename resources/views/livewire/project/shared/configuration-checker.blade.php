@@ -12,7 +12,7 @@
                 </svg>
             </x-slot:icon>
             <x-slot:description>
-                <span>Please restart (or redeploy) to apply the new configuration.</span>
+                <span>Please redeploy to apply the new configuration.</span>
             </x-slot:description>
             <x-slot:button-text @click="disableSponsorship()">
                 Disable This Popup

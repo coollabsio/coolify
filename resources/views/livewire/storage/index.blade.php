@@ -4,14 +4,16 @@
     </x-slot>
     <div class="flex items-center gap-2">
         <h1>S3 Storages</h1>
-        <x-modal-input buttonTitle="+ Add" title="New S3 Storage" :closeOutside="false">
-            <livewire:storage.create />
-        </x-modal-input>
+        @can('create', App\Models\S3Storage::class)
+            <x-modal-input buttonTitle="+ Add" title="New S3 Storage" :closeOutside="false">
+                <livewire:storage.create />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="subtitle">S3 storages for backups.</div>
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($s3 as $storage)
-            <a href="/storages/{{ $storage->uuid }}" @class(['gap-2 border cursor-pointer box group'])>
+            <a {{ wireNavigate() }} href="/storages/{{ $storage->uuid }}" @class(['gap-2 border cursor-pointer coolbox group'])>
                 <div class="flex flex-col justify-center mx-6">
                     <div class="box-title">
                         {{ $storage->name }}

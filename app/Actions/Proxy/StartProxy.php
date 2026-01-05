@@ -13,19 +13,27 @@ class StartProxy
 {
     use AsAction;
 
-    public function handle(Server $server, bool $async = true, bool $force = false): string|Activity
+    public function handle(Server $server, bool $async = true, bool $force = false, bool $restarting = false): string|Activity
     {
         $proxyType = $server->proxyType();
         if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
             return 'OK';
         }
+        $server->proxy->set('status', 'starting');
+        $server->save();
+        $server->refresh();
+
+        if (! $restarting) {
+            ProxyStatusChangedUI::dispatch($server->team_id);
+        }
+
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
-        $configuration = CheckConfiguration::run($server);
+        $configuration = GetProxyConfiguration::run($server);
         if (! $configuration) {
             throw new \Exception('Configuration is not synced');
         }
-        SaveConfiguration::run($server, $configuration);
+        SaveProxyConfiguration::run($server, $configuration);
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
         $server->save();
@@ -55,23 +63,34 @@ class StartProxy
                 'docker compose pull',
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
-                '    docker rm -f coolify-proxy || true',
+                '    docker stop coolify-proxy 2>/dev/null || true',
+                '    docker rm -f coolify-proxy 2>/dev/null || true',
+                '    # Wait for container to be fully removed',
+                '    for i in {1..10}; do',
+                '        if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+                '            break',
+                '        fi',
+                '        echo "Waiting for coolify-proxy to be removed... ($i/10)"',
+                '        sleep 1',
+                '    done',
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
+            ]);
+            // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
+            $commands = $commands->merge(ensureProxyNetworksExist($server));
+            $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
                 'docker compose up -d --wait --remove-orphans',
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
-        $server->proxy->set('status', 'starting');
-        $server->save();
-        ProxyStatusChangedUI::dispatch($server->team_id);
 
         if ($async) {
             return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id);
         } else {
             instant_remote_process($commands, $server);
+
             $server->proxy->set('type', $proxyType);
             $server->save();
             ProxyStatusChanged::dispatch($server->id);
