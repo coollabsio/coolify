@@ -1429,43 +1429,19 @@ services:
             {:ok, _} = Supavisor.Tenants.create_tenant(params)
           end
 
-  # =============================================================================
   # Supabase MCP (Model Context Protocol) Server
-  # =============================================================================
-  # WARNING: MCP lacks native OAuth. NEVER expose this to the public internet.
-  # Access ONLY via:
-  #   1. SSH tunnel: ssh -L 3000:localhost:3000 user@server
-  #   2. Wireguard VPN (Default range 10.0.0.0/24 restricted via Middleware)
-  #
-  # Requirements:
-  #   - Configure MCP_DOMAIN (e.g. mcp-proj1.yourdomain.com)
-  #   - Ensure Service Variable MCP_ALLOWED_IPS is set or defaults to VPN range.
-  # =============================================================================
+  # Enables AI assistants to interact with your database
+  # Configure domain in Coolify UI to expose the service
   supabase-mcp:
     image: 'supabase/postgres-mcp:latest'
     environment:
+      - SERVICE_URL_SUPABASEMCP_3000
       - DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
     depends_on:
       supabase-db:
         condition: service_healthy
-    networks:
-      - coolify
-    labels:
-      - "coolify.managed=true"
-      - "coolify.serviceId=${SERVICE_ID}"
-      - "traefik.enable=true"
-      # Unique router per instance prevents configuration collisions
-      - "traefik.http.routers.mcp-${SERVICE_ID}.rule=Host(`${MCP_DOMAIN:-mcp.localhost}`)"
-      - "traefik.http.routers.mcp-${SERVICE_ID}.entrypoints=websecure"
-      - "traefik.http.routers.mcp-${SERVICE_ID}.tls=true"
-      - "traefik.http.routers.mcp-${SERVICE_ID}.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.mcp-${SERVICE_ID}.service=mcp-${SERVICE_ID}"
-      - "traefik.http.services.mcp-${SERVICE_ID}.loadbalancer.server.port=3000"
-      # Security: Only allow traffic from the Coolify Wireguard range
-      - "traefik.http.middlewares.mcp-vpn-${SERVICE_ID}.ipallowlist.sourcerange=${MCP_ALLOWED_IPS:-10.0.0.0/24}"
-      - "traefik.http.routers.mcp-${SERVICE_ID}.middlewares=mcp-vpn-${SERVICE_ID}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/3000' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
