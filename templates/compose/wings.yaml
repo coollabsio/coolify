@@ -1,0 +1,45 @@
+# documentation: https://pterodactyl.io/
+# slogan: Wings is Pterodactyl's server control plane
+# category: devtools
+# tags: game, game server, management, panel, minecraft
+# logo: svgs/pterodactyl.png
+# port: 8443
+
+services:
+  wings:
+    image: "ghcr.io/pterodactyl/wings:latest"
+    environment:
+      - SERVICE_URL_WINGS_8443
+      - "TZ=${TIMEZONE:-UTC}"
+      - WINGS_USERNAME=$SERVICE_USER_WINGS
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/var/lib/docker/containers/:/var/lib/docker/containers/"
+      - "/var/lib/pterodactyl/volumes:/var/lib/pterodactyl/volumes"
+      - "/tmp/pterodactyl:/tmp/pterodactyl"
+      - wings_lib:/var/lib/pterodactyl/
+      - wings_logs:/var/log/pterodactyl/
+      - type: bind
+        source: ./etc/config.yml
+        target: /etc/pterodactyl/config.yml
+        content: |
+          debug: false
+          uuid: ReplaceConfig
+          token_id: ReplaceConfig
+          token: ReplaceConfig
+          api:
+            host: 0.0.0.0
+            port: 8443 # Warning, panel must have 443 as daemon port, while here it should should be 8443, FQDN in Coolify for this service should be https://*:8443
+            ssl:
+              enabled: false
+              cert: ReplaceConfig
+              key: ReplaceConfig
+            upload_limit: 100
+          system:
+            data: /var/lib/pterodactyl/volumes
+            sftp:
+              bind_port: 2022
+          allowed_mounts: []
+          remote: ''
+    ports:
+      - '2022:2022'

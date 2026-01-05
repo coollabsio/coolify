@@ -25,9 +25,9 @@
         </label>
     @endif
     @if ($useMonacoEditor)
-        <x-forms.monaco-editor id="{{ $id }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
-            name="{{ $id }}" model="{{ $value ?? $id }}" wire:model="{{ $value ?? $id }}"
-            readonly="{{ $readonly }}" label="dockerfile" />
+        <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
+            name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
+            readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
     @else
         @if ($type === 'password')
             <div class="relative" x-data="{ type: 'password' }">
@@ -45,35 +45,34 @@
                 @endif
                 <input x-cloak x-show="type === 'password'" value="{{ $value }}"
                     {{ $attributes->merge(['class' => $defaultClassInput]) }} @required($required)
-                    @if ($id !== 'null') wire:model={{ $id }} @endif
-                    wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                    wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
-                    type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
+                    @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+                    wire:loading.attr="disabled"
+                    type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                     name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                     aria-placeholder="{{ $attributes->get('placeholder') }}">
                 <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}" x-cloak x-show="type !== 'password'"
                     placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
-                    @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
+                    @if ($realtimeValidation) wire:model.debounce.200ms="{{ $modelBinding }}" wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"
                 @else
-            wire:model={{ $value ?? $id }}
-                     wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300' wire:dirty.class="dark:focus:ring-warning dark:ring-warning" @endif
-                    @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                    name="{{ $name }}" name={{ $id }}></textarea>
+            wire:model={{ $value ?? $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+                    @disabled($disabled) @readonly($readonly) @required($required) id="{{ $htmlId }}"
+                    name="{{ $name }}" name={{ $modelBinding }}
+                    @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
 
             </div>
         @else
             <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}"
                 {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}"
                 {{ !$spellcheck ? 'spellcheck=false' : '' }} {{ $attributes->merge(['class' => $defaultClass]) }}
-                @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
+                @if ($realtimeValidation) wire:model.debounce.200ms="{{ $modelBinding }}" wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"
         @else
-    wire:model={{ $value ?? $id }}
-    wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300' wire:dirty.class="dark:focus:ring-warning dark:ring-warning" @endif
-                @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                name="{{ $name }}" name={{ $id }}></textarea>
+    wire:model={{ $value ?? $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+                @disabled($disabled) @readonly($readonly) @required($required) id="{{ $htmlId }}"
+                name="{{ $name }}" name={{ $modelBinding }}
+                @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
         @endif
     @endif
-    @error($id)
+    @error($modelBinding)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>
         </label>

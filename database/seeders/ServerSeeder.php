@@ -13,6 +13,7 @@ class ServerSeeder extends Seeder
     {
         Server::create([
             'id' => 0,
+            'uuid' => 'localhost',
             'name' => 'localhost',
             'description' => 'This is a test docker container in development mode',
             'ip' => 'coolify-testing-host',

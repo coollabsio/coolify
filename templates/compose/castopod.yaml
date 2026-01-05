@@ -1,5 +1,6 @@
 # documentation:https://docs.castopod.org/main/en/
 # slogan: Castopod is a free & open-source hosting platform made for podcasters who want engage and interact with their audience.
+# category: media
 # tags: podcast, media, audio, video, streaming, hosting, platform, castopod
 # logo: svgs/castopod.svg
 # port: 8000
@@ -10,12 +11,12 @@ services:
     volumes:
       - castopod-media:/var/www/castopod/public/media
     environment:
-      - SERVICE_FQDN_CASTOPOD_8000
+      - SERVICE_URL_CASTOPOD_8000
       - MYSQL_DATABASE=castopod
       - MYSQL_USER=$SERVICE_USER_MYSQL
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
       - CP_DISABLE_HTTPS=${CP_DISABLE_HTTPS:-1}
-      - CP_BASEURL=$SERVICE_FQDN_CASTOPOD
+      - CP_BASEURL=$SERVICE_URL_CASTOPOD
       - CP_ANALYTICS_SALT=$SERVICE_REALBASE64_64_SALT
       - CP_CACHE_HANDLER=redis
       - CP_REDIS_HOST=redis

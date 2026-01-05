@@ -21,8 +21,9 @@ class OtherController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Returns the version of the application',
-                content: new OA\JsonContent(
-                    type: 'string',
+                content: new OA\MediaType(
+                    mediaType: 'text/html',
+                    schema: new OA\Schema(type: 'string'),
                     example: 'v4.0.0',
                 )),
             new OA\Response(
@@ -166,8 +167,9 @@ class OtherController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Healthcheck endpoint.',
-                content: new OA\JsonContent(
-                    type: 'string',
+                content: new OA\MediaType(
+                    mediaType: 'text/html',
+                    schema: new OA\Schema(type: 'string'),
                     example: 'OK',
                 )),
             new OA\Response(

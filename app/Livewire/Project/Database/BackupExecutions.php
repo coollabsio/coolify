@@ -2,10 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -14,7 +13,19 @@ class BackupExecutions extends Component
 
     public $database;
 
-    public $executions = [];
+    public ?Collection $executions;
+
+    public int $executions_count = 0;
+
+    public int $skip = 0;
+
+    public int $defaultTake = 10;
+
+    public bool $showNext = false;
+
+    public bool $showPrev = false;
+
+    public int $currentPage = 1;
 
     public $setDeletableBackup;
 
@@ -40,14 +51,24 @@ class BackupExecutions extends Component
         }
     }
 
+    public function cleanupDeleted()
+    {
+        if ($this->backup) {
+            $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
+            if ($deletedCount > 0) {
+                $this->backup->executions()->where('local_storage_deleted', true)->delete();
+                $this->refreshBackupExecutions();
+                $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
+            } else {
+                $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+            }
+        }
+    }
+
     public function deleteBackup($executionId, $password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -85,18 +106,74 @@ class BackupExecutions extends Component
 
     public function refreshBackupExecutions(): void
     {
-        if ($this->backup && $this->backup->exists) {
-            $this->executions = $this->backup->executions()->get()->toArray();
-        } else {
-            $this->executions = [];
+        $this->loadExecutions();
+    }
+
+    public function reloadExecutions()
+    {
+        $this->loadExecutions();
+    }
+
+    public function previousPage(?int $take = null)
+    {
+        if ($take) {
+            $this->skip = $this->skip - $take;
         }
+        $this->skip = $this->skip - $this->defaultTake;
+        if ($this->skip < 0) {
+            $this->showPrev = false;
+            $this->skip = 0;
+        }
+        $this->updateCurrentPage();
+        $this->loadExecutions();
+    }
+
+    public function nextPage(?int $take = null)
+    {
+        if ($take) {
+            $this->skip = $this->skip + $take;
+        }
+        $this->showPrev = true;
+        $this->updateCurrentPage();
+        $this->loadExecutions();
+    }
+
+    private function loadExecutions()
+    {
+        if ($this->backup && $this->backup->exists) {
+            ['executions' => $executions, 'count' => $count] = $this->backup->executionsPaginated($this->skip, $this->defaultTake);
+            $this->executions = $executions;
+            $this->executions_count = $count;
+        } else {
+            $this->executions = collect([]);
+            $this->executions_count = 0;
+        }
+        $this->showMore();
+    }
+
+    private function showMore()
+    {
+        if ($this->executions->count() !== 0) {
+            $this->showNext = true;
+            if ($this->executions->count() < $this->defaultTake) {
+                $this->showNext = false;
+            }
+
+            return;
+        }
+    }
+
+    private function updateCurrentPage()
+    {
+        $this->currentPage = intval($this->skip / $this->defaultTake) + 1;
     }
 
     public function mount(ScheduledDatabaseBackup $backup)
     {
         $this->backup = $backup;
         $this->database = $backup->database;
-        $this->refreshBackupExecutions();
+        $this->updateCurrentPage();
+        $this->loadExecutions();
     }
 
     public function server()
@@ -119,11 +196,6 @@ class BackupExecutions extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup-executions', [
-            'checkboxes' => [
-                ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'],
-                // ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently from SFTP Storage'],
-            ],
-        ]);
+        return view('livewire.project.database.backup-executions');
     }
 }

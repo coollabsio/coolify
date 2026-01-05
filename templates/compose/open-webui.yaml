@@ -1,5 +1,6 @@
 # documentation: https://docs.openwebui.com
 # slogan: User-friendly AI Interface (Supports Ollama, OpenAI API, ...)
+# category: ai
 # tags: ai,models,deployment,open-web-ui,integration
 # logo: svgs/openwebui.svg
 # port: 8080
@@ -10,7 +11,7 @@ services:
     volumes:
       - "open-webui:/app/backend/data"
     environment:
-      - SERVICE_FQDN_OPENWEBUI_8080
+      - SERVICE_URL_OPENWEBUI_8080
     healthcheck:
       test:
         - CMD

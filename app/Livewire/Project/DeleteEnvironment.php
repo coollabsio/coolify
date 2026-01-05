@@ -3,10 +3,13 @@
 namespace App\Livewire\Project;
 
 use App\Models\Environment;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
 {
+    use AuthorizesRequests;
+
     public int $environment_id;
 
     public bool $disabled = false;
@@ -31,10 +34,12 @@ class DeleteEnvironment extends Component
             'environment_id' => 'required|int',
         ]);
         $environment = Environment::findOrFail($this->environment_id);
+        $this->authorize('delete', $environment);
+
         if ($environment->isEmpty()) {
             $environment->delete();
 
-            return redirect()->route('project.show', parameters: ['project_uuid' => $this->parameters['project_uuid']]);
+            return redirectRoute($this, 'project.show', ['project_uuid' => $this->parameters['project_uuid']]);
         }
 
         return $this->dispatch('error', "<strong>Environment {$environment->name}</strong> has defined resources, please delete them first.");

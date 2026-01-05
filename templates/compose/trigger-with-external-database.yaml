@@ -1,5 +1,6 @@
 # documentation: https://trigger.dev
 # slogan: The open source Background Jobs framework for TypeScript
+# category: automation
 # tags: trigger.dev, background jobs, typescript, trigger, jobs, cron, scheduler
 # logo: svgs/trigger.png
 # port: 3000
@@ -8,9 +9,9 @@ services:
   trigger:
     image: ghcr.io/triggerdotdev/trigger.dev:main
     environment:
-      - SERVICE_FQDN_TRIGGER_3000
-      - LOGIN_ORIGIN=$SERVICE_FQDN_TRIGGER
-      - APP_ORIGIN=$SERVICE_FQDN_TRIGGER
+      - SERVICE_URL_TRIGGER_3000
+      - LOGIN_ORIGIN=$SERVICE_URL_TRIGGER
+      - APP_ORIGIN=$SERVICE_URL_TRIGGER
       - MAGIC_LINK_SECRET=$SERVICE_PASSWORD_32_MAGIC
       - ENCRYPTION_KEY=$SERVICE_PASSWORD_32_ENCRYPTION
       - SESSION_SECRET=$SERVICE_PASSWORD_32_SESSION

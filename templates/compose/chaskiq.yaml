@@ -1,5 +1,6 @@
 # documentation: https://chaskiq.io
 # slogan: Chaskiq is an messaging platform for marketing, support & sales
+# category: cms
 # tags: chaskiq,messaging,chat,marketing,support,sales,open,source,rails,redis,postgresql,sidekiq
 # logo: svgs/chaskiq.png
 # port: 3000
@@ -8,13 +9,13 @@ services:
   chaskiq:
     image: chaskiq/chaskiq:latest
     environment:
-      - SERVICE_FQDN_CHASKIQ_3000
+      - SERVICE_URL_CHASKIQ_3000
       - REDIS_URL=redis://redis:6379/
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - SERVICE_URL=${SERVICE_URL_CHASKIQ}
-      - HOST=${SERVICE_FQDN_CHASKIQ_3000}
-      - ASSET_HOST=${SERVICE_FQDN_CHASKIQ_3000}
+      - HOST=${SERVICE_URL_CHASKIQ_3000}
+      - ASSET_HOST=${SERVICE_URL_CHASKIQ_3000}
       - WS=wss://${SERVICE_URL_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
@@ -80,8 +81,8 @@ services:
       - REDIS_URL=redis://redis:6379/
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - HOST=${SERVICE_FQDN_CHASKIQ_3000}
-      - ASSET_HOST=${SERVICE_FQDN_CHASKIQ_3000}
+      - HOST=${SERVICE_URL_CHASKIQ_3000}
+      - ASSET_HOST=${SERVICE_URL_CHASKIQ_3000}
       - WS=wss://${SERVICE_URL_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}

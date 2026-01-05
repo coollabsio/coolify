@@ -8,6 +8,10 @@ on:
   pull_request_target:
     types: [closed]
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   remove-labels-and-assignees:
     runs-on: ubuntu-latest

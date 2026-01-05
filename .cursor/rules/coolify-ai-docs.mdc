@@ -1,0 +1,156 @@
+---
+title: Coolify AI Documentation
+description: Master reference to all Coolify AI documentation in .ai/ directory
+globs: **/*
+alwaysApply: true
+---
+
+# Coolify AI Documentation
+
+All Coolify AI documentation has been consolidated in the **`.ai/`** directory for better organization and single source of truth.
+
+## Quick Start
+
+- **For Claude Code**: Start with `CLAUDE.md` in the root directory
+- **For Cursor IDE**: Start with `.ai/README.md` for navigation
+- **For All AI Tools**: Browse `.ai/` directory by topic
+
+## Documentation Structure
+
+All detailed documentation lives in `.ai/` with the following organization:
+
+### 📚 Core Documentation
+- **[Technology Stack](.ai/core/technology-stack.md)** - All versions, packages, dependencies (SINGLE SOURCE OF TRUTH for versions)
+- **[Project Overview](.ai/core/project-overview.md)** - What Coolify is, high-level architecture
+- **[Application Architecture](.ai/core/application-architecture.md)** - System design, components, relationships
+- **[Deployment Architecture](.ai/core/deployment-architecture.md)** - Deployment flows, Docker, proxies
+
+### 💻 Development
+- **[Development Workflow](.ai/development/development-workflow.md)** - Dev setup, commands, daily workflows
+- **[Testing Patterns](.ai/development/testing-patterns.md)** - How to write/run tests, Docker requirements
+- **[Laravel Boost](.ai/development/laravel-boost.md)** - Laravel-specific guidelines (SINGLE SOURCE for Laravel Boost)
+
+### 🎨 Code Patterns
+- **[Database Patterns](.ai/patterns/database-patterns.md)** - Eloquent, migrations, relationships
+- **[Frontend Patterns](.ai/patterns/frontend-patterns.md)** - Livewire, Alpine.js, Tailwind CSS
+- **[Security Patterns](.ai/patterns/security-patterns.md)** - Auth, authorization, security
+- **[Form Components](.ai/patterns/form-components.md)** - Enhanced forms with authorization
+- **[API & Routing](.ai/patterns/api-and-routing.md)** - API design, routing conventions
+
+### 📖 Meta
+- **[Maintaining Docs](.ai/meta/maintaining-docs.md)** - How to update/improve documentation
+- **[Sync Guide](.ai/meta/sync-guide.md)** - Keeping docs synchronized
+
+## Quick Decision Tree
+
+**What are you working on?**
+
+### Running Commands
+→ `.ai/development/development-workflow.md`
+- `npm run dev` / `npm run build` - Frontend
+- `php artisan serve` / `php artisan migrate` - Backend
+- `docker exec coolify php artisan test` - Feature tests (requires Docker)
+- `./vendor/bin/pest tests/Unit` - Unit tests (no Docker needed)
+- `./vendor/bin/pint` - Code formatting
+
+### Writing Tests
+→ `.ai/development/testing-patterns.md`
+- **Unit tests**: No database, use mocking, run outside Docker
+- **Feature tests**: Can use database, MUST run inside Docker
+- Critical: Docker execution requirements prevent database connection errors
+
+### Building UI
+→ `.ai/patterns/frontend-patterns.md` + `.ai/patterns/form-components.md`
+- Livewire 3.5.20 with server-side state
+- Alpine.js for client interactions
+- Tailwind CSS 4.1.4 styling
+- Form components with `canGate` authorization
+
+### Database Work
+→ `.ai/patterns/database-patterns.md`
+- Eloquent ORM patterns
+- Migration best practices
+- Relationship definitions
+- Query optimization
+
+### Security & Authorization
+→ `.ai/patterns/security-patterns.md` + `.ai/patterns/form-components.md`
+- Team-based access control
+- Policy and gate patterns
+- Form authorization (`canGate`, `canResource`)
+- API security with Sanctum
+
+### Laravel-Specific
+→ `.ai/development/laravel-boost.md`
+- Laravel 12.4.1 patterns
+- Livewire 3 best practices
+- Pest testing patterns
+- Laravel conventions
+
+### Version Numbers
+→ `.ai/core/technology-stack.md`
+- **SINGLE SOURCE OF TRUTH** for all version numbers
+- Laravel 12.4.1, PHP 8.4.7, Tailwind 4.1.4, etc.
+- Never duplicate versions - always reference this file
+
+## Critical Patterns (Always Follow)
+
+### Testing Commands
+```bash
+# Unit tests (no database, outside Docker)
+./vendor/bin/pest tests/Unit
+
+# Feature tests (requires database, inside Docker)
+docker exec coolify php artisan test
+```
+
+**NEVER** run Feature tests outside Docker - they will fail with database connection errors.
+
+### Form Authorization
+ALWAYS include authorization on form components:
+```blade
+<x-forms.input canGate="update" :canResource="$resource" id="name" label="Name" />
+```
+
+### Livewire Components
+MUST have exactly ONE root element. No exceptions.
+
+### Version Numbers
+Use exact versions from `technology-stack.md`:
+- ✅ Laravel 12.4.1
+- ❌ Laravel 12 or "v12"
+
+### Code Style
+```bash
+# Always run before committing
+./vendor/bin/pint
+```
+
+## For AI Assistants
+
+### Important Notes
+1. **Single Source of Truth**: Each piece of information exists in ONE location only
+2. **Cross-Reference, Don't Duplicate**: Link to other files instead of copying content
+3. **Version Precision**: Always use exact versions from `technology-stack.md`
+4. **Docker for Feature Tests**: This is non-negotiable for database-dependent tests
+5. **Form Authorization**: Security requirement, not optional
+
+### When to Use Which File
+- **Quick commands**: `CLAUDE.md` or `development-workflow.md`
+- **Detailed patterns**: Topic-specific files in `.ai/patterns/`
+- **Testing**: `.ai/development/testing-patterns.md`
+- **Laravel specifics**: `.ai/development/laravel-boost.md`
+- **Versions**: `.ai/core/technology-stack.md`
+
+## Maintaining Documentation
+
+When updating documentation:
+1. Read `.ai/meta/maintaining-docs.md` first
+2. Follow single source of truth principle
+3. Update cross-references when moving content
+4. Test all links work
+5. See `.ai/meta/sync-guide.md` for sync guidelines
+
+## Migration Note
+
+This file replaces all previous `.cursor/rules/*.mdc` files. All content has been migrated to `.ai/` directory for better organization and to serve as single source of truth for all AI tools (Claude Code, Cursor IDE, etc.).
