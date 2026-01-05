@@ -1,5 +1,6 @@
 # documentation: https://docs.ntfy.sh/
 # slogan: ntfy is a simple HTTP-based pub-sub notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, and/or using a REST API.
+# category: messaging
 # tags: ntfy, notification, push notification, pub-sub, notify
 # logo: svgs/ntfy.svg
 # port: 80
@@ -10,8 +11,8 @@ services:
     command:
       - serve
     environment:
-      - SERVICE_FQDN_NTFY_80
-      - NTFY_BASE_URL=${SERVICE_FQDN_NTFY}
+      - SERVICE_URL_NTFY_80
+      - NTFY_BASE_URL=${SERVICE_URL_NTFY}
       - TZ=${TZ:-UTC}
       - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db

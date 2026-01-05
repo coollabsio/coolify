@@ -14,10 +14,11 @@ use OpenApi\Attributes as OA;
         'uuid' => ['type' => 'string'],
         'resourceable_type' => ['type' => 'string'],
         'resourceable_id' => ['type' => 'integer'],
-        'is_build_time' => ['type' => 'boolean'],
         'is_literal' => ['type' => 'boolean'],
         'is_multiline' => ['type' => 'boolean'],
         'is_preview' => ['type' => 'boolean'],
+        'is_runtime' => ['type' => 'boolean'],
+        'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
         'is_shown_once' => ['type' => 'boolean'],
         'key' => ['type' => 'string'],
@@ -35,15 +36,16 @@ class EnvironmentVariable extends BaseModel
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
-        'is_build_time' => 'boolean',
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
+        'is_runtime' => 'boolean',
+        'is_buildtime' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
     ];
 
-    protected $appends = ['real_value', 'is_shared', 'is_really_required'];
+    protected $appends = ['real_value', 'is_shared', 'is_really_required', 'is_nixpacks', 'is_coolify'];
 
     protected static function booted()
     {
@@ -61,8 +63,10 @@ class EnvironmentVariable extends BaseModel
                         ModelsEnvironmentVariable::create([
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
-                            'is_build_time' => $environment_variable->is_build_time,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
+                            'is_literal' => $environment_variable->is_literal ?? false,
+                            'is_runtime' => $environment_variable->is_runtime ?? false,
+                            'is_buildtime' => $environment_variable->is_buildtime ?? false,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
@@ -137,6 +141,32 @@ class EnvironmentVariable extends BaseModel
         );
     }
 
+    protected function isNixpacks(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (str($this->key)->startsWith('NIXPACKS_')) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
+    }
+
+    protected function isCoolify(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (str($this->key)->startsWith('SERVICE_')) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
+    }
+
     protected function isShared(): Attribute
     {
         return Attribute::make(
@@ -162,11 +192,11 @@ class EnvironmentVariable extends BaseModel
             return $environment_variable;
         }
         foreach ($sharedEnvsFound as $sharedEnv) {
-            $type = str($sharedEnv)->match('/(.*?)\./');
+            $type = str($sharedEnv)->trim()->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 continue;
             }
-            $variable = str($sharedEnv)->match('/\.(.*)/');
+            $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
             if ($type->value() === 'environment') {
                 $id = $resource->environment->id;
             } elseif ($type->value() === 'project') {
@@ -203,7 +233,7 @@ class EnvironmentVariable extends BaseModel
         $environment_variable = trim($environment_variable);
         $type = str($environment_variable)->after('{{')->before('.')->value;
         if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt((string) str($environment_variable)->replace(' ', ''));
+            return encrypt($environment_variable);
         }
 
         return encrypt($environment_variable);

@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Server;
 
+use App\Jobs\ConnectProxyToNetworksJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Destinations extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public Collection $networks;
@@ -26,13 +30,13 @@ class Destinations extends Component
 
     private function createNetworkAndAttachToProxy()
     {
-        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+        ConnectProxyToNetworksJob::dispatchSync($this->server);
     }
 
     public function add($name)
     {
         if ($this->server->isSwarm()) {
+            $this->authorize('create', SwarmDocker::class);
             $found = $this->server->swarmDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');
@@ -46,6 +50,7 @@ class Destinations extends Component
                 ]);
             }
         } else {
+            $this->authorize('create', StandaloneDocker::class);
             $found = $this->server->standaloneDockers()->where('network', $name)->first();
             if ($found) {
                 $this->dispatch('error', 'Network already added to this server.');

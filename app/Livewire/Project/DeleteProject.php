@@ -3,10 +3,13 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class DeleteProject extends Component
 {
+    use AuthorizesRequests;
+
     public array $parameters;
 
     public int $project_id;
@@ -27,10 +30,12 @@ class DeleteProject extends Component
             'project_id' => 'required|int',
         ]);
         $project = Project::findOrFail($this->project_id);
+        $this->authorize('delete', $project);
+
         if ($project->isEmpty()) {
             $project->delete();
 
-            return redirect()->route('project.index');
+            return redirectRoute($this, 'project.index');
         }
 
         return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");

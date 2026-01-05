@@ -1,13 +1,14 @@
 # ignore: true
 # documentation: https://hub.docker.com/_/sonarqube/
 # slogan: SonarQube is a self-managed, automatic code review tool that systematically helps you deliver Clean Code
+# category: productivity
 # tags: sonarqube, code-review, clean-code, quality, code-quality, code-analysis, code-smells, code-coverage, code-security
 
 services:
   sonarqube:
     image: sonarqube:community
     environment:
-      - SERVICE_FQDN_SONARQUBE_9000
+      - SERVICE_URL_SONARQUBE_9000
       - SONAR_JDBC_URL=jdbc:postgresql://postgresql:5432/${POSTGRES_DB:-sonar}
       - SONAR_JDBC_USERNAME=$SERVICE_USER_POSTGRES
       - SONAR_JDBC_PASSWORD=$SERVICE_PASSWORD_POSTGRES

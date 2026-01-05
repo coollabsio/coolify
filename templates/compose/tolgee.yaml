@@ -1,5 +1,6 @@
 # documentation: https://tolgee.io/
 # slogan: Tolgee is a localization management platform for developers and translators.
+# category: productivity
 # tags: localization,translation,management,platform
 # logo: svgs/tolgee.svg
 # port: 8080
@@ -8,7 +9,7 @@ services:
   tolgee:
     image: tolgee/tolgee
     environment:
-      - SERVICE_FQDN_TOLGEE_8080
+      - SERVICE_URL_TOLGEE_8080
       - TOLGEE_AUTHENTICATION_ENABLED=true
       - TOLGEE_AUTHENTICATION_INITIAL_PASSWORD=$SERVICE_PASSWORD_TOLGEE
       - TOLGEE_AUTHENTICATION_INITIAL_USERNAME=admin

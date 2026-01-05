@@ -5,17 +5,19 @@
     <div class="flex items-center gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
-            <x-modal-input buttonTitle="+ Add" title="New Destination">
-                <livewire:destination.new.docker />
-            </x-modal-input>
+            @can('createAnyResource')
+                <x-modal-input buttonTitle="+ Add" title="New Destination">
+                    <livewire:destination.new.docker />
+                </x-modal-input>
+            @endcan
         @endif
     </div>
     <div class="subtitle">Network endpoints to deploy your resources.</div>
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($servers as $server)
             @forelse ($server->destinations() as $destination)
                 @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-                    <a class="box group"
+                    <a class="coolbox group" {{ wireNavigate() }}
                         href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                         <div class="flex flex-col justify-center mx-6">
                             <div class="box-title">{{ $destination->name }}</div>
@@ -24,7 +26,7 @@
                     </a>
                 @endif
                 @if ($destination->getMorphClass() === 'App\Models\SwarmDocker')
-                    <a class="box group"
+                    <a class="coolbox group" {{ wireNavigate() }}
                         href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                         <div class="flex flex-col mx-6">
                             <div class="box-title">{{ $destination->name }}</div>

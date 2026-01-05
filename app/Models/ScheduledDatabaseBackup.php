@@ -10,6 +10,21 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    public static function ownedByCurrentTeam()
+    {
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ScheduledDatabaseBackup::whereRelation('team', 'id', $teamId)->orderBy('created_at', 'desc');
+    }
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
     public function database(): MorphTo
     {
         return $this->morphTo();
@@ -34,6 +49,18 @@ class ScheduledDatabaseBackup extends BaseModel
     public function get_last_days_backup_status($days = 7)
     {
         return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
+    }
+
+    public function executionsPaginated(int $skip = 0, int $take = 10)
+    {
+        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->orderBy('created_at', 'desc');
+        $count = $executions->count();
+        $executions = $executions->skip($skip)->take($take)->get();
+
+        return [
+            'count' => $count,
+            'executions' => $executions,
+        ];
     }
 
     public function server()

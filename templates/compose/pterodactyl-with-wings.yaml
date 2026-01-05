@@ -1,0 +1,234 @@
+# documentation: https://pterodactyl.io/
+# slogan: Pterodactyl is a free, open-source game server management panel
+# category: media
+# tags: game, game server, management, panel, minecraft
+# logo: svgs/pterodactyl.png
+# port: 80, 8443
+
+services:
+  mariadb:
+    image: 'mariadb:11.8'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'healthcheck.sh --connect --innodb_initialized || exit 1'
+      start_period: 10s
+      interval: 10s
+      timeout: 1s
+      retries: 3
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MYSQLROOT
+      - MYSQL_DATABASE=pterodactyl-db
+      - MYSQL_USER=$SERVICE_USER_MYSQL
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
+    volumes:
+      - 'pterodactyl-db:/var/lib/mysql'
+  redis:
+    image: 'redis:alpine'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli ping || exit 1'
+      interval: 10s
+      timeout: 1s
+      retries: 3
+  pterodactyl:
+    image: 'ghcr.io/pterodactyl/panel:v1.11.11'
+    volumes:
+      - 'panel-var:/app/var/'
+      - 'panel-nginx:/etc/nginx/http.d/'
+      - 'panel-certs:/etc/letsencrypt/'
+      -
+        type: bind
+        source: ./etc/entrypoint.sh
+        target: /entrypoint.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -e
+
+           echo "Setting logs permissions..."
+           chown -R nginx: /app/storage/logs/
+
+           USER_EXISTS=$(php artisan tinker --no-ansi --execute='echo \Pterodactyl\Models\User::where("email", "'"$ADMIN_EMAIL"'")->exists() ? "1" : "0";')
+
+           if [ "$USER_EXISTS" = "0" ]; then
+             echo "Admin User does not exist, creating user now."
+             php artisan p:user:make --no-interaction \
+               --admin=1 \
+               --email="$ADMIN_EMAIL" \
+               --username="$ADMIN_USERNAME" \
+               --name-first="$ADMIN_FIRSTNAME" \
+               --name-last="$ADMIN_LASTNAME" \
+               --password="$ADMIN_PASSWORD"
+             echo "Admin user created successfully!"
+           else
+             echo "Admin User already exists, skipping creation."
+           fi
+
+           exec supervisord --nodaemon
+    command:
+      - /entrypoint.sh
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -sf http://localhost:80 || exit 1'
+      interval: 10s
+      timeout: 1s
+      retries: 3
+    environment:
+      - HASHIDS_SALT=$SERVICE_PASSWORD_HASHIDS
+      - HASHIDS_LENGTH=8
+      - SERVICE_URL_PTERODACTYL_80
+      - 'ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}'
+      - 'ADMIN_USERNAME=${SERVICE_USER_ADMIN}'
+      - 'ADMIN_FIRSTNAME=${ADMIN_FIRSTNAME:-Admin}'
+      - 'ADMIN_LASTNAME=${ADMIN_LASTNAME:-User}'
+      - 'ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}'
+      - 'PTERODACTYL_HTTPS=${PTERODACTYL_HTTPS:-false}'
+      - APP_ENV=production
+      - APP_ENVIRONMENT_ONLY=false
+      - APP_URL=$SERVICE_URL_PTERODACTYL
+      - 'APP_TIMEZONE=${TIMEZONE:-UTC}'
+      - 'APP_SERVICE_AUTHOR=${APP_SERVICE_AUTHOR:-author@example.com}'
+      - 'LOG_LEVEL=${LOG_LEVEL:-debug}'
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_DRIVER=redis
+      - REDIS_HOST=redis
+      - DB_DATABASE=pterodactyl-db
+      - DB_USERNAME=$SERVICE_USER_MYSQL
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - MAIL_FROM=$MAIL_FROM
+      - MAIL_DRIVER=$MAIL_DRIVER
+      - MAIL_HOST=$MAIL_HOST
+      - MAIL_PORT=$MAIL_PORT
+      - MAIL_USERNAME=$MAIL_USERNAME
+      - MAIL_PASSWORD=$MAIL_PASSWORD
+      - MAIL_ENCRYPTION=$MAIL_ENCRYPTION
+  wings:
+    image: 'ghcr.io/pterodactyl/wings:v1.11.13'
+    restart: unless-stopped
+    ports:
+      - "2022:2022"
+    environment:
+      - SERVICE_URL_WINGS_8443
+      - 'TZ=${TIMEZONE:-UTC}'
+      - WINGS_USERNAME=pterodactyl
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/var/lib/docker/containers/:/var/lib/docker/containers/'
+      - '/var/lib/pterodactyl/:/var/lib/pterodactyl/'
+      - '/tmp/pterodactyl/:/tmp/pterodactyl/'
+      - 'wings-logs:/var/log/pterodactyl/'
+      -
+        type: bind
+        source: ./etc/config.yml
+        target: /etc/pterodactyl/config.yml
+        content: |-
+          debug: false
+          uuid: REPLACE FROM CONFIG #example: abc9abc8-abc7-abc6-abc5-abc4abc3abc2
+          token_id: REPLACE FROM CONFIG #example: abc1abc2abc3abc4
+          token: REPLACE FROM CONFIG  #example: abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10abc11abc12abc13abc14abc15abc16
+          api:
+            host: 0.0.0.0
+            port: 8443 # use port 443 IN THE PANEL during node setup
+            ssl:
+              enabled: false
+              cert: REPLACE FROM CONFIG #example: /etc/letsencrypt/live/wings-abcabcabcabcabc.example.com/fullchain.pem
+              key: REPLACE FROM CONFIG #example: /etc/letsencrypt/live/wings-abcabcabcabcabc.example.com/privkey.pem
+            disable_remote_download: false
+            upload_limit: 100
+            trusted_proxies: []
+          system:
+            root_directory: /var/lib/pterodactyl
+            log_directory: /var/log/pterodactyl
+            data: /var/lib/pterodactyl/volumes
+            archive_directory: /var/lib/pterodactyl/archives
+            backup_directory: /var/lib/pterodactyl/backups
+            tmp_directory: /tmp/pterodactyl
+            username: pterodactyl
+            timezone: UTC
+            user:
+              rootless:
+                enabled: false
+                container_uid: 0
+                container_gid: 0
+              uid: 988
+              gid: 988
+            disk_check_interval: 150
+            activity_send_interval: 60
+            activity_send_count: 100
+            check_permissions_on_boot: true
+            enable_log_rotate: true
+            websocket_log_count: 150
+            sftp:
+              bind_address: 0.0.0.0
+              bind_port: 2022
+              read_only: false
+            crash_detection:
+              enabled: true
+              detect_clean_exit_as_crash: true
+              timeout: 60
+            backups:
+              write_limit: 0
+              compression_level: best_speed
+            transfers:
+              download_limit: 0
+            openat_mode: auto
+          docker:
+            network:
+              interface: 172.28.0.1
+              dns:
+                - 1.1.1.1
+                - 1.0.0.1
+              name: pterodactyl_nw
+              ispn: false
+              driver: bridge
+              network_mode: pterodactyl_nw
+              is_internal: false
+              enable_icc: true
+              network_mtu: 1500
+              interfaces:
+                v4:
+                  subnet: 172.28.0.0/16
+                  gateway: 172.28.0.1
+                v6:
+                  subnet: fdba:17c8:6c94::/64
+                  gateway: fdba:17c8:6c94::1011
+            domainname: ""
+            registries: {}
+            tmpfs_size: 100
+            container_pid_limit: 512
+            installer_limits:
+              memory: 1024
+              cpu: 100
+            overhead:
+              override: false
+              default_multiplier: 1.05
+              multipliers: {}
+            use_performant_inspect: true
+            userns_mode: ""
+            log_config:
+              type: local
+              config:
+                compress: "false"
+                max-file: "1"
+                max-size: 5m
+                mode: non-blocking
+          throttles:
+            enabled: true
+            lines: 2000
+            line_reset_interval: 100
+          remote: http://pterodactyl:80
+          remote_query:
+            timeout: 30
+            boot_servers_per_page: 50
+          allowed_mounts: []
+          allowed_origins:
+            - http://pterodactyl:80
+            - PANEL DOMAIN # example: https://pterodactyl-abcabcabcabcavc.example.com
+          allow_cors_private_network: false
+          ignore_panel_config_updates: false

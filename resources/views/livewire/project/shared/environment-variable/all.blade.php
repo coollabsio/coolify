@@ -2,20 +2,43 @@
     <div>
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
-            <div class="flex flex-col items-center">
-                <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
-                    <livewire:project.shared.environment-variable.add />
-                </x-modal-input>
-            </div>
-            <x-forms.button
-                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+            @can('manageEnvironment', $resource)
+                <div class="flex flex-col items-center">
+                    <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
+                        <livewire:project.shared.environment-variable.add />
+                    </x-modal-input>
+                </div>
+                <x-forms.button
+                    wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+            @endcan
         </div>
         <div>Environment variables (secrets) for this resource. </div>
-        @if ($resourceClass === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
-            <div class="w-64 pt-2">
-                <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                    helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
-                    instantSave></x-forms.checkbox>
+        @if ($resourceClass === 'App\Models\Application')
+            <div class="flex flex-col gap-2 pt-2">
+                @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                    <div class="w-64">
+                        @can('manageEnvironment', $resource)
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
+                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                instantSave></x-forms.checkbox>
+                        @else
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
+                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                disabled></x-forms.checkbox>
+                        @endcan
+                    </div>
+                @endif
+                <div class="w-64">
+                    @can('manageEnvironment', $resource)
+                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                            instantSave></x-forms.checkbox>
+                    @else
+                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                            disabled></x-forms.checkbox>
+                    @endcan
+                </div>
             </div>
         @endif
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
@@ -37,14 +60,7 @@
             <h3>Production Environment Variables</h3>
             <div>Environment (secrets) variables for Production.</div>
         </div>
-        @php
-            $requiredEmptyVars = $resource->environment_variables->filter(function ($env) {
-                return $env->is_required && empty($env->value);
-            });
-
-            $otherVars = $resource->environment_variables->diff($requiredEmptyVars);
-        @endphp
-        @forelse ($requiredEmptyVars->merge($otherVars) as $env)
+        @forelse ($this->environmentVariables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
@@ -55,23 +71,34 @@
                 <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview as $env)
+            @foreach ($this->environmentVariablesPreview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
             @endforeach
         @endif
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
-            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
-                label="Production Environment Variables"></x-forms.textarea>
+            @can('manageEnvironment', $resource)
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                    label="Production Environment Variables"></x-forms.textarea>
 
-            @if ($showPreview)
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap"
-                    label="Preview Deployments Environment Variables" id="variablesPreview"
-                    wire:model="variablesPreview"></x-forms.textarea>
-            @endif
+                @if ($showPreview)
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap"
+                        label="Preview Deployments Environment Variables" id="variablesPreview"
+                        wire:model="variablesPreview"></x-forms.textarea>
+                @endif
 
-            <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
+                <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
+            @else
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                    label="Production Environment Variables" disabled></x-forms.textarea>
+
+                @if ($showPreview)
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap"
+                        label="Preview Deployments Environment Variables" id="variablesPreview"
+                        wire:model="variablesPreview" disabled></x-forms.textarea>
+                @endif
+            @endcan
         </form>
     @endif
 </div>

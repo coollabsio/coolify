@@ -1,5 +1,6 @@
 # documentation: https://nicolargo.github.io/glances/
 # slogan: An Eye on your system
+# category: monitoring
 # tags: monitoring tool python cross platform
 # logo: svgs/glances.png
 # port: 61208
@@ -10,7 +11,7 @@ services:
     restart: unless-stopped
     environment:
       - GLANCES_OPT=-w
-      - SERVICE_FQDN_GLANCES_61208
+      - SERVICE_URL_GLANCES_61208
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:ro

@@ -1,5 +1,6 @@
 # documentation: https://www.mautic.org/
 # slogan: Mautic v5 Open Source Marketing Automation
+# category: analytics
 # tags: php,mautic,marketing,automation,email,service,5,open,source,crm
 # logo: svgs/mautic.svg
 # port: 80
@@ -43,7 +44,7 @@ services:
       - 'mautic_data/bin:/var/www/html/bin:z'
       - 'mautic_data/cron:/opt/mautic/cron:z'
     environment:
-      - SERVICE_FQDN_MAUTIC_80
+      - SERVICE_URL_MAUTIC_80
       - 'DOCKER_MAUTIC_LOAD_TEST_DATA=${MAUTIC_LOAD_TEST_DATA:-false}'
       - 'DOCKER_MAUTIC_RUN_MIGRATIONS=${MAUTIC_RUN_MIGRATIONS:-false}'
       - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'

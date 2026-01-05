@@ -55,10 +55,10 @@
             <div class="flex gap-2">
                 <h1>Subscription</h1>
             </div>
-            <div>You are not an admin so you cannot manage your Team's subscription. If this does not make sense, please
-                <span class="underline cursor-pointer dark:text-white" wire:click="help">contact
-                    us</span>.
-            </div>
+            <x-callout type="warning" title="Permission Required">
+                You are not an admin so you cannot manage your Team's subscription. If this does not make sense, please
+                <span class="underline cursor-pointer dark:text-white" wire:click="help">contact us</span>.
+            </x-callout>
         </div>
     @endif
 </div>

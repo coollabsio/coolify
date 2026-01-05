@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
 use App\Traits\DeletesUserSessions;
@@ -53,7 +54,24 @@ class User extends Authenticatable implements SendsEmail
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
+        'email_change_code_expires_at' => 'datetime',
     ];
+
+    /**
+     * Set the email attribute to lowercase.
+     */
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Set the pending_email attribute to lowercase.
+     */
+    public function setPendingEmailAttribute($value)
+    {
+        $this->attributes['pending_email'] = $value ? strtolower($value) : null;
+    }
 
     protected static function boot()
     {
@@ -203,6 +221,16 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    public function changelogReads()
+    {
+        return $this->hasMany(UserChangelogRead::class);
+    }
+
+    public function getUnreadChangelogCount(): int
+    {
+        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
+    }
+
     public function getRecipients(): array
     {
         return [$this->email];
@@ -268,9 +296,10 @@ class User extends Authenticatable implements SendsEmail
 
     public function isInstanceAdmin()
     {
-        $found_root_team = Auth::user()->teams->filter(function ($team) {
+        $found_root_team = $this->teams->filter(function ($team) {
             if ($team->id == 0) {
-                if (! Auth::user()->isAdmin()) {
+                $role = $team->pivot->role;
+                if ($role !== 'admin' && $role !== 'owner') {
                     return false;
                 }
 
@@ -283,31 +312,166 @@ class User extends Authenticatable implements SendsEmail
         return $found_root_team->count() > 0;
     }
 
-    public function currentTeam()
+    public function currentTeam(): ?Team
     {
-        return Cache::remember('team:'.Auth::id(), 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
-                return Auth::user()->teams[0];
-            }
+        $sessionTeamId = data_get(session('currentTeam'), 'id');
 
-            return Team::find(session('currentTeam')->id);
+        if (is_null($sessionTeamId)) {
+            return null;
+        }
+
+        // Check if user actually belongs to this team
+        if (! $this->teams->contains('id', $sessionTeamId)) {
+            session()->forget('currentTeam');
+            Cache::forget('user:'.$this->id.':team:'.$sessionTeamId);
+
+            return null;
+        }
+
+        return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
+            return Team::find($sessionTeamId);
         });
     }
 
-    public function otherTeams()
-    {
-        return Auth::user()->teams->filter(function ($team) {
-            return $team->id != currentTeam()->id;
-        });
-    }
-
-    public function role()
+    public function role(): ?string
     {
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
-        return data_get($user, 'pivot.role');
+        $current = $this->currentTeam();
+        if (is_null($current)) {
+            return null;
+        }
+
+        $team = $this->teams->where('id', $current->id)->first();
+
+        return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Get the user's role in a specific team
+     */
+    public function roleInTeam(int $teamId): ?string
+    {
+        $team = $this->teams->where('id', $teamId)->first();
+
+        return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Check if the user is an admin or owner of a specific team
+     */
+    public function isAdminOfTeam(int $teamId): bool
+    {
+        $team = $this->teams->where('id', $teamId)->first();
+
+        if (! $team) {
+            return false;
+        }
+
+        $role = $team->pivot->role ?? null;
+
+        return $role === 'admin' || $role === 'owner';
+    }
+
+    /**
+     * Check if the user can access system resources (team_id=0)
+     * Must be admin/owner of root team
+     */
+    public function canAccessSystemResources(): bool
+    {
+        // Check if user is member of root team
+        $rootTeam = $this->teams->where('id', 0)->first();
+
+        if (! $rootTeam) {
+            return false;
+        }
+
+        // Check if user is admin or owner of root team
+        return $this->isAdminOfTeam(0);
+    }
+
+    public function requestEmailChange(string $newEmail): void
+    {
+        // Generate 6-digit code
+        $code = sprintf('%06d', mt_rand(0, 999999));
+
+        // Set expiration using config value
+        $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
+        $expiresAt = Carbon::now()->addMinutes($expiryMinutes);
+
+        $this->update([
+            'pending_email' => $newEmail,
+            'email_change_code' => $code,
+            'email_change_code_expires_at' => $expiresAt,
+        ]);
+
+        // Send verification email to new address
+        $this->notify(new \App\Notifications\TransactionalEmails\EmailChangeVerification($this, $code, $newEmail, $expiresAt));
+    }
+
+    public function isEmailChangeCodeValid(string $code): bool
+    {
+        return $this->email_change_code === $code
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    public function confirmEmailChange(string $code): bool
+    {
+        if (! $this->isEmailChangeCodeValid($code)) {
+            return false;
+        }
+
+        $oldEmail = $this->email;
+        $newEmail = $this->pending_email;
+
+        // Update email and clear change request fields
+        $this->update([
+            'email' => $newEmail,
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+
+        // For cloud users, dispatch job to update Stripe customer email asynchronously
+        $currentTeam = $this->currentTeam();
+        if (isCloud() && $currentTeam?->subscription) {
+            dispatch(new UpdateStripeCustomerEmailJob(
+                $currentTeam,
+                $this->id,
+                $newEmail,
+                $oldEmail
+            ));
+        }
+
+        return true;
+    }
+
+    public function clearEmailChangeRequest(): void
+    {
+        $this->update([
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+    }
+
+    public function hasEmailChangeRequest(): bool
+    {
+        return ! is_null($this->pending_email)
+            && ! is_null($this->email_change_code)
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    /**
+     * Check if the user has a password set.
+     * OAuth users are created without passwords.
+     */
+    public function hasPassword(): bool
+    {
+        return ! empty($this->password);
     }
 }

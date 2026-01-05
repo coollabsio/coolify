@@ -4,11 +4,14 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureCloudflared;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class CloudflareTunnel extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     #[Validate(['required', 'string'])]
@@ -51,6 +54,7 @@ class CloudflareTunnel extends Component
     public function toggleCloudflareTunnels()
     {
         try {
+            $this->authorize('update', $this->server);
             remote_process(['docker rm -f coolify-cloudflared'], $this->server, false, 10);
             $this->isCloudflareTunnelsEnabled = false;
             $this->server->settings->is_cloudflare_tunnel = false;
@@ -68,6 +72,7 @@ class CloudflareTunnel extends Component
 
     public function manualCloudflareConfig()
     {
+        $this->authorize('update', $this->server);
         $this->isCloudflareTunnelsEnabled = true;
         $this->server->settings->is_cloudflare_tunnel = true;
         $this->server->settings->save();
@@ -78,6 +83,7 @@ class CloudflareTunnel extends Component
     public function automatedCloudflareConfig()
     {
         try {
+            $this->authorize('update', $this->server);
             if (str($this->ssh_domain)->contains('https://')) {
                 $this->ssh_domain = str($this->ssh_domain)->replace('https://', '')->replace('http://', '')->trim();
                 $this->ssh_domain = str($this->ssh_domain)->replace('/', '');

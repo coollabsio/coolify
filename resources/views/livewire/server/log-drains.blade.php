@@ -20,7 +20,8 @@
                                 @if ($isLogDrainAxiomEnabled || $isLogDrainCustomEnabled)
                                     <x-forms.checkbox disabled id="isLogDrainNewRelicEnabled" label="Enabled" />
                                 @else
-                                    <x-forms.checkbox instantSave id="isLogDrainNewRelicEnabled" label="Enabled" />
+                                    <x-forms.checkbox instantSave canGate="update" :canResource="$server"
+                                        id="isLogDrainNewRelicEnabled" label="Enabled" />
                                 @endif
                             </div>
                             <div class="flex flex-col gap-4">
@@ -33,9 +34,10 @@
                                             helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
                                             label="Endpoint" />
                                     @else
-                                        <x-forms.input type="password" required id="logDrainNewRelicLicenseKey"
-                                            label="License Key" />
-                                        <x-forms.input required id="logDrainNewRelicBaseUri"
+                                        <x-forms.input canGate="update" :canResource="$server" type="password" required
+                                            id="logDrainNewRelicLicenseKey" label="License Key" />
+                                        <x-forms.input canGate="update" :canResource="$server" required
+                                            id="logDrainNewRelicBaseUri"
                                             placeholder="https://log-api.eu.newrelic.com/log/v1"
                                             helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
                                             label="Endpoint" />
@@ -43,7 +45,7 @@
                                 </div>
                             </div>
                             <div class="flex justify-end gap-4 pt-6">
-                                <x-forms.button type="submit">
+                                <x-forms.button canGate="update" :canResource="$server" type="submit">
                                     Save
                                 </x-forms.button>
                             </div>
@@ -54,7 +56,8 @@
                             @if ($isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled)
                                 <x-forms.checkbox disabled id="isLogDrainAxiomEnabled" label="Enabled" />
                             @else
-                                <x-forms.checkbox instantSave id="isLogDrainAxiomEnabled" label="Enabled" />
+                                <x-forms.checkbox instantSave canGate="update" :canResource="$server"
+                                    id="isLogDrainAxiomEnabled" label="Enabled" />
                             @endif
                         </div>
                         <form wire:submit='submit("axiom")' class="flex flex-col">
@@ -66,14 +69,15 @@
                                         <x-forms.input disabled required id="logDrainAxiomDatasetName"
                                             label="Dataset Name" />
                                     @else
-                                        <x-forms.input type="password" required id="logDrainAxiomApiKey"
-                                            label="API Key" />
-                                        <x-forms.input required id="logDrainAxiomDatasetName" label="Dataset Name" />
+                                        <x-forms.input canGate="update" :canResource="$server" type="password" required
+                                            id="logDrainAxiomApiKey" label="API Key" />
+                                        <x-forms.input canGate="update" :canResource="$server" required
+                                            id="logDrainAxiomDatasetName" label="Dataset Name" />
                                     @endif
                                 </div>
                             </div>
                             <div class="flex justify-end gap-4 pt-6">
-                                <x-forms.button type="submit">
+                                <x-forms.button canGate="update" :canResource="$server" type="submit">
                                     Save
                                 </x-forms.button>
                             </div>
@@ -83,7 +87,8 @@
                             @if ($isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled)
                                 <x-forms.checkbox disabled id="isLogDrainCustomEnabled" label="Enabled" />
                             @else
-                                <x-forms.checkbox instantSave id="isLogDrainCustomEnabled" label="Enabled" />
+                                <x-forms.checkbox instantSave canGate="update" :canResource="$server"
+                                    id="isLogDrainCustomEnabled" label="Enabled" />
                             @endif
                         </div>
                         <form wire:submit='submit("custom")' class="flex flex-col">
@@ -94,15 +99,15 @@
                                     <x-forms.textarea disabled id="logDrainCustomConfigParser"
                                         label="Custom Parser Configuration" />
                                 @else
-                                    <x-forms.textarea rows="6" required id="logDrainCustomConfig"
-                                        label="Custom FluentBit Configuration" />
-                                    <x-forms.textarea id="logDrainCustomConfigParser"
-                                        label="Custom Parser Configuration" />
+                                    <x-forms.textarea canGate="update" :canResource="$server" rows="6" required
+                                        id="logDrainCustomConfig" label="Custom FluentBit Configuration" />
+                                    <x-forms.textarea canGate="update" :canResource="$server"
+                                        id="logDrainCustomConfigParser" label="Custom Parser Configuration" />
                                 @endif
 
                             </div>
                             <div class="flex justify-end gap-4 pt-6">
-                                <x-forms.button type="submit">
+                                <x-forms.button canGate="update" :canResource="$server" type="submit">
                                     Save
                                 </x-forms.button>
                             </div>

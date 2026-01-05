@@ -1,5 +1,6 @@
 # documentation: https://docs.nextcloud.com
 # slogan: NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.
+# category: storage
 # tags: cloud, collaboration, communication, filestorage, data
 # logo: svgs/nextcloud.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   nextcloud:
     image: lscr.io/linuxserver/nextcloud:latest
     environment:
-      - SERVICE_FQDN_NEXTCLOUD_80
+      - SERVICE_URL_NEXTCLOUD_80
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Europe/Madrid}

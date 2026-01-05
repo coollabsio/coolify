@@ -1,5 +1,5 @@
 <div>
-    <div class="pb-0 subtitle">
+    <div class="pb-2 subtitle">
         <div>Private Keys are used to connect to your servers without passwords.</div>
         <div class="font-bold">You should not use passphrase protected keys.</div>
     </div>

@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://github.com/dockur/windows
 # slogan: Run Windows in a containerized environment.
+# category: productivity
 # tags: windows, virtualization, container, os
 # logo: svgs/windows.svg
 # port: 8006
@@ -11,7 +12,7 @@ services:
     volumes:
       - windows-storage:/storage
     environment:
-      - SERVICE_FQDN_WINDOWS_8006
+      - SERVICE_URL_WINDOWS_8006
       - VERSION=11
     devices:
       - /dev/kvm:/dev/kvm
