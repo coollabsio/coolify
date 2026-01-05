@@ -47,16 +47,19 @@
                             label="{{ __('input.email') }}" />
                         <x-forms.input required type="password" id="password" name="password"
                             label="{{ __('input.password') }}" />
-                        <x-forms.input required type="password" id="password_confirmation"
-                            name="password_confirmation" label="{{ __('input.password.again') }}" />
+                        <x-forms.input required type="password" id="password_confirmation" name="password_confirmation"
+                            label="{{ __('input.password.again') }}" />
 
-                        <div class="p-4 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
+                        <div
+                            class="p-4 bg-neutral-50 dark:bg-coolgray-200 rounded-lg border border-neutral-200 dark:border-coolgray-400">
                             <p class="text-xs dark:text-neutral-400">
-                                Your password should be min 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one symbol.
+                                Your password should be min 8 characters long and contain at least one uppercase letter,
+                                one lowercase letter, one number, and one symbol.
                             </p>
                         </div>
 
-                        <x-forms.button class="w-full justify-center py-3 box-boarding mt-2" type="submit" isHighlighted>
+                        <x-forms.button class="w-full justify-center py-3 box-boarding mt-2" type="submit"
+                            isHighlighted>
                             {{ __('auth.reset_password') }}
                         </x-forms.button>
                     </form>
@@ -66,13 +69,14 @@
                             <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
                         </div>
                         <div class="relative flex justify-center text-sm">
-                            <span class="px-2 dark:bg-base text-neutral-500 dark:text-neutral-400">
+                            <span class="px-2 bg-gray-50 dark:bg-base text-neutral-500 dark:text-neutral-400">
                                 Remember your password?
                             </span>
                         </div>
                     </div>
 
-                    <a href="/login" class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
+                    <a href="/login"
+                        class="block w-full text-center py-3 px-4 rounded-lg border border-neutral-300 dark:border-coolgray-400 font-medium hover:border-coollabs dark:hover:border-warning transition-colors">
                         Back to Login
                     </a>
                 </div>

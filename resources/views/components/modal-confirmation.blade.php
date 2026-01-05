@@ -29,17 +29,23 @@
 
 @php
     use App\Models\InstanceSettings;
+    // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
+    // Skip ONLY password confirmation for OAuth users (they have no password)
+    $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
+        $skipPasswordConfirmation = false;
     }
+    // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
+    $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
-    finalStep: {{ $confirmWithPassword && !$disableTwoStepConfirmation ? 3 : 2 }},
+    finalStep: {{ $confirmWithPassword && !$skipPasswordConfirmation ? 3 : 2 }},
     deleteText: '',
     password: '',
     actions: @js($actions),
@@ -50,7 +56,7 @@
     })(),
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
-    confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
+    confirmWithPassword: @js($confirmWithPassword && !$skipPasswordConfirmation),
     submitAction: @js($submitAction),
     dispatchAction: @js($dispatchAction),
     passwordError: '',
@@ -59,6 +65,7 @@
     dispatchEventType: @js($dispatchEventType),
     dispatchEventMessage: @js($dispatchEventMessage),
     disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
+    skipPasswordConfirmation: @js($skipPasswordConfirmation),
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
@@ -68,7 +75,7 @@
         $wire.$refresh();
     },
     step1ButtonText: @js($step1ButtonText),
-    step2ButtonText: @js($step2ButtonText),
+    step2ButtonText: @js($effectiveStep2ButtonText),
     step3ButtonText: @js($step3ButtonText),
     validatePassword() {
         if (this.confirmWithPassword && !this.password) {
@@ -92,10 +99,14 @@
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
         const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
 
-        if (this.confirmWithPassword) {
-            params.push(this.password);
+        // Always pass password parameter (empty string if password confirmation is skipped)
+        // This ensures consistent method signature for backend Livewire methods
+        params.push(this.confirmWithPassword ? this.password : '');
+
+        // Only pass selectedActions if there are checkboxes with selections
+        if (this.selectedActions.length > 0) {
+            params.push(this.selectedActions);
         }
-        params.push(this.selectedActions);
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
@@ -177,7 +188,7 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
             <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
@@ -186,8 +197,8 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
-                <div class="flex justify-between items-center pb-3">
+                class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                <div class="flex justify-between items-center py-6 px-7 shrink-0">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
                         class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
@@ -197,7 +208,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative w-auto">
+                <div class="relative w-auto overflow-y-auto px-7 pb-6" style="-webkit-overflow-scrolling: touch;">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -316,7 +327,7 @@
                                     if (dispatchEvent) {
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
-                                    if (confirmWithPassword && !disableTwoStepConfirmation) {
+                                    if (confirmWithPassword && !skipPasswordConfirmation) {
                                         step++;
                                     } else {
                                         modalOpen = false;
@@ -330,7 +341,7 @@
                     </div>
 
                     <!-- Step 3: Password confirmation -->
-                    @if (!$disableTwoStepConfirmation)
+                    @if (!$skipPasswordConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
                             <x-callout type="danger" title="Final Confirmation" class="mb-4">
                                 Please enter your password to confirm this destructive action.

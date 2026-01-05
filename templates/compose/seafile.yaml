@@ -12,7 +12,7 @@ services:
       - seafile-data:/shared
     environment:
       - SERVICE_URL_SEAFILE_80
-      - SEAFILE_SERVER_HOSTNAME=${SERVICE_URL_SEAFILE_80}
+      - SEAFILE_SERVER_HOSTNAME=${SERVICE_FQDN_SEAFILE}
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_ROOT_PASSWD=${SERVICE_PASSWORD_MYSQLROOT}
@@ -24,11 +24,12 @@ services:
       - TIME_ZONE=${TIME_ZONE:-UTC}
       - INIT_SEAFILE_ADMIN_EMAIL=${INIT_SEAFILE_ADMIN_EMAIL:-test@example.com}
       - INIT_SEAFILE_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
-      - SEAFILE_SERVER_PROTOCOL=${SEAFILE_SERVER_PROTOCOL:-http}
+      - SEAFILE_SERVER_PROTOCOL=https
       - SITE_ROOT=${SITE_ROOT:-/}
       - NON_ROOT=${NON_ROOT:-false}
       - JWT_PRIVATE_KEY=${SERVICE_PASSWORD_64_JWT}
       - SEAFILE_LOG_TO_STDOUT=${SEAFILE_LOG_TO_STDOUT:-true}
+      - 'FILE_SERVER_ROOT=${SERVICE_URL_SEAFILE}/seafhttp'
     depends_on:
       mariadb:
         condition: service_healthy
@@ -36,9 +37,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/api2/ping"]
-      interval: 20s
-      timeout: 5s
-      retries: 10
+      interval: 10s
+      timeout: 20s
+      retries: 5
 
   mariadb:
     image: mariadb:11
@@ -51,9 +52,9 @@ services:
       - MYSQL_DATABASE=${MYSQL_DATABASE:-seafile-db}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 5s
+      interval: 10s
       timeout: 20s
-      retries: 10
+      retries: 5
 
   memcached:
     image: memcached:latest
@@ -64,6 +65,6 @@ services:
           "CMD-SHELL",
           'bash -c "echo version | (exec 3<>/dev/tcp/localhost/11211; cat >&3; timeout 0.5 cat <&3; exec 3<&-)"',
         ]
-      interval: 20s
-      timeout: 5s
-      retries: 10
+      interval: 10s
+      timeout: 20s
+      retries: 5

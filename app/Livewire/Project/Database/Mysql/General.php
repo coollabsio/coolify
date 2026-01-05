@@ -94,8 +94,6 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'mysqlRootPassword.required' => 'The Root Password field is required.',
                 'mysqlUser.required' => 'The MySQL User field is required.',
                 'mysqlPassword.required' => 'The MySQL Password field is required.',

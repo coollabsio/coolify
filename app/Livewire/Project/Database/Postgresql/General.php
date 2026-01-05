@@ -106,8 +106,6 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'postgresUser.required' => 'The Postgres User field is required.',
                 'postgresPassword.required' => 'The Postgres Password field is required.',
                 'postgresDb.required' => 'The Postgres Database field is required.',
@@ -328,12 +326,15 @@ class General extends Component
         $configuration_dir = database_configuration_dir().'/'.$container_name;
 
         if ($oldScript && $oldScript['filename'] !== $script['filename']) {
-            $old_file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$oldScript['filename']}";
-            $delete_command = "rm -f $old_file_path";
             try {
+                // Validate and escape filename to prevent command injection
+                validateShellSafePath($oldScript['filename'], 'init script filename');
+                $old_file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$oldScript['filename']}";
+                $escapedOldPath = escapeshellarg($old_file_path);
+                $delete_command = "rm -f {$escapedOldPath}";
                 instant_remote_process([$delete_command], $this->server);
             } catch (Exception $e) {
-                $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
+                $this->dispatch('error', $e->getMessage());
 
                 return;
             }
@@ -370,13 +371,17 @@ class General extends Component
         if ($found) {
             $container_name = $this->database->uuid;
             $configuration_dir = database_configuration_dir().'/'.$container_name;
-            $file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$script['filename']}";
 
-            $command = "rm -f $file_path";
             try {
+                // Validate and escape filename to prevent command injection
+                validateShellSafePath($script['filename'], 'init script filename');
+                $file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$script['filename']}";
+                $escapedPath = escapeshellarg($file_path);
+
+                $command = "rm -f {$escapedPath}";
                 instant_remote_process([$command], $this->server);
             } catch (Exception $e) {
-                $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
+                $this->dispatch('error', $e->getMessage());
 
                 return;
             }
@@ -405,6 +410,16 @@ class General extends Component
             'new_filename' => 'required|string',
             'new_content' => 'required|string',
         ]);
+
+        try {
+            // Validate filename to prevent command injection
+            validateShellSafePath($this->new_filename, 'init script filename');
+        } catch (Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+
+            return;
+        }
+
         $found = collect($this->initScripts)->firstWhere('filename', $this->new_filename);
         if ($found) {
             $this->dispatch('error', 'Filename already exists.');

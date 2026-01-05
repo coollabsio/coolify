@@ -9,17 +9,28 @@
                 placeholder="If empty, your GitHub user will be used." id="organization" label="Organization (on GitHub)" />
         </div>
         @if (!isCloud())
-            <div class="w-48">
-                <x-forms.checkbox id="is_system_wide" label="System Wide"
-                    helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
+            <div x-data="{ showWarning: @entangle('is_system_wide') }">
+                <div class="w-48">
+                    <x-forms.checkbox id="is_system_wide" label="System Wide"
+                        helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
+                </div>
+                <div x-show="showWarning" x-transition x-cloak class="w-full max-w-2xl mx-auto pt-2">
+                    <x-callout type="warning" title="Not Recommended">
+                        <div class="whitespace-normal break-words">
+                            System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team
+                            can use this GitHub App to deploy applications from your repositories. For better security and
+                            isolation, it's recommended to create team-specific GitHub Apps instead.
+                        </div>
+                    </x-callout>
+                </div>
             </div>
         @endif
         <div x-data="{
-            activeAccordion: '',
-            setActiveAccordion(id) {
-                this.activeAccordion = (this.activeAccordion == id) ? '' : id
-            }
-        }" class="relative w-full py-2 mx-auto overflow-hidden text-sm font-normal rounded-md">
+                                activeAccordion: '',
+                                setActiveAccordion(id) {
+                                    this.activeAccordion = (this.activeAccordion == id) ? '' : id
+                                }
+                            }" class="relative w-full py-2 mx-auto overflow-hidden text-sm font-normal rounded-md">
             <div x-data="{ id: $id('accordion') }" class="cursor-pointer">
                 <button @click="setActiveAccordion(id)"
                     class="flex items-center justify-between w-full px-1 py-2 text-left select-none dark:hover:text-white hover:bg-white/5"

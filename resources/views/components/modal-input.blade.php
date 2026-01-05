@@ -8,8 +8,15 @@
     'content' => null,
     'closeOutside' => true,
     'minWidth' => '36rem',
+    'maxWidth' => '48rem',
     'isFullWidth' => false,
 ])
+
+@php
+    $modalId = 'modal-' . uniqid();
+@endphp
+
+
 <div x-data="{ modalOpen: false }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
@@ -32,21 +39,21 @@
     <template x-teleport="body">
         <div x-show="modalOpen"
             x-init="$watch('modalOpen', value => { if(value) { $nextTick(() => { const firstInput = $el.querySelector('input, textarea, select'); firstInput?.focus(); }) } })"
-            class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4">
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 @if ($closeOutside) @click="modalOpen=false" @endif
                 class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+            <div id="{{ $modalId }}" x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
                 x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[{{ $minWidth }}] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                <div class="flex items-center justify-between pb-3">
+                class="relative w-full min-w-full lg:min-w-[{{ $minWidth }}] max-w-[{{ $maxWidth }}] max-h-[calc(100vh-2rem)] border rounded-sm drop-shadow-sm bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col">
+                <div class="flex items-center justify-between py-6 px-6 shrink-0">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"
                         class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base">
@@ -56,7 +63,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="relative flex items-center justify-center w-auto">
+                <div class="relative flex items-center justify-center w-auto overflow-y-auto px-6 pb-6" style="-webkit-overflow-scrolling: touch;">
                     {{ $slot }}
                 </div>
             </div>

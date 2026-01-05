@@ -194,6 +194,36 @@ YAML;
         ->not->toThrow(Exception::class);
 });
 
+test('array-format with environment variable and path concatenation', function () {
+    // This is the reported issue #7127 - ${VAR}/path should be allowed
+    $dockerComposeYaml = <<<'YAML'
+services:
+  web:
+    image: nginx
+    volumes:
+      - type: bind
+        source: '${VOLUMES_PATH}/mysql'
+        target: /var/lib/mysql
+      - type: bind
+        source: '${DATA_PATH}/config'
+        target: /etc/config
+      - type: bind
+        source: '${VOLUME_PATH}/app_data'
+        target: /app/data
+YAML;
+
+    $parsed = Yaml::parse($dockerComposeYaml);
+
+    // Verify all three volumes have the correct source format
+    expect($parsed['services']['web']['volumes'][0]['source'])->toBe('${VOLUMES_PATH}/mysql');
+    expect($parsed['services']['web']['volumes'][1]['source'])->toBe('${DATA_PATH}/config');
+    expect($parsed['services']['web']['volumes'][2]['source'])->toBe('${VOLUME_PATH}/app_data');
+
+    // The validation should allow this - the reported bug was that it was blocked
+    expect(fn () => validateDockerComposeForInjection($dockerComposeYaml))
+        ->not->toThrow(Exception::class);
+});
+
 test('array-format with malicious environment variable default', function () {
     $dockerComposeYaml = <<<'YAML'
 services:
