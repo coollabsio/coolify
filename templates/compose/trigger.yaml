@@ -7,7 +7,7 @@
 
 services:
   trigger:
-    image: 'ghcr.io/triggerdotdev/trigger.dev:v4.3.1'
+    image: 'ghcr.io/triggerdotdev/trigger.dev:v4.3.0'
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
@@ -24,7 +24,6 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_URL_TRIGGER_3000
-      - REMIX_APP_PORT=3000
       - APP_ORIGIN=${SERVICE_URL_TRIGGER_3000}
       - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER_3000}
       - API_ORIGIN=${SERVICE_URL_TRIGGER_3000}
@@ -59,14 +58,14 @@ services:
       - DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT:-100}
       - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID:-}
       - AUTH_GITHUB_CLIENT_SECRET=${AUTH_GITHUB_CLIENT_SECRET:-}
-      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-smtp}
+      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-resend}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_SECURE=${SMTP_SECURE:-}
-      - FROM_EMAIL=${FROM_EMAIL:-}
+      - FROM_EMAIL=${FROM_EMAIL:-onboarding@resend.dev}
       - REPLY_TO_EMAIL=${REPLY_TO_EMAIL:-}
       - WHITELISTED_EMAILS=${WHITELISTED_EMAILS:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
@@ -89,7 +88,7 @@ services:
       start_period: 120s
 
   supervisor:
-    image: 'ghcr.io/triggerdotdev/supervisor:v4.3.1'
+    image: 'ghcr.io/triggerdotdev/supervisor:v4.3.0'
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
@@ -128,7 +127,7 @@ services:
       start_period: 30s
 
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:0.4.2
+    image: tecnativa/docker-socket-proxy:v0.4.2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -201,7 +200,7 @@ services:
       start_period: 10s
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8-lts
+    image: clickhouse/clickhouse-server:25.8
     environment:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
@@ -230,18 +229,11 @@ services:
     healthcheck:
       test:
         - CMD
-        - curl
-        - '-f'
-        - http://localhost:9000/minio/health/live
+        - mc
+        - ready
+        - local
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
-volumes:
-  postgresql-data:
-  redis-data:
-  clickhouse-data:
-  clickhouse-logs:
-  minio-data:
-  shared-data:
