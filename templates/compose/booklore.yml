@@ -29,15 +29,13 @@ services:
     healthcheck:
       test: "wget --no-verbose --tries=1 --spider http://localhost/login || exit 1"
   mariadb:
-    image: "lscr.io/linuxserver/mariadb:11.4.5"
+    image: "mariadb:12.2.1-ubi10-rc"
     environment:
-      - "PUID=${DB_PUID:-1000}"
-      - "PGID=${DB_GUID:-1000}"
       - "TZ=${TZ}"
-      - "MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_DBROOT}"
-      - "MYSQL_DATABASE=booklore"
-      - "MYSQL_USER=${SERVICE_USER_DB}"
-      - "MYSQL_PASSWORD=${SERVICE_PASSWORD_DB}"
+      - "MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_DBROOT}"
+      - "MARIADB_DATABASE=booklore"
+      - "MARIADB_USER=${SERVICE_USER_DB}"
+      - "MARIADB_PASSWORD=${SERVICE_PASSWORD_DB}"
     volumes:
       - "db-data:/config"
     healthcheck:
@@ -47,6 +45,9 @@ services:
         - ping
         - "-h"
         - localhost
+        - "-u"
+        - "${SERVICE_USER_DB}"      # Replace with your username
+        - "--password=${SERVICE_PASSWORD_DB}" # Replace with your password
 volumes:
   db-data: null
   booklore-books: null
