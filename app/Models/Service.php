@@ -515,6 +515,31 @@ class Service extends BaseModel
                     }
                     $fields->put('RabbitMQ', $data->toArray());
                     break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
+                    break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -1043,6 +1068,31 @@ class Service extends BaseModel
                     }
 
                     $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
                     break;
                 default:
                     $data = collect([]);

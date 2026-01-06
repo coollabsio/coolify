@@ -8,16 +8,14 @@ namespace App\Support;
 class ValidationPatterns
 {
     /**
-     * Pattern for names (allows letters, numbers, spaces, dashes, underscores, dots, slashes, colons, parentheses)
-     * Matches CleanupNames::sanitizeName() allowed characters
-     */
-    public const NAME_PATTERN = '/^[a-zA-Z0-9\s\-_.:\/()]+$/';
+     * Pattern for names excluding all dangerous characters
+    */
+    public const NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.]+$/u';
 
     /**
-     * Pattern for descriptions (allows more characters including quotes, commas, etc.)
-     * More permissive than names but still restricts dangerous characters
+     * Pattern for descriptions excluding all dangerous characters with some additional allowed characters
      */
-    public const DESCRIPTION_PATTERN = '/^[a-zA-Z0-9\s\-_.:\/()\'\",.!?@#%&+=\[\]{}|~`*]+$/';
+    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*]+$/u';
 
     /**
      * Get validation rules for name fields
@@ -66,7 +64,7 @@ class ValidationPatterns
     public static function nameMessages(): array
     {
         return [
-            'name.regex' => 'The name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+            'name.regex' => "The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).",
             'name.min' => 'The name must be at least :min characters.',
             'name.max' => 'The name may not be greater than :max characters.',
         ];
@@ -78,12 +76,12 @@ class ValidationPatterns
     public static function descriptionMessages(): array
     {
         return [
-            'description.regex' => 'The description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+            'description.regex' => "The description may only contain letters (including Unicode), numbers, spaces, and common punctuation (- _ . , ! ? ( ) ' \" + = *).",
             'description.max' => 'The description may not be greater than :max characters.',
         ];
     }
 
-    /**
+    /** 
      * Get combined validation messages for both name and description fields
      */
     public static function combinedMessages(): array

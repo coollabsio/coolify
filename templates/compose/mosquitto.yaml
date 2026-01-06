@@ -15,14 +15,15 @@ services:
       - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}
       - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
     volumes:
-      - mosquitto-config:/mosquitto/config
-      - mosquitto-certs:/certs
+      - "./mosquitto/config:/mosquitto/config"
+      - "./certs:/certs"
+    ports:
+      - "8883:8883"
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
       interval: 30s
       timeout: 10s
       retries: 3
-
     entrypoint: 'sh -c "
       if [ ''$REQUIRE_CERTIFICATE'' = ''true'' ]; then
       echo ''listener 8883'' > /mosquitto/config/mosquitto.conf &&
