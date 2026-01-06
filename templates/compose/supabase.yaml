@@ -280,7 +280,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:2025.12.17-sha-43f4f7f
+    image: supabase/studio:2026.01.05-sha-1077b50
     healthcheck:
       test:
         [
@@ -318,6 +318,8 @@ services:
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
+      - 'POSTGRES_HOST=${POSTGRES_HOSTNAME:-supabase-db}'
+      - CURRENT_CLI_VERSION=2.67.1
   supabase-db:
     image: supabase/postgres:15.8.1.048
     healthcheck:
