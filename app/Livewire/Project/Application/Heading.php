@@ -100,18 +100,16 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
+        if ($result['status'] === 'queue_full') {
+            $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+            return;
+        }
         if ($result['status'] === 'skipped') {
             $this->dispatch('error', 'Deployment skipped', $result['message']);
 
             return;
         }
-
-        // Reset restart count on successful deployment
-        $this->application->update([
-            'restart_count' => 0,
-            'last_restart_at' => null,
-            'last_restart_type' => null,
-        ]);
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
@@ -151,18 +149,16 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );
+        if ($result['status'] === 'queue_full') {
+            $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+            return;
+        }
         if ($result['status'] === 'skipped') {
             $this->dispatch('success', 'Deployment skipped', $result['message']);
 
             return;
         }
-
-        // Reset restart count on manual restart
-        $this->application->update([
-            'restart_count' => 0,
-            'last_restart_at' => now(),
-            'last_restart_type' => 'manual',
-        ]);
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],

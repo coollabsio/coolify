@@ -351,7 +351,7 @@ class ServicesController extends Controller
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
                 ];
-                if ($oneClickServiceName === 'cloudflared') {
+                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
                 $service = Service::create($servicePayload);
@@ -376,6 +376,10 @@ class ServicesController extends Controller
                     });
                 }
                 $service->parse(isNew: true);
+
+                // Apply service-specific application prerequisites
+                applyServiceApplicationPrerequisites($service);
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
@@ -677,7 +681,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -867,7 +870,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -948,7 +950,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1065,7 +1066,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1196,7 +1196,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1311,7 +1310,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1321,7 +1319,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1400,7 +1397,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1481,7 +1477,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1562,7 +1557,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(

@@ -111,7 +111,7 @@
                                     <x-highlighted text="*" />
                                 </label>
                                 <div
-                                    class="p-4 border border-yellow-500 dark:border-yellow-600 rounded bg-yellow-50 dark:bg-yellow-900/10">
+                                    class="p-4 border border-warning-500 dark:border-warning-600 rounded bg-warning-50 dark:bg-warning-900/10">
                                     <p class="text-sm mb-3 text-neutral-700 dark:text-neutral-300">
                                         No private keys found. You need to create a private key to continue.
                                     </p>

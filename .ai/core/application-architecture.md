@@ -283,13 +283,21 @@ class EnvironmentVariable extends Model
 
 ### **Team-Based Soft Scoping**
 
-All major resources include team-based query scoping:
+All major resources include team-based query scoping with request-level caching:
 
 ```php
-// Automatic team filtering
-$applications = Application::ownedByCurrentTeam()->get();
-$servers = Server::ownedByCurrentTeam()->get();
+// ✅ CORRECT - Use cached methods (request-level cache via once())
+$applications = Application::ownedByCurrentTeamCached();
+$servers = Server::ownedByCurrentTeamCached();
+
+// ✅ CORRECT - Filter cached collection in memory
+$activeServers = Server::ownedByCurrentTeamCached()->where('is_active', true);
+
+// Only use query builder when you need eager loading or fresh data
+$projects = Project::ownedByCurrentTeam()->with('environments')->get();
 ```
+
+See [Database Patterns](.ai/patterns/database-patterns.md#request-level-caching-with-ownedbycurrentteamcached) for full documentation.
 
 ### **Configuration Inheritance**
 

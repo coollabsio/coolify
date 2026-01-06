@@ -18,6 +18,16 @@
 
     --color-base: #101010;
     --color-warning: #fcd452;
+    --color-warning-50: #fefce8;
+    --color-warning-100: #fef9c3;
+    --color-warning-200: #fef08a;
+    --color-warning-300: #fde047;
+    --color-warning-400: #fcd452;
+    --color-warning-500: #facc15;
+    --color-warning-600: #ca8a04;
+    --color-warning-700: #a16207;
+    --color-warning-800: #854d0e;
+    --color-warning-900: #713f12;
     --color-success: #22C55E;
     --color-error: #dc2626;
     --color-coollabs-50: #f5f0ff;
@@ -175,4 +185,15 @@ section {
 
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.log-highlight {
+    background-color: rgba(234, 179, 8, 0.4);
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.dark .log-highlight {
+    background-color: rgba(234, 179, 8, 0.3);
 }

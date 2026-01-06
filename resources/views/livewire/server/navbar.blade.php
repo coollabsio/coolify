@@ -2,6 +2,13 @@
     <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
+            @if ($server->id === 0)
+                <div class="mb-4 p-3 text-sm bg-warning/10 border border-warning/30 rounded-lg text-warning">
+                    <span class="font-semibold">Note:</span> This is the localhost server where Coolify runs.
+                    During proxy restart, the connection may be temporarily lost.
+                    If logs stop updating, please refresh the browser after a few minutes.
+                </div>
+            @endif
             <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
@@ -58,14 +65,14 @@
             class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
     'server_uuid' => data_get($server, 'uuid'),
-]) }}">
+]) }}" {{ wireNavigate() }}>
                 Configuration
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
                         <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" {{ wireNavigate() }}>
                             Proxy
                             @if ($this->hasTraefikOutdated)
                                 <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
@@ -77,7 +84,7 @@
             @endif
             <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}" href="{{ route('server.resources', [
     'server_uuid' => data_get($server, 'uuid'),
-]) }}">
+]) }}" {{ wireNavigate() }}>
                 Resources
             </a>
             @can('canAccessTerminal')
@@ -90,7 +97,7 @@
             @can('update', $server)
                         <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" {{ wireNavigate() }}>
                             Security
                         </a>
             @endcan
@@ -174,6 +181,7 @@
                         }
                     });
                     $wire.$on('restartEvent', () => {
+                        if ($wire.restartInitiated) return;
                         window.dispatchEvent(new CustomEvent('startproxy'))
                         $wire.$call('restart');
                     });

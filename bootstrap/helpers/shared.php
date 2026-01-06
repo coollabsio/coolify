@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
@@ -181,8 +182,11 @@ function refreshSession(?Team $team = null): void
             $team = User::find(Auth::id())->teams->first();
         }
     }
+    // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
-    Cache::remember('team:'.Auth::id(), 3600, function () use ($team) {
+    // Use new cache key format that includes team ID
+    Cache::forget('user:'.Auth::id().':team:'.$team->id);
+    Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
@@ -230,7 +234,7 @@ function get_route_parameters(): array
 function get_latest_sentinel_version(): string
 {
     try {
-        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $response = Http::get(config('constants.coolify.versions_url'));
         $versions = $response->json();
 
         return data_get($versions, 'coolify.sentinel.version');
@@ -300,6 +304,24 @@ function generate_application_name(string $git_repository, string $git_branch, ?
     return Str::kebab("$git_repository:$git_branch-$cuid");
 }
 
+/**
+ * Sort branches by priority: main first, master second, then alphabetically.
+ *
+ * @param  Collection  $branches  Collection of branch objects with 'name' key
+ */
+function sortBranchesByPriority(Collection $branches): Collection
+{
+    return $branches->sortBy(function ($branch) {
+        $name = data_get($branch, 'name');
+
+        return match ($name) {
+            'main' => '0_main',
+            'master' => '1_master',
+            default => '2_'.$name,
+        };
+    })->values();
+}
+
 function base_ip(): string
 {
     if (isDev()) {
@@ -365,7 +387,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive();
 }
 
 function isProduction(): bool
@@ -529,7 +551,21 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
     $resource = queryResourcesByUuid($uuid);
-    if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
+    if (is_null($resource)) {
+        return null;
+    }
+
+    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    if ($resource instanceof \App\Models\ServiceDatabase) {
+        if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+
+        return null;
+    }
+
+    // Standard resources: environment->project->team_id
+    if ($resource->environment->project->team_id === $teamId) {
         return $resource;
     }
 
@@ -616,6 +652,12 @@ function queryResourcesByUuid(string $uuid)
         return $clickhouse;
     }
 
+    // Check for ServiceDatabase by its own UUID
+    $serviceDatabase = ServiceDatabase::whereUuid($uuid)->first();
+    if ($serviceDatabase) {
+        return $serviceDatabase;
+    }
+
     return $resource;
 }
 function generateTagDeployWebhook($tag_name)
@@ -651,6 +693,12 @@ function generateGitManualWebhook($resource, $type)
 function removeAnsiColors($text)
 {
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
+}
+
+function sanitizeLogsForExport(string $text): string
+{
+    // All sanitization is now handled by remove_iip()
+    return remove_iip($text);
 }
 
 function getTopLevelNetworks(Service|Application $resource)
@@ -941,6 +989,9 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
         case 'SUPABASEANON':
             $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
             if (is_null($signingKey)) {
@@ -1139,7 +1190,7 @@ function get_public_ips()
         $ipv4 = $first->output();
         if ($ipv4) {
             $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
             if ($validate_ipv4 == false) {
                 echo "Invalid ipv4: $ipv4\n";
 
@@ -1154,7 +1205,7 @@ function get_public_ips()
         $ipv6 = $second->output();
         if ($ipv6) {
             $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
             if ($validate_ipv6 == false) {
                 echo "Invalid ipv6: $ipv6\n";
 
@@ -2897,6 +2948,35 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function wireNavigate(): string
+{
+    try {
+        $settings = instanceSettings();
+
+        // Return wire:navigate.hover for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate.hover' : '';
+    } catch (\Exception $e) {
+        return 'wire:navigate.hover';
+    }
+}
+
+/**
+ * Redirect to a named route with SPA navigation support.
+ * Automatically uses wire:navigate when is_wire_navigate_enabled is true.
+ */
+function redirectRoute(Livewire\Component $component, string $name, array $parameters = []): mixed
+{
+    $navigate = true;
+
+    try {
+        $navigate = instanceSettings()->is_wire_navigate_enabled ?? true;
+    } catch (\Exception $e) {
+        $navigate = true;
+    }
+
+    return $component->redirectRoute($name, $parameters, navigate: $navigate);
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();
@@ -3307,4 +3387,136 @@ function formatContainerStatus(string $status): string
         // Simple status: running → Running
         return str($status)->headline()->value();
     }
+}
+
+/**
+ * Check if password confirmation should be skipped.
+ * Returns true if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ *
+ * @return bool True if password confirmation should be skipped
+ */
+function shouldSkipPasswordConfirmation(): bool
+{
+    // Skip if two-step confirmation is globally disabled
+    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+        return true;
+    }
+
+    // Skip if user has no password (OAuth users)
+    if (! Auth::user()?->hasPassword()) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Verify password for two-step confirmation.
+ * Skips verification if:
+ * - Two-step confirmation is globally disabled
+ * - User has no password (OAuth users)
+ *
+ * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
+ * @param  \Livewire\Component|null  $component  Optional Livewire component to add errors to
+ * @return bool True if verification passed (or skipped), false if password is incorrect
+ */
+function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $component = null): bool
+{
+    // Skip if password confirmation should be skipped
+    if (shouldSkipPasswordConfirmation()) {
+        return true;
+    }
+
+    // Verify the password
+    if (! Hash::check($password, Auth::user()->password)) {
+        if ($component) {
+            $component->addError('password', 'The provided password is incorrect.');
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
+ * This preserves the visual shape of the data better than simple averaging.
+ *
+ * @param  array  $data  Array of [timestamp, value] pairs
+ * @param  int  $threshold  Target number of points
+ * @return array Downsampled data
+ */
+function downsampleLTTB(array $data, int $threshold): array
+{
+    $dataLength = count($data);
+
+    // Return unchanged if threshold >= data length, or if threshold <= 2
+    // (threshold <= 2 would cause division by zero in bucket calculation)
+    if ($threshold >= $dataLength || $threshold <= 2) {
+        return $data;
+    }
+
+    $sampled = [];
+    $sampled[] = $data[0]; // Always keep first point
+
+    $bucketSize = ($dataLength - 2) / ($threshold - 2);
+
+    $a = 0; // Index of previous selected point
+
+    for ($i = 0; $i < $threshold - 2; $i++) {
+        // Calculate bucket range
+        $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
+        $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
+        $bucketEnd = min($bucketEnd, $dataLength - 1);
+
+        // Calculate average point for next bucket (used as reference)
+        $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
+        $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
+        $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
+
+        $avgX = 0;
+        $avgY = 0;
+        $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
+
+        if ($nextBucketCount > 0) {
+            for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
+                $avgX += $data[$j][0];
+                $avgY += $data[$j][1];
+            }
+            $avgX /= $nextBucketCount;
+            $avgY /= $nextBucketCount;
+        }
+
+        // Find point in current bucket with largest triangle area
+        $maxArea = -1;
+        $maxAreaIndex = $bucketStart;
+
+        $pointAX = $data[$a][0];
+        $pointAY = $data[$a][1];
+
+        for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
+            // Triangle area calculation
+            $area = abs(
+                ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
+                ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
+            ) * 0.5;
+
+            if ($area > $maxArea) {
+                $maxArea = $area;
+                $maxAreaIndex = $j;
+            }
+        }
+
+        $sampled[] = $data[$maxAreaIndex];
+        $a = $maxAreaIndex;
+    }
+
+    $sampled[] = $data[$dataLength - 1]; // Always keep last point
+
+    return $sampled;
 }

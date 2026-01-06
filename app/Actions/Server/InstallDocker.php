@@ -78,6 +78,8 @@ class InstallDocker
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('arch')) {
+                $command = $command->merge([$this->getArchDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -146,8 +148,19 @@ class InstallDocker
             ')';
     }
 
+    private function getArchDockerInstallCommand(): string
+    {
+        // Use -Syu to perform full system upgrade before installing Docker
+        // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
+        // as they can lead to broken dependencies and system instability
+        // Use --needed to skip reinstalling packages that are already up-to-date (idempotent)
+        return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
+            'systemctl enable docker.service && '.
+            'systemctl start docker.service';
+    }
+
     private function getGenericDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
+        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion}";
     }
 }

@@ -77,9 +77,9 @@
                                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                                     <button type="button" x-show="traefikWarningsDismissed"
                                             @click="traefikWarningsDismissed = false; localStorage.removeItem('callout-dismissed-traefik-warnings-{{ $server->id }}')"
-                                            class="p-1.5 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
+                                            class="p-1.5 rounded hover:bg-warning-100 dark:hover:bg-warning-900/30 transition-colors"
                                             title="Show Traefik warnings">
-                                        <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                                        <svg class="w-4 h-4 text-warning-600 dark:text-warning-400" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                                             <path fill="currentColor" d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16"></path>
                                         </svg>
                                     </button>
@@ -170,13 +170,13 @@
                 <div class="subtitle">Select a proxy you would like to use on this server.</div>
                 @can('update', $server)
                     <div class="grid gap-4">
-                        <x-forms.button class="box" wire:click="selectProxy('NONE')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('NONE')">
                             Custom (None)
                         </x-forms.button>
-                        <x-forms.button class="box" wire:click="selectProxy('TRAEFIK')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('TRAEFIK')">
                             Traefik
                         </x-forms.button>
-                        <x-forms.button class="box" wire:click="selectProxy('CADDY')">
+                        <x-forms.button class="coolbox" wire:click="selectProxy('CADDY')">
                             Caddy
                         </x-forms.button>
                         {{-- <x-forms.button disabled class="box">

@@ -153,9 +153,23 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    /**
+     * Get query builder for services owned by current team.
+     * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all services owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Service::ownedByCurrentTeam()->get();
+        });
     }
 
     public function deleteConfigurations()
@@ -501,6 +515,31 @@ class Service extends BaseModel
                     }
                     $fields->put('RabbitMQ', $data->toArray());
                     break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
+                    break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -711,6 +750,84 @@ class Service extends BaseModel
                     }
 
                     $fields->put('MinIO', $data->toArray());
+                    break;
+                case $image->contains('garage'):
+                    $data = collect([]);
+                    $s3_api_url = $this->environment_variables()->where('key', 'GARAGE_S3_API_URL')->first();
+                    $web_url = $this->environment_variables()->where('key', 'GARAGE_WEB_URL')->first();
+                    $admin_url = $this->environment_variables()->where('key', 'GARAGE_ADMIN_URL')->first();
+                    $admin_token = $this->environment_variables()->where('key', 'GARAGE_ADMIN_TOKEN')->first();
+                    if (is_null($admin_token)) {
+                        $admin_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGE')->first();
+                    }
+                    $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
+                    if (is_null($rpc_secret)) {
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                    }
+                    $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
+                    if (is_null($metrics_token)) {
+                        $metrics_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGEMETRICS')->first();
+                    }
+
+                    if ($s3_api_url) {
+                        $data = $data->merge([
+                            'S3 API URL' => [
+                                'key' => data_get($s3_api_url, 'key'),
+                                'value' => data_get($s3_api_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($web_url) {
+                        $data = $data->merge([
+                            'Web URL' => [
+                                'key' => data_get($web_url, 'key'),
+                                'value' => data_get($web_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_url) {
+                        $data = $data->merge([
+                            'Admin URL' => [
+                                'key' => data_get($admin_url, 'key'),
+                                'value' => data_get($admin_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_token) {
+                        $data = $data->merge([
+                            'Admin Token' => [
+                                'key' => data_get($admin_token, 'key'),
+                                'value' => data_get($admin_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($rpc_secret) {
+                        $data = $data->merge([
+                            'RPC Secret' => [
+                                'key' => data_get($rpc_secret, 'key'),
+                                'value' => data_get($rpc_secret, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($metrics_token) {
+                        $data = $data->merge([
+                            'Metrics Token' => [
+                                'key' => data_get($metrics_token, 'key'),
+                                'value' => data_get($metrics_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Garage', $data->toArray());
                     break;
                 case $image->contains('weblate'):
                     $data = collect([]);
@@ -951,6 +1068,31 @@ class Service extends BaseModel
                     }
 
                     $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
                     break;
                 default:
                     $data = collect([]);

@@ -168,6 +168,9 @@ class ValidateAndInstallServerJob implements ShouldQueue
             if (! $this->server->isBuildServer()) {
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if ($proxyShouldRun) {
+                    // Ensure networks exist BEFORE dispatching async proxy startup
+                    // This prevents race condition where proxy tries to start before networks are created
+                    instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                     StartProxy::dispatch($this->server);
                 }
             }

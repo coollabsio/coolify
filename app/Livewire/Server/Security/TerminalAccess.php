@@ -2,11 +2,8 @@
 
 namespace App\Livewire\Server\Security;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -44,13 +41,9 @@ class TerminalAccess extends Component
                 throw new \Exception('Only team administrators and owners can modify terminal access.');
             }
 
-            // Verify password unless two-step confirmation is disabled
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-                if (! Hash::check($password, Auth::user()->password)) {
-                    $this->addError('password', 'The provided password is incorrect.');
-
-                    return;
-                }
+            // Verify password
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return;
             }
 
             // Toggle the terminal setting

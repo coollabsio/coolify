@@ -270,6 +270,84 @@ Routes: [routes/api.php](mdc:routes/api.php)
 - **Build artifact** reuse
 - **Parallel build** processing
 
+### Docker Build Cache Preservation
+
+Coolify provides settings to preserve Docker build cache across deployments, addressing cache invalidation issues.
+
+#### The Problem
+
+By default, Coolify injects `ARG` statements into user Dockerfiles for build-time variables. This breaks Docker's cache mechanism because:
+1. **ARG declarations invalidate cache** - Any change in ARG values after the `ARG` instruction invalidates all subsequent layers
+2. **SOURCE_COMMIT changes every commit** - Causes full rebuilds even when code changes are minimal
+
+#### Application Settings
+
+Two toggles in **Advanced Settings** control this behavior:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `inject_build_args_to_dockerfile` | `true` | Controls whether Coolify adds `ARG` statements to Dockerfile |
+| `include_source_commit_in_build` | `false` | Controls whether `SOURCE_COMMIT` is included in build context |
+
+**Database columns:** `application_settings.inject_build_args_to_dockerfile`, `application_settings.include_source_commit_in_build`
+
+#### Buildpack Coverage
+
+| Build Pack | ARG Injection | Method |
+|------------|---------------|--------|
+| **Dockerfile** | ✅ Yes | `add_build_env_variables_to_dockerfile()` |
+| **Docker Compose** (with `build:`) | ✅ Yes | `modify_dockerfiles_for_compose()` |
+| **PR Deployments** (Dockerfile only) | ✅ Yes | `add_build_env_variables_to_dockerfile()` |
+| **Nixpacks** | ❌ No | Generates its own Dockerfile internally |
+| **Static** | ❌ No | Uses internal Dockerfile |
+| **Docker Image** | ❌ No | No build phase |
+
+#### How It Works
+
+**When `inject_build_args_to_dockerfile` is enabled (default):**
+```dockerfile
+# Coolify modifies your Dockerfile to add:
+FROM node:20
+ARG MY_VAR=value
+ARG COOLIFY_URL=...
+ARG SOURCE_COMMIT=abc123  # (if include_source_commit_in_build is true)
+# ... rest of your Dockerfile
+```
+
+**When `inject_build_args_to_dockerfile` is disabled:**
+- Coolify does NOT modify the Dockerfile
+- `--build-arg` flags are still passed (harmless without matching `ARG` in Dockerfile)
+- User must manually add `ARG` statements for any build-time variables they need
+
+**When `include_source_commit_in_build` is disabled (default):**
+- `SOURCE_COMMIT` is NOT included in build-time variables
+- `SOURCE_COMMIT` is still available at **runtime** (in container environment)
+- Docker cache preserved across different commits
+
+#### Recommended Configuration
+
+| Use Case | inject_build_args | include_source_commit | Cache Behavior |
+|----------|-------------------|----------------------|----------------|
+| Maximum cache preservation | `false` | `false` | Best cache retention |
+| Need build-time vars, no commit | `true` | `false` | Cache breaks on var changes |
+| Need commit at build-time | `true` | `true` | Cache breaks every commit |
+| Manual ARG management | `false` | `true` | Cache preserved (no ARG in Dockerfile) |
+
+#### Implementation Details
+
+**Files:**
+- `app/Jobs/ApplicationDeploymentJob.php`:
+  - `set_coolify_variables()` - Conditionally adds SOURCE_COMMIT to Docker build context based on `include_source_commit_in_build` setting
+  - `generate_coolify_env_variables(bool $forBuildTime)` - Distinguishes build-time vs. runtime variables; excludes cache-busting variables like SOURCE_COMMIT from build context unless explicitly enabled
+  - `generate_env_variables()` - Populates `$this->env_args` with build-time ARG values, respecting `include_source_commit_in_build` toggle
+  - `add_build_env_variables_to_dockerfile()` - Injects ARG statements into Dockerfiles after FROM instructions; skips injection if `inject_build_args_to_dockerfile` is disabled
+  - `modify_dockerfiles_for_compose()` - Applies ARG injection to Docker Compose service Dockerfiles; respects `inject_build_args_to_dockerfile` toggle
+- `app/Models/ApplicationSetting.php` - Defines `inject_build_args_to_dockerfile` and `include_source_commit_in_build` boolean properties
+- `app/Livewire/Project/Application/Advanced.php` - Livewire component providing UI bindings for cache preservation toggles
+- `resources/views/livewire/project/application/advanced.blade.php` - Checkbox UI elements for user-facing toggles
+
+**Note:** Docker Compose services without a `build:` section (image-only) are automatically skipped.
+
 ### Runtime Optimization
 - **Container resource** limits
 - **Auto-scaling** based on metrics
@@ -428,7 +506,7 @@ services:
 - `templates/compose/chaskiq.yaml` - Entrypoint script
 
 **Implementation:**
-- Parsed: `bootstrap/helpers/parsers.php` (line 717)
+- Parsed: `bootstrap/helpers/parsers.php` in `parseCompose()` function (handles `content` field extraction)
 - Storage: `app/Models/LocalFileVolume.php`
 - Validation: `tests/Unit/StripCoolifyCustomFieldsTest.php`
 
@@ -481,7 +559,7 @@ services:
 - Pre-creating mount points before container starts
 
 **Implementation:**
-- Parsed: `bootstrap/helpers/parsers.php` (line 718)
+- Parsed: `bootstrap/helpers/parsers.php` in `parseCompose()` function (handles `is_directory`/`isDirectory` field extraction)
 - Storage: `app/Models/LocalFileVolume.php` (`is_directory` column)
 - Validation: `tests/Unit/StripCoolifyCustomFieldsTest.php`
 

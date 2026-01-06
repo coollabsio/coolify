@@ -3,18 +3,12 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
-use App\Models\Server;
 use App\Rules\ValidIpOrCidr;
-use Auth;
-use Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
 {
-    #[Validate('required')]
-    public Server $server;
-
     public InstanceSettings $settings;
 
     #[Validate('boolean')]
@@ -40,10 +34,12 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $disable_two_step_confirmation;
 
+    #[Validate('boolean')]
+    public bool $is_wire_navigate_enabled;
+
     public function rules()
     {
         return [
-            'server' => 'required',
             'is_registration_enabled' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
@@ -52,6 +48,7 @@ class Advanced extends Component
             'allowed_ips' => ['nullable', 'string', new ValidIpOrCidr],
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
+            'is_wire_navigate_enabled' => 'boolean',
         ];
     }
 
@@ -60,7 +57,6 @@ class Advanced extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
-        $this->server = Server::findOrFail(0);
         $this->settings = instanceSettings();
         $this->custom_dns_servers = $this->settings->custom_dns_servers;
         $this->allowed_ips = $this->settings->allowed_ips;
@@ -70,6 +66,7 @@ class Advanced extends Component
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
+        $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
     }
 
     public function submit()
@@ -148,6 +145,7 @@ class Advanced extends Component
             $this->settings->allowed_ips = $this->allowed_ips;
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
+            $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
@@ -157,9 +155,7 @@ class Advanced extends Component
 
     public function toggleTwoStepConfirmation($password): bool
     {
-        if (! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
-
+        if (! verifyPasswordConfirmation($password, $this)) {
             return false;
         }
 

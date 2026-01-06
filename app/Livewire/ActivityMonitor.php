@@ -10,7 +10,7 @@ class ActivityMonitor extends Component
 {
     public ?string $header = null;
 
-    public $activityId;
+    public $activityId = null;
 
     public $eventToDispatch = 'activityFinished';
 
@@ -49,7 +49,22 @@ class ActivityMonitor extends Component
 
     public function hydrateActivity()
     {
+        if ($this->activityId === null) {
+            $this->activity = null;
+
+            return;
+        }
+
         $this->activity = Activity::find($this->activityId);
+    }
+
+    public function updatedActivityId($value)
+    {
+        if ($value) {
+            $this->hydrateActivity();
+            $this->isPollingActive = true;
+            self::$eventDispatched = false;
+        }
     }
 
     public function polling()
@@ -64,8 +79,10 @@ class ActivityMonitor extends Component
                         $causer_id = data_get($this->activity, 'causer_id');
                         $user = User::find($causer_id);
                         if ($user) {
-                            $teamId = $user->currentTeam()->id;
-                            if (! self::$eventDispatched) {
+                            $teamId = data_get($this->activity, 'properties.team_id')
+                                ?? $user->currentTeam()?->id
+                                ?? $user->teams->first()?->id;
+                            if ($teamId && ! self::$eventDispatched) {
                                 if (filled($this->eventData)) {
                                     $this->eventToDispatch::dispatch($teamId, $this->eventData);
                                 } else {

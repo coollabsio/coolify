@@ -65,6 +65,8 @@ class EnvironmentVariable extends BaseModel
                             'value' => $environment_variable->value,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
+                            'is_runtime' => $environment_variable->is_runtime ?? false,
+                            'is_buildtime' => $environment_variable->is_buildtime ?? false,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
@@ -190,11 +192,11 @@ class EnvironmentVariable extends BaseModel
             return $environment_variable;
         }
         foreach ($sharedEnvsFound as $sharedEnv) {
-            $type = str($sharedEnv)->match('/(.*?)\./');
+            $type = str($sharedEnv)->trim()->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 continue;
             }
-            $variable = str($sharedEnv)->match('/\.(.*)/');
+            $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
             if ($type->value() === 'environment') {
                 $id = $resource->environment->id;
             } elseif ($type->value() === 'project') {
@@ -231,7 +233,7 @@ class EnvironmentVariable extends BaseModel
         $environment_variable = trim($environment_variable);
         $type = str($environment_variable)->after('{{')->before('.')->value;
         if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt((string) str($environment_variable)->replace(' ', ''));
+            return encrypt($environment_variable);
         }
 
         return encrypt($environment_variable);

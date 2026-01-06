@@ -18,18 +18,12 @@ class CleanupRedis extends Command
         $dryRun = $this->option('dry-run');
         $skipOverlapping = $this->option('skip-overlapping');
 
-        if ($dryRun) {
-            $this->info('DRY RUN MODE - No data will be deleted');
-        }
-
         $deletedCount = 0;
         $totalKeys = 0;
 
         // Get all keys with the horizon prefix
         $keys = $redis->keys('*');
         $totalKeys = count($keys);
-
-        $this->info("Scanning {$totalKeys} keys for cleanup...");
 
         foreach ($keys as $key) {
             $keyWithoutPrefix = str_replace($prefix, '', $key);
@@ -51,14 +45,12 @@ class CleanupRedis extends Command
 
         // Clean up overlapping queues if not skipped
         if (! $skipOverlapping) {
-            $this->info('Cleaning up overlapping queues...');
             $overlappingCleaned = $this->cleanupOverlappingQueues($redis, $prefix, $dryRun);
             $deletedCount += $overlappingCleaned;
         }
 
         // Clean up stale cache locks (WithoutOverlapping middleware)
         if ($this->option('clear-locks')) {
-            $this->info('Cleaning up stale cache locks...');
             $locksCleaned = $this->cleanupCacheLocks($dryRun);
             $deletedCount += $locksCleaned;
         }
@@ -66,15 +58,14 @@ class CleanupRedis extends Command
         // Clean up stuck jobs (restart mode = aggressive, runtime mode = conservative)
         $isRestart = $this->option('restart');
         if ($isRestart || $this->option('clear-locks')) {
-            $this->info($isRestart ? 'Cleaning up stuck jobs (RESTART MODE - aggressive)...' : 'Checking for stuck jobs (runtime mode - conservative)...');
             $jobsCleaned = $this->cleanupStuckJobs($redis, $prefix, $dryRun, $isRestart);
             $deletedCount += $jobsCleaned;
         }
 
         if ($dryRun) {
-            $this->info("DRY RUN: Would delete {$deletedCount} out of {$totalKeys} keys");
+            $this->info("Redis cleanup: would delete {$deletedCount} items");
         } else {
-            $this->info("Deleted {$deletedCount} out of {$totalKeys} keys");
+            $this->info("Redis cleanup: deleted {$deletedCount} items");
         }
     }
 
@@ -85,11 +76,8 @@ class CleanupRedis extends Command
 
         // Delete completed and failed jobs
         if (in_array($status, ['completed', 'failed'])) {
-            if ($dryRun) {
-                $this->line("Would delete job: {$keyWithoutPrefix} (status: {$status})");
-            } else {
+            if (! $dryRun) {
                 $redis->command('del', [$keyWithoutPrefix]);
-                $this->line("Deleted job: {$keyWithoutPrefix} (status: {$status})");
             }
 
             return true;
@@ -115,11 +103,8 @@ class CleanupRedis extends Command
 
         foreach ($patterns as $pattern => $description) {
             if (str_contains($keyWithoutPrefix, $pattern)) {
-                if ($dryRun) {
-                    $this->line("Would delete {$description}: {$keyWithoutPrefix}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$keyWithoutPrefix]);
-                    $this->line("Deleted {$description}: {$keyWithoutPrefix}");
                 }
 
                 return true;
@@ -132,11 +117,8 @@ class CleanupRedis extends Command
             $weekAgo = now()->subDays(7)->timestamp;
 
             if ($timestamp < $weekAgo) {
-                if ($dryRun) {
-                    $this->line("Would delete old timestamped data: {$keyWithoutPrefix}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$keyWithoutPrefix]);
-                    $this->line("Deleted old timestamped data: {$keyWithoutPrefix}");
                 }
 
                 return true;
@@ -159,8 +141,6 @@ class CleanupRedis extends Command
                 $queueKeys[] = $keyWithoutPrefix;
             }
         }
-
-        $this->info('Found '.count($queueKeys).' queue-related keys');
 
         // Group queues by name pattern to find duplicates
         $queueGroups = [];
@@ -193,7 +173,6 @@ class CleanupRedis extends Command
     private function deduplicateQueueGroup($redis, $baseName, $keys, $dryRun)
     {
         $cleanedCount = 0;
-        $this->line("Processing queue group: {$baseName} (".count($keys).' keys)');
 
         // Sort keys to keep the most recent one
         usort($keys, function ($a, $b) {
@@ -244,11 +223,8 @@ class CleanupRedis extends Command
             }
 
             if ($shouldDelete) {
-                if ($dryRun) {
-                    $this->line("  Would delete empty queue: {$redundantKey}");
-                } else {
+                if (! $dryRun) {
                     $redis->command('del', [$redundantKey]);
-                    $this->line("  Deleted empty queue: {$redundantKey}");
                 }
                 $cleanedCount++;
             }
@@ -271,15 +247,12 @@ class CleanupRedis extends Command
                 if (count($uniqueItems) < count($items)) {
                     $duplicates = count($items) - count($uniqueItems);
 
-                    if ($dryRun) {
-                        $this->line("  Would remove {$duplicates} duplicate jobs from queue: {$queueKey}");
-                    } else {
+                    if (! $dryRun) {
                         // Rebuild the list with unique items
                         $redis->command('del', [$queueKey]);
                         foreach (array_reverse($uniqueItems) as $item) {
                             $redis->command('lpush', [$queueKey, $item]);
                         }
-                        $this->line("  Removed {$duplicates} duplicate jobs from queue: {$queueKey}");
                     }
                     $cleanedCount += $duplicates;
                 }
@@ -307,12 +280,8 @@ class CleanupRedis extends Command
             }
         }
         if (empty($lockKeys)) {
-            $this->info('  No cache locks found.');
-
             return 0;
         }
-
-        $this->info('  Found '.count($lockKeys).' cache lock(s)');
 
         foreach ($lockKeys as $lockKey) {
             // Check TTL to identify stale locks
@@ -326,16 +295,9 @@ class CleanupRedis extends Command
                     $this->warn("  Would delete STALE lock (no expiration): {$lockKey}");
                 } else {
                     $redis->del($lockKey);
-                    $this->info("  ✓ Deleted STALE lock: {$lockKey}");
                 }
                 $cleanedCount++;
-            } elseif ($ttl > 0) {
-                $this->line("  Skipping active lock (expires in {$ttl}s): {$lockKey}");
             }
-        }
-
-        if ($cleanedCount === 0) {
-            $this->info('  No stale locks found (all locks have expiration set)');
         }
 
         return $cleanedCount;
@@ -453,15 +415,9 @@ class CleanupRedis extends Command
                     $redis->command('hset', [$keyWithoutPrefix, 'status', 'failed']);
                     $redis->command('hset', [$keyWithoutPrefix, 'failed_at', $now]);
                     $redis->command('hset', [$keyWithoutPrefix, 'exception', "Job cleaned up by cleanup:redis - {$reason}"]);
-
-                    $this->info("  ✓ Marked as FAILED: {$jobClass} (processing for ".round($processingTime / 60, 1).' min) - '.$reason);
                 }
                 $cleanedCount++;
             }
-        }
-
-        if ($cleanedCount === 0) {
-            $this->info($isRestart ? '  No jobs to clean up' : '  No stuck jobs found (all jobs running normally)');
         }
 
         return $cleanedCount;

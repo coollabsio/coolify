@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -111,7 +112,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -338,9 +339,23 @@ class Application extends BaseModel
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for applications owned by current team.
+     * If you need all applications without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all applications owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Application::ownedByCurrentTeam()->get();
+        });
     }
 
     public function getContainersToStop(Server $server, bool $previewDeployments = false): array
@@ -1035,7 +1050,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings->use_build_secrets);
+        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings->use_build_secrets.$this->settings->inject_build_args_to_dockerfile.$this->settings->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
@@ -1500,10 +1515,10 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
-    public function parse(int $pull_request_id = 0, ?int $preview_id = null)
+    public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return applicationParser($this, $pull_request_id, $preview_id);
+            return applicationParser($this, $pull_request_id, $preview_id, $commit);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
@@ -1511,9 +1526,11 @@ class Application extends BaseModel
         }
     }
 
-    public function loadComposeFile($isInit = false)
+    public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
-        $initialDockerComposeLocation = $this->docker_compose_location;
+        // Use provided restore values or capture current values as fallback
+        $initialDockerComposeLocation = $restoreDockerComposeLocation ?? $this->docker_compose_location;
+        $initialBaseDirectory = $restoreBaseDirectory ?? $this->base_directory;
         if ($isInit && $this->docker_compose_raw) {
             return;
         }
@@ -1568,6 +1585,11 @@ class Application extends BaseModel
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
         } catch (\Exception $e) {
+            // Restore original values on failure only
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
             if (str($e->getMessage())->contains('No such file')) {
                 throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
             }
@@ -1579,8 +1601,7 @@ class Application extends BaseModel
             }
             throw new \RuntimeException($e->getMessage());
         } finally {
-            $this->docker_compose_location = $initialDockerComposeLocation;
-            $this->save();
+            // Cleanup only - restoration happens in catch block
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
             ]);
@@ -1626,6 +1647,11 @@ class Application extends BaseModel
                 'initialDockerComposeLocation' => $this->docker_compose_location,
             ];
         } else {
+            // Restore original values before throwing
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
             throw new \RuntimeException("Docker Compose file not found at: $workdir$composeFile<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
     }
@@ -1950,54 +1976,6 @@ class Application extends BaseModel
         }
 
         return [];
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        if ($server->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
-            if (str($metrics)->contains('error')) {
-                $error = json_decode($metrics, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $metrics = json_decode($metrics, true);
-            $parsedCollection = collect($metrics)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            });
-
-            return $parsedCollection->toArray();
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        if ($server->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
-            if (str($metrics)->contains('error')) {
-                $error = json_decode($metrics, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $metrics = json_decode($metrics, true);
-            $parsedCollection = collect($metrics)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['used']];
-            });
-
-            return $parsedCollection->toArray();
-        }
     }
 
     public function getLimits(): array

@@ -7,7 +7,7 @@
 
 services:
   rybbit:
-    image: 'ghcr.io/rybbit-io/rybbit-client:v1.6.1'
+    image: 'ghcr.io/rybbit-io/rybbit-client:v2.2.3'
     environment:
       - SERVICE_URL_RYBBIT_3002
       - NODE_ENV=production
@@ -23,7 +23,7 @@ services:
       start_period: 10s
 
   rybbit_backend:
-    image: 'ghcr.io/rybbit-io/rybbit-backend:v1.6.1'
+    image: 'ghcr.io/rybbit-io/rybbit-backend:v2.2.3'
     environment:
       - NODE_ENV=production
       - TRUST_PROXY=true
