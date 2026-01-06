@@ -7,24 +7,49 @@
 
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n:1.119.2
+    image: n8nio/n8n:2.1.5
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
       - WEBHOOK_URL=${SERVICE_URL_N8N}
-      - N8N_HOST=${SERVICE_URL_N8N}
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
-      - TZ=${TZ:-Europe/Berlin}
-      - DB_SQLITE_POOL_SIZE=${DB_SQLITE_POOL_SIZE:-3}
-      - N8N_RUNNERS_ENABLED=${N8N_RUNNERS_ENABLED:-true}
+      - N8N_HOST=${SERVICE_FQDN_N8N}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
+      - TZ=${TZ:-UTC}
+      - DB_SQLITE_POOL_SIZE=${DB_SQLITE_POOL_SIZE:-2}
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_RUNNERS_MODE=external
+      - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=${N8N_RUNNERS_BROKER_LISTEN_ADDRESS:-0.0.0.0}
+      - N8N_RUNNERS_BROKER_PORT=${N8N_RUNNERS_BROKER_PORT:-5679}
+      - N8N_RUNNERS_AUTH_TOKEN=${SERVICE_PASSWORD_N8N}
+      - N8N_NATIVE_PYTHON_RUNNER=${N8N_NATIVE_PYTHON_RUNNER:-true}
+      - N8N_RUNNERS_MAX_CONCURRENCY=${N8N_RUNNERS_MAX_CONCURRENCY:-5}
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-true}
       - N8N_GIT_NODE_DISABLE_BARE_REPOS=${N8N_GIT_NODE_DISABLE_BARE_REPOS:-true}
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
       - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
+      - N8N_SKIP_AUTH_ON_OAUTH_CALLBACK=${N8N_SKIP_AUTH_ON_OAUTH_CALLBACK:-false}
     volumes:
       - n8n-data:/home/node/.n8n
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  task-runners:
+    image: n8nio/runners:2.1.5
+    environment:
+      - N8N_RUNNERS_TASK_BROKER_URI=${N8N_RUNNERS_TASK_BROKER_URI:-http://n8n:5679}
+      - N8N_RUNNERS_AUTH_TOKEN=${SERVICE_PASSWORD_N8N}
+      - N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT=${N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT:-15}
+      - N8N_RUNNERS_MAX_CONCURRENCY=${N8N_RUNNERS_MAX_CONCURRENCY:-5}
+    depends_on:
+      - n8n
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- http://127.0.0.1:5680/'
       interval: 5s
       timeout: 20s
       retries: 10

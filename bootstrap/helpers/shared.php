@@ -182,8 +182,11 @@ function refreshSession(?Team $team = null): void
             $team = User::find(Auth::id())->teams->first();
         }
     }
+    // Clear old cache key format for backwards compatibility
     Cache::forget('team:'.Auth::id());
-    Cache::remember('team:'.Auth::id(), 3600, function () use ($team) {
+    // Use new cache key format that includes team ID
+    Cache::forget('user:'.Auth::id().':team:'.$team->id);
+    Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
@@ -384,7 +387,7 @@ function base_url(bool $withPort = true): string
 
 function isSubscribed()
 {
-    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive();
 }
 
 function isProduction(): bool
@@ -548,7 +551,21 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
     $resource = queryResourcesByUuid($uuid);
-    if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
+    if (is_null($resource)) {
+        return null;
+    }
+
+    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    if ($resource instanceof \App\Models\ServiceDatabase) {
+        if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+
+        return null;
+    }
+
+    // Standard resources: environment->project->team_id
+    if ($resource->environment->project->team_id === $teamId) {
         return $resource;
     }
 
@@ -633,6 +650,12 @@ function queryResourcesByUuid(string $uuid)
     $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
     if ($clickhouse) {
         return $clickhouse;
+    }
+
+    // Check for ServiceDatabase by its own UUID
+    $serviceDatabase = ServiceDatabase::whereUuid($uuid)->first();
+    if ($serviceDatabase) {
+        return $serviceDatabase;
     }
 
     return $resource;
@@ -966,6 +989,9 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
         case 'SUPABASEANON':
             $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
             if (is_null($signingKey)) {
@@ -1164,7 +1190,7 @@ function get_public_ips()
         $ipv4 = $first->output();
         if ($ipv4) {
             $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
             if ($validate_ipv4 == false) {
                 echo "Invalid ipv4: $ipv4\n";
 
@@ -1179,7 +1205,7 @@ function get_public_ips()
         $ipv6 = $second->output();
         if ($ipv6) {
             $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
             if ($validate_ipv6 == false) {
                 echo "Invalid ipv6: $ipv6\n";
 
@@ -3415,4 +3441,82 @@ function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $compon
     }
 
     return true;
+}
+
+/**
+ * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
+ * This preserves the visual shape of the data better than simple averaging.
+ *
+ * @param  array  $data  Array of [timestamp, value] pairs
+ * @param  int  $threshold  Target number of points
+ * @return array Downsampled data
+ */
+function downsampleLTTB(array $data, int $threshold): array
+{
+    $dataLength = count($data);
+
+    // Return unchanged if threshold >= data length, or if threshold <= 2
+    // (threshold <= 2 would cause division by zero in bucket calculation)
+    if ($threshold >= $dataLength || $threshold <= 2) {
+        return $data;
+    }
+
+    $sampled = [];
+    $sampled[] = $data[0]; // Always keep first point
+
+    $bucketSize = ($dataLength - 2) / ($threshold - 2);
+
+    $a = 0; // Index of previous selected point
+
+    for ($i = 0; $i < $threshold - 2; $i++) {
+        // Calculate bucket range
+        $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
+        $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
+        $bucketEnd = min($bucketEnd, $dataLength - 1);
+
+        // Calculate average point for next bucket (used as reference)
+        $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
+        $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
+        $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
+
+        $avgX = 0;
+        $avgY = 0;
+        $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
+
+        if ($nextBucketCount > 0) {
+            for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
+                $avgX += $data[$j][0];
+                $avgY += $data[$j][1];
+            }
+            $avgX /= $nextBucketCount;
+            $avgY /= $nextBucketCount;
+        }
+
+        // Find point in current bucket with largest triangle area
+        $maxArea = -1;
+        $maxAreaIndex = $bucketStart;
+
+        $pointAX = $data[$a][0];
+        $pointAY = $data[$a][1];
+
+        for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
+            // Triangle area calculation
+            $area = abs(
+                ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
+                ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
+            ) * 0.5;
+
+            if ($area > $maxArea) {
+                $maxArea = $area;
+                $maxAreaIndex = $j;
+            }
+        }
+
+        $sampled[] = $data[$maxAreaIndex];
+        $a = $maxAreaIndex;
+    }
+
+    $sampled[] = $data[$dataLength - 1]; // Always keep last point
+
+    return $sampled;
 }
