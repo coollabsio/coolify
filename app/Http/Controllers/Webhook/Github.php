@@ -343,8 +343,9 @@ class Github extends Controller
                     }
                     if ($x_github_event === 'push') {
                         if ($application->isDeployable()) {
+                            $has_watch_paths = ! blank($application->watch_paths);
                             $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                            if ($is_watch_path_triggered || is_null($application->watch_paths)) {
+                            if (! $has_watch_paths || $is_watch_path_triggered) {
                                 $deployment_uuid = new Cuid2;
                                 $result = queue_application_deployment(
                                     application: $application,
