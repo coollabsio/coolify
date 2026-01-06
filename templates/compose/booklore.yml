@@ -48,7 +48,3 @@ services:
         - "-u"
         - "${SERVICE_USER_DB}"      # Replace with your username
         - "--password=${SERVICE_PASSWORD_DB}" # Replace with your password
-volumes:
-  db-data: null
-  booklore-books: null
-  booklore-data: null
