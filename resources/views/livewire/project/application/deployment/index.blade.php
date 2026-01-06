@@ -173,6 +173,18 @@
                                 Server: {{ data_get($deployment, 'server_name') }}
                             </div>
                         @endif
+
+                        <a href='#' class='flex items-center gap-2 mt-2'>
+                            @if (data_get($deployment, 'status') === 'queued')
+                                <x-forms.button wire:click.stop.prevent="force_start('{{ data_get($deployment, 'deployment_uuid') }}')">Force Start</x-forms.button>    
+                            @endif
+                            @if (
+                                data_get($deployment, 'status') === 'in_progress' ||
+                                data_get($deployment, 'status') === 'queued'
+                            )
+                                <x-forms.button isError wire:click.stop.prevent="cancel('{{ data_get($deployment, 'deployment_uuid') }}')">Cancel</x-forms.button>
+                            @endif
+                        </a>
                     </div>
                 </a>
             </div>
