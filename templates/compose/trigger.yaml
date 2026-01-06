@@ -7,10 +7,7 @@
 
 services:
   trigger:
-    image: 'ghcr.io/triggerdotdev/trigger.dev:v4-beta'
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: 'ghcr.io/triggerdotdev/trigger.dev:v4.3.1'
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
@@ -92,10 +89,7 @@ services:
       start_period: 120s
 
   supervisor:
-    image: 'ghcr.io/triggerdotdev/supervisor:main'
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: 'ghcr.io/triggerdotdev/supervisor:v4.3.1'
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
@@ -112,7 +106,7 @@ services:
       - TRIGGER_WORKLOAD_API_DOMAIN=${TRIGGER_WORKLOAD_API_DOMAIN:-supervisor}
       - TRIGGER_WORKLOAD_API_PORT_EXTERNAL=8020
       - DOCKER_HOST=tcp://docker-proxy:2375
-      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS:-trigger-net}
+      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS:-}
       - DOCKER_AUTOREMOVE_EXITED_CONTAINERS=1
       - DOCKER_REGISTRY_URL=https://${DEPLOY_REGISTRY_HOST:-ghcr.io}
       - DOCKER_REGISTRY_USERNAME=${DEPLOY_REGISTRY_USERNAME:-}
@@ -134,10 +128,7 @@ services:
       start_period: 30s
 
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:latest
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: tecnativa/docker-socket-proxy:0.4.2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -159,10 +150,7 @@ services:
       start_period: 5s
 
   postgresql:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: postgres:16.6-alpine
     command:
       - '-c'
       - wal_level=logical
@@ -179,10 +167,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: redis:7.2.7
     volumes:
       - redis-data:/data
     healthcheck:
@@ -197,9 +182,6 @@ services:
 
   electric:
     image: electricsql/electric:1.0.24
-    restart: unless-stopped
-    networks:
-      - trigger-net
     depends_on:
       postgresql:
         condition: service_healthy
@@ -219,10 +201,7 @@ services:
       start_period: 10s
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: clickhouse/clickhouse-server:25.8-lts
     environment:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
@@ -240,10 +219,7 @@ services:
       start_period: 30s
 
   minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    networks:
-      - trigger-net
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=admin
@@ -269,7 +245,3 @@ volumes:
   clickhouse-logs:
   minio-data:
   shared-data:
-
-networks:
-  trigger-net:
-    driver: bridge
