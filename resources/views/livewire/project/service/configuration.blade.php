@@ -155,7 +155,7 @@
                                 <div class="flex items-center px-4">
                                     @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
                                         <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
-                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            href="{{ route('project.service.database.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
                                             Backups
                                         </a>
                                     @endif

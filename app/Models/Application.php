@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -111,7 +112,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -1975,54 +1976,6 @@ class Application extends BaseModel
         }
 
         return [];
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        if ($server->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
-            if (str($metrics)->contains('error')) {
-                $error = json_decode($metrics, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $metrics = json_decode($metrics, true);
-            $parsedCollection = collect($metrics)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            });
-
-            return $parsedCollection->toArray();
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        if ($server->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
-            if (str($metrics)->contains('error')) {
-                $error = json_decode($metrics, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $metrics = json_decode($metrics, true);
-            $parsedCollection = collect($metrics)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['used']];
-            });
-
-            return $parsedCollection->toArray();
-        }
     }
 
     public function getLimits(): array

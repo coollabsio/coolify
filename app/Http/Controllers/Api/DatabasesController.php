@@ -117,7 +117,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -182,7 +181,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -245,7 +243,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -614,7 +611,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -832,7 +828,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -842,7 +837,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2104,7 +2098,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
@@ -2193,7 +2186,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2310,14 +2303,14 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'execution_uuid',
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup execution to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2430,7 +2423,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -2527,7 +2520,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2608,7 +2600,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2689,7 +2680,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],

@@ -175,7 +175,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
     throw new \RuntimeException($errorMessage, $exitCode);
 }
 
-function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
+function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null, bool $includeAll = false): Collection
 {
     if (is_null($application_deployment_queue)) {
         return collect([]);
@@ -216,7 +216,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (! $is_debug_enabled) {
+    if (! $is_debug_enabled && ! $includeAll) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
 
