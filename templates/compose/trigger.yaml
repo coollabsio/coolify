@@ -1,4 +1,4 @@
-# documentation: https://trigger.dev/docs/v4/open-source-self-hosting
+# documentation: https://trigger.dev/docs/self-hosting/overview
 # slogan: The open source background jobs platform for developers
 # category: automation
 # tags: background-jobs, typescript, javascript, scheduling, workflows, automation, tasks, queues
@@ -8,6 +8,8 @@
 services:
   trigger:
     image: 'ghcr.io/triggerdotdev/trigger.dev:v4.3.0'
+    # Root user is required for bootstrap and shared volume permissions
+    # See: https://github.com/triggerdotdev/trigger.dev/blob/main/hosting/docker/webapp/docker-compose.yml
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
@@ -43,12 +45,12 @@ services:
       - DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
       - V4_DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
       - OBJECT_STORE_BASE_URL=http://minio:9000
-      - OBJECT_STORE_ACCESS_KEY_ID=admin
+      - OBJECT_STORE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
       - OBJECT_STORE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
-      - CLICKHOUSE_URL=http://default:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123?secure=false
+      - CLICKHOUSE_URL=http://${SERVICE_USER_CLICKHOUSE}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123?secure=false
       - CLICKHOUSE_LOG_LEVEL=info
       - RUN_REPLICATION_ENABLED=1
-      - RUN_REPLICATION_CLICKHOUSE_URL=http://default:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123
+      - RUN_REPLICATION_CLICKHOUSE_URL=http://${SERVICE_USER_CLICKHOUSE}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123
       - RUN_REPLICATION_LOG_LEVEL=info
       - TRIGGER_BOOTSTRAP_ENABLED=1
       - TRIGGER_BOOTSTRAP_WORKER_GROUP_NAME=bootstrap
@@ -202,7 +204,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
     environment:
-      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
       - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
@@ -221,7 +223,7 @@ services:
     image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     command: server /data --console-address ":9001"
     environment:
-      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
       - MINIO_DEFAULT_BUCKETS=packets
     volumes:
