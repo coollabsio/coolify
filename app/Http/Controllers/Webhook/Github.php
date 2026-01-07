@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers\Webhook;
 
-use App\Actions\Application\CleanupPreviewDeployment;
-use App\Enums\ProcessStatus;
 use App\Http\Controllers\Controller;
-use App\Jobs\ApplicationPullRequestUpdateJob;
 use App\Jobs\GithubAppPermissionJob;
+use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
-use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Exception;
@@ -54,6 +51,8 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
+                $before_sha = data_get($payload, 'before');
+                $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
             if (! $branch) {
@@ -69,7 +68,7 @@ class Github extends Controller
             if ($x_github_event === 'pull_request') {
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with branch '$base_branch'.");
+                    return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -152,96 +151,35 @@ class Github extends Controller
                         }
                     }
                     if ($x_github_event === 'pull_request') {
-                        if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
-                            if ($application->isPRDeployable()) {
-                                // Check if PR deployments from public contributors are restricted
-                                if (! $application->settings->is_pr_deployments_public_enabled) {
-                                    $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR'];
-                                    if (! in_array($author_association, $trustedAssociations)) {
-                                        $return_payloads->push([
-                                            'application' => $application->name,
-                                            'status' => 'failed',
-                                            'message' => 'PR deployments are restricted to repository members and contributors. Author association: '.$author_association,
-                                        ]);
+                        // Check if PR deployments are enabled (but allow 'closed' action to cleanup)
+                        if (! $application->isPRDeployable() && $action !== 'closed') {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'failed',
+                                'message' => 'Preview deployments disabled.',
+                            ]);
 
-                                        continue;
-                                    }
-                                }
-                                $deployment_uuid = new Cuid2;
-                                $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                                if (! $found) {
-                                    if ($application->build_pack === 'dockercompose') {
-                                        $pr_app = ApplicationPreview::create([
-                                            'git_type' => 'github',
-                                            'application_id' => $application->id,
-                                            'pull_request_id' => $pull_request_id,
-                                            'pull_request_html_url' => $pull_request_html_url,
-                                            'docker_compose_domains' => $application->docker_compose_domains,
-                                        ]);
-                                        $pr_app->generate_preview_fqdn_compose();
-                                    } else {
-                                        $pr_app = ApplicationPreview::create([
-                                            'git_type' => 'github',
-                                            'application_id' => $application->id,
-                                            'pull_request_id' => $pull_request_id,
-                                            'pull_request_html_url' => $pull_request_html_url,
-                                        ]);
-                                        $pr_app->generate_preview_fqdn();
-                                    }
-                                }
-
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    pull_request_id: $pull_request_id,
-                                    deployment_uuid: $deployment_uuid,
-                                    force_rebuild: false,
-                                    commit: data_get($payload, 'head.sha', 'HEAD'),
-                                    is_webhook: true,
-                                    git_type: 'github'
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
-                                } elseif ($result['status'] === 'skipped') {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'skipped',
-                                        'message' => $result['message'],
-                                    ]);
-                                } else {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'success',
-                                        'message' => 'Preview deployment queued.',
-                                    ]);
-                                }
-                            } else {
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'failed',
-                                    'message' => 'Preview deployments disabled.',
-                                ]);
-                            }
+                            continue;
                         }
-                        if ($action === 'closed') {
-                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if ($found) {
-                                // Use comprehensive cleanup that cancels active deployments,
-                                // kills helper containers, and removes all PR containers
-                                CleanupPreviewDeployment::run($application, $pull_request_id, $found);
 
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'success',
-                                    'message' => 'Preview deployment closed.',
-                                ]);
-                            } else {
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'failed',
-                                    'message' => 'No preview deployment found.',
-                                ]);
-                            }
-                        }
+                        ProcessGithubPullRequestWebhook::dispatch(
+                            applicationId: $application->id,
+                            githubAppId: null,
+                            action: $action,
+                            pullRequestId: $pull_request_id,
+                            pullRequestHtmlUrl: $pull_request_html_url,
+                            beforeSha: $before_sha,
+                            afterSha: $after_sha,
+                            commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
+                            authorAssociation: $author_association,
+                            fullName: $full_name,
+                        );
+
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'queued',
+                            'message' => 'PR webhook received, processing queued.',
+                        ]);
                     }
                 }
             }
@@ -304,6 +242,8 @@ class Github extends Controller
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
+                $before_sha = data_get($payload, 'before');
+                $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
             if (! $id || ! $branch) {
@@ -386,86 +326,37 @@ class Github extends Controller
                         }
                     }
                     if ($x_github_event === 'pull_request') {
-                        if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
-                            if ($application->isPRDeployable()) {
-                                // Check if PR deployments from public contributors are restricted
-                                if (! $application->settings->is_pr_deployments_public_enabled) {
-                                    $trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR', 'CONTRIBUTOR'];
-                                    if (! in_array($author_association, $trustedAssociations)) {
-                                        $return_payloads->push([
-                                            'application' => $application->name,
-                                            'status' => 'failed',
-                                            'message' => 'PR deployments are restricted to repository members and contributors. Author association: '.$author_association,
-                                        ]);
+                        // Check if PR deployments are enabled (but allow 'closed' action to cleanup)
+                        if (! $application->isPRDeployable() && $action !== 'closed') {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'failed',
+                                'message' => 'Preview deployments disabled.',
+                            ]);
 
-                                        continue;
-                                    }
-                                }
-                                $deployment_uuid = new Cuid2;
-                                $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                                if (! $found) {
-                                    ApplicationPreview::create([
-                                        'git_type' => 'github',
-                                        'application_id' => $application->id,
-                                        'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
-                                    ]);
-                                }
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    pull_request_id: $pull_request_id,
-                                    deployment_uuid: $deployment_uuid,
-                                    force_rebuild: false,
-                                    commit: data_get($payload, 'head.sha', 'HEAD'),
-                                    is_webhook: true,
-                                    git_type: 'github'
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
-                                } elseif ($result['status'] === 'skipped') {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'skipped',
-                                        'message' => $result['message'],
-                                    ]);
-                                } else {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'success',
-                                        'message' => 'Preview deployment queued.',
-                                    ]);
-                                }
-                            } else {
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'failed',
-                                    'message' => 'Preview deployments disabled.',
-                                ]);
-                            }
+                            continue;
                         }
-                        if ($action === 'closed' || $action === 'close') {
-                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if ($found) {
-                                // Delete the PR comment on GitHub (GitHub-specific feature)
-                                ApplicationPullRequestUpdateJob::dispatchSync(application: $application, preview: $found, status: ProcessStatus::CLOSED);
 
-                                // Use comprehensive cleanup that cancels active deployments,
-                                // kills helper containers, and removes all PR containers
-                                CleanupPreviewDeployment::run($application, $pull_request_id, $found);
+                        $full_name = data_get($payload, 'repository.full_name');
 
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'success',
-                                    'message' => 'Preview deployment closed.',
-                                ]);
-                            } else {
-                                $return_payloads->push([
-                                    'application' => $application->name,
-                                    'status' => 'failed',
-                                    'message' => 'No preview deployment found.',
-                                ]);
-                            }
-                        }
+                        ProcessGithubPullRequestWebhook::dispatch(
+                            applicationId: $application->id,
+                            githubAppId: $github_app->id,
+                            action: $action,
+                            pullRequestId: $pull_request_id,
+                            pullRequestHtmlUrl: $pull_request_html_url,
+                            beforeSha: $before_sha,
+                            afterSha: $after_sha,
+                            commitSha: data_get($payload, 'pull_request.head.sha', 'HEAD'),
+                            authorAssociation: $author_association,
+                            fullName: $full_name,
+                        );
+
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'queued',
+                            'message' => 'PR webhook received, processing queued.',
+                        ]);
                     }
                 }
             }

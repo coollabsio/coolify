@@ -37,7 +37,7 @@ class NavbarDeleteTeam extends Component
 
         refreshSession();
 
-        return redirect()->route('team.index');
+        return redirectRoute($this, 'team.index');
     }
 
     public function render()
