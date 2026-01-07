@@ -8768,8 +8768,62 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "https:\/\/example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Service"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "service"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by service 'My Service'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -9177,6 +9231,17 @@
                                     "docker_compose_raw": {
                                         "type": "string",
                                         "description": "The Docker Compose raw content."
+                                    },
+                                    "domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The service domains."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "description": "Force domain usage even if conflicts are detected. Default is false."
                                     }
                                 },
                                 "type": "object"

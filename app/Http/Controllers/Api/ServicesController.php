@@ -65,8 +65,37 @@ class ServicesController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'https://example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Service'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'service'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by service \'My Service\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -383,7 +412,7 @@ class ServicesController extends Controller
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
-                $domains = $service->applications()->get()->pluck('fqdn')->sort();
+        $domains = $service->applications()->orderBy('name')->get()->pluck('fqdn');
                 $domains = $domains->map(function ($domain) {
                     if (count(explode(':', $domain)) > 2) {
                         return str($domain)->beforeLast(':')->value();
@@ -703,6 +732,8 @@ class ServicesController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The service domains.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -762,7 +793,7 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'domains', 'force_domain_override'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -770,6 +801,8 @@ class ServicesController extends Controller
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|nullable',
+            'domains' => 'array|nullable',
+            'force_domain_override' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -831,6 +864,67 @@ class ServicesController extends Controller
         if ($request->has('connect_to_docker_network')) {
             $service->connect_to_docker_network = $request->connect_to_docker_network;
         }
+
+        // Handle domains update
+        if ($request->has('domains')) {
+            $domains = $request->domains;
+            $applications = $service->applications()->orderBy('name')->get();
+
+            // Validate domains format
+            foreach ($domains as $domain) {
+                if (!is_string($domain)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'domains' => 'All domains must be strings.',
+                        ],
+                    ], 422);
+                }
+            }
+
+            // Check for domain conflicts if server proxy is running
+            if ($service->server->isProxyShouldRun()) {
+                $teamId = getTeamIdFromToken();
+                $allDomains = collect();
+                foreach ($domains as $domainString) {
+                    if (!empty($domainString)) {
+                        $domainList = str($domainString)->trim()->explode(',')->map(function ($d) {
+                            return trim($d);
+                        })->filter()->values();
+                        $allDomains = $allDomains->merge($domainList);
+                    }
+                }
+                $allDomains = $allDomains->unique();
+                if ($allDomains->isNotEmpty()) {
+                    $result = checkIfDomainIsAlreadyUsedViaAPI($allDomains, $teamId, $service->uuid);
+                    if (isset($result['error'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => ['domains' => $result['error']],
+                        ], 422);
+                    }
+
+                    // If there are conflicts and force is not enabled, return warning
+                    if ($result['hasConflicts'] && !$request->boolean('force_domain_override')) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $result['conflicts'],
+                            'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                        ], 409, [], JSON_UNESCAPED_SLASHES);
+                    }
+                }
+            }
+
+            // Assign domains to applications (ordered by name)
+            $applicationsOrdered = $applications->sortBy('name');
+            foreach ($applicationsOrdered as $index => $application) {
+                if (isset($domains[$index])) {
+                    $application->fqdn = $domains[$index];
+                    $application->save();
+                }
+            }
+        }
+
         $service->save();
 
         $service->parse();
@@ -838,19 +932,26 @@ class ServicesController extends Controller
             StartService::dispatch($service);
         }
 
-        $domains = $service->applications()->get()->pluck('fqdn')->sort();
+        $domains = $service->applications()->orderBy('name')->get()->pluck('fqdn');
         $domains = $domains->map(function ($domain) {
-            if (count(explode(':', $domain)) > 2) {
-                return str($domain)->beforeLast(':')->value();
+            if (empty($domain)) {
+                return $domain;
             }
-
-            return $domain;
+            // Split by comma and process each domain individually
+            $domainList = str($domain)->trim()->explode(',')->map(function ($d) {
+                $d = trim($d);
+                if (count(explode(':', $d)) > 2) {
+                    return str($d)->beforeLast(':')->value();
+                }
+                return $d;
+            });
+            return $domainList->implode(',');
         })->values();
 
         return response()->json([
             'uuid' => $service->uuid,
             'domains' => $domains,
-        ])->setStatusCode(200);
+        ], 200, [], JSON_UNESCAPED_SLASHES);
     }
 
     #[OA\Get(
