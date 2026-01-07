@@ -7,34 +7,26 @@
 
 services:
   trigger:
-    image: 'ghcr.io/triggerdotdev/trigger.dev:v4.3.0'
+    image: ghcr.io/triggerdotdev/trigger.dev:v4.3.0
     # Root user is required for bootstrap and shared volume permissions
     # See: https://github.com/triggerdotdev/trigger.dev/blob/main/hosting/docker/webapp/docker-compose.yml
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      electric:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
       - SERVICE_URL_TRIGGER_3000
       - APP_ORIGIN=${SERVICE_URL_TRIGGER_3000}
       - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER_3000}
       - API_ORIGIN=${SERVICE_URL_TRIGGER_3000}
       - SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
-      - MAGIC_LINK_SECRET=${SERVICE_PASSWORD_64_MAGIC}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-abcdefghijklmnopqrstuvwxyz123456}
-      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_MANAGEDWORKER}
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable
-      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?schema=public&sslmode=disable
+      - MAGIC_LINK_SECRET=${SERVICE_PASSWORD_64_MAGICLINK}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_WORKERSECRET}
+      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN}
+      - NODE_ENV=production
+      - APP_LOG_LEVEL=info
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?schema=public&sslmode=disable
+      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?schema=public&sslmode=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_TLS_DISABLED=true
@@ -44,9 +36,9 @@ services:
       - DEPLOY_REGISTRY_PROTOCOL=${DEPLOY_REGISTRY_PROTOCOL:-https}
       - DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
       - V4_DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
-      - OBJECT_STORE_BASE_URL=http://minio:9000
-      - OBJECT_STORE_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
-      - OBJECT_STORE_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - OBJECT_STORE_BASE_URL=${OBJECT_STORE_BASE_URL}
+      - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
+      - OBJECT_STORE_SECRET_ACCESS_KEY=${OBJECT_STORE_SECRET_ACCESS_KEY}
       - CLICKHOUSE_URL=http://${SERVICE_USER_CLICKHOUSE}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123?secure=false
       - CLICKHOUSE_LOG_LEVEL=info
       - RUN_REPLICATION_ENABLED=1
@@ -55,63 +47,64 @@ services:
       - TRIGGER_BOOTSTRAP_ENABLED=1
       - TRIGGER_BOOTSTRAP_WORKER_GROUP_NAME=bootstrap
       - TRIGGER_BOOTSTRAP_WORKER_TOKEN_PATH=/home/node/shared/worker_token
-      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN:-}
       - DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT:-300}
       - DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT:-100}
       - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID:-}
       - AUTH_GITHUB_CLIENT_SECRET=${AUTH_GITHUB_CLIENT_SECRET:-}
-      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-resend}
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_SECURE=${SMTP_SECURE:-}
-      - FROM_EMAIL=${FROM_EMAIL:-onboarding@resend.dev}
-      - REPLY_TO_EMAIL=${REPLY_TO_EMAIL:-}
-      - WHITELISTED_EMAILS=${WHITELISTED_EMAILS:-}
-      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
-      - NODE_ENV=production
-      - APP_LOG_LEVEL=info
+      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-smtp}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - REPLY_TO_EMAIL=${REPLY_TO_EMAIL}
+      - WHITELISTED_EMAILS=${WHITELISTED_EMAILS}
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
       - GRACEFUL_SHUTDOWN_TIMEOUT=1000
-      - INTERNAL_OTEL_TRACE_LOGGING_ENABLED=0
-      - TRIGGER_TELEMETRY_DISABLED=${TRIGGER_TELEMETRY_DISABLED:-0}
+      - INTERNAL_OTEL_TRACE_LOGGING_ENABLED=${INTERNAL_OTEL_TRACE_LOGGING_ENABLED:-0}
+      - TRIGGER_TELEMETRY_DISABLED=${TRIGGER_TELEMETRY_DISABLED:-true}
     volumes:
       - shared-data:/home/node/shared
     healthcheck:
       test:
         - CMD
         - node
-        - '-e'
+        - "-e"
         - "require('http').get('http://127.0.0.1:3000/healthcheck',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      electric:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
 
   supervisor:
-    image: 'ghcr.io/triggerdotdev/supervisor:v4.3.0'
+    image: ghcr.io/triggerdotdev/supervisor:v4.3.0
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
-    depends_on:
-      trigger:
-        condition: service_healthy
-      docker-proxy:
-        condition: service_healthy
     environment:
       - TRIGGER_API_URL=http://trigger:3000
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://trigger:3000/otel
-      - TRIGGER_WORKER_TOKEN=file:///home/node/shared/worker_token
-      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_MANAGEDWORKER}
-      - TRIGGER_WORKLOAD_API_DOMAIN=${TRIGGER_WORKLOAD_API_DOMAIN:-supervisor}
+      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN:-file:///home/node/shared/worker_token}
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_WORKERSECRET}
+      - TRIGGER_WORKLOAD_API_DOMAIN=${TRIGGER_WORKLOAD_API_DOMAIN}
       - TRIGGER_WORKLOAD_API_PORT_EXTERNAL=8020
       - DOCKER_HOST=tcp://docker-proxy:2375
-      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS:-}
-      - DOCKER_AUTOREMOVE_EXITED_CONTAINERS=1
+      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS}
+      - DOCKER_AUTOREMOVE_EXITED_CONTAINERS=${DOCKER_AUTOREMOVE_EXITED_CONTAINERS:-1}
       - DOCKER_REGISTRY_URL=https://${DEPLOY_REGISTRY_HOST:-ghcr.io}
-      - DOCKER_REGISTRY_USERNAME=${DEPLOY_REGISTRY_USERNAME:-}
-      - DOCKER_REGISTRY_PASSWORD=${DEPLOY_REGISTRY_PASSWORD:-}
+      - DOCKER_REGISTRY_USERNAME=${DEPLOY_REGISTRY_USERNAME}
+      - DOCKER_REGISTRY_PASSWORD=${DEPLOY_REGISTRY_PASSWORD}
       - ENFORCE_MACHINE_PRESETS=1
       - TRIGGER_DEQUEUE_INTERVAL_MS=1000
       - DEBUG=${SUPERVISOR_DEBUG:-0}
@@ -121,12 +114,16 @@ services:
       test:
         - CMD
         - node
-        - '-e'
+        - "-e"
         - "require('http').get('http://127.0.0.1:8020/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 30s
+    depends_on:
+      trigger:
+        condition: service_healthy
+      docker-proxy:
+        condition: service_healthy
 
   docker-proxy:
     image: tecnativa/docker-socket-proxy:v0.4.2
@@ -134,13 +131,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - LOG_LEVEL=info
-      - POST=1
-      - CONTAINERS=1
-      - IMAGES=1
-      - INFO=1
-      - NETWORKS=1
-      - AUTH=1
-      - DISTRIBUTION=1
+      - POST=${POST:-1}
+      - CONTAINERS=${CONTAINERS:-1}
+      - IMAGES=${IMAGES:-1}
+      - INFO=${INFO:-1}
+      - NETWORKS=${NETWORKS:-1}
+      - AUTH=${AUTH:-1}
+      - DISTRIBUTION=${DISTRIBUTION:-1}
     healthcheck:
       test:
         - CMD-SHELL
@@ -148,17 +145,16 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 5s
 
   postgresql:
-    image: postgres:16.6-alpine
+    image: postgres:16-alpine
     command:
-      - '-c'
+      - "-c"
       - wal_level=logical
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-trigger}
+      - POSTGRES_DB=${POSTGRES_DB:-trigger-db}
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     healthcheck:
@@ -168,7 +164,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.2.7
+    image: redis:7-alpine
     volumes:
       - redis-data:/data
     healthcheck:
@@ -179,27 +175,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
   electric:
-    image: electricsql/electric:1.0.24
-    depends_on:
-      postgresql:
-        condition: service_healthy
+    image: electricsql/electric:1.2.9
     environment:
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger}?sslmode=disable
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?sslmode=disable
       - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
       - ELECTRIC_USAGE_REPORTING=false
     healthcheck:
       test:
         - CMD
         - curl
-        - '-f'
-        - 'http://localhost:3000/v1/health'
+        - "-f"
+        - "http://localhost:3000/v1/health"
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    depends_on:
+      postgresql:
+        condition: service_healthy
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
@@ -217,25 +211,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
-
-  minio:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
-    command: server /data --console-address ":9001"
-    environment:
-      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
-      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
-      - MINIO_DEFAULT_BUCKETS=packets
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test:
-        - CMD
-        - mc
-        - ready
-        - local
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
