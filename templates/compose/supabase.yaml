@@ -280,7 +280,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:2025.12.17-sha-43f4f7f
+    image: supabase/studio:2026.01.07-sha-037e5f9
     healthcheck:
       test:
         [
@@ -299,6 +299,8 @@ services:
       - HOSTNAME=0.0.0.0
       - STUDIO_PG_META_URL=http://supabase-meta:8080
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_HOST=${POSTGRES_HOST:-supabase-db}
+      - CURRENT_CLI_VERSION=2.67.1
 
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
