@@ -24,6 +24,9 @@ class Advanced extends Component
     #[Validate(['integer', 'min:1'])]
     public int $dynamicTimeout = 1;
 
+    #[Validate(['integer', 'min:1'])]
+    public int $deploymentQueueLimit = 25;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -43,12 +46,14 @@ class Advanced extends Component
             $this->validate();
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;
+            $this->server->settings->deployment_queue_limit = $this->deploymentQueueLimit;
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
             $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
             $this->server->settings->save();
         } else {
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
+            $this->deploymentQueueLimit = $this->server->settings->deployment_queue_limit;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
         }

@@ -1,9 +1,13 @@
-![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest_released_version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
-)
+<div align="center">
 
-[![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
+# Coolify
+An open-source & self-hostable Heroku / Netlify / Vercel alternative. 
 
-# About the Project
+![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
+) [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
+</div>
+
+## About the Project
 
 Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc.
 
@@ -15,7 +19,7 @@ No vendor lock-in, which means that all the configurations for your applications
 
 For more information, take a look at our landing page at [coolify.io](https://coolify.io).
 
-# Installation
+## Installation
 
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
@@ -25,11 +29,11 @@ You can find the installation script source [here](./scripts/install.sh).
 > [!NOTE]
 > Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
 
-# Support
+## Support
 
 Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).
 
-# Cloud
+## Cloud
 
 If you do not want to self-host Coolify, there is a paid cloud version available: [app.coolify.io](https://app.coolify.io)
 
@@ -44,14 +48,14 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 - Better support
 - Less maintenance for you
 
-# Donations
+## Donations
 To stay completely free and open-source, with no feature behind the paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the project's future development.
 
 [coolify.io/sponsorships](https://coolify.io/sponsorships)
 
 Thank you so much!
 
-## Big Sponsors
+### Big Sponsors
 
 * [23M](https://23m.com?ref=coolify.io) - Your experts for high-availability hosting solutions!
 * [Algora](https://algora.io?ref=coolify.io) - Open source contribution platform
@@ -88,7 +92,7 @@ Thank you so much!
 * [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
 
 
-## Small Sponsors
+### Small Sponsors
 
 <a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="XamanApp" src="https://github.com/XamanApp.png"/></a>
@@ -141,7 +145,7 @@ Thank you so much!
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
-# Recognitions
+## Recognitions
 
 <p>
 <a href="https://news.ycombinator.com/item?id=26624341">
@@ -157,17 +161,17 @@ Thank you so much!
 
 <a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-# Core Maintainers
+## Core Maintainers
 
 | Andras Bacsai | 🏔️ Peak |
 |------------|------------|
 | <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="peaklabs-dev" /> |
 | <a href="https://github.com/andrasbacsai"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/heyandras"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/heyandras.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> | <a href="https://github.com/peaklabs-dev"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/peaklabs_dev"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/peaklabs.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> |
 
-# Repo Activity
+## Repo Activity
 
 ![Alt](https://repobeats.axiom.co/api/embed/eab1c8066f9c59d0ad37b76c23ebb5ccac4278ae.svg "Repobeats analytics image")
 
-# Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=coollabsio/coolify&type=Date)](https://star-history.com/#coollabsio/coolify&Date)

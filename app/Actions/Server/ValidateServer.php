@@ -45,6 +45,16 @@ class ValidateServer
             throw new \Exception($this->error);
         }
 
+        $validationResult = $server->validatePrerequisites();
+        if (! $validationResult['success']) {
+            $missingCommands = implode(', ', $validationResult['missing']);
+            $this->error = "Prerequisites ({$missingCommands}) are not installed. Please install them before continuing or use the validation with installation endpoint.";
+            $server->update([
+                'validation_logs' => $this->error,
+            ]);
+            throw new \Exception($this->error);
+        }
+
         $this->docker_installed = $server->validateDockerEngine();
         $this->docker_compose_installed = $server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {

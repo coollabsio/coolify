@@ -121,7 +121,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
-                    $envs = instant_remote_process($commands, $this->server);
+                    $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
                     $user = $envs->filter(function ($env) {
@@ -152,7 +152,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
-                    $envs = instant_remote_process($commands, $this->server);
+                    $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
                     $rootPassword = $envs->filter(function ($env) {
@@ -175,7 +175,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env";
-                    $envs = instant_remote_process($commands, $this->server);
+                    $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
                     $rootPassword = $envs->filter(function ($env) {
                         return str($env)->startsWith('MARIADB_ROOT_PASSWORD=');
@@ -217,7 +217,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     try {
                         $commands = [];
                         $commands[] = "docker exec $this->container_name env | grep MONGO_INITDB_";
-                        $envs = instant_remote_process($commands, $this->server);
+                        $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
                         if (filled($envs)) {
                             $envs = str($envs)->explode("\n");
@@ -489,21 +489,26 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $collectionsToExclude = collect();
                 }
                 $commands[] = 'mkdir -p '.$this->backup_dir;
+
+                // Validate and escape database name to prevent command injection
+                validateShellSafePath($databaseName, 'database name');
+                $escapedDatabaseName = escapeshellarg($databaseName);
+
                 if ($collectionsToExclude->count() === 0) {
                     if (str($this->database->image)->startsWith('mongo:4')) {
                         $commands[] = "docker exec $this->container_name mongodump --uri=\"$url\" --gzip --archive > $this->backup_location";
                     } else {
-                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $databaseName --gzip --archive > $this->backup_location";
+                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $escapedDatabaseName --gzip --archive > $this->backup_location";
                     }
                 } else {
                     if (str($this->database->image)->startsWith('mongo:4')) {
                         $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
                     } else {
-                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $databaseName --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
+                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $escapedDatabaseName --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
                     }
                 }
             }
-            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -525,11 +530,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup->dump_all) {
                 $backupCommand .= " $this->container_name pg_dumpall --username {$this->database->postgres_user} | gzip > $this->backup_location";
             } else {
-                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+                // Validate and escape database name to prevent command injection
+                validateShellSafePath($database, 'database name');
+                $escapedDatabase = escapeshellarg($database);
+                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $escapedDatabase > $this->backup_location";
             }
 
             $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -547,9 +555,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup->dump_all) {
                 $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
             } else {
-                $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" $database > $this->backup_location";
+                // Validate and escape database name to prevent command injection
+                validateShellSafePath($database, 'database name');
+                $escapedDatabase = escapeshellarg($database);
+                $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" $escapedDatabase > $this->backup_location";
             }
-            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -567,9 +578,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup->dump_all) {
                 $commands[] = "docker exec $this->container_name mariadb-dump -u root -p\"{$this->database->mariadb_root_password}\" --all-databases --single-transaction --quick --lock-tables=false --compress > $this->backup_location";
             } else {
-                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p\"{$this->database->mariadb_root_password}\" $database > $this->backup_location";
+                // Validate and escape database name to prevent command injection
+                validateShellSafePath($database, 'database name');
+                $escapedDatabase = escapeshellarg($database);
+                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p\"{$this->database->mariadb_root_password}\" $escapedDatabase > $this->backup_location";
             }
-            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -600,7 +614,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function calculate_size()
     {
-        return instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server, false);
+        return instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server, false, false, null, disableMultiplexing: true);
     }
 
     private function upload_to_s3(): void
@@ -623,9 +637,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $fullImageName = $this->getFullImageName();
 
-            $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup_log_uuid}"], $this->server, false);
+            $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
             if (filled($containerExists)) {
-                instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false);
+                instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
             }
 
             if (isDev()) {
@@ -639,9 +653,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
+
+            // Escape S3 credentials to prevent command injection
+            $escapedEndpoint = escapeshellarg($endpoint);
+            $escapedKey = escapeshellarg($key);
+            $escapedSecret = escapeshellarg($secret);
+
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
-            instant_remote_process($commands, $this->server);
+            instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
         } catch (\Throwable $e) {
@@ -650,7 +670,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $command = "docker rm -f backup-of-{$this->backup_log_uuid}";
-            instant_remote_process([$command], $this->server);
+            instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
     }
 

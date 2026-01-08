@@ -15,6 +15,8 @@ class ApplicationSetting extends Model
         'is_container_label_escape_enabled' => 'boolean',
         'is_container_label_readonly_enabled' => 'boolean',
         'use_build_secrets' => 'boolean',
+        'inject_build_args_to_dockerfile' => 'boolean',
+        'include_source_commit_in_build' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
         'is_debug_enabled' => 'boolean',
@@ -23,6 +25,7 @@ class ApplicationSetting extends Model
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
+        'docker_images_to_keep' => 'integer',
     ];
 
     protected $guarded = [];

@@ -23,6 +23,8 @@ class Test extends Notification implements ShouldQueue
 
     public $tries = 5;
 
+    public bool $isTestNotification = true;
+
     public function __construct(public ?string $emails = null, public ?string $channel = null, public ?bool $ping = false)
     {
         $this->onQueue('high');

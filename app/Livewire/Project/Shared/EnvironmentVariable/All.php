@@ -63,20 +63,30 @@ class All extends Component
 
     public function getEnvironmentVariablesProperty()
     {
-        if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables()->orderBy('order')->get();
+        $query = $this->resource->environment_variables()
+            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($this->is_env_sorting_enabled) {
+            $query->orderBy('key');
+        } else {
+            $query->orderBy('order');
         }
 
-        return $this->resource->environment_variables;
+        return $query->get();
     }
 
     public function getEnvironmentVariablesPreviewProperty()
     {
-        if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables_preview()->orderBy('order')->get();
+        $query = $this->resource->environment_variables_preview()
+            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($this->is_env_sorting_enabled) {
+            $query->orderBy('key');
+        } else {
+            $query->orderBy('order');
         }
 
-        return $this->resource->environment_variables_preview;
+        return $query->get();
     }
 
     public function getDevView()

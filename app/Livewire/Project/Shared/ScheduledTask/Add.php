@@ -41,7 +41,7 @@ class Add extends Component
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
-        'timeout' => 'required|integer|min:60|max:3600',
+        'timeout' => 'required|integer|min:60|max:36000',
     ];
 
     protected $validationAttributes = [
