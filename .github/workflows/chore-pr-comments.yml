@@ -1,0 +1,49 @@
+name: Add comment based on label
+on:
+  pull_request_target:
+    types:
+      - labeled
+
+permissions:
+  pull-requests: write
+
+jobs:
+  add-comment:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - label: "⚙️ Service"
+            body: |
+              Hi @${{ github.event.pull_request.user.login }}! 👋
+
+              It appears to us that you are either adding a new service or making changes to an existing one.
+              We kindly ask you to also review and update the **Coolify Documentation** to include this new service or it's new configuration needs.
+              This will help ensure that our documentation remains accurate and up-to-date for all users.
+
+              Coolify Docs Repository: https://github.com/coollabsio/coolify-docs
+              How to Contribute a new Service to the Docs: https://coolify.io/docs/get-started/contribute/service#adding-a-new-service-template-to-the-coolify-documentation
+          - label: "🛠️ Feature"
+            body: |
+              Hi @${{ github.event.pull_request.user.login }}! 👋
+
+              It appears to us that you are adding a new feature to Coolify.
+              We kindly ask you to also update the **Coolify Documentation** to include information about this new feature.
+              This will help ensure that our documentation remains accurate and up-to-date for all users.
+
+              Coolify Docs Repository: https://github.com/coollabsio/coolify-docs
+              How to Contribute to the Docs: https://coolify.io/docs/get-started/contribute/documentation
+          # - label: "✨ Enhancement"
+          #  body: |
+          #    It appears to us that you are making an enhancement to Coolify.
+          #    We kindly ask you to also review and update the Coolify Documentation to include information about this enhancement if applicable.
+          #    This will help ensure that our documentation remains accurate and up-to-date for all users.
+    steps:
+      - name: Add comment
+        if: github.event.label.name == matrix.label
+        run: gh pr comment "$NUMBER" --body "$BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          BODY: ${{ matrix.body }}

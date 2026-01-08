@@ -12,7 +12,7 @@
         {{ data_get($member, 'pivot.role') }}
     </td>
     <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
-        @if (Auth::user()->isAdminFromSession())
+        @can('manageMembers', currentTeam())
             @if ($member->id !== Auth::id())
                 @if (Auth::user()->isOwner())
                     @if (data_get($member, 'pivot.role') === 'owner')
@@ -43,6 +43,10 @@
             @else
                 <div>(This is you)</div>
             @endif
-        @endif
+        @else
+            @if ($member->id === Auth::id())
+                <div>(This is you)</div>
+            @endif
+        @endcan
     </td>
 </tr>

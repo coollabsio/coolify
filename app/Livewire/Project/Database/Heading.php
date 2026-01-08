@@ -62,6 +62,11 @@ class Heading extends Component
         }
     }
 
+    public function manualCheckStatus()
+    {
+        $this->checkStatus();
+    }
+
     public function mount()
     {
         $this->parameters = get_route_parameters();

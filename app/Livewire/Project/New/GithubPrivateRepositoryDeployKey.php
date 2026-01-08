@@ -90,7 +90,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public function mount()
     {
         if (isDev()) {
-            $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
+            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/v4.x';
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
@@ -194,7 +194,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->name = generate_random_name($application->uuid);
             $application->save();

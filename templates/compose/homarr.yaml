@@ -7,14 +7,14 @@
 
 services:
   homarr:
-    image: ghcr.io/ajnart/homarr:latest
+    image: ghcr.io/homarr-labs/homarr:v1.40.0
     environment:
       - SERVICE_URL_HOMARR_7575
+      - SERVICE_HEX_32_HOMARR
+      - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_32_HOMARR}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./homarr/configs:/app/data/configs
-      - ./homarr/icons:/app/public/icons
-      - ./homarr/data:/data
+      - ./homarr/appdata:/appdata
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7575"]
       interval: 5s

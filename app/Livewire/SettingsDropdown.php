@@ -2,7 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Jobs\PullChangelogFromGitHub;
+use App\Jobs\PullChangelog;
 use App\Services\ChangelogService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -21,6 +21,11 @@ class SettingsDropdown extends Component
         $user = Auth::user();
 
         return app(ChangelogService::class)->getEntriesForUser($user);
+    }
+
+    public function getCurrentVersionProperty()
+    {
+        return 'v'.config('constants.coolify.version');
     }
 
     public function openWhatsNewModal()
@@ -50,7 +55,7 @@ class SettingsDropdown extends Component
         }
 
         try {
-            PullChangelogFromGitHub::dispatch();
+            PullChangelog::dispatch();
             $this->dispatch('success', 'Changelog fetch initiated! Check back in a few moments.');
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to fetch changelog: '.$e->getMessage());
@@ -62,6 +67,7 @@ class SettingsDropdown extends Component
         return view('livewire.settings-dropdown', [
             'entries' => $this->entries,
             'unreadCount' => $this->unreadCount,
+            'currentVersion' => $this->currentVersion,
         ]);
     }
 }

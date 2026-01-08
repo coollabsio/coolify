@@ -76,8 +76,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                         $this->server->save();
-                        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+                        ConnectProxyToNetworksJob::dispatchSync($this->server);
                     }
                 }
             }

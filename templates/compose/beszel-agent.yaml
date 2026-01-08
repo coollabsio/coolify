@@ -1,0 +1,18 @@
+# documentation: https://www.beszel.dev/guide/agent-installation
+# slogan: Monitoring agent for Beszel
+# category: monitoring
+# tags: beszel,monitoring,server,stats,alerts
+# logo: svgs/beszel.svg
+
+services:
+  beszel-agent:
+    image: 'henrygd/beszel-agent:0.16.1' # Released on 14 Nov 2025
+    environment:
+      - LISTEN=/beszel_socket/beszel.sock
+      - HUB_URL=${HUB_URL?}
+      - 'TOKEN=${TOKEN?}'
+      - 'KEY=${KEY?}'
+    volumes:
+      - beszel_agent_data:/var/lib/beszel-agent
+      - beszel_socket:/beszel_socket
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'

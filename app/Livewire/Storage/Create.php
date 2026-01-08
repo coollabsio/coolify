@@ -4,11 +4,14 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Uri;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public string $name;
 
     public string $description;
@@ -94,6 +97,8 @@ class Create extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', S3Storage::class);
+
             $this->validate();
             $this->storage = new S3Storage;
             $this->storage->name = $this->name;
@@ -111,7 +116,7 @@ class Create extends Component
             $this->storage->testConnection();
             $this->storage->save();
 
-            return redirect()->route('storage.show', $this->storage->uuid);
+            return redirectRoute($this, 'storage.show', [$this->storage->uuid]);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
             // return handleError($e, $this);

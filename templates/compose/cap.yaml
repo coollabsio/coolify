@@ -1,0 +1,75 @@
+# documentation: https://cap.so
+# slogan: Cap is the open source alternative to Loom. Lightweight, powerful, and cross-platform. Record and share in seconds.
+# tags: cap,loom,open,source,low,code
+# logo: svgs/cap.svg
+# port: 5679
+
+# Storage Configuration:
+# Option 1: Remote S3-compatible storage (AWS S3, Cloudflare R2, etc.)
+# Set these environment variables:
+# - CAP_AWS_ACCESS_KEY: Your S3/R2 access key
+# - CAP_AWS_SECRET_KEY: Your S3/R2 secret key  
+# - CAP_AWS_BUCKET: Your S3/R2 bucket name
+# - CAP_AWS_REGION: Your S3/R2 region (e.g., us-east-1, auto for R2)
+# - CAP_AWS_ENDPOINT: Your S3/R2 endpoint URL
+# - S3_PUBLIC_ENDPOINT: Public endpoint for your bucket (same as CAP_AWS_ENDPOINT for most cases)
+# - S3_INTERNAL_ENDPOINT: Internal endpoint (same as CAP_AWS_ENDPOINT for most cases)
+# - S3_PATH_STYLE: true for R2/most S3-compatible, false for AWS S3 virtual-hosted style
+#
+# Option 2: Local MinIO storage
+# Deploy MinIO as a separate service in the same network and set:
+# - CAP_AWS_ACCESS_KEY: MinIO root user
+# - CAP_AWS_SECRET_KEY: MinIO root password
+# - CAP_AWS_BUCKET: Your bucket name (e.g., capso)
+# - CAP_AWS_REGION: us-east-1 (or any region)
+# - CAP_AWS_ENDPOINT: http://minio:9000 (internal MinIO endpoint)
+# - S3_PUBLIC_ENDPOINT: http://your-minio-domain:9000 (public MinIO endpoint)
+# - S3_INTERNAL_ENDPOINT: http://minio:9000 (internal MinIO endpoint)
+# - S3_PATH_STYLE: true
+
+services:
+  cap-web:
+    image: 'ghcr.io/capsoftware/cap-web:latest'
+    environment:
+      - SERVICE_URL_CAP_3000
+      - 'DATABASE_URL=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@cap-db:3306/${MYSQL_DATABASE:-planetscale}'
+      - 'WEB_URL=${SERVICE_URL_CAP}'
+      - 'NEXTAUTH_URL=${SERVICE_URL_CAP}'
+      - 'DATABASE_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_DATABASEENCRYPTIONKEY}'
+      - 'NEXTAUTH_SECRET=${SERVICE_PASSWORD_64_NEXTAUTHSECRET}'
+      - 'CAP_AWS_ACCESS_KEY=${CAP_AWS_ACCESS_KEY:?}'
+      - 'CAP_AWS_SECRET_KEY=${CAP_AWS_SECRET_KEY:?}'
+      - 'CAP_AWS_BUCKET=${CAP_AWS_BUCKET:?}'
+      - 'CAP_AWS_REGION=${CAP_AWS_REGION:?}'
+      - 'S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:?}'
+      - 'S3_INTERNAL_ENDPOINT=${S3_INTERNAL_ENDPOINT:?}'
+      - 'NEXT_RUNTIME=nodejs'
+      - 'S3_PATH_STYLE=${S3_PATH_STYLE:-true}'
+      - 'CAP_AWS_ENDPOINT=${CAP_AWS_ENDPOINT:?}'
+    depends_on:
+      cap-db:
+        condition: service_healthy
+        
+  cap-db:
+    image: 'mysql:8.0'
+    environment:
+      - 'MYSQL_USER=${SERVICE_USER_MYSQL}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE:-planetscale}'
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}'
+      - 'MYSQL_ALLOW_EMPTY_PASSWORD=${MYSQL_ALLOW_EMPTY_PASSWORD:-yes}'
+    command:
+      - '--max_connections=1000'
+      - '--default-authentication-plugin=mysql_native_password'
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - '-h'
+        - 127.0.0.1
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - 'cap_db:/var/lib/mysql'

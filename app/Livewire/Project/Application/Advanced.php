@@ -29,10 +29,19 @@ class Advanced extends Component
     public bool $isPreviewDeploymentsEnabled = false;
 
     #[Validate(['boolean'])]
+    public bool $isPrDeploymentsPublicEnabled = false;
+
+    #[Validate(['boolean'])]
     public bool $isAutoDeployEnabled = true;
 
     #[Validate(['boolean'])]
     public bool $disableBuildCache = false;
+
+    #[Validate(['boolean'])]
+    public bool $injectBuildArgsToDockerfile = true;
+
+    #[Validate(['boolean'])]
+    public bool $includeSourceCommitInBuild = false;
 
     #[Validate(['boolean'])]
     public bool $isLogDrainEnabled = false;
@@ -91,6 +100,7 @@ class Advanced extends Component
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
             $this->application->settings->is_git_shallow_clone_enabled = $this->isGitShallowCloneEnabled;
             $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
+            $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
             $this->application->settings->is_auto_deploy_enabled = $this->isAutoDeployEnabled;
             $this->application->settings->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->application->settings->is_gpu_enabled = $this->isGpuEnabled;
@@ -106,6 +116,8 @@ class Advanced extends Component
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
+            $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
+            $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
             $this->application->settings->save();
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
@@ -117,6 +129,7 @@ class Advanced extends Component
             $this->isGitLfsEnabled = $this->application->settings->is_git_lfs_enabled;
             $this->isGitShallowCloneEnabled = $this->application->settings->is_git_shallow_clone_enabled ?? false;
             $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
+            $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
             $this->isAutoDeployEnabled = $this->application->settings->is_auto_deploy_enabled;
             $this->isGpuEnabled = $this->application->settings->is_gpu_enabled;
             $this->gpuDriver = $this->application->settings->gpu_driver;
@@ -129,6 +142,8 @@ class Advanced extends Component
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
+            $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
+            $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
         }
     }
 
