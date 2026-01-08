@@ -5,20 +5,47 @@
 # port: 80
 
 services:
-  autobase-console-db:
-    image: autobase/console_db:2.4.1
+  autobase:
+    image: autobase/console_ui:2.4.1
+    platform: linux/amd64
+    environment:
+      - SERVICE_FQDN_AUTOBASE_80
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
+      - PG_CONSOLE_API_HOST=autobase-api
     healthcheck:
-      test: pg_isready -U postgres -h 127.0.0.1
+      test: [ "CMD", "curl", "http://localhost:80/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      autobase-api:
+        condition: service_healthy
+
+  autobase-db:
+    image: autobase/console_db:2.4.1
+    platform: linux/amd64
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - autobase-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
-    environment:
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
-    volumes:
-      - console_postgres:/var/lib/postgresql
 
-  autobase-console-api:
+  autobase-api:
     image: autobase/console_api:2.4.1
+    platform: linux/amd64
+    environment:
+      - PG_CONSOLE_DB_HOST=autobase-db
+      - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
+      - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_ENCRYPTIONKEY}
+      - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/ansible:/tmp/ansible
     healthcheck:
       test: ["CMD", "curl", "-fsS",
             "-H", "accept: application/json",
@@ -28,29 +55,5 @@ services:
       timeout: 5s
       retries: 5
     depends_on:
-      autobase-console-db:
+      autobase-db:
         condition: service_healthy
-    environment:
-      - PG_CONSOLE_DB_HOST=autobase-console-db
-      - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_DB}
-      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
-      - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_ENCRYPTIONKEY}
-      - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/ansible:/tmp/ansible
-
-  autobase-console-ui:
-    image: autobase/console_ui:2.4.1
-    healthcheck:
-      test: [ "CMD", "curl", "http://localhost:80/" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    depends_on:
-      autobase-console-api:
-        condition: service_healthy
-    environment:
-      - SERVICE_FQDN_AUTOBASE_CONSOLE_UI_80
-      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
-      - PG_CONSOLE_API_HOST=autobase-console-api
