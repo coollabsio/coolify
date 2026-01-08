@@ -11,7 +11,7 @@
 
     <form wire:submit="submit" class="w-full">
         <div class="flex flex-col gap-2 pb-2">
-            <div class="flex gap-2 items-end pt-4">
+            <div class="flex gap-2 items-end">
                 <h2>Scheduled Task</h2>
                 <x-forms.button type="submit">
                     Save
@@ -35,6 +35,8 @@
                 <x-forms.input placeholder="Name" id="name" label="Name" required />
                 <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" required />
                 <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
+                <x-forms.input type="number" placeholder="300" id="timeout"
+                    helper="Maximum execution time in seconds (60-36000)." label="Timeout (seconds)" required />
                 @if ($type === 'application')
                     <x-forms.input placeholder="php"
                         helper="You can leave this empty if your resource only has one container." id="container"

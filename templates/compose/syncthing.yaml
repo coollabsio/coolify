@@ -1,5 +1,6 @@
 # documentation: https://syncthing.net/
 # slogan: Syncthing synchronizes files between two or more computers in real time.
+# category: storage
 # tags: filestorage, data, synchronization
 # logo: svgs/syncthing.svg
 # port: 8384
@@ -8,7 +9,7 @@ services:
   syncthing:
     image: lscr.io/linuxserver/syncthing:latest
     environment:
-      - SERVICE_FQDN_SYNCTHING_8384
+      - SERVICE_URL_SYNCTHING_8384
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Etc/UTC}

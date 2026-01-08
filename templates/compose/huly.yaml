@@ -1,5 +1,6 @@
 # ignore: true
 # documentation: https://huly.io/
+# category: cms
 # slogan: Open Source All-in-One Project Management Platform
 # tags: linear,jira,slack,project,management,notion,motion
 # port: 8080
@@ -14,10 +15,15 @@ services:
     volumes:
       - huly-db:/data/db
   minio:
-    image: "minio/minio"
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     command: server /data --address ":9000" --console-address ":9001"
     volumes:
-      - huly-files:/data
+      - huly-files:/data      
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
   elastic:
     image: "elasticsearch:7.14.2"
     command: |
@@ -39,7 +45,7 @@ services:
   account:
     image: hardcoreeng/account:v0.6.246
     environment:
-      - SERVICE_FQDN_HULY_3000
+      - SERVICE_URL_HULY_3000
       - SERVER_PORT=3000
       - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
       - MONGO_URL=mongodb://mongodb:27017
@@ -55,7 +61,7 @@ services:
   front:
     image: hardcoreeng/front:v0.6.246
     environment:
-      - SERVICE_FQDN_HULY_8080
+      - SERVICE_URL_HULY_8080
       - MONGO_URL=mongodb://mongodb:27017
       - SERVER_PORT=8080
       - SERVER_SECRET=$SERVICE_PASSWORD_SECRET

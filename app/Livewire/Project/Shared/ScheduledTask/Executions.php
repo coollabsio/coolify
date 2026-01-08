@@ -105,6 +105,19 @@ class Executions extends Component
         $this->currentPage++;
     }
 
+    public function loadAllLogs()
+    {
+        if (! $this->selectedExecution || ! $this->selectedExecution->message) {
+            return;
+        }
+
+        $lines = collect(explode("\n", $this->selectedExecution->message));
+        $totalLines = $lines->count();
+        $totalPages = ceil($totalLines / $this->logsPerPage);
+
+        $this->currentPage = $totalPages;
+    }
+
     public function getLogLinesProperty()
     {
         if (! $this->selectedExecution) {

@@ -1,5 +1,6 @@
 # documentation: https://github.com/linuxserver/budge
 # slogan: A budgeting personal finance app.
+# category: productivity
 # tags: personal finance, budgeting, expense tracking
 # logo: svgs/budge.png
 
@@ -7,7 +8,7 @@ services:
   budge:
     image: lscr.io/linuxserver/budge:latest
     environment:
-      - SERVICE_FQDN_BUDGE
+      - SERVICE_URL_BUDGE
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

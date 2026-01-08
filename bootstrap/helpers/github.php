@@ -135,7 +135,13 @@ function getPermissionsPath(GithubApp $source)
 
 function loadRepositoryByPage(GithubApp $source, string $token, int $page)
 {
-    $response = Http::withToken($token)->get("{$source->api_url}/installation/repositories?per_page=100&page={$page}");
+    $response = Http::GitHub($source->api_url, $token)
+        ->timeout(20)
+        ->retry(3, 200, throw: false)
+        ->get('/installation/repositories', [
+            'per_page' => 100,
+            'page' => $page,
+        ]);
     $json = $response->json();
     if ($response->status() !== 200) {
         return [
@@ -155,4 +161,55 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'total_count' => $json['total_count'],
         'repositories' => $json['repositories'],
     ];
+}
+function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
+{
+    try {
+        if (! $source) {
+            // Manual webhooks don't have GitHub App authentication
+            // Return empty array so watch paths are ignored (current behavior)
+            return [];
+        }
+
+        $endpoint = "/repos/{$owner}/{$repo}/compare/{$beforeSha}...{$afterSha}";
+        $response = githubApi($source, $endpoint, 'get', null, false);
+
+        if (! $response) {
+            return [];
+        }
+
+        $files = collect(data_get($response, 'data.files', []));
+
+        return $files->pluck('filename')->filter()->values()->toArray();
+    } catch (Exception $e) {
+        ray('Error fetching GitHub commit range files: '.$e->getMessage());
+
+        return [];
+    }
+}
+
+function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): array
+{
+    try {
+        if (! $source) {
+            // Manual webhooks don't have GitHub App authentication
+            // Return empty array so watch paths are ignored (current behavior)
+            return [];
+        }
+
+        $endpoint = "/repos/{$owner}/{$repo}/pulls/{$pullRequestId}/files";
+        $response = githubApi($source, $endpoint, 'get', null, false);
+
+        if (! $response) {
+            return [];
+        }
+
+        $files = collect(data_get($response, 'data', []));
+
+        return $files->pluck('filename')->filter()->values()->toArray();
+    } catch (Exception $e) {
+        ray('Error fetching GitHub PR files: '.$e->getMessage());
+
+        return [];
+    }
 }

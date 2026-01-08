@@ -1,0 +1,22 @@
+name: Cleanup Untagged GHCR Images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup-all-packages:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ['coolify', 'coolify-helper', 'coolify-realtime', 'coolify-testing-host']
+    steps:
+      - name: Delete untagged ${{ matrix.package }} images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: 'container'
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: 'true'

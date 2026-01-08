@@ -1,0 +1,64 @@
+# documentation: https://docs.usesend.com/self-hosting/overview
+# slogan: Usesend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.
+# category: messaging
+# tags: resend, mailer, marketing emails, transaction emails, self-hosting, postmark
+# logo: svgs/usesend.svg
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_DB_POSTGRES:-usesend}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - usesend-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    volumes:
+      - usesend-redis-data:/data
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  usesend:
+    image: usesend/usesend:latest
+    expose:
+      - 3000
+    environment:
+      - SERVICE_URL_USESEND_3000
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${SERVICE_DB_POSTGRES:-usesend}
+      - NEXTAUTH_URL=${SERVICE_URL_USESEND}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY:?}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY:?}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:?}
+      - GITHUB_ID=${GITHUB_ID:?}
+      - GITHUB_SECRET=${GITHUB_SECRET:?}
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_IS_CLOUD=${NEXT_PUBLIC_IS_CLOUD:-false}
+      - API_RATE_LIMIT=${API_RATE_LIMIT:-1}
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://usesend:3000 || exit 1"]
+      interval: 5s
+      retries: 10
+      timeout: 2s

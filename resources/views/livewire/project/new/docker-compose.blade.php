@@ -7,7 +7,7 @@
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
         <x-forms.textarea useMonacoEditor monacoEditorLanguage="yaml" label="Docker Compose file" rows="20"
-            id="dockerComposeRaw"
+            id="dockerComposeRaw" autofocus
             placeholder='services:
   ghost:
     documentation: https://ghost.org/docs/config

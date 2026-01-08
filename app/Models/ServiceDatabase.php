@@ -30,9 +30,23 @@ class ServiceDatabase extends BaseModel
         return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for service databases owned by current team.
+     * If you need all service databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all service databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return ServiceDatabase::ownedByCurrentTeam()->get();
+        });
     }
 
     public function restart()
@@ -84,6 +98,10 @@ class ServiceDatabase extends BaseModel
         $image = str($this->image)->before(':');
         if ($image->contains('supabase/postgres')) {
             $finalImage = 'supabase/postgres';
+        } elseif ($image->contains('timescale')) {
+            $finalImage = 'postgresql';
+        } elseif ($image->contains('pgvector')) {
+            $finalImage = 'postgresql';
         } elseif ($image->contains('postgres') || $image->contains('postgis')) {
             $finalImage = 'postgresql';
         } else {

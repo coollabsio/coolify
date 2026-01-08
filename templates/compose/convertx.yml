@@ -1,5 +1,6 @@
 # documentation: https://github.com/C4illin/ConvertX
 # slogan: A self-hosted online file converter. Supports over a thousand different formats.
+# category: backend
 # tags: converter,file,documents,files,directories
 # logo: svgs/convertx.png
 # port: 3000
@@ -8,7 +9,7 @@ services:
   convertx:
     image: ghcr.io/c4illin/convertx:latest
     environment:
-      - SERVICE_FQDN_CONVERTX
+      - SERVICE_URL_CONVERTX
       - ACCOUNT_REGISTRATION=${ACCOUNT_REGISTRATION:-false}
       - HTTP_ALLOWED=${HTTP_ALLOWED:-true}
       - ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-false}

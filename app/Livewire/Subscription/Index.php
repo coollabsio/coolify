@@ -75,7 +75,7 @@ class Index extends Component
             }
         } catch (\Exception $e) {
             // Log the error
-            logger()->error('Stripe API error: ' . $e->getMessage());
+            logger()->error('Stripe API error: '.$e->getMessage());
             // Set a flag to show an error message to the user
             $this->addError('stripe', 'Could not retrieve subscription information. Please try again later.');
         } finally {

@@ -14,7 +14,7 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
-        // \App\Http\Middleware\TrustHosts::class,
+        \App\Http\Middleware\TrustHosts::class,
         \App\Http\Middleware\TrustProxies::class,
         \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
@@ -71,5 +71,8 @@ class Kernel extends HttpKernel
         'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         'api.ability' => \App\Http\Middleware\ApiAbility::class,
         'api.sensitive' => \App\Http\Middleware\ApiSensitiveData::class,
+        'can.create.resources' => \App\Http\Middleware\CanCreateResources::class,
+        'can.update.resource' => \App\Http\Middleware\CanUpdateResource::class,
+        'can.access.terminal' => \App\Http\Middleware\CanAccessTerminal::class,
     ];
 }
