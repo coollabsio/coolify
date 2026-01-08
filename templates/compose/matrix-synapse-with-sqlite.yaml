@@ -14,7 +14,6 @@ services:
   synapse:
     image: matrixdotorg/synapse:latest
     environment:
-      - SERVICE_FQDN_SYNAPSE_8008
       - SERVICE_URL_SYNAPSE_8008
       - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME:?}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
@@ -70,6 +69,3 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
-
-volumes:
-  synapse-data:
