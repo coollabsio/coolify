@@ -1309,6 +1309,7 @@ All notable changes to this project will be documented in this file.
 - Remove duplicated validation messages
 - *(service)* Remove unused envs from hoppscotch (#6513)
 - Move all env sorting to one place
+- *(service)* Improve autobase
 
 ### 📚 Documentation
 
@@ -1382,6 +1383,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Replace brittle line number references with maintainable method descriptions
 - Update application architecture and database patterns for request-level caching best practices
+- Update changelog
 
 ### ⚡ Performance
 
