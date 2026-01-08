@@ -52,7 +52,7 @@ class Rollback extends Component
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $this->application,
             deployment_uuid: $deployment_uuid,
             commit: $commit,
@@ -60,7 +60,13 @@ class Rollback extends Component
             force_rebuild: false,
         );
 
-        return redirect()->route('project.application.deployment.show', [
+        if ($result['status'] === 'queue_full') {
+            $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+            return;
+        }
+
+        return redirectRoute($this, 'project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,

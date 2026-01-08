@@ -90,7 +90,7 @@ class Gitea extends Controller
                 if ($x_gitea_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || is_null($application->watch_paths)) {
+                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
                             $deployment_uuid = new Cuid2;
                             $result = queue_application_deployment(
                                 application: $application,
@@ -99,7 +99,9 @@ class Gitea extends Controller
                                 commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
                             );
-                            if ($result['status'] === 'skipped') {
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'application' => $application->name,
                                     'status' => 'skipped',
@@ -169,7 +171,9 @@ class Gitea extends Controller
                                 is_webhook: true,
                                 git_type: 'gitea'
                             );
-                            if ($result['status'] === 'skipped') {
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
                                     'application' => $application->name,
                                     'status' => 'skipped',

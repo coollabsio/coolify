@@ -6,113 +6,106 @@
         <livewire:project.shared.configuration-checker :resource="$application" />
         <livewire:project.application.heading :application="$application" />
         <div x-data="{
-        fullscreen: false,
+        fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
-        intervalId: null,
+        rafId: null,
         showTimestamps: true,
         searchQuery: '',
-        renderTrigger: 0,
+        matchCount: 0,
         deploymentId: '{{ $application_deployment_queue->deployment_uuid ?? 'deployment' }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
-            if (this.fullscreen === false) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
+        },
+        scrollToBottom() {
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
             }
         },
-        isScrolling: false,
+        scheduleScroll() {
+            if (!this.alwaysScroll) return;
+            this.rafId = requestAnimationFrame(() => {
+                this.scrollToBottom();
+                if (this.alwaysScroll) {
+                    setTimeout(() => this.scheduleScroll(), 250);
+                }
+            });
+        },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        this.isScrolling = true;
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
-                    }
-                }, 100);
+                this.scheduleScroll();
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
-        handleScroll(event) {
-            if (!this.alwaysScroll || this.isScrolling) return;
-            const el = event.target;
-            // Check if user scrolled away from the bottom
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-            if (distanceFromBottom > 50) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+        hasActiveLogSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                return false;
             }
-        },
-        matchesSearch(text) {
-            if (!this.searchQuery.trim()) return true;
-            return text.toLowerCase().includes(this.searchQuery.toLowerCase());
+            const logsContainer = document.getElementById('logs');
+            if (!logsContainer) return false;
+            const range = selection.getRangeAt(0);
+            return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
-            let decoded = text;
-            let prev = '';
-            let iterations = 0;
-            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
-
-            while (decoded !== prev && iterations < maxIterations) {
-                prev = decoded;
-                const doc = new DOMParser().parseFromString(decoded, 'text/html');
-                decoded = doc.documentElement.textContent;
-                iterations++;
-            }
-            return decoded;
+            const doc = new DOMParser().parseFromString(text, 'text/html');
+            return doc.documentElement.textContent;
         },
-        renderHighlightedLog(el, text) {
-            const decoded = this.decodeHtml(text);
+        highlightText(el, text, query) {
+            if (this.hasActiveLogSelection()) return;
+
             el.textContent = '';
-
-            if (!this.searchQuery.trim()) {
-                el.textContent = decoded;
-                return;
-            }
-
-            const query = this.searchQuery.toLowerCase();
-            const lowerText = decoded.toLowerCase();
+            const lowerText = text.toLowerCase();
             let lastIndex = 0;
-
             let index = lowerText.indexOf(query, lastIndex);
+
             while (index !== -1) {
-                // Add text before match
                 if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
                 }
-                // Add highlighted match
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
-                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                mark.textContent = text.substring(index, index + query.length);
                 el.appendChild(mark);
-
-                lastIndex = index + this.searchQuery.length;
+                lastIndex = index + query.length;
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            // Add remaining text
-            if (lastIndex < decoded.length) {
-                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            if (lastIndex < text.length) {
+                el.appendChild(document.createTextNode(text.substring(lastIndex)));
             }
         },
-        getMatchCount() {
-            if (!this.searchQuery.trim()) return 0;
+        applySearch() {
             const logs = document.getElementById('logs');
-            if (!logs) return 0;
+            if (!logs) return;
             const lines = logs.querySelectorAll('[data-log-line]');
+            const query = this.searchQuery.trim().toLowerCase();
             let count = 0;
+
             lines.forEach(line => {
-                if (line.dataset.logContent && line.dataset.logContent.toLowerCase().includes(this.searchQuery.toLowerCase())) {
-                    count++;
+                const content = (line.dataset.logContent || '').toLowerCase();
+                const textSpan = line.querySelector('[data-line-text]');
+                const matches = !query || content.includes(query);
+
+                line.classList.toggle('hidden', !matches);
+                if (matches && query) count++;
+
+                if (textSpan) {
+                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    if (!query) {
+                        textSpan.textContent = originalText;
+                    } else if (matches) {
+                        this.highlightText(textSpan, originalText, query);
+                    }
                 }
             });
-            return count;
+
+            this.matchCount = query ? count : 0;
         },
         downloadLogs() {
             const logs = document.getElementById('logs');
@@ -134,54 +127,70 @@
             a.click();
             URL.revokeObjectURL(url);
         },
+        stopScroll() {
+            this.scrollToBottom();
+            this.alwaysScroll = false;
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+        },
         init() {
-            // Re-render logs after Livewire updates
-            document.addEventListener('livewire:navigated', () => {
-                this.$nextTick(() => { this.renderTrigger++; });
+            // Watch search query changes
+            this.$watch('searchQuery', () => {
+                this.applySearch();
             });
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    this.$nextTick(() => { this.renderTrigger++; });
-                });
+
+            // Apply search after Livewire updates
+            Livewire.hook('morph.updated', ({ el }) => {
+                if (el.id === 'logs') {
+                    this.$nextTick(() => {
+                        this.applySearch();
+                        if (this.alwaysScroll) {
+                            this.scrollToBottom();
+                        }
+                    });
+                }
             });
+
+            // Stop auto-scroll when deployment finishes
+            Livewire.on('deploymentFinished', () => {
+                setTimeout(() => {
+                    this.stopScroll();
+                }, 500);
+            });
+
             // Start auto-scroll if deployment is in progress
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        this.isScrolling = true;
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
-                    }
-                }, 100);
+                this.scheduleScroll();
             }
         }
     }">
             <livewire:project.application.deployment-navbar
                 :application_deployment_queue="$application_deployment_queue" />
-            @if (data_get($application_deployment_queue, 'status') === 'in_progress')
-                <div class="flex items-center gap-1 pt-2 ">Deployment is
-                    <div class="dark:text-warning">
-                        {{ Str::headline(data_get($this->application_deployment_queue, 'status')) }}.
-                    </div>
-                    <x-loading class="loading-ring" />
-                </div>
-                {{-- <div class="">Logs will be updated automatically.</div> --}}
-            @else
-                <div class="pt-2 ">Deployment is <span
-                        class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
-                </div>
-            @endif
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'relative'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 relative'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'mt-4 border border-dotted rounded-sm'">
+                    :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
                     <div
-                        class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
-                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
-                            class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                        <span x-show="!searchQuery.trim()"></span>
-                        <div class="flex items-center gap-2">
+                        class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
+                        <div class="flex items-center gap-3">
+                            @if (data_get($application_deployment_queue, 'status') === 'in_progress')
+                                <div class="flex items-center gap-1">
+                                    <span>Deployment is</span>
+                                    <span class="dark:text-warning">In Progress</span>
+                                    <x-loading class="loading-ring loading-xs" />
+                                </div>
+                            @else
+                                <div class="flex items-center gap-1">
+                                    <span>Deployment is</span>
+                                    <span class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>
+                                </div>
+                            @endif
+                            <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
+                                class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
+                        </div>
+                        <div class="flex flex-wrap items-center justify-end gap-2 flex-1">
                             <div class="relative">
                                 <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -189,7 +198,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                                 </svg>
-                                <input type="text" x-model="searchQuery" placeholder="Find in logs"
+                                <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                     class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-200" />
                                 <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                     class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -199,14 +208,77 @@
                                     </svg>
                                 </button>
                             </div>
-                            <button x-on:click="downloadLogs()" title="Download Logs"
+                            <div class="flex flex-wrap items-center gap-1">
+                                <button
+                                    x-on:click="
+                                    $wire.copyLogs().then(logs => {
+                                        navigator.clipboard.writeText(logs);
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    });
+                                "
+                                title="Copy Logs"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                        d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                                 </svg>
                             </button>
+                            <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative">
+                                <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
+                                    class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                </button>
+                                <div x-show="downloadMenuOpen" x-on:click.away="downloadMenuOpen = false"
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
+                                    <div class="py-1">
+                                        <button x-on:click="downloadLogs(); downloadMenuOpen = false"
+                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            Download displayed logs
+                                        </button>
+                                        <button x-on:click="
+                                            downloadingAllLogs = true;
+                                            $wire.downloadAllLogs().then(logs => {
+                                                if (!logs) return;
+                                                const blob = new Blob([logs], { type: 'text/plain' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+                                                a.download = 'deployment-' + deploymentId + '-all-logs-' + timestamp + '.txt';
+                                                a.click();
+                                                URL.revokeObjectURL(url);
+                                                Livewire.dispatch('success', ['All logs downloaded.']);
+                                            }).finally(() => {
+                                                downloadingAllLogs = false;
+                                                downloadMenuOpen = false;
+                                            });
+                                        "
+                                            :disabled="downloadingAllLogs"
+                                            :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
+                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            <span x-show="!downloadingAllLogs">Download all logs</span>
+                                            <span x-show="downloadingAllLogs" class="flex items-center gap-2">
+                                                <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Downloading...
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                             <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
                                 :class="showTimestamps ? '!text-warning' : ''"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -252,13 +324,14 @@
                                         d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                                 </svg>
                             </button>
+                            </div>
                         </div>
                     </div>
-                    <div id="logsContainer" @scroll="handleScroll"
+                    <div id="logsContainer"
                         class="flex flex-col overflow-y-auto p-2 px-4 min-h-4 scrollbar"
-                        :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
+                        :class="fullscreen ? 'flex-1' : 'max-h-[30rem]'">
                         <div id="logs" class="flex flex-col font-mono">
-                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
@@ -268,19 +341,19 @@
                                     $searchableContent = $line['timestamp'] . ' ' . $lineContent;
                                 @endphp
                                 <div data-log-line data-log-content="{{ htmlspecialchars($searchableContent) }}"
-                                    x-bind:class="{ 'hidden': !matchesSearch($el.dataset.logContent) }" @class([
+                                    @class([
                                         'mt-2' => isset($line['command']) && $line['command'],
-                                        'flex gap-2',
+                                        'flex gap-2 log-line',
                                     ])>
                                     <span x-show="showTimestamps"
                                         class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
-                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}" @class([
-                                        'text-success dark:text-warning' => $line['hidden'],
-                                        'text-red-500' => $line['stderr'],
-                                        'font-bold' => isset($line['command']) && $line['command'],
-                                        'whitespace-pre-wrap',
-                                    ])
-                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"></span>
+                                    <span data-line-text="{{ htmlspecialchars($lineContent) }}"
+                                        @class([
+                                            'text-success dark:text-warning' => $line['hidden'],
+                                            'text-red-500' => $line['stderr'],
+                                            'font-bold' => isset($line['command']) && $line['command'],
+                                            'whitespace-pre-wrap',
+                                        ])>{{ $lineContent }}</span>
                                 </div>
                             @empty
                                 <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>

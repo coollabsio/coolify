@@ -43,21 +43,26 @@ class EmailChannel
                 throw new Exception('No email recipients found');
             }
 
-            foreach ($recipients as $recipient) {
-                // Check if the recipient is part of the team
-                if (! $members->contains('email', $recipient)) {
-                    $emailSettings = $notifiable->emailNotificationSettings;
-                    data_set($emailSettings, 'smtp_password', '********');
-                    data_set($emailSettings, 'resend_api_key', '********');
-                    send_internal_notification(sprintf(
-                        "Recipient is not part of the team: %s\nTeam: %s\nNotification: %s\nNotifiable: %s\nEmail Settings:\n%s",
-                        $recipient,
-                        $team,
-                        get_class($notification),
-                        get_class($notifiable),
-                        json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-                    ));
-                    throw new Exception('Recipient is not part of the team');
+            // Skip team membership validation for test notifications
+            $isTestNotification = data_get($notification, 'isTestNotification', false);
+
+            if (! $isTestNotification) {
+                foreach ($recipients as $recipient) {
+                    // Check if the recipient is part of the team
+                    if (! $members->contains('email', $recipient)) {
+                        $emailSettings = $notifiable->emailNotificationSettings;
+                        data_set($emailSettings, 'smtp_password', '********');
+                        data_set($emailSettings, 'resend_api_key', '********');
+                        send_internal_notification(sprintf(
+                            "Recipient is not part of the team: %s\nTeam: %s\nNotification: %s\nNotifiable: %s\nEmail Settings:\n%s",
+                            $recipient,
+                            $team,
+                            get_class($notification),
+                            get_class($notifiable),
+                            json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                        ));
+                        throw new Exception('Recipient is not part of the team');
+                    }
                 }
             }
 

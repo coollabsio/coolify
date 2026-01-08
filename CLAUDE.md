@@ -10,6 +10,42 @@ This file provides guidance to **Claude Code** (claude.ai/code) when working wit
 
 Coolify is an open-source, self-hostable platform for deploying applications and managing servers - an alternative to Heroku/Netlify/Vercel. It's built with Laravel (PHP) and uses Docker for containerization.
 
+## Git Worktree Shared Dependencies
+
+This repository uses git worktrees for parallel development with **automatic shared dependency setup** via Conductor.
+
+### How It Works
+
+The `conductor.json` setup script (`scripts/conductor-setup.sh`) automatically:
+1. Creates symlinks from worktree's `node_modules` and `vendor` to the main repository's directories
+2. All worktrees share the same dependencies from the main repository
+3. This happens automatically when Conductor creates a new worktree
+
+### Benefits
+
+- **Save disk space**: Only one copy of dependencies across all worktrees
+- **Faster setup**: No need to run `npm install` or `composer install` for each worktree
+- **Consistent versions**: All worktrees use the same dependency versions
+- **Auto-configured**: Handled by Conductor's setup script
+- **Simple**: Uses the main repo's existing directories, no extra folders
+
+### Manual Setup (If Needed)
+
+If you need to set up symlinks manually or for non-Conductor worktrees:
+
+```bash
+# From the worktree directory
+rm -rf node_modules vendor
+ln -sf ../../node_modules node_modules
+ln -sf ../../vendor vendor
+```
+
+### Important Notes
+
+- Dependencies are shared from the main repository (`$CONDUCTOR_ROOT_PATH`)
+- Run `npm install` or `composer install` from the main repo or any worktree to update all
+- If different branches need different dependency versions, this won't work - remove symlinks and use separate directories
+
 ## Development Commands
 
 ### Frontend Development

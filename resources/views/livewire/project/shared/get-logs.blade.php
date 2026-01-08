@@ -5,135 +5,161 @@
         logsLoaded: false,
         fullscreen: false,
         alwaysScroll: false,
-        intervalId: null,
+        rafId: null,
+        scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         searchQuery: '',
-        renderTrigger: 0,
+        matchCount: 0,
         containerName: '{{ $container ?? "logs" }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
                 this.alwaysScroll = false;
-                clearInterval(this.intervalId);
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
+            }
+        },
+        handleKeyDown(event) {
+            if (event.key === 'Escape' && this.fullscreen) {
+                this.makeFullscreen();
             }
         },
         isScrolling: false,
+        scrollToBottom() {
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                this.isScrolling = true;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(() => { this.isScrolling = false; }, 50);
+            }
+        },
+        scheduleScroll() {
+            if (!this.alwaysScroll) return;
+            this.rafId = requestAnimationFrame(() => {
+                this.scrollToBottom();
+                if (this.alwaysScroll) {
+                    setTimeout(() => this.scheduleScroll(), 250);
+                }
+            });
+        },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
-                this.intervalId = setInterval(() => {
-                    const logsContainer = document.getElementById('logsContainer');
-                    if (logsContainer) {
-                        this.isScrolling = true;
-                        logsContainer.scrollTop = logsContainer.scrollHeight;
-                        setTimeout(() => { this.isScrolling = false; }, 50);
-                    }
-                }, 100);
+                this.scheduleScroll();
             } else {
-                clearInterval(this.intervalId);
-                this.intervalId = null;
+                if (this.rafId) {
+                    cancelAnimationFrame(this.rafId);
+                    this.rafId = null;
+                }
             }
         },
         handleScroll(event) {
             if (!this.alwaysScroll || this.isScrolling) return;
-            const el = event.target;
-            // Check if user scrolled away from the bottom
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-            if (distanceFromBottom > 50) {
-                this.alwaysScroll = false;
-                clearInterval(this.intervalId);
-                this.intervalId = null;
-            }
+            clearTimeout(this.scrollDebounce);
+            this.scrollDebounce = setTimeout(() => {
+                const el = event.target;
+                const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (distanceFromBottom > 100) {
+                    this.alwaysScroll = false;
+                    if (this.rafId) {
+                        cancelAnimationFrame(this.rafId);
+                        this.rafId = null;
+                    }
+                }
+            }, 150);
         },
         toggleColorLogs() {
             this.colorLogs = !this.colorLogs;
             localStorage.setItem('coolify-color-logs', this.colorLogs);
+            this.applyColorLogs();
         },
-        getLogLevel(text) {
-            const lowerText = text.toLowerCase();
-            // Error detection (highest priority)
-            if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(lowerText)) {
-                return 'error';
-            }
-            // Warning detection
-            if (/\b(warn|warning|wrn|caution)\b/.test(lowerText)) {
-                return 'warning';
-            }
-            // Debug detection
-            if (/\b(debug|dbg|trace|verbose)\b/.test(lowerText)) {
-                return 'debug';
-            }
-            // Info detection
-            if (/\b(info|inf|notice)\b/.test(lowerText)) {
-                return 'info';
-            }
-            return null;
+        applyColorLogs() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                line.classList.remove('log-error', 'log-warning', 'log-debug', 'log-info');
+                if (!this.colorLogs) return;
+                if (/\b(error|err|failed|failure|exception|fatal|panic|critical)\b/.test(content)) {
+                    line.classList.add('log-error');
+                } else if (/\b(warn|warning|wrn|caution)\b/.test(content)) {
+                    line.classList.add('log-warning');
+                } else if (/\b(debug|dbg|trace|verbose)\b/.test(content)) {
+                    line.classList.add('log-debug');
+                } else if (/\b(info|inf|notice)\b/.test(content)) {
+                    line.classList.add('log-info');
+                }
+            });
         },
-        matchesSearch(line) {
-            if (!this.searchQuery.trim()) return true;
-            return line.toLowerCase().includes(this.searchQuery.toLowerCase());
+        hasActiveLogSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+                return false;
+            }
+            const logsContainer = document.getElementById('logs');
+            if (!logsContainer) return false;
+            const range = selection.getRangeAt(0);
+            return logsContainer.contains(range.commonAncestorContainer);
         },
         decodeHtml(text) {
-            // Decode HTML entities, handling double-encoding with max iteration limit to prevent DoS
-            let decoded = text;
-            let prev = '';
-            let iterations = 0;
-            const maxIterations = 3; // Prevent DoS from deeply nested HTML entities
-
-            while (decoded !== prev && iterations < maxIterations) {
-                prev = decoded;
-                const doc = new DOMParser().parseFromString(decoded, 'text/html');
-                decoded = doc.documentElement.textContent;
-                iterations++;
-            }
-            return decoded;
+            const doc = new DOMParser().parseFromString(text, 'text/html');
+            return doc.documentElement.textContent;
         },
-        renderHighlightedLog(el, text) {
-            const decoded = this.decodeHtml(text);
-            el.textContent = '';
+        applySearch() {
+            const logs = document.getElementById('logs');
+            if (!logs) return;
+            const lines = logs.querySelectorAll('[data-log-line]');
+            const query = this.searchQuery.trim().toLowerCase();
+            let count = 0;
 
-            if (!this.searchQuery.trim()) {
-                el.textContent = decoded;
-                return;
-            }
+            lines.forEach(line => {
+                const content = (line.dataset.logContent || '').toLowerCase();
+                const textSpan = line.querySelector('[data-line-text]');
+                const matches = !query || content.includes(query);
 
-            const query = this.searchQuery.toLowerCase();
-            const lowerText = decoded.toLowerCase();
-            let lastIndex = 0;
+                line.classList.toggle('hidden', !matches);
+                if (matches && query) count++;
 
-            let index = lowerText.indexOf(query, lastIndex);
-            while (index !== -1) {
-                // Add text before match
-                if (index > lastIndex) {
-                    el.appendChild(document.createTextNode(decoded.substring(lastIndex, index)));
+                // Update highlighting
+                if (textSpan) {
+                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    if (!query) {
+                        textSpan.textContent = originalText;
+                    } else if (matches) {
+                        this.highlightText(textSpan, originalText, query);
+                    }
                 }
-                // Add highlighted match
+            });
+
+            this.matchCount = query ? count : 0;
+        },
+        highlightText(el, text, query) {
+            // Skip if user has selection
+            if (this.hasActiveLogSelection()) return;
+
+            el.textContent = '';
+            const lowerText = text.toLowerCase();
+            let lastIndex = 0;
+            let index = lowerText.indexOf(query, lastIndex);
+
+            while (index !== -1) {
+                if (index > lastIndex) {
+                    el.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+                }
                 const mark = document.createElement('span');
                 mark.className = 'log-highlight';
-                mark.textContent = decoded.substring(index, index + this.searchQuery.length);
+                mark.textContent = text.substring(index, index + query.length);
                 el.appendChild(mark);
-
-                lastIndex = index + this.searchQuery.length;
+                lastIndex = index + query.length;
                 index = lowerText.indexOf(query, lastIndex);
             }
 
-            // Add remaining text
-            if (lastIndex < decoded.length) {
-                el.appendChild(document.createTextNode(decoded.substring(lastIndex)));
+            if (lastIndex < text.length) {
+                el.appendChild(document.createTextNode(text.substring(lastIndex)));
             }
-        },
-        getMatchCount() {
-            if (!this.searchQuery.trim()) return 0;
-            const logs = document.getElementById('logs');
-            if (!logs) return 0;
-            const lines = logs.querySelectorAll('[data-log-line]');
-            let count = 0;
-            lines.forEach(line => {
-                if (line.textContent.toLowerCase().includes(this.searchQuery.toLowerCase())) {
-                    count++;
-                }
-            });
-            return count;
         },
         downloadLogs() {
             const logs = document.getElementById('logs');
@@ -157,20 +183,44 @@
         },
         init() {
             if (this.expanded) {
-                this.$wire.getLogs();
+                this.$wire.getLogs(true);
                 this.logsLoaded = true;
             }
-            // Re-render logs after Livewire updates
-            Livewire.hook('commit', ({ succeed }) => {
-                succeed(() => {
-                    this.$nextTick(() => { this.renderTrigger++; });
+
+            // Watch search query changes
+            this.$watch('searchQuery', () => {
+                this.applySearch();
+            });
+
+            // Handler for applying colors and search after DOM changes
+            const applyAfterUpdate = () => {
+                this.$nextTick(() => {
+                    this.applyColorLogs();
+                    this.applySearch();
+                    if (this.alwaysScroll) {
+                        this.scrollToBottom();
+                    }
                 });
+            };
+
+            // Apply colors after Livewire updates (existing content)
+            Livewire.hook('morph.updated', ({ el }) => {
+                if (el.id === 'logs') {
+                    applyAfterUpdate();
+                }
+            });
+
+            // Apply colors after Livewire adds new content (initial load)
+            Livewire.hook('morph.added', ({ el }) => {
+                if (el.id === 'logs') {
+                    applyAfterUpdate();
+                }
             });
         }
-    }">
+    }" @keydown.window="handleKeyDown($event)">
         @if ($collapsible)
             <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
-                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(); logsLoaded = true; }">
+                x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
                 <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
@@ -191,23 +241,24 @@
             </div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
-            :class="fullscreen ? 'fullscreen flex flex-col' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'">
-            <div class="flex flex-col bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300 border-neutral-200"
-                :class="fullscreen ? 'h-full' : 'border border-solid rounded-sm'">
+            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"
+            :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
+            <div class="flex flex-col dark:text-white dark:border-coolgray-300 border-neutral-200"
+                :class="fullscreen ? 'h-full w-full bg-white dark:bg-coolgray-100' : 'bg-white dark:bg-coolgray-100 border border-solid rounded-sm'">
                 <div
-                    class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
+                    class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                     <div class="flex items-center gap-2">
                         <form wire:submit="getLogs(true)" class="relative flex items-center">
                             <span
                                 class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
-                            <input type="number" wire:model="numberOfLines" placeholder="100" min="1"
-                                title="Number of Lines" {{ $streamLogs ? 'readonly' : '' }}
-                                class="input input-sm w-32 pl-11 text-center dark:bg-coolgray-300" />
+                            <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
+                                title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
+                                class="input input-sm w-32 pl-11 dark:bg-coolgray-300" />
                         </form>
-                        <span x-show="searchQuery.trim()" x-text="getMatchCount() + ' matches'"
+                        <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center justify-end gap-2 flex-1">
                         <div class="relative">
                             <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -215,7 +266,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                             </svg>
-                            <input type="text" x-model="searchQuery" placeholder="Find in logs"
+                            <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                 class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-300" />
                             <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
@@ -225,37 +276,13 @@
                                 </svg>
                             </button>
                         </div>
-                        <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
+                        <div class="flex flex-wrap items-center gap-1">
+                            <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
                             class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                            </svg>
-                        </button>
-                        <button x-on:click="downloadLogs()" title="Download Logs"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                            </svg>
-                        </button>
-                        <button wire:click="toggleTimestamps" title="Toggle Timestamps"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $showTimeStamps ? '!text-warning' : '' }}">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>
-                        </button>
-                        <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
-                            :class="colorLogs ? '!text-warning' : ''"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                             </svg>
                         </button>
                         <button wire:click="toggleStreamLogs"
@@ -274,6 +301,93 @@
                                     <path d="M8 5v14l11-7L8 5z" />
                                 </svg>
                             @endif
+                        </button>
+                        <button
+                            x-on:click="
+                                $wire.copyLogs().then(logs => {
+                                    navigator.clipboard.writeText(logs);
+                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                });
+                            "
+                            title="Copy Logs"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                            </svg>
+                        </button>
+                        <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative">
+                            <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
+                                class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                            </button>
+                            <div x-show="downloadMenuOpen" x-on:click.away="downloadMenuOpen = false"
+                                x-transition:enter="transition ease-out duration-100"
+                                x-transition:enter-start="transform opacity-0 scale-95"
+                                x-transition:enter-end="transform opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-75"
+                                x-transition:leave-start="transform opacity-100 scale-100"
+                                x-transition:leave-end="transform opacity-0 scale-95"
+                                class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
+                                <div class="py-1">
+                                    <button x-on:click="downloadLogs(); downloadMenuOpen = false"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                        Download displayed logs
+                                    </button>
+                                    <button x-on:click="
+                                        downloadingAllLogs = true;
+                                        $wire.downloadAllLogs().then(logs => {
+                                            if (!logs) return;
+                                            const blob = new Blob([logs], { type: 'text/plain' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+                                            a.download = containerName + '-all-logs-' + timestamp + '.txt';
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            Livewire.dispatch('success', ['All logs downloaded.']);
+                                        }).finally(() => {
+                                            downloadingAllLogs = false;
+                                            downloadMenuOpen = false;
+                                        });
+                                    "
+                                        :disabled="downloadingAllLogs"
+                                        :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
+                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                        <span x-show="!downloadingAllLogs">Download all logs</span>
+                                        <span x-show="downloadingAllLogs" class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Downloading...
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <button wire:click="toggleTimestamps" title="Toggle Timestamps"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $showTimeStamps ? '!text-warning' : '' }}">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                        </button>
+                        <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
+                            :class="colorLogs ? '!text-warning' : ''"
+                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+                            </svg>
                         </button>
                         <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
                             x-on:click="toggleScroll"
@@ -301,28 +415,27 @@
                                     stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                             </svg>
                         </button>
+                        </div>
                     </div>
                 </div>
                 <div id="logsContainer" @scroll="handleScroll"
                     class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
+                        @php
+                            $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
+                        @endphp
                         <div id="logs" class="font-mono max-w-full cursor-default">
-                            <div x-show="searchQuery.trim() && getMatchCount() === 0"
+                            <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="text-gray-500 dark:text-gray-400 py-2">
                                 No matches found.
                             </div>
-                            @foreach (explode("\n", $outputs) as $line)
+                            @foreach ($displayLines as $index => $line)
                                 @php
-                                    // Skip empty lines
-                                    if (trim($line) === '') {
-                                        continue;
-                                    }
-
                                     // Parse timestamp from log line (ISO 8601 format: 2025-12-04T11:48:39.136764033Z)
                                     $timestamp = '';
                                     $logContent = $line;
-                                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s*(.*)$/', $line, $matches)) {
+                                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?\s(.*)$/', $line, $matches)) {
                                         $year = $matches[1];
                                         $month = $matches[2];
                                         $day = $matches[3];
@@ -334,32 +447,23 @@
                                         $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                                         $monthName = $monthNames[(int)$month - 1] ?? $month;
 
-                                        // Format: 2025-Dec-04 09:44:58.198879
-                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}.{$microseconds}";
+                                        // Format for display: 2025-Dec-04 09:44:58
+                                        $timestamp = "{$year}-{$monthName}-{$day} {$time}";
+                                        // Include microseconds in key for uniqueness
+                                        $lineKey = "{$timestamp}.{$microseconds}";
                                     }
-
                                 @endphp
-                                <div data-log-line data-log-content="{{ $line }}"
-                                    x-bind:class="{
-                                        'hidden': !matchesSearch($el.dataset.logContent),
-                                        'bg-red-500/10 dark:bg-red-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'error',
-                                        'bg-yellow-500/10 dark:bg-yellow-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'warning',
-                                        'bg-purple-500/10 dark:bg-purple-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'debug',
-                                        'bg-blue-500/10 dark:bg-blue-500/15': colorLogs && getLogLevel($el.dataset.logContent) === 'info',
-                                    }"
-                                    class="flex gap-2">
+                                <div wire:key="{{ $lineKey ?? 'line-' . $index }}" data-log-line data-log-content="{{ $line }}" class="flex gap-2 log-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="shrink-0 text-gray-500">{{ $timestamp }}</span>
                                     @endif
-                                    <span data-line-text="{{ $logContent }}"
-                                        x-effect="renderTrigger; searchQuery; renderHighlightedLog($el, $el.dataset.lineText)"
-                                        class="whitespace-pre-wrap break-all"></span>
+                                    <span data-line-text="{{ $logContent }}" class="whitespace-pre-wrap break-all">{{ $logContent }}</span>
                                 </div>
                             @endforeach
                         </div>
                     @else
                         <pre id="logs"
-                            class="font-mono whitespace-pre-wrap break-all max-w-full">Refresh to get the logs...</pre>
+                            class="font-mono whitespace-pre-wrap break-all max-w-full text-neutral-400">No logs yet.</pre>
                     @endif
                 </div>
             </div>

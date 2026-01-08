@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
-use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -270,10 +269,9 @@ class StartKeydb
             return;
         }
         $filename = 'keydb.conf';
-        Storage::disk('local')->put("tmp/keydb.conf_{$this->database->uuid}", $this->database->keydb_conf);
-        $path = Storage::path("tmp/keydb.conf_{$this->database->uuid}");
-        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
-        Storage::disk('local')->delete("tmp/keydb.conf_{$this->database->uuid}");
+        $content = $this->database->keydb_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 
     private function buildStartCommand(): string

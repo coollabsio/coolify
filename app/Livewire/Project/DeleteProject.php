@@ -35,7 +35,7 @@ class DeleteProject extends Component
         if ($project->isEmpty()) {
             $project->delete();
 
-            return redirect()->route('project.index');
+            return redirectRoute($this, 'project.index');
         }
 
         return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");

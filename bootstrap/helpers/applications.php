@@ -28,6 +28,20 @@ function queue_application_deployment(Application $application, string $deployme
         $destination_id = $destination->id;
     }
 
+    // Check if the deployment queue is full for this server
+    $serverForQueueCheck = $server ?? Server::find($server_id);
+    $queue_limit = $serverForQueueCheck->settings->deployment_queue_limit ?? 25;
+    $queued_count = ApplicationDeploymentQueue::where('server_id', $server_id)
+        ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+        ->count();
+
+    if ($queued_count >= $queue_limit) {
+        return [
+            'status' => 'queue_full',
+            'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
+        ];
+    }
+
     // Check if there's already a deployment in progress or queued for this application and commit
     $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
         ->where('commit', $commit)

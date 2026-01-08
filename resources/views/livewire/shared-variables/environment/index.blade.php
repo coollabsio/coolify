@@ -15,7 +15,7 @@
                     href="{{ route('shared-variables.environment.show', [
                         'project_uuid' => $project->uuid,
                         'environment_uuid' => $environment->uuid,
-                    ]) }}">
+                    ]) }}" {{ wireNavigate() }}>
                     <div class="flex flex-col justify-center flex-1 mx-6 ">
                         <div class="box-title"> {{ $environment->name }}</div>
                         <div class="box-description">

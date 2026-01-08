@@ -40,8 +40,6 @@ class Show extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'privateKeyValue.required' => 'The Private Key field is required.',
                 'privateKeyValue.string' => 'The Private Key must be a valid string.',
             ]
@@ -107,7 +105,7 @@ class Show extends Component
             $this->private_key->safeDelete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
-            return redirect()->route('security.private-key.index');
+            return redirectRoute($this, 'security.private-key.index');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
