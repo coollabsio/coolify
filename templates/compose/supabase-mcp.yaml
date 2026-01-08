@@ -1,7 +1,7 @@
 # documentation: https://supabase.io
-# slogan: The open source Firebase alternative.
+# slogan: Supabase with Model Context Protocol for AI assistants.
 # category: backend
-# tags: firebase, alternative, open-source
+# tags: firebase, alternative, open-source, mcp, ai, claude, cursor, windsurf
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
 # port: 8000
@@ -1428,3 +1428,21 @@ services:
           else
             {:ok, _} = Supavisor.Tenants.create_tenant(params)
           end
+
+  # Supabase MCP (Model Context Protocol) Server
+  # Enables AI assistants to interact with your database
+  # Configure domain in Coolify UI to expose the service
+  supabase-mcp:
+    image: 'supabase/postgres-mcp:latest'
+    environment:
+      - SERVICE_URL_SUPABASEMCP_3000
+      - DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/3000' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
