@@ -25,6 +25,8 @@ class ValidateAndInstall extends Component
 
     public $supported_os_type = null;
 
+    public $prerequisites_installed = null;
+
     public $docker_installed = null;
 
     public $docker_compose_installed = null;
@@ -33,12 +35,15 @@ class ValidateAndInstall extends Component
 
     public $error = null;
 
+    public string $installationStep = 'Prerequisites';
+
     public bool $ask = false;
 
     protected $listeners = [
         'init',
         'validateConnection',
         'validateOS',
+        'validatePrerequisites',
         'validateDockerEngine',
         'validateDockerVersion',
         'refresh' => '$refresh',
@@ -48,6 +53,7 @@ class ValidateAndInstall extends Component
     {
         $this->uptime = null;
         $this->supported_os_type = null;
+        $this->prerequisites_installed = null;
         $this->docker_installed = null;
         $this->docker_version = null;
         $this->docker_compose_installed = null;
@@ -69,6 +75,7 @@ class ValidateAndInstall extends Component
         $this->authorize('update', $this->server);
         $this->uptime = null;
         $this->supported_os_type = null;
+        $this->prerequisites_installed = null;
         $this->docker_installed = null;
         $this->docker_compose_installed = null;
         $this->docker_version = null;
@@ -103,6 +110,43 @@ class ValidateAndInstall extends Component
 
             return;
         }
+        $this->dispatch('validatePrerequisites');
+    }
+
+    public function validatePrerequisites()
+    {
+        $validationResult = $this->server->validatePrerequisites();
+        $this->prerequisites_installed = $validationResult['success'];
+        if (! $validationResult['success']) {
+            if ($this->install) {
+                if ($this->number_of_tries == $this->max_tries) {
+                    $missingCommands = implode(', ', $validationResult['missing']);
+                    $this->error = "Prerequisites ({$missingCommands}) could not be installed. Please install them manually before continuing.";
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                } else {
+                    if ($this->number_of_tries <= $this->max_tries) {
+                        $this->installationStep = 'Prerequisites';
+                        $activity = $this->server->installPrerequisites();
+                        $this->number_of_tries++;
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
+                    }
+
+                    return;
+                }
+            } else {
+                $missingCommands = implode(', ', $validationResult['missing']);
+                $this->error = "Prerequisites ({$missingCommands}) are not installed. Please install them before continuing.";
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
+
+                return;
+            }
+        }
         $this->dispatch('validateDockerEngine');
     }
 
@@ -121,9 +165,10 @@ class ValidateAndInstall extends Component
                     return;
                 } else {
                     if ($this->number_of_tries <= $this->max_tries) {
+                        $this->installationStep = 'Docker';
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
 
                     return;
@@ -161,6 +206,9 @@ class ValidateAndInstall extends Component
                 if (! $proxyShouldRun) {
                     return;
                 }
+                // Ensure networks exist BEFORE dispatching async proxy startup
+                // This prevents race condition where proxy tries to start before networks are created
+                instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                 StartProxy::dispatch($this->server);
             } else {
                 $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');

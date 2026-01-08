@@ -21,7 +21,7 @@ class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            $response = Http::retry(3, 1000)->get('https://cdn.coollabs.io/coolify/versions.json');
+            $response = Http::retry(3, 1000)->get(config('constants.coolify.versions_url'));
             if ($response->successful()) {
                 $versions = $response->json();
                 $settings = instanceSettings();

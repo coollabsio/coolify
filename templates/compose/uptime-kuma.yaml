@@ -7,7 +7,7 @@
 
 services:
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    image: louislam/uptime-kuma:2
     environment:
       - SERVICE_URL_UPTIMEKUMA_3001
     volumes:

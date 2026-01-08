@@ -265,6 +265,14 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -531,6 +539,14 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -797,6 +813,14 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1010,6 +1034,14 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1214,6 +1246,14 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1298,6 +1338,10 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -1340,7 +1384,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get application by UUID.'
@@ -1371,7 +1414,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -1436,7 +1478,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Application updated.'
         required: true
@@ -1641,6 +1682,10 @@ paths:
                 force_domain_override:
                   type: boolean
                   description: 'Force domain usage even if conflicts are detected. Default is false.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '200':
@@ -1685,7 +1730,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: lines
           in: query
@@ -1728,7 +1772,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by application UUID.'
@@ -1761,7 +1804,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -1820,7 +1862,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -1883,7 +1924,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -1903,9 +1943,9 @@ paths:
           content:
             application/json:
               schema:
-                properties:
-                  message: { type: string, example: 'Environment variables updated.' }
-                type: object
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1930,7 +1970,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -1938,7 +1977,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -1972,7 +2010,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: force
           in: query
@@ -2021,7 +2058,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop application.'
@@ -2055,7 +2091,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart application.'
@@ -2070,6 +2105,223 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /cloud-tokens:
+    get:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'List Cloud Provider Tokens'
+      description: 'List all cloud provider tokens for the authenticated team.'
+      operationId: list-cloud-tokens
+      responses:
+        '200':
+          description: 'Get all cloud provider tokens.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { uuid: { type: string }, name: { type: string }, provider: { type: string, enum: [hetzner, digitalocean] }, team_id: { type: integer }, servers_count: { type: integer }, created_at: { type: string }, updated_at: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'Create Cloud Provider Token'
+      description: 'Create a new cloud provider token. The token will be validated before being stored.'
+      operationId: create-cloud-token
+      requestBody:
+        description: 'Cloud provider token details'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - provider
+                - token
+                - name
+              properties:
+                provider:
+                  type: string
+                  enum: [hetzner, digitalocean]
+                  example: hetzner
+                  description: 'The cloud provider.'
+                token:
+                  type: string
+                  example: your-api-token-here
+                  description: 'The API token for the cloud provider.'
+                name:
+                  type: string
+                  example: 'My Hetzner Token'
+                  description: 'A friendly name for the token.'
+              type: object
+      responses:
+        '201':
+          description: 'Cloud provider token created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os, description: 'The UUID of the token.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cloud-tokens/{uuid}':
+    get:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'Get Cloud Provider Token'
+      description: 'Get cloud provider token by UUID.'
+      operationId: get-cloud-token-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Token UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Get cloud provider token by UUID'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                  name: { type: string }
+                  provider: { type: string }
+                  team_id: { type: integer }
+                  servers_count: { type: integer }
+                  created_at: { type: string }
+                  updated_at: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'Delete Cloud Provider Token'
+      description: 'Delete cloud provider token by UUID. Cannot delete if token is used by any servers.'
+      operationId: delete-cloud-token-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cloud provider token.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Cloud provider token deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Cloud provider token deleted.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'Update Cloud Provider Token'
+      description: 'Update cloud provider token name.'
+      operationId: update-cloud-token-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Token UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: 'Cloud provider token updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                  description: 'The friendly name for the token.'
+              type: object
+      responses:
+        '200':
+          description: 'Cloud provider token updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cloud-tokens/{uuid}/validate':
+    post:
+      tags:
+        - 'Cloud Tokens'
+      summary: 'Validate Cloud Provider Token'
+      description: 'Validate a cloud provider token against the provider API.'
+      operationId: validate-cloud-token-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Token UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Token validation result.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  valid: { type: boolean, example: true }
+                  message: { type: string, example: 'Token is valid.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -2112,7 +2364,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all backups for a database'
@@ -2144,7 +2395,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Backup configuration data'
         required: true
@@ -2233,7 +2483,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Get all databases'
@@ -2265,7 +2514,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_configurations
           in: query
@@ -2330,7 +2578,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database data'
         required: true
@@ -2492,7 +2739,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -2535,7 +2781,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: scheduled_backup_uuid
           in: path
@@ -2543,7 +2788,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Database backup configuration data'
         required: true
@@ -3390,7 +3634,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: execution_uuid
           in: path
@@ -3398,7 +3641,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: delete_s3
           in: query
@@ -3449,7 +3691,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'List of backup executions'
@@ -3479,7 +3720,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start database.'
@@ -3513,7 +3753,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop database.'
@@ -3547,7 +3786,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Restart database.'
@@ -3732,7 +3970,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: skip
           in: query
@@ -4084,6 +4321,258 @@ paths:
       security:
         -
           bearerAuth: []
+  /hetzner/locations:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner Locations'
+      description: 'Get all available Hetzner datacenter locations.'
+      operationId: get-hetzner-locations
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner locations.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string }, description: { type: string }, country: { type: string }, city: { type: string }, latitude: { type: number }, longitude: { type: number } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /hetzner/server-types:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner Server Types'
+      description: 'Get all available Hetzner server types (instance sizes).'
+      operationId: get-hetzner-server-types
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner server types.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string }, description: { type: string }, cores: { type: integer }, memory: { type: number }, disk: { type: integer }, prices: { type: array, items: { type: object, properties: { location: { type: string, description: 'Datacenter location name' }, price_hourly: { type: object, properties: { net: { type: string }, gross: { type: string } } }, price_monthly: { type: object, properties: { net: { type: string }, gross: { type: string } } } } } } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /hetzner/images:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner Images'
+      description: 'Get all available Hetzner system images (operating systems).'
+      operationId: get-hetzner-images
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner images.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string }, description: { type: string }, type: { type: string }, os_flavor: { type: string }, os_version: { type: string }, architecture: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /hetzner/ssh-keys:
+    get:
+      tags:
+        - Hetzner
+      summary: 'Get Hetzner SSH Keys'
+      description: 'Get all SSH keys stored in the Hetzner account.'
+      operationId: get-hetzner-ssh-keys
+      parameters:
+        -
+          name: cloud_provider_token_uuid
+          in: query
+          description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+          required: false
+          schema:
+            type: string
+        -
+          name: cloud_provider_token_id
+          in: query
+          description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'List of Hetzner SSH keys.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { id: { type: integer }, name: { type: string }, fingerprint: { type: string }, public_key: { type: string } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /servers/hetzner:
+    post:
+      tags:
+        - Hetzner
+      summary: 'Create Hetzner Server'
+      description: 'Create a new server on Hetzner and register it in Coolify.'
+      operationId: create-hetzner-server
+      requestBody:
+        description: 'Hetzner server creation parameters'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - location
+                - server_type
+                - image
+                - private_key_uuid
+              properties:
+                cloud_provider_token_uuid:
+                  type: string
+                  example: abc123
+                  description: 'Cloud provider token UUID. Required if cloud_provider_token_id is not provided.'
+                cloud_provider_token_id:
+                  type: string
+                  example: abc123
+                  description: 'Deprecated: Use cloud_provider_token_uuid instead. Cloud provider token UUID.'
+                  deprecated: true
+                location:
+                  type: string
+                  example: nbg1
+                  description: 'Hetzner location name'
+                server_type:
+                  type: string
+                  example: cx11
+                  description: 'Hetzner server type name'
+                image:
+                  type: integer
+                  example: 15512617
+                  description: 'Hetzner image ID'
+                name:
+                  type: string
+                  example: my-server
+                  description: 'Server name (auto-generated if not provided)'
+                private_key_uuid:
+                  type: string
+                  example: xyz789
+                  description: 'Private key UUID'
+                enable_ipv4:
+                  type: boolean
+                  example: true
+                  description: 'Enable IPv4 (default: true)'
+                enable_ipv6:
+                  type: boolean
+                  example: true
+                  description: 'Enable IPv6 (default: true)'
+                hetzner_ssh_key_ids:
+                  type: array
+                  items: { type: integer }
+                  description: 'Additional Hetzner SSH key IDs'
+                cloud_init_script:
+                  type: string
+                  description: 'Cloud-init YAML script (optional)'
+                instant_validate:
+                  type: boolean
+                  example: false
+                  description: 'Validate server immediately after creation'
+              type: object
+      responses:
+        '201':
+          description: 'Hetzner server created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, example: og888os, description: 'The UUID of the server.' }
+                  hetzner_server_id: { type: integer, description: 'The Hetzner server ID.' }
+                  ip: { type: string, description: 'The server IP address.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          $ref: '#/components/responses/429'
+      security:
+        -
+          bearerAuth: []
   /version:
     get:
       summary: Version
@@ -4287,7 +4776,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Project deleted.'
@@ -4322,7 +4810,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Project updated.'
         required: true
@@ -4858,7 +5345,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Server deleted.'
@@ -5249,7 +5735,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Service updated.'
         required: true
@@ -5325,7 +5810,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'All environment variables by service UUID.'
@@ -5358,7 +5842,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env created.'
         required: true
@@ -5419,7 +5902,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Env updated.'
         required: true
@@ -5484,7 +5966,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         description: 'Bulk envs updated.'
         required: true
@@ -5533,7 +6014,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: env_uuid
           in: path
@@ -5541,7 +6021,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Environment variable deleted.'
@@ -5575,7 +6054,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Start service.'
@@ -5609,7 +6087,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: 'Stop service.'
@@ -5643,7 +6120,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
         -
           name: latest
           in: query
@@ -6244,11 +6720,6 @@ components:
           type: string
         description:
           type: string
-        environments:
-          description: 'The environments of the project.'
-          type: array
-          items:
-            $ref: '#/components/schemas/Environment'
       type: object
     Server:
       description: 'Server model'
@@ -6311,6 +6782,8 @@ components:
         id:
           type: integer
         concurrent_builds:
+          type: integer
+        deployment_queue_limit:
           type: integer
         dynamic_timeout:
           type: integer
@@ -6556,6 +7029,22 @@ components:
                   type: array
                   items: { type: string }
             type: object
+    '429':
+      description: 'Rate limit exceeded.'
+      headers:
+        Retry-After:
+          description: 'Number of seconds to wait before retrying.'
+          schema:
+            type: integer
+            example: 60
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: 'Rate limit exceeded. Please try again later.'
+            type: object
   securitySchemes:
     bearerAuth:
       type: http
@@ -6566,6 +7055,9 @@ tags:
     name: Applications
     description: Applications
   -
+    name: 'Cloud Tokens'
+    description: 'Cloud Tokens'
+  -
     name: Databases
     description: Databases
   -
@@ -6574,6 +7066,9 @@ tags:
   -
     name: 'GitHub Apps'
     description: 'GitHub Apps'
+  -
+    name: Hetzner
+    description: Hetzner
   -
     name: Projects
     description: Projects

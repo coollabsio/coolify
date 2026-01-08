@@ -97,12 +97,14 @@
             }" @click.outside="open = false" class="relative">
 
             {{-- Unified Input Container with Tags Inside --}}
-            <div @click="$refs.searchInput.focus()"
-                class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5  px-2 w-full text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text px-1 focus-within:border-l-4 focus-within:border-l-coollabs dark:focus-within:border-l-warning text-black dark:text-white"
+            <div @click="$refs.searchInput.focus()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
+                class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5  px-2 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text px-1 text-black dark:text-white"
+                :style="focused ? 'box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;' : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;'"
+                x-init="$watch('focused', () => { if ($root.classList.contains('dark') || document.documentElement.classList.contains('dark')) { $el.style.boxShadow = focused ? 'inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424' : 'inset 4px 0 0 transparent, inset 0 0 0 2px #242424'; } })"
                 :class="{
                         'opacity-50': {{ $disabled ? 'true' : 'false' }}
                     }" wire:loading.class="opacity-50"
-                wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4">
+                wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]">
 
                 {{-- Selected Tags Inside Input --}}
                 <template x-for="value in selected" :key="value">
@@ -221,11 +223,13 @@
                 <input type="hidden" :value="selected" @required($required) />
 
                 {{-- Input Container --}}
-                <div @click="openDropdown()"
-                    class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text focus-within:border-l-4 focus-within:border-l-coollabs dark:focus-within:border-l-warning text-black dark:text-white"
+                <div @click="openDropdown()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
+                    class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text text-black dark:text-white"
+                    :style="focused ? 'box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;' : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;'"
+                    x-init="$watch('focused', () => { if ($root.classList.contains('dark') || document.documentElement.classList.contains('dark')) { $el.style.boxShadow = focused ? 'inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424' : 'inset 4px 0 0 transparent, inset 0 0 0 2px #242424'; } })"
                     :class="{
                     'opacity-50': {{ $disabled ? 'true' : 'false' }}
-                }" wire:loading.class="opacity-50" wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4">
+                }" wire:loading.class="opacity-50" wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]">
 
                     {{-- Display Selected Value or Search Input --}}
                     <div class="flex-1 flex items-center min-w-0 px-1">

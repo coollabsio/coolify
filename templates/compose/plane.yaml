@@ -4,72 +4,77 @@
 # tags: plane,project-management,tool,open,source,api,nextjs,redis,postgresql,django,pm
 # logo: svgs/plane.svg
 
-x-app-env: &app-env
-  environment:
-    - APP_RELEASE=${APP_RELEASE:-v0.25.2}
-    - WEB_URL=${SERVICE_URL_PLANE}
-    - DEBUG=${DEBUG:-0}
-    - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
-    # Gunicorn Workers
-    - GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
-    #DB SETTINGS
-    - PGHOST=plane-db
-    - PGDATABASE=plane
-    - POSTGRES_USER=$SERVICE_USER_POSTGRES
-    - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-    - POSTGRES_DB=plane
-    - POSTGRES_PORT=5432
-    - PGDATA=/var/lib/postgresql/data
-    - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@plane-db/plane
-    # REDIS SETTINGS
-    - REDIS_HOST=plane-redis
-    - REDIS_PORT=6379
-    - REDIS_URL=${REDIS_URL:-redis://plane-redis:6379/}
+x-db-env: &db-env
+  PGHOST: plane-db
+  PGDATABASE: plane
+  POSTGRES_USER: $SERVICE_USER_POSTGRES
+  POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
+  POSTGRES_DB: plane
+  POSTGRES_PORT: 5432
+  PGDATA: /var/lib/postgresql/data
 
-    # RabbitMQ Settings
-    - RABBITMQ_HOST=plane-mq
-    - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
-    - RABBITMQ_DEFAULT_USER=${SERVICE_USER_RABBITMQ:-plane}
-    - RABBITMQ_DEFAULT_PASS=${SERVICE_PASSWORD_RABBITMQ:-plane}
-    - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-plane}
-    - RABBITMQ_VHOST=${RABBITMQ_VHOST:-plane}
-    - 'AMQP_URL=amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@plane-mq:${RABBITMQ_PORT}/plane'
-    # Application secret
-    - SECRET_KEY=$SERVICE_PASSWORD_64_SECRETKEY
-    # DATA STORE SETTINGS
-    - USE_MINIO=${USE_MINIO:-1}
-    - AWS_REGION=${AWS_REGION}
-    - AWS_ACCESS_KEY_ID=$SERVICE_USER_MINIO
-    - AWS_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_MINIO
-    - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
-    - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-uploads}
-    - MINIO_ROOT_USER=$SERVICE_USER_MINIO
-    - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
-    - BUCKET_NAME=${BUCKET_NAME:-uploads}
-    - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
-    # Live server env
-    - API_BASE_URL=${API_BASE_URL:-http://api:8000}
+x-redis-env: &redis-env
+  REDIS_HOST: ${REDIS_HOST:-plane-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_URL: ${REDIS_URL:-redis://plane-redis:6379/}
+
+x-minio-env: &minio-env
+  MINIO_ROOT_USER: $SERVICE_USER_MINIO
+  MINIO_ROOT_PASSWORD: $SERVICE_PASSWORD_MINIO
+
+x-aws-s3-env: &aws-s3-env
+  AWS_REGION: ${AWS_REGION:-}
+  AWS_ACCESS_KEY_ID: $SERVICE_USER_MINIO
+  AWS_SECRET_ACCESS_KEY: $SERVICE_PASSWORD_MINIO
+  AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-http://plane-minio:9000}
+  AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+
+x-mq-env: &mq-env # RabbitMQ Settings
+  RABBITMQ_HOST: plane-mq
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_DEFAULT_USER: ${SERVICE_USER_RABBITMQ:-plane}
+  RABBITMQ_DEFAULT_PASS: ${SERVICE_PASSWORD_RABBITMQ:-plane}
+  RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-plane}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:-plane}
+
+x-live-env: &live-env
+  API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+
+x-app-env: &app-env
+  APP_RELEASE: ${APP_RELEASE:-v1.0.0}
+  WEB_URL: ${SERVICE_URL_PLANE}
+  DEBUG: ${DEBUG:-0}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+  GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
+  USE_MINIO: ${USE_MINIO:-1}
+  DATABASE_URL: postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@plane-db/plane
+  SECRET_KEY: $SERVICE_PASSWORD_64_SECRETKEY
+  AMQP_URL: amqp://${SERVICE_USER_RABBITMQ}:${SERVICE_PASSWORD_RABBITMQ}@plane-mq:${RABBITMQ_PORT:-5672}/plane
+  API_KEY_RATE_LIMIT: ${API_KEY_RATE_LIMIT:-60/minute}
+  MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
 
 services:
   proxy:
+    image: artifacts.plane.so/makeplane/plane-proxy:${APP_RELEASE:-v1.0.0}
     environment:
       - SERVICE_URL_PLANE
+      - APP_DOMAIN=${SERVICE_URL_PLANE}
+      - SITE_ADDRESS=:80
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
-      - BUCKET_NAME=${BUCKET_NAME:-uploads}
-    image: makeplane/plane-proxy:${APP_RELEASE:-v0.25.1}
+      - BUCKET_NAME=${AWS_S3_BUCKET_NAME:-uploads}
     depends_on:
       - web
       - api
       - space
+      - admin
+      - live
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 2s
       timeout: 10s
       retries: 15
-
   web:
-    image: makeplane/plane-frontend:${APP_RELEASE:-v0.25.1}
-    command: node web/server.js web
+    image: artifacts.plane.so/makeplane/plane-frontend:${APP_RELEASE:-v1.0.0}
     depends_on:
       - api
       - worker
@@ -78,9 +83,9 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   space:
-    image: makeplane/plane-space:${APP_RELEASE:-v0.25.1}
-    command: node space/server.js space
+    image: artifacts.plane.so/makeplane/plane-space:${APP_RELEASE:-v1.0.0}
     depends_on:
       - api
       - worker
@@ -92,8 +97,7 @@ services:
       retries: 15
 
   admin:
-    image: makeplane/plane-admin:${APP_RELEASE:-v0.25.1}
-    command: node admin/server.js admin
+    image: artifacts.plane.so/makeplane/plane-admin:${APP_RELEASE:-v1.0.0}
     depends_on:
       - api
       - web
@@ -104,12 +108,13 @@ services:
       retries: 15
 
   live:
-    <<: *app-env
-    image: makeplane/plane-live:${APP_RELEASE:-v0.25.1}
-    command: node live/dist/server.js live
+    image: artifacts.plane.so/makeplane/plane-live:${APP_RELEASE:-v1.0.0}
+    environment:
+      <<: [*live-env, *redis-env]
     depends_on:
       - api
       - web
+      - plane-redis
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
@@ -117,14 +122,16 @@ services:
       retries: 15
 
   api:
-    <<: *app-env
-    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
+    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
     command: ./bin/docker-entrypoint-api.sh
     volumes:
       - logs_api:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
     depends_on:
       - plane-db
       - plane-redis
+      - plane-mq
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
@@ -132,15 +139,17 @@ services:
       retries: 15
 
   worker:
-    <<: *app-env
-    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
+    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
     command: ./bin/docker-entrypoint-worker.sh
     volumes:
       - logs_worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
     depends_on:
       - api
       - plane-db
       - plane-redis
+      - plane-mq
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
@@ -148,15 +157,17 @@ services:
       retries: 15
 
   beat-worker:
-    <<: *app-env
-    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
+    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
     command: ./bin/docker-entrypoint-beat.sh
     volumes:
       - logs_beat-worker:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
     depends_on:
       - api
       - plane-db
       - plane-redis
+      - plane-mq
     healthcheck:
       test: ["CMD", "echo", "hey whats up"]
       interval: 2s
@@ -164,20 +175,23 @@ services:
       retries: 15
 
   migrator:
-    <<: *app-env
-    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
+    image: artifacts.plane.so/makeplane/plane-backend:${APP_RELEASE:-v1.0.0}
     restart: "no"
     command: ./bin/docker-entrypoint-migrator.sh
     volumes:
       - logs_migrator:/code/plane/logs
+    environment:
+      <<: [*app-env, *db-env, *redis-env, *minio-env, *aws-s3-env, *mq-env]
     depends_on:
       - plane-db
       - plane-redis
 
+  # Comment this if you already have a database running
   plane-db:
-    <<: *app-env
     image: postgres:15.7-alpine
     command: postgres -c 'max_connections=1000'
+    environment:
+      <<: *db-env
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -187,7 +201,6 @@ services:
       retries: 10
 
   plane-redis:
-    <<: *app-env
     image: valkey/valkey:7.2.5-alpine
     volumes:
       - redisdata:/data
@@ -198,9 +211,10 @@ services:
       retries: 10
 
   plane-mq:
-    <<: *app-env
     image: rabbitmq:3.13.6-management-alpine
     restart: always
+    environment:
+      <<: *mq-env
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -209,10 +223,12 @@ services:
       timeout: 30s
       retries: 3
 
+  # Comment this if you using any external s3 compatible storage
   plane-minio:
-    <<: *app-env
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     command: server /export --console-address ":9090"
+    environment:
+      <<: *minio-env
     volumes:
       - uploads:/export
     healthcheck:

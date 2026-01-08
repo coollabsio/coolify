@@ -196,7 +196,7 @@ class Change extends Component
             $github_app_uuid = request()->github_app_uuid;
             $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
             $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
-            $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get();
+            $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
             $this->applications = $this->github_app->applications;
             $settings = instanceSettings();

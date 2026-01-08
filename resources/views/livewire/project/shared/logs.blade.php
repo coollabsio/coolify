@@ -17,13 +17,17 @@
                 <div x-init="$wire.loadAllContainers()" wire:loading.remove wire:target="loadAllContainers">
                     @forelse ($servers as $server)
                         <div class="py-2">
-                            <h2>Server: {{ $server->name }}</h2>
+                            <h4>Server: {{ $server->name }}</h4>
                             @if ($server->isFunctional())
                                 @if (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
+                                    @php
+                                        $totalContainers = collect($serverContainers)->flatten(1)->count();
+                                    @endphp
                                     @foreach ($serverContainers[$server->id] as $container)
                                         <livewire:project.shared.get-logs
                                             wire:key="{{ data_get($container, 'ID', uniqid()) }}" :server="$server"
-                                            :resource="$resource" :container="data_get($container, 'Names')" />
+                                            :resource="$resource" :container="data_get($container, 'Names')"
+                                            :expandByDefault="$totalContainers === 1" />
                                     @endforeach
                                 @else
                                     <div class="pt-2">No containers are running on server: {{ $server->name }}</div>
@@ -53,7 +57,8 @@
                     @forelse ($containers as $container)
                         @if (data_get($servers, '0'))
                             <livewire:project.shared.get-logs wire:key='{{ $container }}' :server="data_get($servers, '0')"
-                                :resource="$resource" :container="$container" />
+                                :resource="$resource" :container="$container"
+                                :expandByDefault="count($containers) === 1" />
                         @else
                             <div>No functional server found for the database.</div>
                         @endif
@@ -77,7 +82,8 @@
                     @forelse ($containers as $container)
                         @if (data_get($servers, '0'))
                             <livewire:project.shared.get-logs wire:key='{{ $container }}' :server="data_get($servers, '0')"
-                                :resource="$resource" :container="$container" />
+                                :resource="$resource" :container="$container"
+                                :expandByDefault="count($containers) === 1" />
                         @else
                             <div>No functional server found for the service.</div>
                         @endif

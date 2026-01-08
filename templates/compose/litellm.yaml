@@ -32,6 +32,7 @@ services:
       - ANTHROPIC_API_BASE=${ANTHROPIC_API_BASE}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}
       - VOYAGE_API_BASE=${VOYAGE_API_BASE}
+      - STORE_MODEL_IN_DB=${STORE_MODEL_IN_DB}
     volumes:
       - type: bind
         source: ./litellm-config.yaml

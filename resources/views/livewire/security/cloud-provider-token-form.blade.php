@@ -14,13 +14,14 @@
             <x-forms.input required id="name" label="Token Name"
                 placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" />
 
-            <x-forms.input required type="password" id="token" label="API Token" placeholder="Enter your API token" />
+            <x-forms.input required type="password" id="token" label="API Token"
+                placeholder="Enter your API token" />
 
             @if (auth()->user()->currentTeam()->cloudProviderTokens->where('provider', $provider)->isEmpty())
                 <div class="text-sm text-neutral-500 dark:text-neutral-400">
                     Create an API token in the <a
-                        href='{{ $provider === 'hetzner' ? 'https://console.hetzner.com/projects' : '#' }}' target='_blank'
-                        class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a> → choose
+                        href='{{ $provider === 'hetzner' ? 'https://console.hetzner.com/projects' : '#' }}'
+                        target='_blank' class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a> → choose
                     Project → Security → API Tokens.
                     @if ($provider === 'hetzner')
                         <br><br>
@@ -28,7 +29,7 @@
                             class='underline dark:text-white'>Sign up here</a>
                         <br>
                         <span class="text-xs">(Coolify's affiliate link, only new accounts - supports us (€10)
-                        and gives you €20)</span>
+                            and gives you €20)</span>
                     @endif
                 </div>
             @endif
@@ -49,7 +50,8 @@
                 </div>
             </div>
             <div class="flex-1 min-w-64">
-                <x-forms.input required type="password" id="token" label="API Token" placeholder="Enter your API token" />
+                <x-forms.input required type="password" id="token" label="API Token"
+                    placeholder="Enter your API token" />
                 @if (auth()->user()->currentTeam()->cloudProviderTokens->where('provider', $provider)->isEmpty())
                     <div class="text-sm text-neutral-500 dark:text-neutral-400 mt-2">
                         Create an API token in the <a href='https://console.hetzner.com/projects' target='_blank'
@@ -60,7 +62,7 @@
                             class='underline dark:text-white'>Sign up here</a>
                         <br>
                         <span class="text-xs">(Coolify's affiliate link, only new accounts - supports us (€10)
-                        and gives you €20)</span>
+                            and gives you €20)</span>
                     </div>
                 @endif
             </div>

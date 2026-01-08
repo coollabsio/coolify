@@ -40,6 +40,9 @@ class Show extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $container = null;
 
+    #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
+    public $timeout = 300;
+
     #[Locked]
     public ?string $application_uuid;
 
@@ -69,7 +72,7 @@ class Show extends Component
             } elseif ($service_uuid) {
                 $this->type = 'service';
                 $this->service_uuid = $service_uuid;
-                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $service_uuid)->firstOrFail();
+                $this->resource = Service::ownedByCurrentTeamCached()->where('uuid', $service_uuid)->firstOrFail();
             }
             $this->parameters = [
                 'environment_uuid' => $environment_uuid,
@@ -99,6 +102,7 @@ class Show extends Component
             $this->task->command = str($this->command)->trim()->value();
             $this->task->frequency = str($this->frequency)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
+            $this->task->timeout = (int) $this->timeout;
             $this->task->save();
         } else {
             $this->isEnabled = $this->task->enabled;
@@ -106,6 +110,7 @@ class Show extends Component
             $this->command = $this->task->command;
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
+            $this->timeout = $this->task->timeout ?? 300;
         }
     }
 

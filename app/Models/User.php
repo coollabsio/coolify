@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
 use App\Traits\DeletesUserSessions;
@@ -295,9 +296,10 @@ class User extends Authenticatable implements SendsEmail
 
     public function isInstanceAdmin()
     {
-        $found_root_team = Auth::user()->teams->filter(function ($team) {
+        $found_root_team = $this->teams->filter(function ($team) {
             if ($team->id == 0) {
-                if (! Auth::user()->isAdmin()) {
+                $role = $team->pivot->role;
+                if ($role !== 'admin' && $role !== 'owner') {
                     return false;
                 }
 
@@ -310,32 +312,51 @@ class User extends Authenticatable implements SendsEmail
         return $found_root_team->count() > 0;
     }
 
-    public function currentTeam()
+    public function currentTeam(): ?Team
     {
-        return Cache::remember('team:'.Auth::id(), 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
-                return Auth::user()->teams[0];
-            }
+        $sessionTeamId = data_get(session('currentTeam'), 'id');
 
-            return Team::find(session('currentTeam')->id);
+        if (is_null($sessionTeamId)) {
+            return null;
+        }
+
+        // Check if user actually belongs to this team
+        if (! $this->teams->contains('id', $sessionTeamId)) {
+            session()->forget('currentTeam');
+            Cache::forget('user:'.$this->id.':team:'.$sessionTeamId);
+
+            return null;
+        }
+
+        return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
+            return Team::find($sessionTeamId);
         });
     }
 
-    public function otherTeams()
-    {
-        return Auth::user()->teams->filter(function ($team) {
-            return $team->id != currentTeam()->id;
-        });
-    }
-
-    public function role()
+    public function role(): ?string
     {
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
-        return data_get($user, 'pivot.role');
+        $current = $this->currentTeam();
+        if (is_null($current)) {
+            return null;
+        }
+
+        $team = $this->teams->where('id', $current->id)->first();
+
+        return data_get($team, 'pivot.role');
+    }
+
+    /**
+     * Get the user's role in a specific team
+     */
+    public function roleInTeam(int $teamId): ?string
+    {
+        $team = $this->teams->where('id', $teamId)->first();
+
+        return data_get($team, 'pivot.role');
     }
 
     /**
@@ -415,9 +436,10 @@ class User extends Authenticatable implements SendsEmail
         ]);
 
         // For cloud users, dispatch job to update Stripe customer email asynchronously
-        if (isCloud() && $this->currentTeam()->subscription) {
-            dispatch(new \App\Jobs\UpdateStripeCustomerEmailJob(
-                $this->currentTeam(),
+        $currentTeam = $this->currentTeam();
+        if (isCloud() && $currentTeam?->subscription) {
+            dispatch(new UpdateStripeCustomerEmailJob(
+                $currentTeam,
                 $this->id,
                 $newEmail,
                 $oldEmail
@@ -442,5 +464,14 @@ class User extends Authenticatable implements SendsEmail
             && ! is_null($this->email_change_code)
             && $this->email_change_code_expires_at
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    /**
+     * Check if the user has a password set.
+     * OAuth users are created without passwords.
+     */
+    public function hasPassword(): bool
+    {
+        return ! empty($this->password);
     }
 }

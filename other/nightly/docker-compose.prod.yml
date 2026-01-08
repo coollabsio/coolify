@@ -11,7 +11,6 @@ services:
       - /data/coolify/databases:/var/www/html/storage/app/databases
       - /data/coolify/services:/var/www/html/storage/app/services
       - /data/coolify/backups:/var/www/html/storage/app/backups
-      - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
       - APP_ENV=${APP_ENV:-production}
       - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
