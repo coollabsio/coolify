@@ -1,5 +1,5 @@
 # documentation: https://github.com/louislam/uptime-kuma?tab=readme-ov-file
-# slogan: Uptime Kuma (v2 is a monitoring tool for tracking the status and performance of your applications in real-time.
+# slogan: Uptime Kuma is a monitoring tool for tracking the status and performance of your applications in real-time.
 # category: monitoring
 # tags: monitoring, status, performance, web, services, applications, real-time
 # logo: svgs/uptime-kuma.svg
@@ -9,96 +9,30 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:2
     environment:
-      - TZ=${TZ:-Etc/UTC}
       - SERVICE_URL_UPTIMEKUMA_3001
+      - TZ=${TZ:-Etc/UTC}
     volumes:
-      - uptime-kuma:/app/data
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - uptime-kuma-data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "extra/healthcheck"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
-      uptime-kuma-db:
+      mariadb:
         condition: service_healthy
-  uptime-kuma-db:
-    image: mariadb:11.8
-    mem_limit: 1.5g
+
+  mariadb:
+    image: mariadb:11
     environment:
-      - TZ=${TZ:-Etc/UTC}
       - MYSQL_USER=${SERVICE_USER_MARIADB}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
-      - MYSQL_DATABASE=${MARIADB_DATABASE_NAME:-kuma}
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-uptime-kuma-db}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 20s
       retries: 10
     volumes:
-      - uptime-kuma-db:/var/lib/mysql
-      - type: bind
-        source: ./custom-mariadb.cnf
-        target: /etc/mysql/conf.d/custom-mariadb.cnf
-        content: |
-          [mysqld]
-
-          ############################
-          # Basic server settings (Optimized for 1.5GB RAM)
-          ############################
-          bind-address = 0.0.0.0
-          skip-name-resolve = 1
-
-          # Conservative connection limits
-          max_connections        = 60
-          thread_cache_size      = 30
-          table_open_cache       = 300
-          open_files_limit       = 65535
-
-          # Internal temporary tables – small but okay for monitoring workloads
-          tmp_table_size         = 16M
-          max_heap_table_size    = 16M
-
-          # MariaDB: save a bit of RAM
-          performance_schema     = OFF
-
-          ############################
-          # Character set / collation
-          ############################
-          character-set-server   = utf8mb4
-          collation-server       = utf8mb4_unicode_ci
-          skip-character-set-client-handshake = 1
-
-          #####################################
-          # InnoDB – conservative (1.5 GB host)
-          #####################################
-          default_storage_engine = InnoDB
-
-          # Main memory knob: 768 MB
-          innodb_buffer_pool_size        = 768M
-
-          # Redo logs – not huge, not tiny
-          innodb_log_file_size           = 128M
-          innodb_log_buffer_size         = 16M
-
-          innodb_file_per_table          = 1
-          innodb_flush_method            = O_DIRECT
-
-          # Balanced durability vs performance (fine for monitoring data)
-          innodb_flush_log_at_trx_commit = 2
-
-          # IO / threads
-          innodb_read_io_threads         = 4
-          innodb_write_io_threads        = 4
-          innodb_io_capacity             = 800
-          innodb_io_capacity_max         = 1600
-
-          ##############################
-          # Binary logging (if enabled)
-          ##############################
-          # If you don't need replication/point-in-time recovery, you can disable binlog entirely:
-          skip-log-bin
-
-          # If binlog is ON, this keeps fsync overhead low
-          # sync_binlog = 0
+      - mariadb-data:/var/lib/mysql
