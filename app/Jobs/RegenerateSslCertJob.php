@@ -45,7 +45,7 @@ class RegenerateSslCertJob implements ShouldQueue
 
         $query->cursor()->each(function ($certificate) use ($regenerated) {
             try {
-                $caCert = SslCertificate::where('server_id', $certificate->server_id)
+                $caCert = $certificate->server->sslCertificates()
                     ->where('is_ca_certificate', true)
                     ->first();
 

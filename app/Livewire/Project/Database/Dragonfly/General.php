@@ -6,7 +6,6 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use App\Models\StandaloneDragonfly;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -19,7 +18,7 @@ class General extends Component
 {
     use AuthorizesRequests;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public StandaloneDragonfly $database;
 
@@ -63,8 +62,14 @@ class General extends Component
     public function mount()
     {
         try {
+            $this->authorize('view', $this->database);
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
 
             $existingCert = $this->database->sslCertificates()->first();
 
@@ -173,21 +178,20 @@ class General extends Component
 
                 return;
             }
-            if ($this->isPublic) {
-                if (! str($this->database->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->isPublic = false;
+            if ($this->isPublic && ! str($this->database->status)->startsWith('running')) {
+                $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                $this->isPublic = false;
 
-                    return;
-                }
+                return;
+            }
+            $this->syncData(true);
+            if ($this->isPublic) {
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->dbUrlPublic = $this->database->external_db_url;
-            $this->syncData(true);
         } catch (\Throwable $e) {
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
@@ -249,13 +253,13 @@ class General extends Component
 
             $server = $this->database->destination->server;
 
-            $caCert = SslCertificate::where('server_id', $server->id)
+            $caCert = $server->sslCertificates()
                 ->where('is_ca_certificate', true)
                 ->first();
 
             if (! $caCert) {
                 $server->generateCaCertificate();
-                $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
             }
 
             if (! $caCert) {

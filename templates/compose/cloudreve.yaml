@@ -1,0 +1,57 @@
+# documentation: https://docs.cloudreve.org/
+# slogan: A self-hosted file management and sharing system.
+# category: storage
+# tags: file sharing,cloud storage,self-hosted,open-source
+# logo: svgs/cloudreve.svg
+# port: 5212
+
+services:
+  cloudreve:
+    image: cloudreve/cloudreve:4.10.1
+    environment:
+      - SERVICE_URL_CLOUDREVE_5212
+      - CR_CONF_Database.Type=postgres
+      - CR_CONF_Database.Host=postgres
+      - CR_CONF_Database.User=${SERVICE_USER_POSTGRES}
+      - CR_CONF_Database.Password=${SERVICE_PASSWORD_POSTGRES}
+      - CR_CONF_Database.Name=${POSTGRES_DB:-cloudreve-db}
+      - CR_CONF_Database.Port=5432
+      - CR_CONF_Redis.Server=redis:6379
+      - CR_CONF_Redis.Password=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - cloudreve-data:/cloudreve/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5212"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-cloudreve-db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

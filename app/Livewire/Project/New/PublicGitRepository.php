@@ -107,26 +107,6 @@ class PublicGitRepository extends Component
         $this->query = request()->query();
     }
 
-    public function updatedBaseDirectory()
-    {
-        if ($this->base_directory) {
-            $this->base_directory = rtrim($this->base_directory, '/');
-            if (! str($this->base_directory)->startsWith('/')) {
-                $this->base_directory = '/'.$this->base_directory;
-            }
-        }
-    }
-
-    public function updatedDockerComposeLocation()
-    {
-        if ($this->docker_compose_location) {
-            $this->docker_compose_location = rtrim($this->docker_compose_location, '/');
-            if (! str($this->docker_compose_location)->startsWith('/')) {
-                $this->docker_compose_location = '/'.$this->docker_compose_location;
-            }
-        }
-    }
-
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {

@@ -7,8 +7,8 @@
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
         <div class="space-y-4">
-            <x-forms.input id="imageName" label="Image Name" placeholder="nginx or ghcr.io/user/app"
-                helper="Enter the Docker image name with optional registry. Examples: nginx, ghcr.io/user/app, localhost:5000/myapp"
+            <x-forms.input id="imageName" label="Image Name" placeholder="nginx, docker.io/nginx:latest, ghcr.io/user/app:v1.2.3, or nginx:stable@sha256:abc123..."
+                helper="Enter the Docker image name with optional registry. You can also paste a complete reference like 'nginx:stable@sha256:abc123...' and the fields below will be auto-filled."
                 required autofocus />
             <div class="relative grid grid-cols-1 gap-4 md:grid-cols-2">
                 <x-forms.input id="imageTag" label="Tag (optional)" placeholder="latest"

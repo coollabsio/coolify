@@ -39,6 +39,14 @@ services:
       - ENTE_S3_B2_EU_CEN_REGION=${S3_STORAGE_REGION:-us-east-1}
       - ENTE_S3_B2_EU_CEN_BUCKET=${S3_STORAGE_BUCKET:?}
 
+      - ENTE_SMTP_HOST=${ENTE_SMTP_HOST:-smtp.gmail.com}
+      - ENTE_SMTP_PORT=${ENTE_SMTP_PORT:-587}
+      - ENTE_SMTP_USERNAME=${ENTE_SMTP_USERNAME}
+      - ENTE_SMTP_PASSWORD=${ENTE_SMTP_PASSWORD}
+      - ENTE_SMTP_EMAIL=${ENTE_SMTP_EMAIL}
+      - ENTE_SMTP_SENDER_NAME=${ENTE_SMTP_SENDER_NAME}
+      - ENTE_SMTP_ENCRYPTION=${ENTE_SMTP_ENCRYPTION:-tls}
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,4 +85,3 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-

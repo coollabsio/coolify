@@ -31,7 +31,7 @@ services:
       retries: 15
 
   mongodb:
-    image: docker.io/bitnami/mongodb:5.0
+    image: docker.io/bitnamilegacy/mongodb:5.0
     volumes:
       - mongodb_data:/bitnami/mongodb
     environment:
