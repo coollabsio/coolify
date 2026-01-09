@@ -29,6 +29,7 @@ class InstanceSettings extends Model
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
+        'is_wire_navigate_enabled' => 'boolean',
     ];
 
     protected static function booted(): void

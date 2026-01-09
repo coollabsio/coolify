@@ -65,14 +65,14 @@
             class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
     'server_uuid' => data_get($server, 'uuid'),
-]) }}">
+]) }}" {{ wireNavigate() }}>
                 Configuration
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
                         <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" {{ wireNavigate() }}>
                             Proxy
                             @if ($this->hasTraefikOutdated)
                                 <svg class="w-4 h-4 text-warning" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
@@ -84,7 +84,7 @@
             @endif
             <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}" href="{{ route('server.resources', [
     'server_uuid' => data_get($server, 'uuid'),
-]) }}">
+]) }}" {{ wireNavigate() }}>
                 Resources
             </a>
             @can('canAccessTerminal')
@@ -97,7 +97,7 @@
             @can('update', $server)
                         <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
+                ]) }}" {{ wireNavigate() }}>
                             Security
                         </a>
             @endcan

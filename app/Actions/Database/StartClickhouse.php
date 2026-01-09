@@ -51,7 +51,7 @@ class StartClickhouse
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => "clickhouse-client --password {$this->database->clickhouse_admin_password} --query 'SELECT 1'",
+                        'test' => "clickhouse-client --user {$this->database->clickhouse_admin_user} --password {$this->database->clickhouse_admin_password} --query 'SELECT 1'",
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -152,12 +152,16 @@ class StartClickhouse
             $environment_variables->push("$env->key=$env->real_value");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_USER'))->isEmpty()) {
-            $environment_variables->push("CLICKHOUSE_ADMIN_USER={$this->database->clickhouse_admin_user}");
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_USER'))->isEmpty()) {
+            $environment_variables->push("CLICKHOUSE_USER={$this->database->clickhouse_admin_user}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_ADMIN_PASSWORD'))->isEmpty()) {
-            $environment_variables->push("CLICKHOUSE_ADMIN_PASSWORD={$this->database->clickhouse_admin_password}");
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_PASSWORD'))->isEmpty()) {
+            $environment_variables->push("CLICKHOUSE_PASSWORD={$this->database->clickhouse_admin_password}");
+        }
+
+        if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_DB'))->isEmpty()) {
+            $environment_variables->push("CLICKHOUSE_DB={$this->database->clickhouse_db}");
         }
 
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);

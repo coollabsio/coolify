@@ -1,0 +1,45 @@
+# documentation: https://github.com/calibrain/calibre-web-automated-book-downloader
+# slogan: An intuitive web interface for searching and requesting book downloads, designed to work seamlessly with Calibre-Web-Automated.
+# tags: calibre,calibre-web,ebook,library,epub,ereader,kindle,book,reader,download,downloader
+# logo: svgs/calibre-web-automated-with-downloader.png
+# port: 8083
+
+services:
+  calibre-web-automated:
+    image: crocodilestick/calibre-web-automated:latest
+    environment:
+      - SERVICE_URL_CWA_8083
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-UTC}
+      - NETWORK_SHARE_MODE=${NETWORK_SHARE_MODE:-false}
+    volumes:
+      - cwa-config:/config
+      - cwa-book-ingest:/cwa-book-ingest
+      - calibre-library:/calibre-library
+      - calibre-plugins:/config/.config/calibre/plugins
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -fs http://localhost:8083 || exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  
+  calibre-web-downloader:
+    image: ghcr.io/calibrain/calibre-web-automated-book-downloader:latest
+    environment:
+      - SERVICE_URL_DOWNLOADER_8084
+      - FLASK_PORT=${FLASK_PORT:-8084}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - BOOK_LANGUAGE=${BOOK_LANGUAGE:-en}
+      - USE_BOOK_TITLE=${USE_BOOK_TITLE:-true}
+      - TZ=${TZ:-America/New_York}
+      - APP_ENV=${APP_ENV:-prod}
+      - UID=${UID:-1000}
+      - GID=${GID:-100}
+      - CWA_DB_PATH=${CWA_DB_PATH:-/cwa-config/app.db}
+    volumes:
+      - cwa-book-ingest:/cwa-book-ingest
+      - cwa-config:/cwa-config

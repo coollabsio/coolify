@@ -385,7 +385,7 @@
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($onlyBuildServerAvailable)
                 <div> Only build servers are available, you need at least one server that is not set as build
-                    server. <a class="underline dark:text-white" href="/servers">
+                    server. <a class="underline dark:text-white" href="/servers" {{ wireNavigate() }}>
                         Go to servers page
                     </a> </div>
             @else
@@ -404,7 +404,7 @@
                     <div>
 
                         <div>No validated & reachable servers found. <a class="underline dark:text-white"
-                                href="/servers">
+                                href="/servers" {{ wireNavigate() }}>
                                 Go to servers page
                             </a></div>
                     </div>

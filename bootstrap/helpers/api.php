@@ -135,6 +135,7 @@ function sharedDataApplications()
         'docker_compose_domains' => 'array|nullable',
         'docker_compose_custom_start_command' => 'string|nullable',
         'docker_compose_custom_build_command' => 'string|nullable',
+        'is_container_label_escape_enabled' => 'boolean',
     ];
 }
 
@@ -179,4 +180,5 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_static');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
+    $request->offsetUnset('is_container_label_escape_enabled');
 }

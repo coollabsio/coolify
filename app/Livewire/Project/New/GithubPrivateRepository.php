@@ -128,6 +128,7 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
+        $this->branches = sortBranchesByPriority($this->branches);
         $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
     }
 

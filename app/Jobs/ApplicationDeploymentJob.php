@@ -87,9 +87,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $use_build_server = false;
 
-    // Save original server between phases
-    private Server $original_server;
-
     private Server $mainServer;
 
     private bool $is_this_additional_server = false;
@@ -325,18 +322,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($buildServers->count() === 0) {
                     $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
                     $this->build_server = $this->server;
-                    $this->original_server = $this->server;
                 } else {
                     $this->build_server = $buildServers->random();
                     $this->application_deployment_queue->build_server_id = $this->build_server->id;
                     $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
-                    $this->original_server = $this->server;
                     $this->use_build_server = true;
                 }
             } else {
-                // Set build server & original_server to the same as deployment server
                 $this->build_server = $this->server;
-                $this->original_server = $this->server;
             }
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
@@ -371,7 +364,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             try {
                 $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
-                $this->graceful_shutdown_container($this->deployment_uuid);
+                $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
             } catch (Exception $e) {
                 // Log but don't fail - container cleanup errors are expected when container is already gone
                 \Log::warning('Failed to shutdown container '.$this->deployment_uuid.': '.$e->getMessage());
@@ -937,7 +930,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->preserveRepository) {
             if ($this->use_build_server) {
-                $this->server = $this->original_server;
+                $this->server = $this->mainServer;
             }
             if (str($this->configuration_dir)->isNotEmpty()) {
                 $this->execute_remote_command(
@@ -960,7 +953,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         if (isset($this->docker_compose_base64)) {
             if ($this->use_build_server) {
-                $this->server = $this->original_server;
+                $this->server = $this->mainServer;
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
 
@@ -1342,7 +1335,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Also create in configuration directory
                 if ($this->use_build_server) {
-                    $this->server = $this->original_server;
+                    $this->server = $this->mainServer;
                     $this->execute_remote_command(
                         [
                             "touch $this->configuration_dir/.env",
@@ -1359,7 +1352,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 // For non-Docker Compose deployments, clean up any existing .env files
                 if ($this->use_build_server) {
-                    $this->server = $this->original_server;
+                    $this->server = $this->mainServer;
                     $this->execute_remote_command(
                         [
                             'command' => "rm -f $this->configuration_dir/.env",
@@ -1407,7 +1400,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Write .env file to configuration directory
         if ($this->use_build_server) {
-            $this->server = $this->original_server;
+            $this->server = $this->mainServer;
             $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
@@ -1744,7 +1737,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 if ($this->use_build_server) {
                     $this->write_deployment_configurations();
-                    $this->server = $this->original_server;
+                    $this->server = $this->mainServer;
                 }
                 if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty() || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
@@ -1913,7 +1906,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function create_workdir()
     {
         if ($this->use_build_server) {
-            $this->server = $this->original_server;
+            $this->server = $this->mainServer;
             $this->execute_remote_command(
                 [
                     'command' => "mkdir -p {$this->configuration_dir}",
@@ -1968,7 +1961,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Preparing container with helper image with updated envs.');
         }
 
-        $this->graceful_shutdown_container($this->deployment_uuid);
+        $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
         $this->execute_remote_command(
             [
                 $runCommand,
@@ -1983,8 +1976,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function restart_builder_container_with_actual_commit()
     {
-        // Stop and remove the current helper container
-        $this->graceful_shutdown_container($this->deployment_uuid);
+        // Stop the current helper container (no need for rm -f as it was started with --rm)
+        $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
 
         // Clear cached env_args to force regeneration with actual SOURCE_COMMIT value
         $this->env_args = null;
@@ -2563,7 +2556,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (! is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
         }
-        if ($this->server->isSwarm()) {
+        if ($this->mainServer->isSwarm()) {
             data_forget($docker_compose, 'services.'.$this->container_name.'.container_name');
             data_forget($docker_compose, 'services.'.$this->container_name.'.expose');
             data_forget($docker_compose, 'services.'.$this->container_name.'.restart');
@@ -2613,7 +2606,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
-        if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
+        if ($this->mainServer->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
         }
         if ($this->application->settings->is_gpu_enabled) {
@@ -3171,14 +3164,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName)
+    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
     {
         try {
             $timeout = isDev() ? 1 : 30;
-            $this->execute_remote_command(
-                ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
-                ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
-            );
+            if ($skipRemove) {
+                $this->execute_remote_command(
+                    ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true]
+                );
+            } else {
+                $this->execute_remote_command(
+                    ["docker stop -t $timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                    ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+                );
+            }
         } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
