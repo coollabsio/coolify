@@ -2062,6 +2062,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->coolify_variables .= "COOLIFY_RESOURCE_UUID={$this->application->uuid} ";
     }
 
+    private function resolvePinnedCommit(): ?string
+    {
+        if ($this->pull_request_id !== 0 || $this->rollback) {
+            return null;
+        }
+
+        $pinnedCommit = str(data_get($this->application, 'git_commit_sha'))->trim()->value();
+        if ($pinnedCommit === '' || $pinnedCommit === 'HEAD') {
+            return null;
+        }
+
+        return $pinnedCommit;
+    }
+
     private function check_git_if_build_needed()
     {
         if (is_object($this->source) && $this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
@@ -2073,6 +2087,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application->repository_project_id = $repository_project_id;
                     $this->application->save();
                 }
+            }
+        }
+        $pinnedCommit = $this->resolvePinnedCommit();
+        if ($pinnedCommit) {
+            $this->commit = $pinnedCommit;
+            if ($this->application_deployment_queue->commit !== $pinnedCommit) {
+                $this->application_deployment_queue->commit = $pinnedCommit;
+                $this->application_deployment_queue->save();
             }
         }
         $this->generate_git_import_commands();
@@ -2121,7 +2143,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             );
         }
-        if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
+        if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback && ! $pinnedCommit) {
             // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
             // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
             // Note: Git warnings can be on the same line as the result (no newline)
@@ -2168,6 +2190,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         $this->create_workdir();
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git rev-parse HEAD"),
+                'hidden' => true,
+                'save' => 'checked_out_commit',
+                'ignore_errors' => true,
+            ]
+        );
+        if ($this->saved_outputs->get('checked_out_commit')) {
+            $checkedOutCommit = str($this->saved_outputs->get('checked_out_commit'))->value();
+            if ($checkedOutCommit !== '') {
+                $this->application_deployment_queue->addLogEntry("Checked out commit: {$checkedOutCommit}", hidden: true);
+            }
+        }
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
