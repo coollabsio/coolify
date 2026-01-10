@@ -989,6 +989,9 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
         case 'SUPABASEANON':
             $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
             if (is_null($signingKey)) {
@@ -1187,7 +1190,7 @@ function get_public_ips()
         $ipv4 = $first->output();
         if ($ipv4) {
             $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
             if ($validate_ipv4 == false) {
                 echo "Invalid ipv4: $ipv4\n";
 
@@ -1202,7 +1205,7 @@ function get_public_ips()
         $ipv6 = $second->output();
         if ($ipv6) {
             $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
             if ($validate_ipv6 == false) {
                 echo "Invalid ipv6: $ipv6\n";
 

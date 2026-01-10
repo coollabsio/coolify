@@ -26,10 +26,10 @@ class Index extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $instance_name = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv4')]
     public ?string $public_ipv4 = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv6')]
     public ?string $public_ipv6 = null;
 
     #[Validate('required|string|timezone')]
