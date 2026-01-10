@@ -3,11 +3,21 @@
     <div class="subtitle">Security related settings.</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 scrollbar min-h-10">
-            <a href="{{ route('security.private-key.index') }}">
+            <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
                 <button>Private Keys</button>
             </a>
-            <a href="{{ route('security.api-tokens') }}">
-                <button>API tokens</button>
+            @can('viewAny', App\Models\CloudProviderToken::class)
+                <a href="{{ route('security.cloud-tokens') }}" {{ wireNavigate() }}>
+                    <button>Cloud Tokens</button>
+                </a>
+            @endcan
+            @can('viewAny', App\Models\CloudInitScript::class)
+                <a href="{{ route('security.cloud-init-scripts') }}" {{ wireNavigate() }}>
+                    <button>Cloud-Init Scripts</button>
+                </a>
+            @endcan
+            <a href="{{ route('security.api-tokens') }}" {{ wireNavigate() }}>
+                <button>API Tokens</button>
             </a>
         </nav>
     </div>

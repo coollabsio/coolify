@@ -11,12 +11,11 @@
         </label>
     @endif
     <select {{ $attributes->merge(['class' => $defaultClass]) }} @disabled($disabled) @required($required)
-        wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-        wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled" name={{ $id }}
-        @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model={{ $id }} @endif>
+        wire:loading.attr="disabled" name={{ $modelBinding }} id="{{ $htmlId }}"
+        @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @else wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif>
         {{ $slot }}
     </select>
-    @error($id)
+    @error($modelBinding)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>
         </label>

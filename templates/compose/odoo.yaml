@@ -1,5 +1,6 @@
 # documentation: https://www.odoo.com/
 # slogan: Odoo is a suite of open-source business apps that cover all your company needs.
+# category: cms
 # tags: business, apps, CRM, eCommerce, accounting, inventory, point of sale, project management, open-source
 # logo: svgs/odoo.svg
 # port: 8069
@@ -8,7 +9,7 @@ services:
   odoo:
     image: odoo:18
     environment:
-      - SERVICE_FQDN_ODOO_8069
+      - SERVICE_URL_ODOO_8069
       - HOST=postgresql
       - USER=$SERVICE_USER_POSTGRES
       - PASSWORD=$SERVICE_PASSWORD_POSTGRES

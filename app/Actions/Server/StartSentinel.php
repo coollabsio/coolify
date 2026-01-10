@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Events\SentinelRestarted;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -9,7 +10,7 @@ class StartSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, bool $restart = false, ?string $latestVersion = null)
+    public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null)
     {
         if ($server->isSwarm() || $server->isBuildServer()) {
             return;
@@ -43,7 +44,9 @@ class StartSentinel
         ];
         if (isDev()) {
             // data_set($environments, 'DEBUG', 'true');
-            // $image = 'sentinel';
+            if ($customImage && ! empty($customImage)) {
+                $image = $customImage;
+            }
             $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
         }
         $dockerEnvironments = '-e "'.implode('" -e "', array_map(fn ($key, $value) => "$key=$value", array_keys($environments), $environments)).'"';
@@ -61,5 +64,8 @@ class StartSentinel
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
         $server->sentinelHeartbeat();
+
+        // Dispatch event to notify UI components
+        SentinelRestarted::dispatch($server, $version);
     }
 }

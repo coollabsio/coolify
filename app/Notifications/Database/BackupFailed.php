@@ -88,4 +88,21 @@ class BackupFailed extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+
+        return [
+            'success' => false,
+            'message' => 'Database backup failed',
+            'event' => 'backup_failed',
+            'database_name' => $this->name,
+            'database_uuid' => $this->database->uuid,
+            'database_type' => $this->database_name,
+            'frequency' => $this->frequency,
+            'error_output' => $this->output,
+            'url' => $url,
+        ];
+    }
 }

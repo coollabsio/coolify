@@ -6,7 +6,7 @@
             <h2>Dockerfile</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
-        <x-forms.textarea rows="20" id="dockerfile"
+        <x-forms.textarea useMonacoEditor monacoEditorLanguage="dockerfile" rows="20" id="dockerfile" autofocus
             placeholder='FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

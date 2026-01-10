@@ -42,7 +42,7 @@
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
-                        <x-forms.input required id="smtpPort" placeholder="587" label="Port" />
+                        <x-forms.input required id="smtpPort" type="number" placeholder="587" label="Port" />
                         <x-forms.select required id="smtpEncryption" label="Encryption">
                             <option value="starttls">StartTLS</option>
                             <option value="tls">TLS/SSL</option>

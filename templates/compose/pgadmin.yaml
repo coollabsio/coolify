@@ -1,0 +1,21 @@
+# documentation: https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html
+# slogan: pgAdmin is a web-based database management tool for administering your PostgreSQL databases through a user-friendly interface.
+# category: database
+# tags: database management
+# logo: svgs/postgresql.svg
+# port: 80
+
+services:
+  pgadmin:
+    image: 'dpage/pgadmin4:latest'
+    environment:
+      - SERVICE_URL_PGADMIN
+      - 'PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:?}'
+      - 'PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:?}'
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/login"]
+      interval: 5s
+      timeout: 10s
+      retries: 5

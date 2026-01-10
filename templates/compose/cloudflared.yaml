@@ -1,5 +1,6 @@
 # documentation: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
 # slogan: Client for Cloudflare Tunnel, a daemon that exposes private services through the Cloudflare edge.
+# category: proxy
 # logo: svgs/cloudflared.svg
 
 services:

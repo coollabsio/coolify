@@ -5,11 +5,14 @@ namespace App\Livewire\Notifications;
 use App\Models\DiscordNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Discord extends Component
 {
+    use AuthorizesRequests;
+
     public Team $team;
 
     public DiscordNotificationSettings $settings;
@@ -60,6 +63,9 @@ class Discord extends Component
     public bool $serverPatchDiscordNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $traefikOutdatedDiscordNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
 
     public function mount()
@@ -67,6 +73,7 @@ class Discord extends Component
         try {
             $this->team = auth()->user()->currentTeam();
             $this->settings = $this->team->discordNotificationSettings;
+            $this->authorize('view', $this->settings);
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -77,6 +84,7 @@ class Discord extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->authorize('update', $this->settings);
             $this->settings->discord_enabled = $this->discordEnabled;
             $this->settings->discord_webhook_url = $this->discordWebhookUrl;
 
@@ -93,6 +101,7 @@ class Discord extends Component
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
+            $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
@@ -115,6 +124,7 @@ class Discord extends Component
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
+            $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
         }
@@ -182,6 +192,7 @@ class Discord extends Component
     public function sendTestNotification()
     {
         try {
+            $this->authorize('sendTest', $this->settings);
             $this->team->notify(new Test(channel: 'discord'));
             $this->dispatch('success', 'Test notification sent.');
         } catch (\Throwable $e) {
