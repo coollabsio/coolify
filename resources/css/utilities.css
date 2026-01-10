@@ -49,7 +49,7 @@
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
 }
 
 /* Focus */
@@ -154,7 +154,7 @@
 }
 
 @utility badge-dashboard {
-    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+    @apply absolute top-1 right-1 w-2.5 h-2.5 rounded-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
 }
 
 @utility badge-success {
@@ -229,6 +229,10 @@
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }
 
+@utility coolbox {
+    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
+}
+
 @utility on-box {
     @apply rounded-sm hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }
@@ -287,4 +291,32 @@
 
 @utility xterm {
     @apply p-2;
+}
+
+/* Log line optimization - uses content-visibility for lazy rendering of off-screen log lines */
+@utility log-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.5em;
+}
+
+/* Search highlight styling for logs */
+@utility log-highlight {
+    @apply bg-warning/40 dark:bg-warning/30;
+}
+
+/* Log level color classes */
+@utility log-error {
+    @apply bg-red-500/10 dark:bg-red-500/15;
+}
+
+@utility log-warning {
+    @apply bg-yellow-500/10 dark:bg-yellow-500/15;
+}
+
+@utility log-debug {
+    @apply bg-purple-500/10 dark:bg-purple-500/15;
+}
+
+@utility log-info {
+    @apply bg-blue-500/10 dark:bg-blue-500/15;
 }

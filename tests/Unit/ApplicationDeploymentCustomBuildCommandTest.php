@@ -615,3 +615,58 @@ it('produces correct preview path with normalized baseDirectory', function () {
         expect($path)->not->toContain('//', "Double slash found for baseDir: {$case['baseDir']}");
     }
 });
+
+// Tests for injectDockerComposeBuildArgs() helper function
+it('injects build args when building specific service', function () {
+    $command = 'docker compose build web';
+    $buildArgs = '--build-arg ENV=prod';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker compose build --build-arg ENV=prod web');
+});
+
+it('injects build args with service name containing hyphens', function () {
+    $command = 'docker compose build my-service-name';
+    $buildArgs = '--build-arg TEST=value';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker compose build --build-arg TEST=value my-service-name');
+});
+
+it('injects build args with service name containing underscores', function () {
+    $command = 'docker compose build my_service_name';
+    $buildArgs = '--build-arg TEST=value';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker compose build --build-arg TEST=value my_service_name');
+});
+
+it('injects build args before service name and existing flags', function () {
+    $command = 'docker compose build backend --no-cache';
+    $buildArgs = '--build-arg FOO=bar';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker compose build --build-arg FOO=bar backend --no-cache');
+});
+
+it('handles buildx with target and flags', function () {
+    $command = 'docker buildx build --platform linux/amd64 -t myimage:latest .';
+    $buildArgs = '--build-arg VERSION=1.0';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker buildx build --build-arg VERSION=1.0 --platform linux/amd64 -t myimage:latest .');
+});
+
+it('handles docker compose build with no arguments', function () {
+    $command = 'docker compose build';
+    $buildArgs = '--build-arg FOO=bar';
+
+    $result = injectDockerComposeBuildArgs($command, $buildArgs);
+
+    expect($result)->toBe('docker compose build --build-arg FOO=bar');
+});

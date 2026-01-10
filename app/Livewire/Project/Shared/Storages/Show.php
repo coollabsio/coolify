@@ -2,11 +2,8 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
-use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Show extends Component
@@ -67,7 +64,7 @@ class Show extends Component
     public function mount()
     {
         $this->syncData(false);
-        $this->isReadOnly = $this->storage->isReadOnlyVolume();
+        $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
     }
 
     public function submit()
@@ -84,12 +81,8 @@ class Show extends Component
     {
         $this->authorize('update', $this->resource);
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         $this->storage->delete();

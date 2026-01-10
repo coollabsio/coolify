@@ -272,11 +272,9 @@ test('handles command with mixed operators and subshells', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: 'docker' starts with 'do' which is an excluded keyword, so it doesn't get sudo prefix
-    // This is a known limitation of the startsWith approach. Docker commands still work because
-    // they typically appear in more complex command sequences or are handled separately.
+    // docker commands now correctly get sudo prefix (word boundary fix for 'do' keyword)
     // The || operator adds sudo to what follows, and subshell adds sudo inside $()
-    expect($result[0])->toBe('docker ps || sudo echo $(sudo date)');
+    expect($result[0])->toBe('sudo docker ps || sudo echo $(sudo date)');
 });
 
 test('handles whitespace-only commands gracefully', function () {
@@ -515,4 +513,111 @@ test('skips sudo for select loop keywords', function () {
     expect($result[0])->toBe('select opt in "Option1" "Option2"; do');
     expect($result[0])->not->toContain('sudo select');
     expect($result[2])->toBe('    break');
+});
+
+// Tests for word boundary matching - ensuring commands are not confused with bash keywords
+
+test('adds sudo for ifconfig command (not confused with if keyword)', function () {
+    $commands = collect(['ifconfig eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifconfig eth0');
+    expect($result[0])->not->toContain('if sudo');
+});
+
+test('adds sudo for ifup command (not confused with if keyword)', function () {
+    $commands = collect(['ifup eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifup eth0');
+});
+
+test('adds sudo for ifdown command (not confused with if keyword)', function () {
+    $commands = collect(['ifdown eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifdown eth0');
+});
+
+test('adds sudo for find command (not confused with fi keyword)', function () {
+    $commands = collect(['find /var -name "*.log"']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo find /var -name "*.log"');
+});
+
+test('adds sudo for file command (not confused with fi keyword)', function () {
+    $commands = collect(['file /tmp/test']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo file /tmp/test');
+});
+
+test('adds sudo for finger command (not confused with fi keyword)', function () {
+    $commands = collect(['finger user']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo finger user');
+});
+
+test('adds sudo for docker command (not confused with do keyword)', function () {
+    $commands = collect(['docker ps']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo docker ps');
+});
+
+test('adds sudo for fortune command (not confused with for keyword)', function () {
+    $commands = collect(['fortune']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo fortune');
+});
+
+test('adds sudo for formail command (not confused with for keyword)', function () {
+    $commands = collect(['formail -s procmail']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo formail -s procmail');
+});
+
+test('if keyword with word boundary gets sudo inserted correctly', function () {
+    $commands = collect(['if [ -f /tmp/test ]; then']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if sudo [ -f /tmp/test ]; then');
+});
+
+test('fi keyword with word boundary is not given sudo', function () {
+    $commands = collect(['fi']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('fi');
+});
+
+test('for keyword with word boundary is not given sudo', function () {
+    $commands = collect(['for i in 1 2 3; do']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('for i in 1 2 3; do');
+});
+
+test('do keyword with word boundary is not given sudo', function () {
+    $commands = collect(['do']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('do');
 });

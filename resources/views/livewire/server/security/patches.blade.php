@@ -19,7 +19,7 @@
                     <span class="text-xs text-neutral-500">(experimental)</span>
                     <x-helper
                         helper="Only available for apt, dnf and zypper package managers atm, more coming
-            soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
+            soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}' {{ wireNavigate() }}>notification settings</a>." />
                     @if (isDev())
                         <x-forms.button type="button" wire:click="sendTestEmail">
                             Send Test Email (dev only)</x-forms.button>

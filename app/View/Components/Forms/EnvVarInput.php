@@ -26,6 +26,7 @@ class EnvVarInput extends Component
         public bool $disabled = false,
         public bool $readonly = false,
         public ?string $helper = null,
+        public bool $allowToPeak = true,
         public string $defaultClass = 'input',
         public string $autocomplete = 'off',
         public ?int $minlength = null,
@@ -70,6 +71,10 @@ class EnvVarInput extends Component
 
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
+        }
+
+        if ($this->type === 'password') {
+            $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
         }
 
         $this->scopeUrls = [

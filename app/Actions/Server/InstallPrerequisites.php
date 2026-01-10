@@ -46,6 +46,13 @@ class InstallPrerequisites
                 'command -v git >/dev/null || zypper install -y git',
                 'command -v jq >/dev/null || zypper install -y jq',
             ]);
+        } elseif ($supported_os_type->contains('arch')) {
+            // Use -Syu for full system upgrade to avoid partial upgrade issues on Arch Linux
+            // --needed flag skips packages that are already installed and up-to-date
+            $command = $command->merge([
+                "echo 'Installing Prerequisites for Arch Linux...'",
+                'pacman -Syu --noconfirm --needed curl wget git jq',
+            ]);
         } else {
             throw new \Exception('Unsupported OS type for prerequisites installation');
         }

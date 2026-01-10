@@ -206,6 +206,9 @@ class ValidateAndInstall extends Component
                 if (! $proxyShouldRun) {
                     return;
                 }
+                // Ensure networks exist BEFORE dispatching async proxy startup
+                // This prevents race condition where proxy tries to start before networks are created
+                instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                 StartProxy::dispatch($this->server);
             } else {
                 $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');

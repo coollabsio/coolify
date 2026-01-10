@@ -53,6 +53,8 @@ class Select extends Component
 
     protected $queryString = [
         'server_id',
+        'type' => ['except' => ''],
+        'destination_uuid' => ['except' => '', 'as' => 'destination'],
     ];
 
     public function mount()
@@ -66,6 +68,20 @@ class Select extends Component
             $project = Project::whereUuid($projectUuid)->firstOrFail();
             $this->environments = $project->environments;
             $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
+
+            // Check if we have all required params for PostgreSQL type selection
+            // This handles navigation from global search
+            $queryType = request()->query('type');
+            $queryServerId = request()->query('server_id');
+            $queryDestination = request()->query('destination');
+
+            if ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
+                $this->type = $queryType;
+                $this->server_id = $queryServerId;
+                $this->destination_uuid = $queryDestination;
+                $this->server = Server::find($queryServerId);
+                $this->current_step = 'select-postgresql-type';
+            }
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

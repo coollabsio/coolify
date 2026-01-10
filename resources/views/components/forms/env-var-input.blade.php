@@ -10,7 +10,8 @@
         </label>
     @endif
 
-    <div x-data="{
+    <div class="relative" x-data="{
+            type: '{{ $type }}',
             showDropdown: false,
             suggestions: [],
             selectedIndex: 0,
@@ -181,8 +182,19 @@
                 }
             }
         }"
-        @click.outside="showDropdown = false"
-        class="relative">
+        @click.outside="showDropdown = false">
+
+        @if ($type === 'password' && $allowToPeak)
+            <div x-on:click="changePasswordFieldType"
+                class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white z-10">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                    <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+                </svg>
+            </div>
+        @endif
 
         <input
             x-ref="input"
@@ -198,7 +210,11 @@
                 wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4"
             @endif
             wire:loading.attr="disabled"
-            type="{{ $type }}"
+            @if ($type === 'password')
+                :type="type"
+            @else
+                type="{{ $type }}"
+            @endif
             @disabled($disabled)
             @if ($htmlId !== 'null') id="{{ $htmlId }}" @endif
             name="{{ $name }}"

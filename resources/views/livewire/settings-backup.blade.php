@@ -43,7 +43,7 @@
                         Please validate your server to enable Instance Backup.
                     </div>
                     <a href="{{ route('server.show', [$server->uuid]) }}"
-                        class="text-black hover:text-gray-700 dark:text-white dark:hover:text-gray-200 underline">
+                        class="text-black hover:text-gray-700 dark:text-white dark:hover:text-gray-200 underline" {{ wireNavigate() }}>
                         Go to Server Settings to Validate
                     </a>
                 </div>

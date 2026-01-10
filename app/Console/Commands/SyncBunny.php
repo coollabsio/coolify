@@ -50,6 +50,7 @@ class SyncBunny extends Command
 
             // Clone the repository
             $this->info('Cloning coolify-cdn repository...');
+            $output = [];
             exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to clone repository: '.implode("\n", $output));
@@ -59,6 +60,7 @@ class SyncBunny extends Command
 
             // Create feature branch
             $this->info('Creating feature branch...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to create branch: '.implode("\n", $output));
@@ -96,6 +98,7 @@ class SyncBunny extends Command
 
             // Stage and commit
             $this->info('Committing changes...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to stage changes: '.implode("\n", $output));
@@ -133,6 +136,7 @@ class SyncBunny extends Command
 
             // Push to remote
             $this->info('Pushing branch to remote...');
+            $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to push branch: '.implode("\n", $output));
@@ -146,6 +150,7 @@ class SyncBunny extends Command
             $prTitle = 'Update releases.json - '.date('Y-m-d H:i:s');
             $prBody = 'Automated update of releases.json with latest '.count($releases).' releases from GitHub API';
             $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
             exec($prCommand, $output, $returnCode);
 
             // Clean up
@@ -166,6 +171,193 @@ class SyncBunny extends Command
             return true;
         } catch (\Throwable $e) {
             $this->error('Error syncing releases: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Sync both releases.json and versions.json to GitHub repository in one PR
+     */
+    private function syncReleasesAndVersionsToGitHubRepo(string $versionsLocation, bool $nightly = false): bool
+    {
+        $this->info('Syncing releases.json and versions.json to GitHub repository...');
+        try {
+            // 1. Fetch releases from GitHub API
+            $this->info('Fetching releases from GitHub API...');
+            $response = Http::timeout(30)
+                ->get('https://api.github.com/repos/coollabsio/coolify/releases', [
+                    'per_page' => 30,
+                ]);
+
+            if (! $response->successful()) {
+                $this->error('Failed to fetch releases from GitHub: '.$response->status());
+
+                return false;
+            }
+
+            $releases = $response->json();
+
+            // 2. Read versions.json
+            if (! file_exists($versionsLocation)) {
+                $this->error("versions.json not found at: $versionsLocation");
+
+                return false;
+            }
+
+            $file = file_get_contents($versionsLocation);
+            $versionsJson = json_decode($file, true);
+            $actualVersion = data_get($versionsJson, 'coolify.v4.version');
+
+            $timestamp = time();
+            $tmpDir = sys_get_temp_dir().'/coolify-cdn-combined-'.$timestamp;
+            $branchName = 'update-releases-and-versions-'.$timestamp;
+            $versionsTargetPath = $nightly ? 'json/versions-nightly.json' : 'json/versions.json';
+
+            // 3. Clone the repository
+            $this->info('Cloning coolify-cdn repository...');
+            $output = [];
+            exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to clone repository: '.implode("\n", $output));
+
+                return false;
+            }
+
+            // 4. Create feature branch
+            $this->info('Creating feature branch...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to create branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 5. Write releases.json
+            $this->info('Writing releases.json...');
+            $releasesPath = "$tmpDir/json/releases.json";
+            $releasesDir = dirname($releasesPath);
+
+            if (! is_dir($releasesDir)) {
+                if (! mkdir($releasesDir, 0755, true)) {
+                    $this->error("Failed to create directory: $releasesDir");
+                    exec('rm -rf '.escapeshellarg($tmpDir));
+
+                    return false;
+                }
+            }
+
+            $releasesJsonContent = json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if (file_put_contents($releasesPath, $releasesJsonContent) === false) {
+                $this->error("Failed to write releases.json to: $releasesPath");
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 6. Write versions.json
+            $this->info('Writing versions.json...');
+            $versionsPath = "$tmpDir/$versionsTargetPath";
+            $versionsDir = dirname($versionsPath);
+
+            if (! is_dir($versionsDir)) {
+                if (! mkdir($versionsDir, 0755, true)) {
+                    $this->error("Failed to create directory: $versionsDir");
+                    exec('rm -rf '.escapeshellarg($tmpDir));
+
+                    return false;
+                }
+            }
+
+            $versionsJsonContent = json_encode($versionsJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if (file_put_contents($versionsPath, $versionsJsonContent) === false) {
+                $this->error("Failed to write versions.json to: $versionsPath");
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 7. Stage both files
+            $this->info('Staging changes...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json '.escapeshellarg($versionsTargetPath).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to stage changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 8. Check for changes
+            $this->info('Checking for changes...');
+            $statusOutput = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git status --porcelain 2>&1', $statusOutput, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to check repository status: '.implode("\n", $statusOutput));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            if (empty(array_filter($statusOutput))) {
+                $this->info('Both files are already up to date. No changes to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
+            // 9. Commit changes
+            $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+            $commitMessage = "Update releases.json and $envLabel versions.json to $actualVersion - ".date('Y-m-d H:i:s');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to commit changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 10. Push to remote
+            $this->info('Pushing branch to remote...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to push branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // 11. Create pull request
+            $this->info('Creating pull request...');
+            $prTitle = "Update releases.json and $envLabel versions.json to $actualVersion - ".date('Y-m-d H:i:s');
+            $prBody = "Automated update:\n- releases.json with latest ".count($releases)." releases from GitHub API\n- $envLabel versions.json to version $actualVersion";
+            $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
+            exec($prCommand, $output, $returnCode);
+
+            // 12. Clean up
+            exec('rm -rf '.escapeshellarg($tmpDir));
+
+            if ($returnCode !== 0) {
+                $this->error('Failed to create PR: '.implode("\n", $output));
+
+                return false;
+            }
+
+            $this->info('Pull request created successfully!');
+            if (! empty($output)) {
+                $this->info('PR URL: '.implode("\n", $output));
+            }
+            $this->info("Version synced: $actualVersion");
+            $this->info('Total releases synced: '.count($releases));
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->error('Error syncing to GitHub: '.$e->getMessage());
 
             return false;
         }
@@ -413,31 +605,48 @@ class SyncBunny extends Command
 
                 return;
             } elseif ($only_version) {
-                $this->warn('⚠️  DEPRECATION WARNING: The --release option is deprecated.');
-                $this->warn('   Please use --github-versions instead to create a PR to the coolify-cdn repository.');
-                $this->warn('   This option will continue to work but may be removed in a future version.');
-                $this->newLine();
-
                 if ($nightly) {
-                    $this->info('About to sync NIGHLTY versions.json to BunnyCDN.');
+                    $this->info('About to sync NIGHTLY versions.json to BunnyCDN and create GitHub PR.');
                 } else {
-                    $this->info('About to sync PRODUCTION versions.json to BunnyCDN.');
+                    $this->info('About to sync PRODUCTION versions.json to BunnyCDN and create GitHub PR.');
                 }
                 $file = file_get_contents($versions_location);
                 $json = json_decode($file, true);
                 $actual_version = data_get($json, 'coolify.v4.version');
 
-                $confirmed = confirm("Are you sure you want to sync to {$actual_version}?");
+                $this->info("Version: {$actual_version}");
+                $this->info('This will:');
+                $this->info('  1. Sync versions.json to BunnyCDN (deprecated but still supported)');
+                $this->info('  2. Create ONE GitHub PR with both releases.json and versions.json');
+                $this->newLine();
+
+                $confirmed = confirm('Are you sure you want to proceed?');
                 if (! $confirmed) {
                     return;
                 }
 
-                // Sync versions.json to BunnyCDN
+                // 1. Sync versions.json to BunnyCDN (deprecated but still needed)
+                $this->info('Step 1/2: Syncing versions.json to BunnyCDN...');
                 Http::pool(fn (Pool $pool) => [
                     $pool->storage(fileName: $versions_location)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
                 ]);
-                $this->info('versions.json uploaded & purged...');
+                $this->info('✓ versions.json uploaded & purged to BunnyCDN');
+                $this->newLine();
+
+                // 2. Create GitHub PR with both releases.json and versions.json
+                $this->info('Step 2/2: Creating GitHub PR with releases.json and versions.json...');
+                $githubSuccess = $this->syncReleasesAndVersionsToGitHubRepo($versions_location, $nightly);
+                if ($githubSuccess) {
+                    $this->info('✓ GitHub PR created successfully with both files');
+                } else {
+                    $this->error('✗ Failed to create GitHub PR');
+                }
+                $this->newLine();
+
+                $this->info('=== Summary ===');
+                $this->info('BunnyCDN sync: ✓ Complete');
+                $this->info('GitHub PR: '.($githubSuccess ? '✓ Created (releases.json + versions.json)' : '✗ Failed'));
 
                 return;
             } elseif ($only_github_releases) {

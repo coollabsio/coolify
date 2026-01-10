@@ -7,7 +7,7 @@
         <x-server.sidebar-proxy :server="$server" :parameters="$parameters" />
         <div class="w-full">
             <h2 class="pb-4">Logs</h2>
-            <livewire:project.shared.get-logs :server="$server" container="coolify-proxy" displayName="Coolify Proxy" />
+            <livewire:project.shared.get-logs :server="$server" container="coolify-proxy" displayName="Coolify Proxy" :collapsible="false" />
         </div>
     </div>
 </div>

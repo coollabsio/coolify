@@ -358,7 +358,7 @@ function parseDockerVolumeString(string $volumeString): array
     ];
 }
 
-function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null): Collection
+function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
@@ -1145,11 +1145,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $template = $resource->preview_url_template;
                         $host = $url->getHost();
                         $schema = $url->getScheme();
+                        $portInt = $url->getPort();
+                        $port = $portInt !== null ? ':'.$portInt : '';
                         $random = new Cuid2;
                         $preview_fqdn = str_replace('{{random}}', $random, $template);
                         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                         $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
-                        $preview_fqdn = "$schema://$preview_fqdn";
+                        $preview_fqdn = "$schema://$preview_fqdn{$port}";
                         $preview->fqdn = $preview_fqdn;
                         $preview->save();
 
@@ -1324,6 +1326,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             ->values();
 
         $payload['env_file'] = $envFiles;
+
+        // Inject commit-based image tag for services with build directive (for rollback support)
+        // Only inject if service has build but no explicit image defined
+        $hasBuild = data_get($service, 'build') !== null;
+        $hasImage = data_get($service, 'image') !== null;
+        if ($hasBuild && ! $hasImage && $commit) {
+            $imageTag = str($commit)->substr(0, 128)->value();
+            if ($isPullRequest) {
+                $imageTag = "pr-{$pullRequestId}";
+            }
+            $imageRepo = "{$uuid}_{$serviceName}";
+            $payload['image'] = "{$imageRepo}:{$imageTag}";
+        }
+
         if ($isPullRequest) {
             $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
@@ -1644,9 +1660,16 @@ function serviceParser(Service $resource): Collection
                 if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
-                        $fqdn = "$fqdn$path";
-                        $url = "$url$path";
-                        $fqdnValueForEnv = "$fqdnValueForEnv$path";
+                        // Only add path if it's not already present (prevents duplication on subsequent parse() calls)
+                        if (! str($fqdn)->endsWith($path)) {
+                            $fqdn = "$fqdn$path";
+                        }
+                        if (! str($url)->endsWith($path)) {
+                            $url = "$url$path";
+                        }
+                        if (! str($fqdnValueForEnv)->endsWith($path)) {
+                            $fqdnValueForEnv = "$fqdnValueForEnv$path";
+                        }
                     }
                 }
 
