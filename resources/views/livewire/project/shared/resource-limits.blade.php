@@ -7,12 +7,10 @@
         <div class="">Limit your container resources by CPU & memory.</div>
         <h3 class="pt-4">Limit CPUs</h3>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$resource" placeholder="1.5"
+            <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" step="0.1"
+                placeholder="1.5"
                 helper="0 means use all CPUs. Floating point number, like 0.002 or 1.5. More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>cpus</a>."
-                label="Number of CPUs" id="limitsCpus" />
-            <x-forms.input canGate="update" :canResource="$resource" placeholder="0-2"
-                helper="Empty means use all CPU sets. 0-2 will use CPU 0, CPU 1 and CPU 2. More info <a class='underline dark:text-white'  target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>cpuset</a>."
-                label="CPU sets to use" id="limitsCpuset">
+                label="Number of CPU threads" id="limitsCpus">
                 <x-slot:suffix>
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -26,12 +24,41 @@
                         <path d="M20 14h3" />
                         <path d="M1 9h3" />
                         <path d="M1 14h3" />
+                        <path d="M12 9v6" />
+                        <path d="M9 12h6" />
                     </svg>
                 </x-slot:suffix>
             </x-forms.input>
-            <x-forms.input canGate="update" :canResource="$resource" placeholder="1024"
-                helper="More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>cpu_shares</a>."
-                label="CPU Weight" id="limitsCpuShares" />
+            <x-forms.input canGate="update" :canResource="$resource" placeholder="0-2"
+                helper="Pin container to specific CPU threads. 0 means use all threads. Example: 0-1,4 results in using threads 0,1,4.<br>More info <a class='underline dark:text-white'  target='_blank' href='https://docs.docker.com/engine/reference/run/#cpuset-constraint'>cpuset</a>."
+                label="CPU sets to use" id="limitsCpuset">
+                <x-slot:suffix>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M9 4a3 3 0 0 1 6 0c0 1.657 -1.343 3 -3 3s-3 -1.343 -3 -3" />
+                        <path d="M12 7v13" />
+                        <path d="M9 20h6" />
+                    </svg>
+                </x-slot:suffix>
+            </x-forms.input>
+            <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" step="64"
+                placeholder="1024"
+                helper="Relative CPU priority when containers compete for resources. Default: 1024 (normal). Examples: 512 = half priority, 2048 = double priority.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>cpu_shares</a>."
+                label="CPU Weight" id="limitsCpuShares">
+                <x-slot:suffix>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M5 5m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M19 5m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M5 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M19 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M5 7l0 10" />
+                        <path d="M19 7l0 10" />
+                        <path d="M7 5l10 0" />
+                        <path d="M7 19l10 0" />
+                    </svg>
+                </x-slot:suffix>
+            </x-forms.input>
         </div>
         <h3 class="pt-4">Limit Memory</h3>
         <div class="flex flex-col gap-2">
