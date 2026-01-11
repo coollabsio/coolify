@@ -156,16 +156,6 @@ document.addEventListener('alpine:init', () => {
             return { value: combined, unit: config.defaultUnit };
         },
 
-        validateAndClamp() {
-            const numValue = parseFloat(this.inputValue);
-            if (isNaN(numValue)) return;
-            if (config.min !== null && numValue < config.min) {
-                this.inputValue = String(config.min);
-            } else if (config.max !== null && numValue > config.max) {
-                this.inputValue = String(config.max);
-            }
-        },
-
         toStructured() {
             return {
                 value: this.inputValue || '',
@@ -183,14 +173,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         updateStructured() {
-            this.validateAndClamp();
             this.structuredValue = this.toStructured();
             this.updateCombined();
         },
 
         handleInputChange() {
-            this.validateAndClamp();
-            
             if (this.pendingSync) {
                 clearTimeout(this.pendingSync);
             }
