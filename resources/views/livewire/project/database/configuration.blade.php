@@ -18,9 +18,9 @@
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Persistent
                 Storage</a>
             @can('update', $database)
-                <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
-                    href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
-                    Backups</a>
+                <a class='menu-item' wire:current.exact="menu-item-active"
+                    href="{{ route('project.database.import-backup', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
+                    Backup</a>
             @endcan
             <a class='menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Webhooks</a>
@@ -63,7 +63,7 @@
                 <livewire:project.shared.destination :resource="$database" />
             @elseif ($currentRoute === 'project.database.persistent-storage')
                 <livewire:project.service.storage :resource="$database" />
-            @elseif ($currentRoute === 'project.database.import-backups')
+            @elseif ($currentRoute === 'project.database.import-backup')
                 <livewire:project.database.import :resource="$database" />
             @elseif ($currentRoute === 'project.database.webhooks')
                 <livewire:project.shared.webhooks :resource="$database" />

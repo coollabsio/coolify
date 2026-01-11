@@ -16,6 +16,7 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -103,7 +104,7 @@ use Visus\Cuid2\Cuid2;
 
 class Server extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, SchemalessAttributesTrait, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -267,15 +268,6 @@ class Server extends BaseModel
     public static function isUsable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
-    }
-
-    public static function destinationsByServer(string $server_id)
-    {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
-        $standaloneDocker = collect($server->standaloneDockers->all());
-        $swarmDocker = collect($server->swarmDockers->all());
-
-        return $standaloneDocker->concat($swarmDocker);
     }
 
     public function settings()
@@ -665,141 +657,6 @@ $schema://$host {
     public function checkSentinel()
     {
         CheckAndStartSentinelJob::dispatch($this);
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            if (str($cpu)->contains('error')) {
-                $error = json_decode($cpu, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $cpu = json_decode($cpu, true);
-
-            $metrics = collect($cpu)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            })->toArray();
-
-            // Downsample for intervals > 60 minutes to prevent browser freeze
-            if ($mins > 60 && count($metrics) > 1000) {
-                $metrics = $this->downsampleLTTB($metrics, 1000);
-            }
-
-            return collect($metrics);
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            if (str($memory)->contains('error')) {
-                $error = json_decode($memory, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $memory = json_decode($memory, true);
-            $metrics = collect($memory)->map(function ($metric) {
-                $usedPercent = $metric['usedPercent'] ?? 0.0;
-
-                return [(int) $metric['time'], (float) $usedPercent];
-            })->toArray();
-
-            // Downsample for intervals > 60 minutes to prevent browser freeze
-            if ($mins > 60 && count($metrics) > 1000) {
-                $metrics = $this->downsampleLTTB($metrics, 1000);
-            }
-
-            return collect($metrics);
-        }
-    }
-
-    /**
-     * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
-     * This preserves the visual shape of the data better than simple averaging.
-     *
-     * @param  array  $data  Array of [timestamp, value] pairs
-     * @param  int  $threshold  Target number of points
-     * @return array Downsampled data
-     */
-    private function downsampleLTTB(array $data, int $threshold): array
-    {
-        $dataLength = count($data);
-
-        // Return unchanged if threshold >= data length, or if threshold <= 2
-        // (threshold <= 2 would cause division by zero in bucket calculation)
-        if ($threshold >= $dataLength || $threshold <= 2) {
-            return $data;
-        }
-
-        $sampled = [];
-        $sampled[] = $data[0]; // Always keep first point
-
-        $bucketSize = ($dataLength - 2) / ($threshold - 2);
-
-        $a = 0; // Index of previous selected point
-
-        for ($i = 0; $i < $threshold - 2; $i++) {
-            // Calculate bucket range
-            $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
-            $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
-            $bucketEnd = min($bucketEnd, $dataLength - 1);
-
-            // Calculate average point for next bucket (used as reference)
-            $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
-            $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
-            $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
-
-            $avgX = 0;
-            $avgY = 0;
-            $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
-
-            if ($nextBucketCount > 0) {
-                for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
-                    $avgX += $data[$j][0];
-                    $avgY += $data[$j][1];
-                }
-                $avgX /= $nextBucketCount;
-                $avgY /= $nextBucketCount;
-            }
-
-            // Find point in current bucket with largest triangle area
-            $maxArea = -1;
-            $maxAreaIndex = $bucketStart;
-
-            $pointAX = $data[$a][0];
-            $pointAY = $data[$a][1];
-
-            for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
-                // Triangle area calculation
-                $area = abs(
-                    ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
-                    ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
-                ) * 0.5;
-
-                if ($area > $maxArea) {
-                    $maxArea = $area;
-                    $maxAreaIndex = $j;
-                }
-            }
-
-            $sampled[] = $data[$maxAreaIndex];
-            $a = $maxAreaIndex;
-        }
-
-        $sampled[] = $data[$dataLength - 1]; // Always keep last point
-
-        return $sampled;
     }
 
     public function getDiskUsage(): ?string

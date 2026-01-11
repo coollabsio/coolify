@@ -218,7 +218,10 @@ class TeamController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $team = auth()->user()->currentTeam();
+        $team = auth()->user()->teams->where('id', $teamId)->first();
+        if (is_null($team)) {
+            return response()->json(['message' => 'Team not found.'], 404);
+        }
 
         return response()->json(
             $this->removeSensitiveData($team),
@@ -263,7 +266,10 @@ class TeamController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $team = auth()->user()->currentTeam();
+        $team = auth()->user()->teams->where('id', $teamId)->first();
+        if (is_null($team)) {
+            return response()->json(['message' => 'Team not found.'], 404);
+        }
         $team->members->makeHidden([
             'pivot',
             'email_change_code',
