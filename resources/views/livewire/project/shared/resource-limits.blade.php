@@ -76,7 +76,7 @@
                             min="0"
                             placeholder="512"
                             helper="Hard limit on container memory usage. The container will be killed if it exceeds this limit.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>mem_limit</a>."
-                            label="Maximum Memory Limit" id="limitsMemory"
+                            label="Memory Limit" id="limitsMemory"
                             :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
                             defaultOption="m" />
                         <x-forms.input-with-select canGate="update" :canResource="$resource"
@@ -84,7 +84,7 @@
                             min="0"
                             placeholder="256"
                             helper="Guaranteed memory reservation for the container. Docker attempts to ensure this amount is always available.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>mem_reservation</a>."
-                            label="Soft Memory Limit" id="limitsMemoryReservation"
+                            label="Memory Reservation" id="limitsMemoryReservation"
                             :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
                             defaultOption="m" />
                     </div>
