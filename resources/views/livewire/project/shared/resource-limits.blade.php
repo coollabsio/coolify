@@ -20,21 +20,33 @@
         <h3 class="pt-4">Limit Memory</h3>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples: 69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>here</a>."
-                    label="Soft Memory Limit" id="limitsMemoryReservation" />
+                <x-forms.input-with-select canGate="update" :canResource="$resource"
+                    type="number"
+                    min="0"
+                    helper="Guaranteed memory reservation for the container. Docker attempts to ensure this amount is always available.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>here</a>."
+                    label="Soft Memory Limit" id="limitsMemoryReservation"
+                    :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
+                    defaultOption="m" />
                 <x-forms.input canGate="update" :canResource="$resource"
                     helper="0-100.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_swappiness'>here</a>."
                     type="number" min="0" max="100" label="Swappiness"
                     id="limitsMemorySwappiness" />
             </div>
             <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples: 69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>here</a>."
-                    label="Maximum Memory Limit" id="limitsMemory" />
-                <x-forms.input canGate="update" :canResource="$resource"
-                    helper="Examples:69b (byte) or 420k (kilobyte) or 1337m (megabyte) or 1g (gigabyte).<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#memswap_limit'>here</a>."
-                    label="Maximum Swap Limit" id="limitsMemorySwap" />
+                <x-forms.input-with-select canGate="update" :canResource="$resource"
+                    type="number"
+                    min="0"
+                    helper="Hard limit on container memory usage. The container will be killed if it exceeds this limit.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>here</a>."
+                    label="Maximum Memory Limit" id="limitsMemory"
+                    :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
+                    defaultOption="m" />
+                <x-forms.input-with-select canGate="update" :canResource="$resource"
+                    type="number"
+                    min="0"
+                    helper="Total limit for memory plus swap space. Combined limit for both RAM and swap usage.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#memswap_limit'>here</a>."
+                    label="Maximum Swap Limit" id="limitsMemorySwap"
+                    :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
+                    defaultOption="m" />
             </div>
         </div>
     </form>
