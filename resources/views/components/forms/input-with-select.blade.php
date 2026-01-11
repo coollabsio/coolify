@@ -3,6 +3,16 @@
     $selectId = $htmlId !== 'null' ? $htmlId . '-select' : null;
 @endphp
 
+<style>
+    /* Apply dirty styling to visible input when hidden input is dirty */
+    .input-with-select-container input[type="hidden"].dirty-tracker ~ input {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5 !important;
+    }
+    .dark .input-with-select-container input[type="hidden"].dirty-tracker ~ input {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424 !important;
+    }
+</style>
+
 <div class="w-full" 
      x-data="inputWithSelect({
         defaultUnit: @js($defaultOption ?? ''),
@@ -30,7 +40,15 @@
         </label>
     @endif
 
-    <div class="flex">
+    <div class="flex input-with-select-container">
+        {{-- Hidden input for wire:dirty tracking (binds to combinedValue which has the full value with unit) --}}
+        @if ($modelBinding !== 'null')
+            <input type="hidden" 
+                wire:model={{ $combinedBinding }}
+                wire:dirty.class="dirty-tracker"
+            />
+        @endif
+        
         {{-- Input --}}
         <input 
             type="{{ $type }}"
@@ -137,7 +155,7 @@ document.addEventListener('alpine:init', () => {
         parseCombinedValue(combined) {
             // Parse combinedValue (e.g., "512m") into structured format
             // Only matches if suffix is a valid unit to avoid footguns
-            if (!combined || combined === '0') {
+            if (!combined || combined === '0' || combined === 'null' || combined === null) {
                 return { value: '', unit: config.defaultUnit };
             }
 
