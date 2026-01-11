@@ -31,9 +31,9 @@ class ResourceLimits extends Component
         'limitsMemorySwap' => 'required|string',
         'limitsMemorySwappiness' => 'required|integer|min:0|max:100',
         'limitsMemoryReservation' => 'required|string',
-        'limitsCpus' => 'nullable',
-        'limitsCpuset' => 'nullable',
-        'limitsCpuShares' => 'nullable',
+        'limitsCpus' => 'nullable|numeric|min:0|max:1024',
+        'limitsCpuset' => 'nullable|string',
+        'limitsCpuShares' => 'nullable|integer|min:0|max:8192',
     ];
 
     protected $validationAttributes = [
@@ -85,19 +85,19 @@ class ResourceLimits extends Component
             $this->authorize('update', $this->resource);
 
             // Apply default values to properties
-            if (! $this->limitsMemory) {
+            if (!$this->limitsMemory) {
                 $this->limitsMemory = '0';
             }
-            if (! $this->limitsMemorySwap) {
+            if (!$this->limitsMemorySwap) {
                 $this->limitsMemorySwap = '0';
             }
             if (is_null($this->limitsMemorySwappiness)) {
                 $this->limitsMemorySwappiness = 60;
             }
-            if (! $this->limitsMemoryReservation) {
+            if (!$this->limitsMemoryReservation) {
                 $this->limitsMemoryReservation = '0';
             }
-            if (! $this->limitsCpus) {
+            if (!$this->limitsCpus) {
                 $this->limitsCpus = '0';
             }
             if ($this->limitsCpuset === '') {

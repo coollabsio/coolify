@@ -10,7 +10,7 @@
                 <h3>Limit CPUs</h3>
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col md:flex-row gap-4">
-                        <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" step="0.1"
+                        <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" max="1024" step="0.1"
                             placeholder="1.5"
                             helper="Limit how much CPU the container can use. 0 means unlimited (use all available CPUs). Use decimal numbers like 1.5 for one and a half CPUs, or 0.5 for half a CPU.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-quota-constraint'>cpu-quota</a>."
                             label="CPU Limit" id="limitsCpus">
@@ -46,7 +46,7 @@
                                 </svg>
                             </x-slot:suffix>
                         </x-forms.input>
-                        <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" step="64"
+                        <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" max="8192" step="64"
                             placeholder="1024"
                             helper="Relative CPU priority when containers compete for resources. Default: 1024 (normal). Examples: 512 = half priority, 2048 = double priority.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>cpu_shares</a>."
                             label="CPU Weight" id="limitsCpuShares">
