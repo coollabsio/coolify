@@ -11,7 +11,7 @@
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col md:flex-row gap-4">
                         <x-forms.input canGate="update" :canResource="$resource" type="number" min="0" max="1024" step="0.1"
-                            placeholder="1.5"
+                            placeholder="0"
                             helper="Limit how much CPU the container can use. 0 means unlimited (use all available CPUs). Use decimal numbers like 1.5 for one and a half CPUs, or 0.5 for half a CPU.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-quota-constraint'>cpu-quota</a>."
                             label="CPU Limit" id="limitsCpus">
                             <x-slot:suffix>
@@ -34,7 +34,7 @@
                         </x-forms.input>
                     </div>
                     <div class="flex flex-col md:flex-row gap-4">
-                        <x-forms.input canGate="update" :canResource="$resource" placeholder="0-2"
+                        <x-forms.input canGate="update" :canResource="$resource" placeholder="0"
                             helper="Pin container to specific CPU threads. 0 means use all threads. Example: 0-1,4 results in using threads 0,1,4.<br>More info <a class='underline dark:text-white'  target='_blank' href='https://docs.docker.com/engine/reference/run/#cpuset-constraint'>cpuset</a>."
                             label="CPU sets to use" id="limitsCpuset">
                             <x-slot:suffix>
@@ -74,7 +74,7 @@
                         <x-forms.input-with-select canGate="update" :canResource="$resource"
                             type="number"
                             min="0"
-                            placeholder="512"
+                            placeholder="0"
                             helper="Hard limit on container memory usage. The container will be killed if it exceeds this limit.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_limit'>mem_limit</a>."
                             label="Memory Limit" id="limitsMemory"
                             :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
@@ -82,7 +82,7 @@
                         <x-forms.input-with-select canGate="update" :canResource="$resource"
                             type="number"
                             min="0"
-                            placeholder="256"
+                            placeholder="0"
                             helper="Guaranteed memory reservation for the container. Docker attempts to ensure this amount is always available.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#mem_reservation'>mem_reservation</a>."
                             label="Memory Reservation" id="limitsMemoryReservation"
                             :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
@@ -92,7 +92,7 @@
                         <x-forms.input-with-select canGate="update" :canResource="$resource"
                             type="number"
                             min="0"
-                            placeholder="512"
+                            placeholder="0"
                             helper="Total limit for memory plus swap space. Combined limit for both RAM and swap usage.<br>More info <a class='underline dark:text-white' target='_blank' href='https://docs.docker.com/compose/compose-file/05-services/#memswap_limit'>memswap_limit</a>."
                             label="Maximum Swap Limit" id="limitsMemorySwap"
                             :options="['b' => 'B', 'k' => 'KiB', 'm' => 'MiB', 'g' => 'GiB']"
