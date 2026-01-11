@@ -34,12 +34,13 @@ class Input extends Component
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
+        public ?string $suffix = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {
             $hasPermission = Gate::allows($this->canGate, $this->canResource);
 
-            if (! $hasPermission) {
+            if (!$hasPermission) {
                 $this->disabled = true;
             }
         }
@@ -60,7 +61,7 @@ class Input extends Component
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
             $uniqueSuffix = new Cuid2;
-            $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
+            $this->htmlId = $this->modelBinding . '-' . $uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;
         }
@@ -69,7 +70,7 @@ class Input extends Component
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
         if ($this->type === 'password') {
-            $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
+            $this->defaultClass = $this->defaultClass . '  pr-[2.8rem]';
         }
 
         // $this->label = Str::title($this->label);

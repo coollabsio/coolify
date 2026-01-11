@@ -1,3 +1,8 @@
+@php
+    $hasSuffix = (isset($suffix) && $suffix instanceof \Illuminate\View\ComponentSlot && $suffix->isNotEmpty()) || ($suffix ?? null);
+    $inputClass = $hasSuffix ? $defaultClass . ' rounded-r-none border-r-0' : $defaultClass;
+@endphp
+
 <div @class([
     'flex-1' => $isMultiline,
     'w-full' => !$isMultiline,
@@ -45,8 +50,11 @@
 
         </div>
     @else
+        @if ($hasSuffix)
+            <div class="flex">
+        @endif
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
-            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
+            {{ $attributes->merge(['class' => $inputClass]) }} @required($required) @readonly($readonly)
             @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
             wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
@@ -55,6 +63,12 @@
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" @endif>
+        @if ($hasSuffix)
+                <span class="flex items-center px-3 border border-l-0 rounded-r bg-coolgray-100 text-neutral-400 select-none">
+                    {{ $suffix }}
+                </span>
+            </div>
+        @endif
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
