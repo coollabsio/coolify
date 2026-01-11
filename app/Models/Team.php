@@ -50,7 +50,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
     protected static function booted()
     {
         static::created(function ($team) {
-            $team->emailNotificationSettings()->create();
+            $team->emailNotificationSettings()->create([
+                'use_instance_email_settings' => isDev(),
+            ]);
             $team->discordNotificationSettings()->create();
             $team->slackNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();

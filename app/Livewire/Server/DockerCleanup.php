@@ -31,6 +31,9 @@ class DockerCleanup extends Component
     #[Validate('boolean')]
     public bool $deleteUnusedNetworks = false;
 
+    #[Validate('boolean')]
+    public bool $disableApplicationImageRetention = false;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -52,6 +55,7 @@ class DockerCleanup extends Component
             $this->server->settings->docker_cleanup_threshold = $this->dockerCleanupThreshold;
             $this->server->settings->delete_unused_volumes = $this->deleteUnusedVolumes;
             $this->server->settings->delete_unused_networks = $this->deleteUnusedNetworks;
+            $this->server->settings->disable_application_image_retention = $this->disableApplicationImageRetention;
             $this->server->settings->save();
         } else {
             $this->forceDockerCleanup = $this->server->settings->force_docker_cleanup;
@@ -59,6 +63,7 @@ class DockerCleanup extends Component
             $this->dockerCleanupThreshold = $this->server->settings->docker_cleanup_threshold;
             $this->deleteUnusedVolumes = $this->server->settings->delete_unused_volumes;
             $this->deleteUnusedNetworks = $this->server->settings->delete_unused_networks;
+            $this->disableApplicationImageRetention = $this->server->settings->disable_application_image_retention;
         }
     }
 

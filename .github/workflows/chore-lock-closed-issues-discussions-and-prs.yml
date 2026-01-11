@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 1 * * *'
 
+permissions:
+  issues: write
+  discussions: write
+  pull-requests: write
+
 jobs:
   lock-threads:
     runs-on: ubuntu-latest
@@ -13,5 +18,5 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           issue-inactive-days: '30'
-          pr-inactive-days: '30'
           discussion-inactive-days: '30'
+          pr-inactive-days: '30'

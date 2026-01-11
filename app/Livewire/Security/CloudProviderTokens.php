@@ -30,6 +30,60 @@ class CloudProviderTokens extends Component
         $this->tokens = CloudProviderToken::ownedByCurrentTeam()->get();
     }
 
+    public function validateToken(int $tokenId)
+    {
+        try {
+            $token = CloudProviderToken::ownedByCurrentTeam()->findOrFail($tokenId);
+            $this->authorize('view', $token);
+
+            if ($token->provider === 'hetzner') {
+                $isValid = $this->validateHetznerToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Hetzner token is valid.');
+                } else {
+                    $this->dispatch('error', 'Hetzner token validation failed. Please check the token.');
+                }
+            } elseif ($token->provider === 'digitalocean') {
+                $isValid = $this->validateDigitalOceanToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'DigitalOcean token is valid.');
+                } else {
+                    $this->dispatch('error', 'DigitalOcean token validation failed. Please check the token.');
+                }
+            } else {
+                $this->dispatch('error', 'Unknown provider.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function validateHetznerToken(string $token): bool
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.hetzner.cloud/v1/servers?per_page=1');
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateDigitalOceanToken(string $token): bool
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.digitalocean.com/v2/account');
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function deleteToken(int $tokenId)
     {
         try {

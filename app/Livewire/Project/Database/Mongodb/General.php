@@ -18,7 +18,7 @@ class General extends Component
 {
     use AuthorizesRequests;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public StandaloneMongodb $database;
 
@@ -91,8 +91,6 @@ class General extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'mongoInitdbRootUsername.required' => 'The Root Username field is required.',
                 'mongoInitdbRootPassword.required' => 'The Root Password field is required.',
                 'mongoInitdbDatabase.required' => 'The MongoDB Database field is required.',
@@ -122,8 +120,14 @@ class General extends Component
     public function mount()
     {
         try {
+            $this->authorize('view', $this->database);
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
 
             $existingCert = $this->database->sslCertificates()->first();
 
@@ -231,22 +235,23 @@ class General extends Component
 
                 return;
             }
-            if ($this->isPublic) {
-                if (! str($this->database->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->isPublic = false;
+            if ($this->isPublic && ! str($this->database->status)->startsWith('running')) {
+                $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                $this->isPublic = false;
 
-                    return;
-                }
+                return;
+            }
+            $this->syncData(true);
+            if ($this->isPublic) {
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->syncData(true);
         } catch (\Throwable $e) {
             $this->isPublic = ! $this->isPublic;
+            $this->syncData(true);
 
             return handleError($e, $this);
         }

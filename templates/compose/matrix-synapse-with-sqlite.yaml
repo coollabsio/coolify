@@ -1,0 +1,71 @@
+# documentation: https://element-hq.github.io/synapse/latest/welcome_and_overview.html
+# slogan: Chat securely with your family, friends, community, or build great apps with Matrix!
+# category: messaging
+# tags: chat,slack,discord,voip,video,call,matrix,synapse,sqlite
+# logo: svgs/matrix.svg
+# port: 8008
+
+# IMPORTANT: SYNAPSE_SERVER_NAME is permanent and cannot be changed after first deployment!
+# - If hosting at matrix.example.org but want user IDs like @user:example.org, set SYNAPSE_SERVER_NAME=example.org
+# - You'll need to set up .well-known delegation at https://example.org/.well-known/matrix/server
+# - See: https://element-hq.github.io/synapse/latest/delegate.html
+
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    environment:
+      - SERVICE_URL_SYNAPSE_8008
+      - SYNAPSE_SERVER_NAME=${SYNAPSE_SERVER_NAME:?}
+      - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
+      - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - SERVICE_USER_ADMIN=${SERVICE_USER_ADMIN}
+      - SERVICE_PASSWORD_ADMIN=${SERVICE_PASSWORD_ADMIN}
+    volumes:
+      - synapse-data:/data
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        # Generate config on first run
+        if [ ! -f /data/homeserver.yaml ]; then
+          # Generate default config using SYNAPSE_SERVER_NAME (permanent, used in user IDs)
+          /start.py generate
+
+          # Set public_baseurl to actual deployment URL (may differ from server_name)
+          # This allows hosting at matrix.example.org while server_name is example.org
+          if ! grep -q "public_baseurl" /data/homeserver.yaml; then
+            sed -i "/^server_name:/a public_baseurl: ${SERVICE_URL_SYNAPSE}/" /data/homeserver.yaml
+          fi
+
+          # Configure listener for reverse proxy
+          sed -i 's/bind_addresses: \[.*\]/bind_addresses: ["0.0.0.0"]/' /data/homeserver.yaml
+          sed -i '/x_forwarded:/d' /data/homeserver.yaml
+          sed -i '/type: http/a \    x_forwarded: true' /data/homeserver.yaml
+
+          # Enable registration if requested
+          if [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep -q "enable_registration" /data/homeserver.yaml; then
+            echo "enable_registration: true" >> /data/homeserver.yaml
+          fi
+        fi
+
+        # Register admin user if credentials provided
+        if [ -n "${SERVICE_USER_ADMIN}" ] && [ -n "${SERVICE_PASSWORD_ADMIN}" ]; then
+          (
+            while ! curl -sf http://localhost:8008/health > /dev/null 2>&1; do
+              sleep 2
+            done
+            register_new_matrix_user -a \
+              -u "${SERVICE_USER_ADMIN}" \
+              -p "${SERVICE_PASSWORD_ADMIN}" \
+              -c /data/homeserver.yaml \
+              http://localhost:8008 2>/dev/null || true
+          ) &
+        fi
+
+        exec /start.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s

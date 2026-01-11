@@ -23,13 +23,13 @@ class DeleteUserServers
         $servers = collect();
 
         // Get all teams the user belongs to
-        $teams = $this->user->teams;
+        $teams = $this->user->teams()->get();
 
         foreach ($teams as $team) {
             // Only include servers from teams where user is owner or admin
             $userRole = $team->pivot->role;
             if ($userRole === 'owner' || $userRole === 'admin') {
-                $teamServers = $team->servers;
+                $teamServers = $team->servers()->get();
                 $servers = $servers->merge($teamServers);
             }
         }
