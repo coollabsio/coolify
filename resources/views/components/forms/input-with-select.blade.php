@@ -8,10 +8,13 @@
         defaultUnit: @js($defaultOption ?? ''),
         min: @js($min),
         max: @js($max),
+        validUnits: @js(array_keys($options)),
         @if ($modelBinding !== 'null')
-            combinedValue: @entangle($modelBinding),
+            combinedValue: @entangle($combinedBinding),
+            structuredValue: @entangle($structuredBinding),
         @else
             combinedValue: @js($value ?? '0'),
+            structuredValue: @js(['value' => $value ?? '', 'unit' => $defaultOption ?? '']),
         @endif
      })"
      x-ref="container">
@@ -54,7 +57,7 @@
         <select 
             @if ($selectId) id="{{ $selectId }}" @endif
             x-model="selectValue"
-            @change="updateCombined()"
+            @change="updateStructured()"
             @disabled($disabled)
             name="{{ $name }}-select"
             class="select rounded-l-none w-auto min-w-[70px] border-l-0"
@@ -82,17 +85,41 @@ document.addEventListener('alpine:init', () => {
         inputValue: '',
         selectValue: config.defaultUnit,
         combinedValue: config.combinedValue,
+        structuredValue: config.structuredValue,
         pendingSync: null,
 
         init() {
-            this.parseValue(this.combinedValue);
+            // If structuredValue is empty/invalid, parse from combinedValue
+            if (!this.structuredValue || !this.structuredValue.value) {
+                this.parseFromCombined();
+                this.structuredValue = this.toStructured();
+            } else {
+                // Use existing structuredValue
+                this.inputValue = this.structuredValue.value || '';
+                this.selectValue = this.structuredValue.unit || config.defaultUnit;
+            }
             
-            // Watch for external changes to combinedValue (from Livewire)
+            // Watch combinedValue for external changes
             this.$watch('combinedValue', (newVal) => {
-                if (newVal !== this.combined()) {
-                    this.parseValue(newVal);
+                const current = this.toStructured();
+                const parsed = this.parseCombinedValue(newVal);
+                if (current.value !== parsed.value || current.unit !== parsed.unit) {
+                    this.parseFromCombined();
+                    this.structuredValue = this.toStructured();
                 }
             });
+            
+            // Watch structuredValue for external changes
+            this.$watch('structuredValue', (newVal) => {
+                if (newVal && newVal.value !== undefined) {
+                    const current = this.toStructured();
+                    if (current.value !== newVal.value || current.unit !== newVal.unit) {
+                        this.inputValue = newVal.value || '';
+                        this.selectValue = newVal.unit || config.defaultUnit;
+                        this.updateCombined();
+                    }
+                }
+            }, { deep: true });
         },
 
         destroy() {
@@ -101,19 +128,32 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        parseValue(val) {
-            if (!val || val === '0') {
-                this.inputValue = '';
-                this.selectValue = config.defaultUnit;
-                return;
+        parseFromCombined() {
+            const parsed = this.parseCombinedValue(this.combinedValue || '');
+            this.inputValue = parsed.value;
+            this.selectValue = parsed.unit;
+        },
+
+        parseCombinedValue(combined) {
+            // Parse combinedValue (e.g., "512m") into structured format
+            // Only matches if suffix is a valid unit to avoid footguns
+            if (!combined || combined === '0') {
+                return { value: '', unit: config.defaultUnit };
             }
-            const match = String(val).match(/^([\d.]+)\s*(.*)$/);
-            if (match) {
-                this.inputValue = match[1];
-                this.selectValue = match[2] || config.defaultUnit;
-            } else {
-                this.inputValue = val;
+
+            // Try to match valid unit suffix (longest first to handle multi-char units if needed)
+            const sortedUnits = [...config.validUnits].sort((a, b) => b.length - a.length);
+            for (const unit of sortedUnits) {
+                if (combined.endsWith(unit)) {
+                    const value = combined.slice(0, -unit.length);
+                    if (value && !isNaN(parseFloat(value))) {
+                        return { value, unit };
+                    }
+                }
             }
+
+            // No valid unit found, treat entire value as number with default unit
+            return { value: combined, unit: config.defaultUnit };
         },
 
         validateAndClamp() {
@@ -126,27 +166,38 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        combined() {
-            if (!this.inputValue) return '0';
-            return this.inputValue + this.selectValue;
+        toStructured() {
+            return {
+                value: this.inputValue || '',
+                unit: this.selectValue || config.defaultUnit
+            };
         },
 
         updateCombined() {
+            const structured = this.toStructured();
+            if (!structured.value) {
+                this.combinedValue = '0';
+            } else {
+                this.combinedValue = structured.value + structured.unit;
+            }
+        },
+
+        updateStructured() {
             this.validateAndClamp();
-            this.combinedValue = this.combined();
+            this.structuredValue = this.toStructured();
+            this.updateCombined();
         },
 
         handleInputChange() {
-            // Validate/clamp immediately as user types
             this.validateAndClamp();
             
-            // Debounce the combined value update
             if (this.pendingSync) {
                 clearTimeout(this.pendingSync);
             }
             this.pendingSync = setTimeout(() => {
                 if (this.pendingSync !== null && document.activeElement === this.$refs.input) {
-                    this.combinedValue = this.combined();
+                    this.structuredValue = this.toStructured();
+                    this.updateCombined();
                 }
                 this.pendingSync = null;
             }, 500);
@@ -162,7 +213,7 @@ document.addEventListener('alpine:init', () => {
             if (relatedTarget && container && container.contains(relatedTarget)) {
                 return;
             }
-            this.updateCombined();
+            this.updateStructured();
         }
     }));
 });
