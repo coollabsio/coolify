@@ -16,8 +16,6 @@ class InputWithSelect extends Component
 
     public ?string $combinedBinding = null;
 
-    public ?string $structuredBinding = null;
-
     public function __construct(
         public ?string $id = null,
         public ?string $name = null,
@@ -78,7 +76,6 @@ class InputWithSelect extends Component
 
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             $this->combinedBinding = $this->modelBinding;
-            $this->structuredBinding = $this->modelBinding . 'Structured';
         }
 
         if (is_null($this->defaultOption) && !empty($this->options)) {

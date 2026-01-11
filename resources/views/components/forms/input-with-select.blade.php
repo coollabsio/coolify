@@ -13,18 +13,16 @@
     }
 </style>
 
-<div class="w-full" 
+<div class="w-full"
      x-data="inputWithSelect({
         defaultUnit: @js($defaultOption ?? ''),
         min: @js($min),
         max: @js($max),
         validUnits: @js(array_keys($options)),
         @if ($modelBinding !== 'null')
-            combinedValue: @entangle($combinedBinding),
-            structuredValue: @entangle($structuredBinding),
+            entangled: @entangle($combinedBinding),
         @else
-            combinedValue: @js($value ?? '0'),
-            structuredValue: @js(['value' => $value ?? '', 'unit' => $defaultOption ?? '']),
+            entangled: @js($value ?? '0'),
         @endif
      })"
      x-ref="container">
@@ -43,19 +41,18 @@
     <div class="flex input-with-select-container">
         {{-- Hidden input for wire:dirty tracking (binds to combinedValue which has the full value with unit) --}}
         @if ($modelBinding !== 'null')
-            <input type="hidden" 
+            <input type="hidden"
                 wire:model={{ $combinedBinding }}
                 wire:dirty.class="dirty-tracker"
             />
         @endif
-        
+
         {{-- Input --}}
-        <input 
+        <input
             type="{{ $type }}"
             @if ($inputId) id="{{ $inputId }}" @endif
-            x-model="inputValue"
-            @input="handleInputChange()"
-            @blur="handleInputBlur($event)"
+            x-model="value"
+            @blur="commit()"
             @disabled($disabled)
             @readonly($readonly)
             placeholder="{{ $placeholder }}"
@@ -72,10 +69,10 @@
         />
 
         {{-- Select --}}
-        <select 
+        <select
             @if ($selectId) id="{{ $selectId }}" @endif
-            x-model="selectValue"
-            @change="updateStructured()"
+            x-model="unit"
+            @change="commit()"
             @disabled($disabled)
             name="{{ $name }}-select"
             class="select rounded-l-none w-auto min-w-[70px] border-l-0"
@@ -98,128 +95,73 @@
 </div>
 
 <script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('inputWithSelect', (config) => ({
-        inputValue: '',
-        selectValue: config.defaultUnit,
-        combinedValue: config.combinedValue,
-        structuredValue: config.structuredValue,
-        pendingSync: null,
+(function() {
+    let registered = false;
 
-        init() {
-            // If structuredValue is empty/invalid, parse from combinedValue
-            if (!this.structuredValue || !this.structuredValue.value) {
-                this.parseFromCombined();
-                this.structuredValue = this.toStructured();
-            } else {
-                // Use existing structuredValue
-                this.inputValue = this.structuredValue.value || '';
-                this.selectValue = this.structuredValue.unit || config.defaultUnit;
-            }
-            
-            // Watch combinedValue for external changes
-            this.$watch('combinedValue', (newVal) => {
-                const current = this.toStructured();
-                const parsed = this.parseCombinedValue(newVal);
-                if (current.value !== parsed.value || current.unit !== parsed.unit) {
-                    this.parseFromCombined();
-                    this.structuredValue = this.toStructured();
-                }
-            });
-            
-            // Watch structuredValue for external changes
-            this.$watch('structuredValue', (newVal) => {
-                if (newVal && newVal.value !== undefined) {
-                    const current = this.toStructured();
-                    if (current.value !== newVal.value || current.unit !== newVal.unit) {
-                        this.inputValue = newVal.value || '';
-                        this.selectValue = newVal.unit || config.defaultUnit;
-                        this.updateCombined();
-                    }
-                }
-            }, { deep: true });
-        },
-
-        destroy() {
-            if (this.pendingSync) {
-                clearTimeout(this.pendingSync);
-            }
-        },
-
-        parseFromCombined() {
-            const parsed = this.parseCombinedValue(this.combinedValue || '');
-            this.inputValue = parsed.value;
-            this.selectValue = parsed.unit;
-        },
-
-        parseCombinedValue(combined) {
-            // Parse combinedValue (e.g., "512m") into structured format
-            // Only matches if suffix is a valid unit to avoid footguns
-            if (!combined || combined === '0' || combined === 'null' || combined === null) {
-                return { value: '', unit: config.defaultUnit };
-            }
-
-            // Try to match valid unit suffix (longest first to handle multi-char units if needed)
-            const sortedUnits = [...config.validUnits].sort((a, b) => b.length - a.length);
-            for (const unit of sortedUnits) {
-                if (combined.endsWith(unit)) {
-                    const value = combined.slice(0, -unit.length);
-                    if (value && !isNaN(parseFloat(value))) {
-                        return { value, unit };
-                    }
-                }
-            }
-
-            // No valid unit found, treat entire value as number with default unit
-            return { value: combined, unit: config.defaultUnit };
-        },
-
-        toStructured() {
-            return {
-                value: this.inputValue || '',
-                unit: this.selectValue || config.defaultUnit
-            };
-        },
-
-        updateCombined() {
-            const structured = this.toStructured();
-            if (!structured.value) {
-                this.combinedValue = '0';
-            } else {
-                this.combinedValue = structured.value + structured.unit;
-            }
-        },
-
-        updateStructured() {
-            this.structuredValue = this.toStructured();
-            this.updateCombined();
-        },
-
-        handleInputChange() {
-            if (this.pendingSync) {
-                clearTimeout(this.pendingSync);
-            }
-            this.pendingSync = setTimeout(() => {
-                if (this.pendingSync !== null && document.activeElement === this.$refs.input) {
-                    this.structuredValue = this.toStructured();
-                    this.updateCombined();
-                }
-                this.pendingSync = null;
-            }, 500);
-        },
-
-        handleInputBlur(event) {
-            if (this.pendingSync) {
-                clearTimeout(this.pendingSync);
-                this.pendingSync = null;
-            }
-            const relatedTarget = event.relatedTarget;
-            const container = this.$refs.container;
-            if (relatedTarget && container && container.contains(relatedTarget)) {
-                return;
-            }
-            this.updateStructured();
+    function registerInputWithSelect() {
+        // Prevent duplicate registration
+        if (registered) {
+            return;
         }
-    }));
-});
+
+        Alpine.data('inputWithSelect', ({ defaultUnit, validUnits, entangled }) => ({
+            value: '',
+            unit: defaultUnit,
+            entangled: entangled,
+
+            init() {
+                this.fromCombined(this.entangled);
+
+                // Watch for external changes from Livewire
+                this.$watch('entangled', (newVal) => {
+                    const current = this.combined;
+                    if (newVal !== current) {
+                        this.fromCombined(newVal);
+                    }
+                });
+            },
+
+            get combined() {
+                return this.value ? this.value + this.unit : '0';
+            },
+
+            commit() {
+                this.entangled = this.combined;
+            },
+
+            fromCombined(raw) {
+                if (!raw || raw === '0' || raw === 'null' || raw === null) {
+                    this.value = '';
+                    this.unit = defaultUnit;
+                    return;
+                }
+
+                const units = [...validUnits].sort((a, b) => b.length - a.length);
+                for (const u of units) {
+                    if (raw.endsWith(u)) {
+                        const val = raw.slice(0, -u.length);
+                        if (val) {
+                            this.value = val;
+                            this.unit = u;
+                            return;
+                        }
+                    }
+                }
+
+                this.value = raw;
+                this.unit = defaultUnit;
+            }
+        }));
+
+        registered = true;
+    }
+
+    // Alpine already initialized (SPA navigation) - register immediately
+    if (window.Alpine) {
+        registerInputWithSelect();
+    }
+
+    // Also listen for alpine:init (initial page load)
+    document.addEventListener('alpine:init', registerInputWithSelect);
+})();
 </script>
