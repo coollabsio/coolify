@@ -4,7 +4,7 @@
         @if ($resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
         @else
-            <div class="flex flex-col items-start gap-2 min-w-fit">
+            <div class="sub-menu-wrapper">
                 <a class="menu-item"
                     class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
                     {{ wireNavigate() }}
