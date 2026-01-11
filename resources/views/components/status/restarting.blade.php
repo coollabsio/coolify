@@ -4,6 +4,26 @@
     'lastDeploymentLink' => null,
     'noLoading' => false,
 ])
+@php
+    // Handle both colon format (backend) and parentheses format (from services.blade.php)
+    // starting:unknown → Starting (unknown)
+    // starting (unknown) → starting (unknown) (already formatted, display as-is)
+
+    if (str($status)->contains('(')) {
+        // Already in parentheses format from services.blade.php - use as-is
+        $displayStatus = $status;
+        $healthStatus = str($status)->after('(')->before(')')->trim()->value();
+    } elseif (str($status)->contains(':') && !str($status)->startsWith('Proxy')) {
+        // Colon format from backend - transform it
+        $parts = explode(':', $status);
+        $displayStatus = str($parts[0])->headline();
+        $healthStatus = $parts[1] ?? null;
+    } else {
+        // Simple status without health
+        $displayStatus = str($status)->headline();
+        $healthStatus = null;
+    }
+@endphp
 <div class="flex items-center">
     @if (!$noLoading)
         <x-loading wire:loading.delay.longer />
@@ -13,14 +33,14 @@
         <div class="pl-2 pr-1 text-xs font-bold dark:text-warning" @if($title) title="{{$title}}" @endif>
            @if ($lastDeploymentLink)
               <a href="{{ $lastDeploymentLink }}" target="_blank" class="underline cursor-pointer">
-                  {{ str($status)->before(':')->headline() }}
+                  {{ $displayStatus }}
               </a>
           @else
-              {{ str($status)->before(':')->headline() }}
+              {{ $displayStatus }}
           @endif
         </div>
-        @if (!str($status)->startsWith('Proxy') && !str($status)->contains('('))
-            <div class="text-xs dark:text-warning">({{ str($status)->after(':') }})</div>
+        @if ($healthStatus && !str($displayStatus)->contains('('))
+            <div class="text-xs dark:text-warning">({{ $healthStatus }})</div>
         @endif
     </span>
 </div>

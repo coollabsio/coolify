@@ -14,7 +14,7 @@
                             submitAction="saveCaCertificate" :actions="[
                                 'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.',
                                 'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
-                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
+                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates signed with your new CA certificate.',
                                 'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
                             ]"
                             confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
@@ -24,7 +24,7 @@
                             submitAction="regenerateCaCertificate" :actions="[
                                 'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.',
                                 'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
-                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
+                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates signed with the new CA certificate.',
                                 'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
                             ]"
                             confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"

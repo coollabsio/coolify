@@ -9,6 +9,7 @@ use Livewire\Component;
 class Configuration extends Component
 {
     use AuthorizesRequests;
+
     public $currentRoute;
 
     public $database;

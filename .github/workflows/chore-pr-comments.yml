@@ -3,20 +3,13 @@ on:
   pull_request_target:
     types:
       - labeled
+
+permissions:
+  pull-requests: write
+
 jobs:
   add-comment:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: read
-      actions: none
-      checks: none
-      deployments: none
-      issues: none
-      packages: none
-      repository-projects: none
-      security-events: none
-      statuses: none
     strategy:
       matrix:
         include:

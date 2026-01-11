@@ -1,0 +1,48 @@
+# documentation: https://booklore.org/docs/getting-started
+# slogan: Booklore is an open-source library management system for your digital book collection.
+# tags: media, books, kobo, epub, ebook, KOreader
+# logo: svgs/booklore.svg
+# port: 80
+
+services:
+  booklore:
+    image: booklore/booklore:v1.16.5
+    environment:
+      - SERVICE_URL_BOOKLORE_80
+      - USER_ID=${BOOKLORE_USER_ID:-0}
+      - GROUP_ID=${BOOKLORE_GROUP_ID:-0}
+      - TZ=${TZ:-UTC}
+      - DATABASE_URL=jdbc:mariadb://mariadb:3306/${MARIADB_DATABASE:-booklore-db}
+      - DATABASE_USERNAME=${SERVICE_USER_MARIADB}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - BOOKLORE_PORT=80
+    volumes:
+      - booklore-data:/app/data
+      - booklore-books:/books
+      - type: bind
+        source: ~/booklore
+        target: /bookdrop
+        is_directory: true
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --spider http://localhost/login || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:12
+    environment:
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-booklore-db}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
