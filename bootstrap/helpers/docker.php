@@ -401,12 +401,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         $sane_ip_list = [];
         foreach ($ip_list as $_ip) {
             if (filter_var($_ip, FILTER_VALIDATE_IP)) {
-                $sane_ip_list[] = $_ip;
+                $sane_ip_list[] = trim($_ip);
             }
         }
 
         if (count($sane_ip_list) > 0) {
-            $list_string = implode(', ', $sane_ip_list);
+            $list_string = implode(',', $sane_ip_list);
             $labels->push("traefik.http.middlewares.test-ipallowlist.ipallowlist.sourcerange={$list_string}");
         }
     }
@@ -559,7 +559,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 if ($is_force_https_enabled) {
                     $middleware_append_string = 'redirect-to-https';
                     if (isListStringFilled($test_ipallowlist)) {
-                        $middleware_append_string .= ', test-ipallowlist';
+                        $middleware_append_string .= ',test-ipallowlist';
                     }
                     $labels->push("traefik.http.routers.{$http_label}.middlewares={$middleware_append_string}");
                 }
@@ -608,6 +608,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
+                    }
+                    if (isListStringFilled($test_ipallowlist)) {
+                        $middlewares->push('test-ipallowlist');
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
