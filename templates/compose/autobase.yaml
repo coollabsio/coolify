@@ -1,0 +1,59 @@
+# documentation: https://autobase.tech/docs/
+# slogan: Autobase for PostgreSQL® is an open-source alternative to cloud-managed databases (self-hosted DBaaS).
+# tags: database, postgres, automation, self-hosted, dbaas
+# logo: svgs/autobase.svg
+# port: 80
+
+services:
+  autobase:
+    image: autobase/console_ui:2.5.2
+    platform: linux/amd64
+    environment:
+      - SERVICE_FQDN_AUTOBASE_80
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
+      - PG_CONSOLE_API_HOST=autobase-api
+    healthcheck:
+      test: [ "CMD", "curl", "http://localhost:80/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      autobase-api:
+        condition: service_healthy
+
+  autobase-db:
+    image: autobase/console_db:2.5.2
+    platform: linux/amd64
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - autobase-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  autobase-api:
+    image: autobase/console_api:2.5.2
+    platform: linux/amd64
+    environment:
+      - PG_CONSOLE_DB_HOST=autobase-db
+      - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
+      - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_ENCRYPTIONKEY}
+      - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/ansible:/tmp/ansible
+    healthcheck:
+      test: ["CMD", "curl", "-fsS",
+            "-H", "accept: application/json",
+            "-H", "Authorization: Bearer ${SERVICE_PASSWORD_UI}",
+            "http://localhost:8080/api/v1/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      autobase-db:
+        condition: service_healthy

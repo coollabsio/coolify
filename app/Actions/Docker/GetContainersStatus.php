@@ -145,6 +145,12 @@ class GetContainersStatus
                             $this->applicationContainerStatuses->put($applicationId, collect());
                         }
                         $containerName = data_get($labels, 'com.docker.compose.service');
+                        // Fallback for Docker Swarm which uses different labels
+                        if (! $containerName && $this->server->isSwarm()) {
+                            $containerName = data_get($labels, 'coolify.serviceName')
+                                ?? data_get($labels, 'coolify.name')
+                                ?? data_get($labels, 'com.docker.stack.namespace');
+                        }
                         if ($containerName) {
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
                         }
