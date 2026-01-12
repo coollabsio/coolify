@@ -38,6 +38,12 @@ class Advanced extends Component
     public bool $disableBuildCache = false;
 
     #[Validate(['boolean'])]
+    public bool $injectBuildArgsToDockerfile = true;
+
+    #[Validate(['boolean'])]
+    public bool $includeSourceCommitInBuild = false;
+
+    #[Validate(['boolean'])]
     public bool $isLogDrainEnabled = false;
 
     #[Validate(['boolean'])]
@@ -110,6 +116,8 @@ class Advanced extends Component
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
+            $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
+            $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
             $this->application->settings->save();
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
@@ -134,6 +142,8 @@ class Advanced extends Component
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
+            $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
+            $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
         }
     }
 

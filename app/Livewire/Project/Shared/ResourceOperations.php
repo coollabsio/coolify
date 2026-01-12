@@ -36,7 +36,7 @@ class ResourceOperations extends Component
         $parameters = get_route_parameters();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
-        $this->projects = Project::ownedByCurrentTeam()->get();
+        $this->projects = Project::ownedByCurrentTeamCached();
         $this->servers = currentTeam()->servers->filter(fn ($server) => ! $server->isBuildServer());
     }
 

@@ -1,0 +1,56 @@
+# documentation: https://codewithcj.github.io/SparkyFitness/
+# slogan: SparkyFitness is a comprehensive fitness tracking and management application designed to help users monitor their nutrition, exercise, and body measurements. It provides tools for daily progress tracking, goal setting, and insightful reports to support a healthy lifestyle.
+# category: health
+# tags: sparkyfitness, fitness, health, nutrition, exercise, body measurements
+# logo: svgs/sparkyfitness.svg
+# port: 80
+
+services:
+  sparkyfitness-frontend:
+    image: 'codewithcj/sparkyfitness:v0.15.7.3' # Released on Oct 18, 2025
+    environment:
+      - SERVICE_URL_SPARKYFITNESS_80
+    depends_on:
+      - sparkyfitness-server
+
+  sparkyfitness-server:
+    image: 'codewithcj/sparkyfitness_server:v0.15.7.3' # Released on Oct 18, 2025
+    environment:
+      - 'SPARKY_FITNESS_LOG_LEVEL=${SPARKY_FITNESS_LOG_LEVEL:-info}'
+      - 'SPARKY_FITNESS_DB_USER=${SERVICE_USER_POSTGRES}'
+      - SPARKY_FITNESS_DB_HOST=sparkyfitness-db
+      - 'SPARKY_FITNESS_DB_NAME=${SPARKY_FITNESS_DB_NAME:-sparkyfitness}'
+      - 'SPARKY_FITNESS_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'SPARKY_FITNESS_DB_PORT=${SPARKY_FITNESS_DB_PORT:-5432}'
+      - 'SPARKY_FITNESS_API_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_SERVERAPIENCRYPTIONKEY}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_SERVERJWTSECRET}'
+      - 'SPARKY_FITNESS_FRONTEND_URL=${SERVICE_URL_SPARKYFITNESS_80}'
+      - 'SPARKY_FITNESS_DISABLE_SIGNUP=${SPARKY_FITNESS_DISABLE_SIGNUP:-false}'
+      - 'SPARKY_FITNESS_ADMIN_EMAIL=${SPARKY_FITNESS_ADMIN_EMAIL:-admin@example.com}'
+      - 'SPARKY_FITNESS_EMAIL_HOST=${SPARKY_FITNESS_EMAIL_HOST:-smtp.gmail.com}'
+      - 'SPARKY_FITNESS_EMAIL_PORT=${SPARKY_FITNESS_EMAIL_PORT:-587}'
+      - 'SPARKY_FITNESS_EMAIL_SECURE=${SPARKY_FITNESS_EMAIL_SECURE:-false}'
+      - 'SPARKY_FITNESS_EMAIL_USER=${SPARKY_FITNESS_EMAIL_USER}'
+      - 'SPARKY_FITNESS_EMAIL_PASS=${SPARKY_FITNESS_EMAIL_PASS}'
+      - 'SPARKY_FITNESS_EMAIL_FROM=${SPARKY_FITNESS_EMAIL_FROM:-"Sparky Fitness <noreply@sparkyfitness.com>"}'
+    depends_on:
+      - sparkyfitness-db
+    volumes:
+      - 'sparkyfitness-server-backup:/app/SparkyFitnessServer/backup'
+      - 'sparkyfitness-server-uploads:/app/SparkyFitnessServer/uploads'
+
+  sparkyfitness-db:
+    image: 'postgres:15-alpine'
+    environment:
+      - 'POSTGRES_DB=${SPARKY_FITNESS_DB_NAME:-sparkyfitness}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - POSTGRES_PORT=${SPARKY_FITNESS_DB_PORT:-5432}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - 'sparkyfitness-db-postgresql:/var/lib/postgresql/data'
+

@@ -107,3 +107,35 @@ it('identifies invalid sha256 hashes', function () {
         expect($parser->isImageHash())->toBeFalse("Hash {$hash} should not be recognized as valid SHA256");
     }
 });
+
+it('correctly parses and normalizes image with full digest including hash', function () {
+    $parser = new DockerImageParser;
+    $hash = '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0';
+    $parser->parse("nginx@sha256:{$hash}");
+
+    expect($parser->getImageName())->toBe('nginx')
+        ->and($parser->getTag())->toBe($hash)
+        ->and($parser->isImageHash())->toBeTrue()
+        ->and($parser->getFullImageNameWithoutTag())->toBe('nginx')
+        ->and($parser->toString())->toBe("nginx@sha256:{$hash}");
+});
+
+it('correctly parses image when user provides digest-decorated name with colon hash', function () {
+    $parser = new DockerImageParser;
+    $hash = 'deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678';
+
+    // User might provide: nginx@sha256:deadbeef...
+    // This should be parsed correctly without duplication
+    $parser->parse("nginx@sha256:{$hash}");
+
+    $imageName = $parser->getFullImageNameWithoutTag();
+    if ($parser->isImageHash() && ! str_ends_with($imageName, '@sha256')) {
+        $imageName .= '@sha256';
+    }
+
+    // The result should be: nginx@sha256 (name) + deadbeef... (tag)
+    // NOT: nginx:deadbeef...@sha256 or nginx@sha256:deadbeef...@sha256
+    expect($imageName)->toBe('nginx@sha256')
+        ->and($parser->getTag())->toBe($hash)
+        ->and($parser->isImageHash())->toBeTrue();
+});

@@ -41,7 +41,13 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     $database = new StandaloneRedis;
     $database->uuid = (new Cuid2);
     $database->name = 'redis-database-'.$database->uuid;
+
     $redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    if ($otherData && isset($otherData['redis_password'])) {
+        $redis_password = $otherData['redis_password'];
+        unset($otherData['redis_password']);
+    }
+
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

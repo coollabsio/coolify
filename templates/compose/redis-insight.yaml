@@ -1,0 +1,31 @@
+# documentation: https://redis.io/docs/latest/operate/redisinsight/
+# slogan: Redis Insight lets you do both GUI- and CLI-based interactions in a fully-featured desktop GUI client.
+# category: database,observability,developer-tools
+# tags: redis,gui,database,monitoring,analytics
+# logo: svgs/redisinsight.png
+# port: 5540
+
+services:
+  redisinsight:
+    image: 'redis/redisinsight:2.70' # Released on Jul 11, 2025
+    environment:
+      - SERVICE_URL_REDISINSIGHT_5540
+      - RI_APP_HOST=0.0.0.0
+      - RI_APP_PORT=5540
+      - 'RI_ENCRYPTION_KEY=${SERVICE_PASSWORD_RI_ENCRYPTION_KEY}'
+      - 'RI_LOG_LEVEL=${RI_LOG_LEVEL:-info}'
+      - 'RI_FILES_LOGGER=${RI_FILES_LOGGER:-true}'
+      - 'RI_STDOUT_LOGGER=${RI_STDOUT_LOGGER:-true}'
+    volumes:
+      - 'redis_insight_data:/data'
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - 'http://0.0.0.0:5540/api/health'
+      interval: 10s
+      retries: 3
+      timeout: 10s
+      start_period: 10s
+

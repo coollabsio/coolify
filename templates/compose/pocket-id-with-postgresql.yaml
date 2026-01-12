@@ -1,0 +1,55 @@
+# documentation: https://pocket-id.org/docs/setup/installation
+# slogan: A simple and secure OIDC provider with passkey authentication
+# category: auth
+# tags: identity,oidc,oauth,passkey,webauthn,authentication,sso,openid,postgresql
+# logo: svgs/pocketid-logo.png
+# port: 1411
+
+services:
+  pocket-id:
+    image: ghcr.io/pocket-id/pocket-id:v1.13
+    environment:
+      - SERVICE_URL_POCKETID_1411
+      - APP_URL=${SERVICE_URL_POCKETID}
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+      - DB_PROVIDER=postgres
+      - DB_CONNECTION_STRING=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRES_DB:-pocketid}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_POCKETID}
+      - KEYS_STORAGE=${KEYS_STORAGE:-database}
+      - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS=${SMTP_TLS:-starttls}
+      - SMTP_SKIP_CERT_VERIFY=${SMTP_SKIP_CERT_VERIFY:-false}
+      - EMAIL_LOGIN_NOTIFICATION_ENABLED=${EMAIL_LOGIN_NOTIFICATION_ENABLED:-false}
+      - EMAIL_ONE_TIME_ACCESS_AS_ADMIN_ENABLED=${EMAIL_ONE_TIME_ACCESS_AS_ADMIN_ENABLED:-false}
+      - EMAIL_API_KEY_EXPIRATION_ENABLED=${EMAIL_API_KEY_EXPIRATION_ENABLED:-false}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    volumes:
+      - pocket-id-data:/app/data
+    healthcheck:
+      test: ["CMD", "/app/pocket-id", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgresql:
+        condition: service_healthy
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - pocket-id-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRES_DB:-pocketid}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

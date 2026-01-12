@@ -39,7 +39,7 @@ class Show extends Component
 
     public function loadCaCertificate()
     {
-        $this->caCertificate = SslCertificate::where('server_id', $this->server->id)->where('is_ca_certificate', true)->first();
+        $this->caCertificate = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
 
         if ($this->caCertificate) {
             $this->certificateContent = $this->caCertificate->ssl_certificate;
