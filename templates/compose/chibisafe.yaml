@@ -4,11 +4,13 @@
 # logo: svgs/chibisafe.svg
 # port: 80
 
+## This service includes its own reverse proxy because the application routing is broken, also it needs caddy for serving static files https://github.com/coollabsio/coolify/pull/5808#pullrequestreview-3340419006
+
 services:
   chibisafe:
     image: chibisafe/chibisafe:v6.5.5
     environment:
-      - BASE_API_URL=http://chibisafe_server:8000
+      - BASE_API_URL=http://chibisafe-server:8000
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8001"]
       interval: 30s
@@ -16,12 +18,12 @@ services:
       retries: 3
       start_period: 10s
 
-  chibisafe_server:
+  chibisafe-server:
     image: chibisafe/chibisafe-server:v6.5.5
     volumes:
-      - database:/app/database:rw
-      - uploads:/app/uploads:rw
-      - logs:/app/logs:rw
+      - chibisafe-database:/app/database:rw
+      - chibisafe-uploads:/app/uploads:rw
+      - chibisafe-logs:/app/logs:rw
     healthcheck:
       test:
         [
@@ -61,12 +63,12 @@ services:
                   pass_thru
               }
               @api path /api/*
-              reverse_proxy @api http://chibisafe_server:8000 {
+              reverse_proxy @api http://chibisafe-server:8000 {
                   header_up Host {http.reverse_proxy.upstream.hostport}
                   header_up X-Real-IP {http.request.header.X-Real-IP}
               }
               @docs path /docs*
-              reverse_proxy @docs http://chibisafe_server:8000 {
+              reverse_proxy @docs http://chibisafe-server:8000 {
                   header_up Host {http.reverse_proxy.upstream.hostport}
                   header_up X-Real-IP {http.request.header.X-Real-IP}
               }
