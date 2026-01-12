@@ -1190,6 +1190,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Update autobase to version 2.5 (#7923)
 - *(service)* Add chibisafe template (#5808)
 - *(ui)* Improve sidebar menu items styling (#7928)
+- *(service)* Improve open-archiver
 
 ### 🐛 Bug Fixes
 
@@ -5646,6 +5647,7 @@ All notable changes to this project will be documented in this file.
 - Update application architecture and database patterns for request-level caching best practices
 - Remove git worktree symlink instructions from CLAUDE.md
 - Remove git worktree symlink instructions from CLAUDE.md (#7908)
+- Update changelog
 
 ### ⚡ Performance
 
