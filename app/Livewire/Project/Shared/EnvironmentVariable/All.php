@@ -25,6 +25,8 @@ class All extends Component
 
     public bool $is_env_sorting_enabled = false;
 
+    public bool $use_build_secrets = false;
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -34,6 +36,7 @@ class All extends Component
     public function mount()
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
+        $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [\App\Models\Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -49,6 +52,7 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
 
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
+            $this->resource->settings->use_build_secrets = $this->use_build_secrets;
             $this->resource->settings->save();
             $this->getDevView();
             $this->dispatch('success', 'Environment variable settings updated.');
@@ -59,20 +63,30 @@ class All extends Component
 
     public function getEnvironmentVariablesProperty()
     {
-        if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables()->orderBy('order')->get();
+        $query = $this->resource->environment_variables()
+            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($this->is_env_sorting_enabled) {
+            $query->orderBy('key');
+        } else {
+            $query->orderBy('order');
         }
 
-        return $this->resource->environment_variables;
+        return $query->get();
     }
 
     public function getEnvironmentVariablesPreviewProperty()
     {
-        if ($this->is_env_sorting_enabled === false) {
-            return $this->resource->environment_variables_preview()->orderBy('order')->get();
+        $query = $this->resource->environment_variables_preview()
+            ->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+
+        if ($this->is_env_sorting_enabled) {
+            $query->orderBy('key');
+        } else {
+            $query->orderBy('order');
         }
 
-        return $this->resource->environment_variables_preview;
+        return $query->get();
     }
 
     public function getDevView()
@@ -208,6 +222,12 @@ class All extends Component
         $environment = $this->createEnvironmentVariable($data);
         $environment->order = $maxOrder + 1;
         $environment->save();
+
+        // Clear computed property cache to force refresh
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
+
+        $this->dispatch('success', 'Environment variable added.');
     }
 
     private function createEnvironmentVariable($data)
@@ -217,7 +237,8 @@ class All extends Component
         $environment->value = $data['value'];
         $environment->is_multiline = $data['is_multiline'] ?? false;
         $environment->is_literal = $data['is_literal'] ?? false;
-        $environment->is_buildtime_only = $data['is_buildtime_only'] ?? false;
+        $environment->is_runtime = $data['is_runtime'] ?? true;
+        $environment->is_buildtime = $data['is_buildtime'] ?? true;
         $environment->is_preview = $data['is_preview'] ?? false;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
@@ -295,6 +316,9 @@ class All extends Component
     public function refreshEnvs()
     {
         $this->resource->refresh();
+        // Clear computed property cache to force refresh
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
         $this->getDevView();
     }
 }

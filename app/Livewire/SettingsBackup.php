@@ -120,6 +120,8 @@ class SettingsBackup extends Component
 
     public function submit()
     {
+        $this->validate();
+
         $this->database->update([
             'name' => $this->name,
             'description' => $this->description,

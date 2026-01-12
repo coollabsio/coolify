@@ -66,4 +66,19 @@ class DockerCleanupFailed extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $url = base_url().'/server/'.$this->server->uuid;
+
+        return [
+            'success' => false,
+            'message' => 'Docker cleanup job failed',
+            'event' => 'docker_cleanup_failed',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'error_message' => $this->message,
+            'url' => $url,
+        ];
+    }
 }

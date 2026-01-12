@@ -10,12 +10,12 @@ services:
     image: mattermost/mattermost-team-edition:release-10
     platform: linux/amd64
     volumes:
-      - 'mattermost-data-config:/mattermost/config:rw'
-      - 'mattermost-data-data:/mattermost/data:rw'
-      - 'mattermost-data-logs:/mattermost/logs:rw'
-      - 'mattermost-data-plugins:/mattermost/plugins:rw'
-      - 'mattermost-data-client-plugins:/mattermost/client/plugins:rw'
-      - 'mattermost-data-bleve-indexes:/mattermost/bleve-indexes:rw'
+      - "mattermost-data-config:/mattermost/config:rw"
+      - "mattermost-data-data:/mattermost/data:rw"
+      - "mattermost-data-logs:/mattermost/logs:rw"
+      - "mattermost-data-plugins:/mattermost/plugins:rw"
+      - "mattermost-data-client-plugins:/mattermost/client/plugins:rw"
+      - "mattermost-data-bleve-indexes:/mattermost/bleve-indexes:rw"
     environment:
       - SERVICE_URL_MATTERMOST_8065
       - MM_SERVICESETTINGS_SITEURL=${SERVICE_URL_MATTERMOST}
@@ -26,11 +26,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8065"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
 
   postgres:
     image: postgres:16-alpine

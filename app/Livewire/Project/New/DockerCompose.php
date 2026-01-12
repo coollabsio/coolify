@@ -37,6 +37,10 @@ class DockerCompose extends Component
                 'dockerComposeRaw' => 'required',
             ]);
             $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            validateDockerComposeForInjection($this->dockerComposeRaw);
+
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
@@ -69,6 +73,9 @@ class DockerCompose extends Component
                 ]);
             }
             $service->parse(isNew: true);
+
+            // Apply service-specific application prerequisites
+            applyServiceApplicationPrerequisites($service);
 
             return redirect()->route('project.service.configuration', [
                 'service_uuid' => $service->uuid,

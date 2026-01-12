@@ -84,64 +84,6 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     );
 }
 
-function transfer_file_to_container(string $content, string $container_path, string $deployment_uuid, Server $server, bool $throwError = true): ?string
-{
-    $temp_file = tempnam(sys_get_temp_dir(), 'coolify_env_');
-
-    try {
-        // Write content to temporary file
-        file_put_contents($temp_file, $content);
-
-        // Generate unique filename for server transfer
-        $server_temp_file = '/tmp/coolify_env_'.uniqid().'_'.$deployment_uuid;
-
-        // Transfer file to server
-        instant_scp($temp_file, $server_temp_file, $server, $throwError);
-
-        // Ensure parent directory exists in container, then copy file
-        $parent_dir = dirname($container_path);
-        $commands = [];
-        if ($parent_dir !== '.' && $parent_dir !== '/') {
-            $commands[] = executeInDocker($deployment_uuid, "mkdir -p \"$parent_dir\"");
-        }
-        $commands[] = "docker cp $server_temp_file $deployment_uuid:$container_path";
-        $commands[] = "rm -f $server_temp_file";  // Cleanup server temp file
-
-        return instant_remote_process_with_timeout($commands, $server, $throwError);
-
-    } finally {
-        // Always cleanup local temp file
-        if (file_exists($temp_file)) {
-            unlink($temp_file);
-        }
-    }
-}
-
-function transfer_file_to_server(string $content, string $server_path, Server $server, bool $throwError = true): ?string
-{
-    $temp_file = tempnam(sys_get_temp_dir(), 'coolify_env_');
-
-    try {
-        // Write content to temporary file
-        file_put_contents($temp_file, $content);
-
-        // Ensure parent directory exists on server
-        $parent_dir = dirname($server_path);
-        if ($parent_dir !== '.' && $parent_dir !== '/') {
-            instant_remote_process_with_timeout(["mkdir -p \"$parent_dir\""], $server, $throwError);
-        }
-
-        // Transfer file directly to server destination
-        return instant_scp($temp_file, $server_path, $server, $throwError);
-
-    } finally {
-        // Always cleanup local temp file
-        if (file_exists($temp_file)) {
-            unlink($temp_file);
-        }
-    }
-}
-
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -176,7 +118,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -184,11 +126,12 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
+    $effectiveTimeout = $timeout ?? config('constants.ssh.command_timeout');
 
     return \App\Helpers\SshRetryHandler::retry(
-        function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand);
+        function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -232,7 +175,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
     throw new \RuntimeException($errorMessage, $exitCode);
 }
 
-function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
+function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null, bool $includeAll = false): Collection
 {
     if (is_null($application_deployment_queue)) {
         return collect([]);
@@ -273,7 +216,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
     $seenCommands = collect();
     $formatted = collect($decoded);
-    if (! $is_debug_enabled) {
+    if (! $is_debug_enabled && ! $includeAll) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
     }
 
@@ -326,9 +269,41 @@ function remove_iip($text)
     // Ensure the input is valid UTF-8 before processing
     $text = sanitize_utf8_text($text);
 
+    // Git access tokens
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
 
-    return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+    // ANSI color codes
+    $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+
+    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, etc.)
+    // (protocol://user:password@host → protocol://user:<REDACTED>@host)
+    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
+
+    // Email addresses
+    $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
+
+    // Bearer/JWT tokens
+    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
+
+    // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
+    $text = preg_replace('/\b(gh[pousr]_[A-Za-z0-9_]{36,})\b/', REDACTED, $text);
+
+    // GitLab tokens (glpat- = personal access token, glcbt- = CI build token, glrt- = runner token)
+    $text = preg_replace('/\b(gl(?:pat|cbt|rt)-[A-Za-z0-9\-_]{20,})\b/', REDACTED, $text);
+
+    // AWS credentials (Access Key ID starts with AKIA, ABIA, ACCA, ASIA)
+    $text = preg_replace('/\b(A(?:KIA|BIA|CCA|SIA)[A-Z0-9]{16})\b/', REDACTED, $text);
+
+    // AWS Secret Access Key (40 character base64-ish string, typically follows access key)
+    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1='.REDACTED, $text);
+
+    // API keys (common patterns)
+    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
+
+    // Private key blocks
+    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
+
+    return $text;
 }
 
 /**

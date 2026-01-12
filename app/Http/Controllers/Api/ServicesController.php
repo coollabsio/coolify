@@ -105,98 +105,7 @@ class ServicesController extends Controller
                     type: 'object',
                     required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
                     properties: [
-                        'type' => [
-                            'description' => 'The one-click service type',
-                            'type' => 'string',
-                            'enum' => [
-                                'activepieces',
-                                'appsmith',
-                                'appwrite',
-                                'authentik',
-                                'babybuddy',
-                                'budge',
-                                'changedetection',
-                                'chatwoot',
-                                'classicpress-with-mariadb',
-                                'classicpress-with-mysql',
-                                'classicpress-without-database',
-                                'cloudflared',
-                                'code-server',
-                                'dashboard',
-                                'directus',
-                                'directus-with-postgresql',
-                                'docker-registry',
-                                'docuseal',
-                                'docuseal-with-postgres',
-                                'dokuwiki',
-                                'duplicati',
-                                'emby',
-                                'embystat',
-                                'fider',
-                                'filebrowser',
-                                'firefly',
-                                'formbricks',
-                                'ghost',
-                                'gitea',
-                                'gitea-with-mariadb',
-                                'gitea-with-mysql',
-                                'gitea-with-postgresql',
-                                'glance',
-                                'glances',
-                                'glitchtip',
-                                'grafana',
-                                'grafana-with-postgresql',
-                                'grocy',
-                                'heimdall',
-                                'homepage',
-                                'jellyfin',
-                                'kuzzle',
-                                'listmonk',
-                                'logto',
-                                'mediawiki',
-                                'meilisearch',
-                                'metabase',
-                                'metube',
-                                'minio',
-                                'moodle',
-                                'n8n',
-                                'n8n-with-postgresql',
-                                'next-image-transformation',
-                                'nextcloud',
-                                'nocodb',
-                                'odoo',
-                                'openblocks',
-                                'pairdrop',
-                                'penpot',
-                                'phpmyadmin',
-                                'pocketbase',
-                                'posthog',
-                                'reactive-resume',
-                                'rocketchat',
-                                'shlink',
-                                'slash',
-                                'snapdrop',
-                                'statusnook',
-                                'stirling-pdf',
-                                'supabase',
-                                'syncthing',
-                                'tolgee',
-                                'trigger',
-                                'trigger-with-external-database',
-                                'twenty',
-                                'umami',
-                                'unleash-with-postgresql',
-                                'unleash-without-database',
-                                'uptime-kuma',
-                                'vaultwarden',
-                                'vikunja',
-                                'weblate',
-                                'whoogle',
-                                'wordpress-with-mariadb',
-                                'wordpress-with-mysql',
-                                'wordpress-without-database',
-                            ],
-                        ],
+                        'type' => ['description' => 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)', 'type' => 'string'],
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
                         'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
@@ -205,7 +114,7 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
-                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
                     ],
                 ),
             ),
@@ -234,6 +143,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -279,6 +192,13 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+
+        if (filled($request->type) && filled($request->docker_compose_raw)) {
+            return response()->json([
+                'message' => 'You cannot provide both service type and docker_compose_raw. Use one or the other.',
+            ], 422);
+        }
+
         $environmentUuid = $request->environment_uuid;
         $environmentName = $request->environment_name;
         if (blank($environmentUuid) && blank($environmentName)) {
@@ -324,19 +244,33 @@ class ServicesController extends Controller
                 });
             }
             if ($oneClickService) {
-                $service_payload = [
+                $dockerComposeRaw = base64_decode($oneClickService);
+
+                // Validate for command injection BEFORE creating service
+                try {
+                    validateDockerComposeForInjection($dockerComposeRaw);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => $e->getMessage(),
+                        ],
+                    ], 422);
+                }
+
+                $servicePayload = [
                     'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
                     'server_id' => $server->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
                 ];
-                if ($oneClickServiceName === 'cloudflared') {
-                    data_set($service_payload, 'connect_to_docker_network', true);
+                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
+                    data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = Service::create($service_payload);
+                $service = Service::create($servicePayload);
                 $service->name = "$oneClickServiceName-".$service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
@@ -358,6 +292,10 @@ class ServicesController extends Controller
                     });
                 }
                 $service->parse(isNew: true);
+
+                // Apply service-specific application prerequisites
+                applyServiceApplicationPrerequisites($service);
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
@@ -458,6 +396,18 @@ class ServicesController extends Controller
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+
             $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
             $instantDeploy = $request->instant_deploy ?? false;
 
@@ -490,8 +440,11 @@ class ServicesController extends Controller
                 'uuid' => $service->uuid,
                 'domains' => $domains,
             ])->setStatusCode(201);
-        } else {
-            return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
+        } elseif (filled($request->type)) {
+            return response()->json([
+                'message' => 'Invalid service type.',
+                'valid_service_types' => $serviceKeys,
+            ], 404);
         }
     }
 
@@ -619,10 +572,10 @@ class ServicesController extends Controller
 
         DeleteResourceJob::dispatch(
             resource: $service,
-            deleteVolumes: $request->query->get('delete_volumes', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
-            deleteConfigurations: $request->query->get('delete_configurations', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true)
+            deleteVolumes: $request->boolean('delete_volumes', true),
+            deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
+            deleteConfigurations: $request->boolean('delete_configurations', true),
+            dockerCleanup: $request->boolean('docker_cleanup', true)
         );
 
         return response()->json([
@@ -647,7 +600,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -669,7 +621,7 @@ class ServicesController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
                         ],
                     )
                 ),
@@ -703,6 +655,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -769,6 +725,19 @@ class ServicesController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+
             $service->docker_compose_raw = $dockerComposeRaw;
         }
 
@@ -820,7 +789,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -901,7 +869,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -953,6 +920,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1014,7 +985,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1074,6 +1044,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1141,7 +1115,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1190,6 +1163,10 @@ class ServicesController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1252,7 +1229,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1262,7 +1238,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1341,7 +1316,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1422,7 +1396,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1503,7 +1476,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(

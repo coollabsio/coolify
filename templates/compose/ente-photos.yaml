@@ -1,0 +1,87 @@
+# documentation: https://help.ente.io/self-hosting/installation/compose
+# slogan: Ente Photos is a fully open source, End to End Encrypted alternative to Google Photos and Apple Photos.
+# category: media
+# tags: photos,gallery,backup,encryption,privacy,self-hosted,google-photos,alternative
+# logo: svgs/ente-photos.svg
+# port: 8080
+
+services:
+  museum:
+    image: ghcr.io/ente-io/server:latest
+    environment:
+      - SERVICE_URL_MUSEUM_8080
+
+      - ENTE_HTTP_USE_TLS=${ENTE_HTTP_USE_TLS:-false}
+
+      - ENTE_APPS_PUBLIC_ALBUMS=${SERVICE_URL_WEB_3002}
+      - ENTE_APPS_CAST=${SERVICE_URL_WEB_3004}
+      - ENTE_APPS_ACCOUNTS=${SERVICE_URL_WEB_3001}
+
+      - ENTE_DB_HOST=${ENTE_DB_HOST:-postgres}
+      - ENTE_DB_PORT=${ENTE_DB_PORT:-5432}
+      - ENTE_DB_NAME=${ENTE_DB_NAME:-ente_db}
+      - ENTE_DB_USER=${SERVICE_USER_POSTGRES:-pguser}
+      - ENTE_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+
+      - ENTE_KEY_ENCRYPTION=${SERVICE_REALBASE64_ENCRYPTION}
+      - ENTE_KEY_HASH=${SERVICE_REALBASE64_64_HASH}
+
+      - ENTE_JWT_SECRET=${SERVICE_REALBASE64_JWT}
+
+      - ENTE_INTERNAL_ADMIN=${ENTE_INTERNAL_ADMIN:-1580559962386438}
+      - ENTE_INTERNAL_DISABLE_REGISTRATION=${ENTE_INTERNAL_DISABLE_REGISTRATION:-false}
+
+      - ENTE_S3_B2_EU_CEN_ARE_LOCAL_BUCKETS=${PRIMARY_STORAGE_ARE_LOCAL_BUCKETS:-false}
+      - ENTE_S3_B2_EU_CEN_USE_PATH_STYLE_URLS=${PRIMARY_STORAGE_USE_PATH_STYLE_URLS:-true}
+      - ENTE_S3_B2_EU_CEN_KEY=${S3_STORAGE_KEY:?}
+      - ENTE_S3_B2_EU_CEN_SECRET=${S3_STORAGE_SECRET:?}
+      - ENTE_S3_B2_EU_CEN_ENDPOINT=${S3_STORAGE_ENDPOINT:?}
+      - ENTE_S3_B2_EU_CEN_REGION=${S3_STORAGE_REGION:-us-east-1}
+      - ENTE_S3_B2_EU_CEN_BUCKET=${S3_STORAGE_BUCKET:?}
+
+      - ENTE_SMTP_HOST=${ENTE_SMTP_HOST:-smtp.gmail.com}
+      - ENTE_SMTP_PORT=${ENTE_SMTP_PORT:-587}
+      - ENTE_SMTP_USERNAME=${ENTE_SMTP_USERNAME}
+      - ENTE_SMTP_PASSWORD=${ENTE_SMTP_PASSWORD}
+      - ENTE_SMTP_EMAIL=${ENTE_SMTP_EMAIL}
+      - ENTE_SMTP_SENDER_NAME=${ENTE_SMTP_SENDER_NAME}
+      - ENTE_SMTP_ENCRYPTION=${ENTE_SMTP_ENCRYPTION:-tls}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - museum-data:/data
+      - museum-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: ghcr.io/ente-io/web
+    environment:
+      - SERVICE_URL_WEB_3000
+      - ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}
+      - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_WEB_3002}
+
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES:-pguser}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_DB_NAME:-ente_db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

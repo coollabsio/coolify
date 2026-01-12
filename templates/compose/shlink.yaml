@@ -9,7 +9,7 @@ services:
     image: shlinkio/shlink:stable
     environment:
       - SERVICE_URL_SHLINK_8080
-      - DEFAULT_DOMAIN=${SERVICE_URL_SHLINK}
+      - DEFAULT_DOMAIN=${SERVICE_FQDN_SHLINK}
       - IS_HTTPS_ENABLED=false
       - INITIAL_API_KEY=${SERVICE_BASE64_SHLINKAPIKEY}
     volumes:

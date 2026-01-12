@@ -21,6 +21,8 @@ class Create extends Component
 
     public ?string $publicKey = null;
 
+    public bool $modal_mode = false;
+
     protected function rules(): array
     {
         return [
@@ -77,6 +79,14 @@ class Create extends Component
                 'team_id' => currentTeam()->id,
             ]);
 
+            // If in modal mode, dispatch event and don't redirect
+            if ($this->modal_mode) {
+                $this->dispatch('privateKeyCreated', keyId: $privateKey->id);
+                $this->dispatch('success', 'Private key created successfully.');
+
+                return;
+            }
+
             return $this->redirectAfterCreation($privateKey);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -104,7 +114,7 @@ class Create extends Component
     private function redirectAfterCreation(PrivateKey $privateKey)
     {
         return $this->from === 'server'
-            ? redirect()->route('dashboard')
-            : redirect()->route('security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            ? redirectRoute($this, 'dashboard')
+            : redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
     }
 }

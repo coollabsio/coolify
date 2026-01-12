@@ -31,42 +31,6 @@
                     helper="Build servers are used to build your applications, so you cannot deploy applications to it."
                     label="Use it as a build server?" />
             </div>
-            <div class="">
-                <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
-                <div class="pb-4">Read the docs <a class='underline dark:text-white'
-                        href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.</div>
-                @if ($is_swarm_worker || $is_build_server)
-                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?" />
-                @else
-                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?" />
-                @endif
-                @if ($is_swarm_manager || $is_build_server)
-                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?" />
-                @else
-                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?" />
-                @endif
-                @if ($is_swarm_worker && count($swarm_managers) > 0)
-                    <div class="py-4">
-                        <x-forms.select label="Select a Swarm Cluster" id="selected_swarm_cluster" required>
-                            @foreach ($swarm_managers as $server)
-                                @if ($loop->first)
-                                    <option selected value="{{ $server->id }}">{{ $server->name }}</option>
-                                @else
-                                    <option value="{{ $server->id }}">{{ $server->name }}</option>
-                                @endif
-                            @endforeach
-                        </x-forms.select>
-                    </div>
-                @endif
-            </div>
             <x-forms.button type="submit">
                 Continue
             </x-forms.button>

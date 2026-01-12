@@ -1,0 +1,50 @@
+# documentation: https://github.com/metatool-ai/metamcp
+# slogan: MCP Aggregator, Orchestrator, Middleware, Gateway in one app
+# tags: mcp, ai, sse, aggregator, orchestrator, middleware
+# category: mcp
+# logo: svgs/metamcp.png
+# port: 12008
+
+services:
+  app:
+    image: ghcr.io/metatool-ai/metamcp:2.4
+    environment:
+      - SERVICE_URL_METAMCP_12008
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-metamcp_db}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-metamcp_db}
+      - APP_URL=${SERVICE_URL_METAMCP}
+      - NEXT_PUBLIC_APP_URL=${SERVICE_URL_METAMCP}
+      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_AUTH}
+      - TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL=${TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:12008/health'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-metamcp_db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-metamcp_db}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
