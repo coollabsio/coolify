@@ -871,21 +871,21 @@ class Service extends BaseModel
                     break;
                 case $image->contains('linkding'):
                     $data = collect([]);
-                    $SUPERUSER_NAME = $this->environment_variables()->where('key', 'SUPERUSER_NAME')->first();
-                    $SUPERUSER_PASSWORD = $this->environment_variables()->where('key', 'SUPERUSER_PASSWORD')->first();
-                    if ($SUPERUSER_NAME) {
+                    $SERVICE_USER_LINKDING = $this->environment_variables()->where('key', 'SERVICE_USER_LINKDING')->first();
+                    $SERVICE_PASSWORD_LINKDING = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LINKDING')->first();
+                    if ($SERVICE_USER_LINKDING) {
                         $data = $data->merge([
                             'Superuser Name' => [
-                                'key' => data_get($SUPERUSER_NAME, 'key'),
-                                'value' => data_get($SUPERUSER_NAME, 'value'),
+                                'key' => data_get($SERVICE_USER_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_USER_LINKDING, 'value'),
                             ],
                         ]);
                     }
-                    if ($SUPERUSER_PASSWORD) {
+                        if ($SERVICE_PASSWORD_LINKDING) {
                         $data = $data->merge([
                             'Superuser Password' => [
-                                'key' => data_get($SUPERUSER_PASSWORD, 'key'),
-                                'value' => data_get($SUPERUSER_PASSWORD, 'value'),
+                                'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_LINKDING, 'value'),
                                 'isPassword' => true,
                             ],
                         ]);
