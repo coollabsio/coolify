@@ -49,7 +49,7 @@
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
 }
 
 /* Focus */
@@ -154,7 +154,7 @@
 }
 
 @utility badge-dashboard {
-    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+    @apply absolute top-1 right-1 w-2.5 h-2.5 rounded-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
 }
 
 @utility badge-success {
@@ -174,15 +174,34 @@
 }
 
 @utility menu-item {
-    @apply flex gap-3 items-center px-2 py-1 w-full text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
+    @apply flex gap-3 items-center px-2 py-1 w-full text-sm dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 rounded-sm truncate min-w-0;
+}
+@utility menu-item-icon {
+    @apply flex-shrink-0 w-6 h-6 dark:hover:text-white;
+}
+
+@utility menu-item-label {
+    @apply min-w-0 flex-1 truncate;
 }
 
 @utility menu-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning bg-neutral-200 overflow-hidden;
+}
+
+@utility sub-menu-wrapper {
+    @apply flex flex-col items-start gap-2 min-w-40 sm:min-w-48 w-auto max-w-full sm:flex-shrink;
+}
+
+@utility sub-menu-item {
+    @apply flex gap-2 items-center px-2 py-1 w-full text-sm dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 rounded-sm truncate min-w-0;
+}
+
+@utility sub-menu-item-icon {
+    @apply flex-shrink-0 w-4 h-4 dark:hover:text-white;
 }
 
 @utility heading-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning;
 }
 
 @utility icon {
@@ -227,6 +246,10 @@
 
 @utility box-without-bg-without-border {
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
+}
+
+@utility coolbox {
+    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
 }
 
 @utility on-box {
@@ -287,4 +310,32 @@
 
 @utility xterm {
     @apply p-2;
+}
+
+/* Log line optimization - uses content-visibility for lazy rendering of off-screen log lines */
+@utility log-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.5em;
+}
+
+/* Search highlight styling for logs */
+@utility log-highlight {
+    @apply bg-warning/40 dark:bg-warning/30;
+}
+
+/* Log level color classes */
+@utility log-error {
+    @apply bg-red-500/10 dark:bg-red-500/15;
+}
+
+@utility log-warning {
+    @apply bg-yellow-500/10 dark:bg-yellow-500/15;
+}
+
+@utility log-debug {
+    @apply bg-purple-500/10 dark:bg-purple-500/15;
+}
+
+@utility log-info {
+    @apply bg-blue-500/10 dark:bg-blue-500/15;
 }

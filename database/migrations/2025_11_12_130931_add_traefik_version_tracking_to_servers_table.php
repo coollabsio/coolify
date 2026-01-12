@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->string('detected_traefik_version')->nullable();
-        });
+        if (! Schema::hasColumn('servers', 'detected_traefik_version')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->string('detected_traefik_version')->nullable();
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn('detected_traefik_version');
-        });
+        if (Schema::hasColumn('servers', 'detected_traefik_version')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->dropColumn('detected_traefik_version');
+            });
+        }
     }
 };

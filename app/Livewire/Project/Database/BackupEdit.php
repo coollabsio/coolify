@@ -2,16 +2,12 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
@@ -154,12 +150,8 @@ class BackupEdit extends Component
     {
         $this->authorize('manageBackups', $this->backup->database);
 
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         try {
@@ -191,13 +183,14 @@ class BackupEdit extends Component
             $this->backup->delete();
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $previousUrl = url()->previous();
-                $url = Url::fromString($previousUrl);
-                $url = $url->withoutQueryParameter('selectedBackupId');
-                $url = $url->withFragment('backups');
-                $url = $url->getPath()."#{$url->getFragment()}";
+                $serviceDatabase = $this->backup->database;
 
-                return redirect($url);
+                return redirect()->route('project.service.database.backups', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $serviceDatabase->service->uuid,
+                    'stack_service_uuid' => $serviceDatabase->uuid,
+                ]);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }

@@ -43,9 +43,19 @@ class TraefikVersionOutdated extends CustomEmailNotification
         $mail = new MailMessage;
         $count = $this->servers->count();
 
+        // Transform servers to include URLs
+        $serversWithUrls = $this->servers->map(function ($server) {
+            return [
+                'name' => $server->name,
+                'uuid' => $server->uuid,
+                'url' => base_url().'/server/'.$server->uuid.'/proxy',
+                'outdatedInfo' => $server->outdatedInfo ?? [],
+            ];
+        });
+
         $mail->subject("Coolify: Traefik proxy outdated on {$count} server(s)");
         $mail->view('emails.traefik-version-outdated', [
-            'servers' => $this->servers,
+            'servers' => $serversWithUrls,
             'count' => $count,
         ]);
 

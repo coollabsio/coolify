@@ -37,9 +37,23 @@ class ServiceApplication extends BaseModel
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
+    /**
+     * Get query builder for service applications owned by current team.
+     * If you need all service applications without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return ServiceApplication::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all service applications owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return ServiceApplication::ownedByCurrentTeam()->get();
+        });
     }
 
     public function isRunning()

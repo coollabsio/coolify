@@ -4,6 +4,7 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Rules\ValidProxyConfigFilename;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
@@ -38,11 +39,11 @@ class NewDynamicConfiguration extends Component
         try {
             $this->authorize('update', $this->server);
             $this->validate([
-                'fileName' => 'required',
+                'fileName' => ['required', new ValidProxyConfigFilename],
                 'value' => 'required',
             ]);
 
-            // Validate filename to prevent command injection
+            // Additional security validation to prevent command injection
             validateShellSafePath($this->fileName, 'proxy configuration filename');
 
             if (data_get($this->parameters, 'server_uuid')) {

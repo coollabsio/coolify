@@ -13,6 +13,7 @@ use OpenApi\Attributes as OA;
     properties: [
         'id' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
+        'deployment_queue_limit' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
@@ -61,6 +62,7 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_terminal_enabled' => 'boolean',
+        'disable_application_image_retention' => 'boolean',
     ];
 
     protected static function booted()
