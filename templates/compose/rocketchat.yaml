@@ -32,6 +32,7 @@ services:
 
   mongodb:
     image: docker.io/bitnamilegacy/mongodb:5.0
+    hostname: mongodb
     volumes:
       - mongodb_data:/bitnami/mongodb
     environment:
