@@ -143,10 +143,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $databasesToBackup = $this->database->postgres_user;
                     }
                     $this->postgres_password = $envs->filter(function ($env) {
-                        return str($env)->startsWith('POSTGRES_PASSWORD=');
-                    })->first();
-                    if ($this->postgres_password) {
-                        $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
+POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
@@ -156,10 +153,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $envs = str($envs)->explode("\n");
 
                     $rootPassword = $envs->filter(function ($env) {
-                        return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
-                    })->first();
-                    if ($rootPassword) {
-                        $this->database->mysql_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
+MYSQL_ROOT_PASSWORD = os.environ.get("MYSQL_ROOT_PASSWORD")
                     }
 
                     $db = $envs->filter(function ($env) {

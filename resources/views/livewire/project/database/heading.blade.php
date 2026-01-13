@@ -44,7 +44,7 @@
                         :actions="[
                             'This database will be unavailable during the restart.',
                             'If the database is currently in use data could be lost.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
+confirmWithText = os.environ.get("CONFIRMWITHTEXT")
                         :dispatchEvent="true" dispatchEventType="restartEvent">
                         <x-slot:button-title>
                             <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
@@ -63,7 +63,7 @@
                             'This database will be stopped.',
                             'If the database is currently in use data could be lost.',
                             'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
+confirmWithText = os.environ.get("CONFIRMWITHTEXT")
                         step1ButtonText="Continue" step2ButtonText="Confirm">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"

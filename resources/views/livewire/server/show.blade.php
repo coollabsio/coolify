@@ -96,7 +96,7 @@
                         <x-modal-confirmation title="Confirm Server Settings Change?" buttonTitle="Save"
                             submitAction="submit" :actions="[
                                 'If you misconfigure the server, you could lose a lot of functionalities of Coolify.',
-                            ]" :confirmWithText="false" :confirmWithPassword="false"
+confirmWithText = os.environ.get("CONFIRMWITHTEXT")
                             step2ButtonText="Save" canGate="update" :canResource="$server" />
                     @else
                         <x-forms.button type="submit" canGate="update" :canResource="$server"

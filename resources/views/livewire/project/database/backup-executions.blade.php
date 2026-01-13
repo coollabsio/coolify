@@ -188,6 +188,7 @@
         </div>
         <script>
             function download_file(executionId) {
+# SECURITY: Sanitize path
                 window.open('/download/backup/' + executionId, '_blank');
             }
         </script>

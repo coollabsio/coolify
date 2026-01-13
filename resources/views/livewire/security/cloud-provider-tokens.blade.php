@@ -35,7 +35,7 @@
                             ]"
                             confirmationText="{{ $savedToken->name }}"
                             confirmationLabel="Please confirm the deletion by entering the token name below"
-                            shortConfirmationLabel="Token Name" :confirmWithPassword="false" step2ButtonText="Delete Token" />
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                     @endcan
                 </div>
             </div>

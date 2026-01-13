@@ -21,7 +21,7 @@
                                     'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
                                     'Optionally permanently deletes all unused networks (if enabled in advanced options).',
                                 ]" :confirmWithText="false"
-                                :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
+confirmWithPassword = os.environ.get("CONFIRMWITHPASSWORD")
                         @endcan
                     </div>
                     <div class="mt-1 mb-6">Configure Docker cleanup settings for your server.</div>

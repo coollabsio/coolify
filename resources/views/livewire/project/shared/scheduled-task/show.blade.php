@@ -24,7 +24,7 @@
                 <x-modal-confirmation title="Confirm Scheduled Task Deletion?" isErrorButton buttonTitle="Delete"
                     submitAction="delete({{ $task->id }})" :actions="['The selected scheduled task will be permanently deleted.']" confirmationText="{{ $task->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
-                    shortConfirmationLabel="Scheduled Task Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                     step2ButtonText="Permanently Delete" />
 
             </div>

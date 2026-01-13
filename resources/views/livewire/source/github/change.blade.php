@@ -12,14 +12,14 @@
                             <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
                                 submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                 step2ButtonText="Permanently Delete" />
                         @else
                             <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
                                 submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
                                 confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
                                 shortConfirmationLabel="GitHub App Name"
-                                confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
+confirmationText = os.environ.get("CONFIRMATIONTEXT")
                                 step2ButtonText="Permanently Delete" />
                         @endif
                     @endcan
@@ -211,7 +211,7 @@
                     <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                         step2ButtonText="Permanently Delete" />
                 @endcan
             </div>

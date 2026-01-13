@@ -71,7 +71,7 @@
                                     submitAction="changeSource({{ $source->id }}, {{ $source->getMorphClass() }})"
                                     :confirmWithText="true" confirmationText="Change Git Source"
                                     confirmationLabel="Please confirm changing the git source by entering the text below"
-                                    shortConfirmationLabel="Confirmation Text" :confirmWithPassword="false">
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                     <x-slot:customButton>
                                         <div class="flex items-center gap-2">
                                             <div class="box-title">

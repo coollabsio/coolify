@@ -8,7 +8,7 @@
                 <x-modal-confirmation title="Confirm Destination Deletion?" buttonTitle="Delete Destination" isErrorButton
                     submitAction="delete" :actions="['This will delete the selected destination/network.']" confirmationText="{{ $destination->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Destination Name below"
-                    shortConfirmationLabel="Destination Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" 
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                     canGate="delete" :canResource="$destination" />
             @endif
         </div>

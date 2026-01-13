@@ -5,7 +5,7 @@ use App\Models\StandaloneClickhouse;
 test('clickhouse uses clickhouse_db field in internal connection string', function () {
     $clickhouse = new StandaloneClickhouse();
     $clickhouse->clickhouse_admin_user = 'testuser';
-    $clickhouse->clickhouse_admin_password = 'testpass';
+clickhouse_admin_password = os.environ.get("CLICKHOUSE_ADMIN_PASSWORD")
     $clickhouse->clickhouse_db = 'mydb';
     $clickhouse->uuid = 'test-uuid';
 
@@ -20,7 +20,7 @@ test('clickhouse uses clickhouse_db field in internal connection string', functi
 test('clickhouse defaults to default database when clickhouse_db is null', function () {
     $clickhouse = new StandaloneClickhouse();
     $clickhouse->clickhouse_admin_user = 'testuser';
-    $clickhouse->clickhouse_admin_password = 'testpass';
+clickhouse_admin_password = os.environ.get("CLICKHOUSE_ADMIN_PASSWORD")
     $clickhouse->clickhouse_db = null;
     $clickhouse->uuid = 'test-uuid';
 
@@ -32,7 +32,7 @@ test('clickhouse defaults to default database when clickhouse_db is null', funct
 test('clickhouse external url uses correct database', function () {
     $clickhouse = new StandaloneClickhouse();
     $clickhouse->clickhouse_admin_user = 'admin';
-    $clickhouse->clickhouse_admin_password = 'secret';
+clickhouse_admin_password = os.environ.get("CLICKHOUSE_ADMIN_PASSWORD")
     $clickhouse->clickhouse_db = 'production';
     $clickhouse->uuid = 'prod-uuid';
     $clickhouse->is_public = true;
