@@ -1,6 +1,6 @@
 # documentation: https://help.glpi-project.org/documentation
-# slogan: GLPI (Gestionnaire Libre de Parc Informatique) is a free, open-source IT Service Management (ITSM) platform used for IT asset management, helpdesk, and service desk operations, helping organizations inventory hardware/software, manage incidents, track requests, and streamline IT support with features like CMDB, ticketing, and automation.
-# category: automation
+# slogan: GLPI (Gestionnaire Libre de Parc Informatique) is a free, open-source IT Service Management (ITSM) platform used for IT asset management, helpdesk, and service desk operations.
+# category: helpdesk
 # tags: helpdesk, ticketing, support, open-source
 # logo: svgs/glpi.svg
 # port: 80
@@ -15,6 +15,11 @@ services:
       - 'GLPI_DB_NAME=${MYSQL_DATABASE:-glpi}'
       - 'GLPI_DB_USER=${SERVICE_USER_MYSQL}'
       - 'GLPI_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+    volumes:
+      - 'glpi-data:/var/glpi:rw'
+    depends_on:
+      glpi-db:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -24,12 +29,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
-    volumes:
-      - 'glpi-data:/var/glpi:rw'
-    depends_on:
-      glpi-db:
-        condition: service_healthy
   glpi-db:
     image: 'mysql:8'
     volumes:
