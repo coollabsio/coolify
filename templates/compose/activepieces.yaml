@@ -7,7 +7,7 @@
 
 services:
   activepieces:
-    image: ghcr.io/activepieces/activepieces:0.75.0
+    image: ghcr.io/activepieces/activepieces:0.76.1
     environment:
       - SERVICE_URL_ACTIVEPIECES
       - AP_API_KEY=$SERVICE_PASSWORD_64_APIKEY
