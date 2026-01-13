@@ -7,16 +7,16 @@
 
 services:
   glpi:
-    image: 'glpi/glpi:11'
+    image: glpi/glpi:11
     environment:
       - SERVICE_URL_GLPI_80
       - GLPI_DB_HOST=glpi-db
       - GLPI_DB_PORT=3306
-      - 'GLPI_DB_NAME=${MYSQL_DATABASE:-glpi}'
-      - 'GLPI_DB_USER=${SERVICE_USER_MYSQL}'
-      - 'GLPI_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - GLPI_DB_NAME=${MYSQL_DATABASE:-glpi-db}
+      - GLPI_DB_USER=${SERVICE_USER_MYSQL}
+      - GLPI_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
     volumes:
-      - 'glpi-data:/var/glpi:rw'
+      - glpi-data:/var/glpi:rw
     depends_on:
       glpi-db:
         condition: service_healthy
@@ -24,26 +24,27 @@ services:
       test:
         - CMD
         - curl
-        - '-f'
-        - 'http://localhost/'
+        - "-f"
+        - "http://localhost/"
       interval: 30s
       timeout: 10s
       retries: 3
+
   glpi-db:
-    image: 'mysql:8'
+    image: mysql:8
     volumes:
-      - 'mysql-data:/var/lib/mysql'
+      - mysql-data:/var/lib/mysql
     environment:
-      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}'
-      - 'MYSQL_DATABASE=${MYSQL_DATABASE:-glpi}'
-      - 'MYSQL_USER=${SERVICE_USER_MYSQL}'
-      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-glpi-db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
     healthcheck:
       test:
         - CMD
         - mysqladmin
         - ping
-        - '-h'
+        - "-h"
         - 127.0.0.1
       interval: 5s
       timeout: 20s
