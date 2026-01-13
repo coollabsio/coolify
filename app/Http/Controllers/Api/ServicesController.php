@@ -385,7 +385,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -715,7 +715,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [

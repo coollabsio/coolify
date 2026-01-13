@@ -1044,7 +1044,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customNginxConfiguration = base64_decode($customNginxConfiguration);
-            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customNginxConfiguration, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -1597,7 +1597,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $dockerFile = base64_decode($request->dockerfile);
-            if (mb_detect_encoding($dockerFile, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerFile, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -1813,7 +1813,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -2346,7 +2346,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customNginxConfiguration = base64_decode($request->custom_nginx_configuration);
-            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customNginxConfiguration, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -3615,7 +3615,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
