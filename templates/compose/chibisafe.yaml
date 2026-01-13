@@ -1,0 +1,80 @@
+# documentation: https://chibisafe.app/docs/intro
+# slogan: A beautiful and performant vault to save all your files in the cloud.
+# tags: storage,file-sharing,upload,sharing
+# logo: svgs/chibisafe.svg
+# port: 80
+
+## This service includes its own reverse proxy because the application routing is broken, also it needs caddy for serving static files https://github.com/coollabsio/coolify/pull/5808#pullrequestreview-3340419006
+
+services:
+  chibisafe:
+    image: chibisafe/chibisafe:v6.5.5
+    environment:
+      - BASE_API_URL=http://chibisafe-server:8000
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  chibisafe-server:
+    image: chibisafe/chibisafe-server:v6.5.5
+    volumes:
+      - chibisafe-database:/app/database:rw
+      - chibisafe-uploads:/app/uploads:rw
+      - chibisafe-logs:/app/logs:rw
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "--quiet",
+          "http://127.0.0.1:8000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      - SERVICE_URL_CHIBISAFE_80
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - uploads:/app/uploads:ro
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        content: |
+          # chibisafe/Caddyfile
+          # https://chibisafe.moe/guides/running-with-docker
+          :80 {
+            route {
+              file_server * {
+                  root /app/uploads
+                  pass_thru
+              }
+              @api path /api/*
+              reverse_proxy @api http://chibisafe-server:8000 {
+                  header_up Host {http.reverse_proxy.upstream.hostport}
+                  header_up X-Real-IP {http.request.header.X-Real-IP}
+              }
+              @docs path /docs*
+              reverse_proxy @docs http://chibisafe-server:8000 {
+                  header_up Host {http.reverse_proxy.upstream.hostport}
+                  header_up X-Real-IP {http.request.header.X-Real-IP}
+              }
+              reverse_proxy http://chibisafe:8001 {
+                  header_up Host {http.reverse_proxy.upstream.hostport}
+                  header_up X-Real-IP {http.request.header.X-Real-IP}
+              }
+            }
+          }

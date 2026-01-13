@@ -1,0 +1,24 @@
+# documentation: https://v2.silverbullet.md/Install/Configuration
+# slogan: SilverBullet is a tool to develop, organize, and structure your personal knowledge and to make it universally accessible across all your devices.
+# tags: note-taking,markdown,pkm
+# logo: svgs/silverbullet.png
+# port: 3000
+
+services:
+  silverbullet:
+    image: ghcr.io/silverbulletmd/silverbullet:v2
+    environment:
+    - SERVICE_URL_SILVERBULLET_3000
+    - SB_USER=${SERVICE_USER_SILVERBULLET}:${SERVICE_PASSWORD_SILVERBULLET}
+    volumes:
+      - silverbullet-space:/space
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '--quiet'
+        - 'http://127.0.0.1:3000'
+      interval: 2s
+      timeout: 10s
+      retries: 5

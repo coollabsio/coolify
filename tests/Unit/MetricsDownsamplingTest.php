@@ -1,19 +1,9 @@
 <?php
 
-use App\Models\Server;
-
 /**
- * Helper to call the private downsampleLTTB method on Server model via reflection.
+ * Tests for the downsampleLTTB helper function used for metrics downsampling.
+ * This function implements the Largest-Triangle-Three-Buckets algorithm.
  */
-function callDownsampleLTTB(array $data, int $threshold): array
-{
-    $server = new Server;
-    $reflection = new ReflectionClass($server);
-    $method = $reflection->getMethod('downsampleLTTB');
-
-    return $method->invoke($server, $data, $threshold);
-}
-
 it('returns data unchanged when below threshold', function () {
     $data = [
         [1000, 10.5],
@@ -21,7 +11,7 @@ it('returns data unchanged when below threshold', function () {
         [3000, 15.7],
     ];
 
-    $result = callDownsampleLTTB($data, 1000);
+    $result = downsampleLTTB($data, 1000);
 
     expect($result)->toBe($data);
 });
@@ -35,10 +25,10 @@ it('returns data unchanged when threshold is 2 or less', function () {
         [5000, 12.0],
     ];
 
-    $result = callDownsampleLTTB($data, 2);
+    $result = downsampleLTTB($data, 2);
     expect($result)->toBe($data);
 
-    $result = callDownsampleLTTB($data, 1);
+    $result = downsampleLTTB($data, 1);
     expect($result)->toBe($data);
 });
 
@@ -52,7 +42,7 @@ it('downsamples to target threshold count', function () {
         $data[] = [$i * 1000, mt_rand(0, 100) / 10];
     }
 
-    $result = callDownsampleLTTB($data, 10);
+    $result = downsampleLTTB($data, 10);
 
     expect(count($result))->toBe(10);
 });
@@ -63,7 +53,7 @@ it('preserves first and last data points', function () {
         $data[] = [$i * 1000, $i * 1.5];
     }
 
-    $result = callDownsampleLTTB($data, 20);
+    $result = downsampleLTTB($data, 20);
 
     // First point should be preserved
     expect($result[0])->toBe($data[0]);
@@ -78,7 +68,7 @@ it('maintains chronological order', function () {
         $data[] = [$i * 60000, sin($i / 10) * 50 + 50]; // Sine wave pattern
     }
 
-    $result = callDownsampleLTTB($data, 50);
+    $result = downsampleLTTB($data, 50);
 
     // Verify all timestamps are in non-decreasing order
     $previousTimestamp = -1;
@@ -100,7 +90,7 @@ it('handles large datasets efficiently', function () {
     }
 
     $startTime = microtime(true);
-    $result = callDownsampleLTTB($data, 1000);
+    $result = downsampleLTTB($data, 1000);
     $executionTime = microtime(true) - $startTime;
 
     expect(count($result))->toBe(1000);
@@ -121,7 +111,7 @@ it('preserves peaks and valleys in data', function () {
         $data[] = [$i * 1000, $value];
     }
 
-    $result = callDownsampleLTTB($data, 20);
+    $result = downsampleLTTB($data, 20);
 
     // The peak (100) and valley (0) should be preserved due to LTTB algorithm
     $values = array_column($result, 1);
