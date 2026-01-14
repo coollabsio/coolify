@@ -430,8 +430,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         $ip_list = explode(',', $test_ipallowlist);
         $sane_ip_list = [];
         foreach ($ip_list as $_ip) {
-            if (filter_var($_ip, FILTER_VALIDATE_IP)) {
-                $sane_ip_list[] = trim($_ip);
+            $_ip = trim($_ip);
+            if (preg_match('/^(\d{1,3}\.){3}\d{1,3}(\/([0-9]|[12][0-9]|3[0-2]))?$/', $_ip)) {
+                $sane_ip_list[] = $_ip;
             }
         }
 
