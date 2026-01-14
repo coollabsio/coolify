@@ -31,7 +31,7 @@ services:
       retries: 15
 
   mongodb:
-    image: docker.io/bitnamilegacy/mongodb:5.0
+    image: docker.io/bitnami/mongodb:7.0
     volumes:
       - mongodb_data:/bitnami/mongodb
     environment:
@@ -44,7 +44,7 @@ services:
       - MONGODB_ENABLE_JOURNAL=${MONGODB_ENABLE_JOURNAL:-true}
       - ALLOW_EMPTY_PASSWORD=${ALLOW_EMPTY_PASSWORD:-yes}
     healthcheck:
-      test: echo 'db.stats().ok' | mongo localhost:27017/test --quiet
+      test: mongosh --eval 'db.runCommand("ping").ok' localhost:27017/test --quiet
       interval: 2s
       timeout: 10s
       retries: 15
