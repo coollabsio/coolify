@@ -1,0 +1,46 @@
+# documentation: https://docs.sftpgo.com/2.7/
+# slogan: SFTPGo is an event-driven SFTP, FTP/S, HTTP/S and WebDAV server.
+# tags: sftpgo,sftp,ftp,file,webdav
+# logo: svgs/sftpgo.png
+# port: 8080
+
+services:
+  sftpgo:
+    image: ghcr.io/drakkan/sftpgo:v2.7-alpine
+    ports:
+      - 2222:2222
+    environment:
+      - SERVICE_FQDN_SFTPGO_8080
+      - SFTPGO_DATA_PROVIDER__DRIVER=postgresql
+      - SFTPGO_DATA_PROVIDER__CONNECTION_STRING=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgresql:5432/${POSTGRES_DATABASE:-sftpgo-db}
+      - SFTPGO_SFTPD__BINDINGS__0__PORT=${PORT_SFTPGO:-2222}
+      - SFTPGO_LOG_LEVEL=${LOG_LEVEL:-info}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8080/
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - sftpgo-data:/srv/sftpgo/data
+      - sftpgo-keys:/var/lib/sftpgo
+
+  postgresql:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DATABASE:-sftpgo-db}
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 10s
+      retries: 20

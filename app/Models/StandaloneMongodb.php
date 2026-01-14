@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMongodb extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
     protected $guarded = [];
 
@@ -341,50 +342,6 @@ class StandaloneMongodb extends BaseModel
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
 
-    public function getCpuMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['percent']];
-        });
-
-        return $parsedCollection->toArray();
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['used']];
-        });
-
-        return $parsedCollection->toArray();
-    }
-
     public function isBackupSolutionAvailable()
     {
         return true;
@@ -392,14 +349,6 @@ class StandaloneMongodb extends BaseModel
 
     public function environment_variables()
     {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 }

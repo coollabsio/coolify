@@ -10,7 +10,7 @@ services:
     image: sequin/sequin:latest
     environment:
       - SERVICE_URL_SEQUIN_7376
-      - SERVER_HOST=${SERVICE_URL_SEQUIN}
+      - SERVER_HOST=${SERVICE_FQDN_SEQUIN}
       - PG_HOSTNAME=postgres
       - PG_DATABASE=${POSTGRES_DB:-sequin-db}
       - PG_PORT=5432

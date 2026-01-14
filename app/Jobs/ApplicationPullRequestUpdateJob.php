@@ -54,8 +54,9 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
                 ProcessStatus::CLOSED => '', // Already handled above, but included for completeness
             };
             $this->build_logs_url = base_url()."/project/{$this->application->environment->project->uuid}/environment/{$this->application->environment->uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+            $application_logs_url = base_url()."/project/{$this->application->environment->project->uuid}/environment/{$this->application->environment->uuid}/application/{$this->application->uuid}/logs";
 
-            $this->body .= '[Open Build Logs]('.$this->build_logs_url.")\n\n\n";
+            $this->body .= '[Open Build Logs]('.$this->build_logs_url.') | [Open Application Logs]('.$application_logs_url.")\n\n\n";
             $this->body .= 'Last updated at: '.now()->toDateTimeString().' CET';
             if ($this->preview->pull_request_issue_comment_id) {
                 $this->update_comment();
