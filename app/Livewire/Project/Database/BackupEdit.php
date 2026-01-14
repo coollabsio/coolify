@@ -8,7 +8,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
@@ -184,13 +183,14 @@ class BackupEdit extends Component
             $this->backup->delete();
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $previousUrl = url()->previous();
-                $url = Url::fromString($previousUrl);
-                $url = $url->withoutQueryParameter('selectedBackupId');
-                $url = $url->withFragment('backups');
-                $url = $url->getPath()."#{$url->getFragment()}";
+                $serviceDatabase = $this->backup->database;
 
-                return redirect($url);
+                return redirect()->route('project.service.database.backups', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $serviceDatabase->service->uuid,
+                    'stack_service_uuid' => $serviceDatabase->uuid,
+                ]);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }

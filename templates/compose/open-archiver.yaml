@@ -1,0 +1,87 @@
+# documentation: https://docs.openarchiver.com/
+# slogan: A self-hosted, open-source email archiving solution with full-text search capability.
+# tags: email archiving,email,compliance,search
+# logo: svgs/openarchiver.svg
+# port: 3000
+
+services:
+  open-archiver:
+    image: logiclabshq/open-archiver:latest
+    environment:
+      - SERVICE_URL_OPENARCHIVER_3000
+      - ENCRYPTION_KEY=${SERVICE_HEX_32_ENCRYPTIONKEY}
+      - STORAGE_ENCRYPTION_KEY=${SERVICE_HEX_32_STORAGEENCRYPTIONKEY}
+      - PORT_BACKEND=${PORT_BACKEND:-4000}
+      - PORT_FRONTEND=${PORT_FRONTEND:-3000}
+      - NODE_ENV=${NODE_ENV:-production}
+      - SYNC_FREQUENCY=${SYNC_FREQUENCY:-* * * * *}
+      - POSTGRES_DB=${POSTGRES_DB:-open_archive}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-open-archiver-db}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
+      - MEILI_HOST=http://meilisearch:7700
+      - REDIS_HOST=valkey
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_VALKEY}
+      - REDIS_TLS_ENABLED=false
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_LOCAL_ROOT_PATH=${STORAGE_LOCAL_ROOT_PATH:-/var/data/open-archiver}
+      - BODY_SIZE_LIMIT=${BODY_SIZE_LIMIT:-100M}
+      - STORAGE_S3_ENDPOINT=${STORAGE_S3_ENDPOINT}
+      - STORAGE_S3_BUCKET=${STORAGE_S3_BUCKET}
+      - STORAGE_S3_ACCESS_KEY_ID=${STORAGE_S3_ACCESS_KEY_ID}
+      - STORAGE_S3_SECRET_ACCESS_KEY=${STORAGE_S3_SECRET_ACCESS_KEY}
+      - STORAGE_S3_REGION=${STORAGE_S3_REGION}
+      - STORAGE_S3_FORCE_PATH_STYLE=${STORAGE_S3_FORCE_PATH_STYLE:-false}
+      - JWT_SECRET=${SERVICE_BASE64_128_JWT}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+    volumes:
+      - archiver-data:/var/data/open-archiver
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-open-archiver-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - LC_ALL=C
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --requirepass ${SERVICE_PASSWORD_VALKEY}
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    environment:
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
+    volumes:
+      - meilisearch-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

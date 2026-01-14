@@ -117,7 +117,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -182,7 +181,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -245,7 +243,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -392,7 +389,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $postgresConf = base64_decode($request->postgres_conf);
-                    if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($postgresConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -432,7 +429,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $redisConf = base64_decode($request->redis_conf);
-                    if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($redisConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -459,7 +456,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $keydbConf = base64_decode($request->keydb_conf);
-                    if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($keydbConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -489,7 +486,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $mariadbConf = base64_decode($request->mariadb_conf);
-                    if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($mariadbConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -518,7 +515,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $mongoConf = base64_decode($request->mongo_conf);
-                    if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($mongoConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -549,7 +546,7 @@ class DatabasesController extends Controller
                         ], 422);
                     }
                     $mysqlConf = base64_decode($request->mysql_conf);
-                    if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
+                    if (mb_detect_encoding($mysqlConf, 'UTF-8', true) === false) {
                         return response()->json([
                             'message' => 'Validation failed.',
                             'errors' => [
@@ -614,7 +611,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -832,7 +828,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -842,7 +837,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1707,7 +1701,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $postgresConf = base64_decode($request->postgres_conf);
-                if (mb_detect_encoding($postgresConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($postgresConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -1762,7 +1756,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $mariadbConf = base64_decode($request->mariadb_conf);
-                if (mb_detect_encoding($mariadbConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($mariadbConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -1821,7 +1815,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $mysqlConf = base64_decode($request->mysql_conf);
-                if (mb_detect_encoding($mysqlConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($mysqlConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -1877,7 +1871,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $redisConf = base64_decode($request->redis_conf);
-                if (mb_detect_encoding($redisConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($redisConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -1963,7 +1957,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $keydbConf = base64_decode($request->keydb_conf);
-                if (mb_detect_encoding($keydbConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($keydbConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -2057,7 +2051,7 @@ class DatabasesController extends Controller
                     ], 422);
                 }
                 $mongoConf = base64_decode($request->mongo_conf);
-                if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
+                if (mb_detect_encoding($mongoConf, 'UTF-8', true) === false) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -2104,7 +2098,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
@@ -2193,7 +2186,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2310,14 +2303,14 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'execution_uuid',
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup execution to delete',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
             new OA\Parameter(
                 name: 'delete_s3',
@@ -2430,7 +2423,7 @@ class DatabasesController extends Controller
                 in: 'path',
                 required: true,
                 description: 'UUID of the backup configuration',
-                schema: new OA\Schema(type: 'string', format: 'uuid')
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -2527,7 +2520,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2608,7 +2600,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2689,7 +2680,6 @@ class DatabasesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],

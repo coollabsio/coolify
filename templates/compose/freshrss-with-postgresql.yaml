@@ -14,7 +14,7 @@ services:
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-freshrss}
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_HOST=postgresql
+      - POSTGRES_HOST=freshrss-db
     volumes:
       - freshrss-data:/var/www/FreshRSS/data
       - freshrss-extensions:/var/www/FreshRSS/extensions

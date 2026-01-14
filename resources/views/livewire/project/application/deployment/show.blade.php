@@ -173,7 +173,7 @@
                     class="flex flex-col w-full bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
                     :class="fullscreen ? 'h-full' : 'border border-dotted rounded-sm'">
                     <div
-                        class="flex items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
+                        class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
                         <div class="flex items-center gap-3">
                             @if (data_get($application_deployment_queue, 'status') === 'in_progress')
                                 <div class="flex items-center gap-1">
@@ -190,7 +190,7 @@
                             <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                                 class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center justify-end gap-2 flex-1">
                             <div class="relative">
                                 <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -208,8 +208,9 @@
                                     </svg>
                                 </button>
                             </div>
-                            <button
-                                x-on:click="
+                            <div class="flex flex-wrap items-center gap-1">
+                                <button
+                                    x-on:click="
                                     $wire.copyLogs().then(logs => {
                                         navigator.clipboard.writeText(logs);
                                         Livewire.dispatch('success', ['Logs copied to clipboard.']);
@@ -223,14 +224,61 @@
                                         d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                                 </svg>
                             </button>
-                            <button x-on:click="downloadLogs()" title="Download Logs"
-                                class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                            </button>
+                            <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative">
+                                <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
+                                    class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                </button>
+                                <div x-show="downloadMenuOpen" x-on:click.away="downloadMenuOpen = false"
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
+                                    <div class="py-1">
+                                        <button x-on:click="downloadLogs(); downloadMenuOpen = false"
+                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            Download displayed logs
+                                        </button>
+                                        <button x-on:click="
+                                            downloadingAllLogs = true;
+                                            $wire.downloadAllLogs().then(logs => {
+                                                if (!logs) return;
+                                                const blob = new Blob([logs], { type: 'text/plain' });
+                                                const url = URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                const timestamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+                                                a.download = 'deployment-' + deploymentId + '-all-logs-' + timestamp + '.txt';
+                                                a.click();
+                                                URL.revokeObjectURL(url);
+                                                Livewire.dispatch('success', ['All logs downloaded.']);
+                                            }).finally(() => {
+                                                downloadingAllLogs = false;
+                                                downloadMenuOpen = false;
+                                            });
+                                        "
+                                            :disabled="downloadingAllLogs"
+                                            :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
+                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            <span x-show="!downloadingAllLogs">Download all logs</span>
+                                            <span x-show="downloadingAllLogs" class="flex items-center gap-2">
+                                                <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Downloading...
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                             <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
                                 :class="showTimestamps ? '!text-warning' : ''"
                                 class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -276,6 +324,7 @@
                                         d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                                 </svg>
                             </button>
+                            </div>
                         </div>
                     </div>
                     <div id="logsContainer"
