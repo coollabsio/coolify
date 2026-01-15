@@ -318,6 +318,10 @@ services:
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
+
+      # fix for issue mentioned here https://github.com/supabase/supabase/issues/39593
+      - "POSTGRES_HOST=${POSTGRES_HOSTNAME:-supabase-db}"
+      - "CURRENT_CLI_VERSION=2.53.6"
   supabase-db:
     image: supabase/postgres:15.8.1.048
     healthcheck:
