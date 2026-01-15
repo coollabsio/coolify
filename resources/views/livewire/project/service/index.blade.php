@@ -4,14 +4,17 @@
         @if ($resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
         @else
-            <div class="flex flex-col items-start gap-2 min-w-fit">
-                <a class="menu-item"
+            <div class="sub-menu-wrapper">
+                <a class="sub-menu-item"
                     class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
                     {{ wireNavigate() }}
                     href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
-                    <button><- Back</button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="sub-menu-item-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span class="menu-item-label">Back</span>
                 </a>
-                <a class="menu-item menu-item-active" href="#">General</a>
+                <a class="sub-menu-item menu-item-active" href="#"><span class="menu-item-label">General</span></a>
             </div>
         @endif
         <div class="w-full">
