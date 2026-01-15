@@ -1,0 +1,282 @@
+# documentation: https://supercheck.io/docs/deployment/self-hosted
+# slogan: Open Source AI-Powered Test Automation & Monitoring Platform
+# category: automation
+# tags: monitoring, testing, playwright, k6, status-pages, uptime, synthetic-monitors, ai, automation
+# logo: svgs/supercheck.svg
+# port: 3000
+
+# YAML anchors for shared configuration (same pattern as docker-compose-secure.yml)
+x-common-env: &common-env # Database Configuration
+  DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-supercheck}
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USER: ${SERVICE_USER_POSTGRES}
+  DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+  DB_NAME: ${POSTGRES_DB:-supercheck}
+
+  # Redis Configuration
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${SERVICE_PASSWORD_REDIS}
+  REDIS_URL: redis://:${SERVICE_PASSWORD_REDIS}@redis:6379
+  REDIS_TLS_ENABLED: false
+
+  # App Configuration (Coolify auto-generates URLs via SERVICE_URL_*)
+  NEXT_PUBLIC_APP_URL: ${SERVICE_URL_SUPERCHECK}
+  APP_URL: ${SERVICE_URL_SUPERCHECK}
+  BETTER_AUTH_URL: ${SERVICE_URL_SUPERCHECK}
+  BETTER_AUTH_SECRET: ${SERVICE_BASE64_64_AUTH}
+  NODE_ENV: production
+
+  # Parallel Execution Capacity
+  RUNNING_CAPACITY: ${RUNNING_CAPACITY:-2}
+  QUEUED_CAPACITY: ${QUEUED_CAPACITY:-10}
+
+  # Container limits
+  CONTAINER_CPU_LIMIT: ${CONTAINER_CPU_LIMIT:-1.0}
+  CONTAINER_MEMORY_LIMIT_MB: ${CONTAINER_MEMORY_LIMIT_MB:-1536}
+  TEST_EXECUTION_TIMEOUT_MS: ${TEST_EXECUTION_TIMEOUT_MS:-300000}
+  JOB_EXECUTION_TIMEOUT_MS: ${JOB_EXECUTION_TIMEOUT_MS:-3600000}
+  K6_TEST_EXECUTION_TIMEOUT_MS: ${K6_TEST_EXECUTION_TIMEOUT_MS:-3600000}
+  K6_JOB_EXECUTION_TIMEOUT_MS: ${K6_JOB_EXECUTION_TIMEOUT_MS:-3600000}
+
+  # AWS S3 / MinIO Configuration
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${SERVICE_USER_MINIO}
+  AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
+  S3_ENDPOINT: http://minio:9000
+  S3_TEST_BUCKET_NAME: playwright-test-artifacts
+  S3_JOB_BUCKET_NAME: playwright-job-artifacts
+  S3_MONITOR_BUCKET_NAME: playwright-monitor-artifacts
+  S3_K6_TEST_BUCKET_NAME: k6-test-artifacts
+  S3_K6_JOB_BUCKET_NAME: k6-job-artifacts
+  S3_STATUS_BUCKET_NAME: status-page-artifacts
+  S3_REQUIREMENTS_BUCKET_NAME: test-requirement-artifacts
+  S3_FORCE_PATH_STYLE: true
+  S3_OPERATION_TIMEOUT: ${S3_OPERATION_TIMEOUT:-10000}
+  S3_MAX_RETRIES: ${S3_MAX_RETRIES:-3}
+
+  # Notification Channel Limits
+  MAX_JOB_NOTIFICATION_CHANNELS: ${MAX_JOB_NOTIFICATION_CHANNELS:-10}
+  MAX_MONITOR_NOTIFICATION_CHANNELS: ${MAX_MONITOR_NOTIFICATION_CHANNELS:-10}
+
+  # Document Upload Limits
+  MAX_DOCUMENT_SIZE_MB: ${MAX_DOCUMENT_SIZE_MB:-10}
+  MAX_DOCUMENTS_PER_PROJECT: ${MAX_DOCUMENTS_PER_PROJECT:-100}
+
+  # Playwright Configuration
+  PLAYWRIGHT_WORKERS: ${PLAYWRIGHT_WORKERS:-1}
+  PLAYWRIGHT_RETRIES: ${PLAYWRIGHT_RETRIES:-1}
+  PLAYWRIGHT_TRACE: ${PLAYWRIGHT_TRACE:-retain-on-failure}
+  PLAYWRIGHT_SCREENSHOT: ${PLAYWRIGHT_SCREENSHOT:-on}
+  PLAYWRIGHT_VIDEO: ${PLAYWRIGHT_VIDEO:-retain-on-failure}
+
+  # Cleanup Configuration
+  MONITOR_CLEANUP_ENABLED: ${MONITOR_CLEANUP_ENABLED:-true}
+  MONITOR_CLEANUP_CRON: ${MONITOR_CLEANUP_CRON:-0 2 * * *}
+  MONITOR_CLEANUP_BATCH_SIZE: ${MONITOR_CLEANUP_BATCH_SIZE:-1000}
+  MONITOR_PRESERVE_STATUS_CHANGES: ${MONITOR_PRESERVE_STATUS_CHANGES:-true}
+  MONITOR_CLEANUP_SAFETY_LIMIT: ${MONITOR_CLEANUP_SAFETY_LIMIT:-1000000}
+  MONITOR_AGGREGATES_CLEANUP_ENABLED: ${MONITOR_AGGREGATES_CLEANUP_ENABLED:-true}
+  MONITOR_AGGREGATES_CLEANUP_CRON: ${MONITOR_AGGREGATES_CLEANUP_CRON:-30 2 * * *}
+  MONITOR_AGGREGATES_CLEANUP_BATCH_SIZE: ${MONITOR_AGGREGATES_CLEANUP_BATCH_SIZE:-1000}
+  MONITOR_AGGREGATES_CLEANUP_SAFETY_LIMIT: ${MONITOR_AGGREGATES_CLEANUP_SAFETY_LIMIT:-500000}
+  JOB_RUNS_CLEANUP_ENABLED: ${JOB_RUNS_CLEANUP_ENABLED:-true}
+  JOB_RUNS_CLEANUP_CRON: ${JOB_RUNS_CLEANUP_CRON:-0 3 * * *}
+  JOB_RUNS_CLEANUP_BATCH_SIZE: ${JOB_RUNS_CLEANUP_BATCH_SIZE:-100}
+  JOB_RUNS_CLEANUP_SAFETY_LIMIT: ${JOB_RUNS_CLEANUP_SAFETY_LIMIT:-10000}
+  PLAYGROUND_CLEANUP_ENABLED: ${PLAYGROUND_CLEANUP_ENABLED:-true}
+  PLAYGROUND_CLEANUP_CRON: ${PLAYGROUND_CLEANUP_CRON:-0 5 * * *}
+  PLAYGROUND_CLEANUP_MAX_AGE_HOURS: ${PLAYGROUND_CLEANUP_MAX_AGE_HOURS:-24}
+  WEBHOOK_CLEANUP_ENABLED: ${WEBHOOK_CLEANUP_ENABLED:-true}
+  WEBHOOK_CLEANUP_CRON: ${WEBHOOK_CLEANUP_CRON:-0 4 * * *}
+  WEBHOOK_CLEANUP_BATCH_SIZE: ${WEBHOOK_CLEANUP_BATCH_SIZE:-1000}
+  WEBHOOK_CLEANUP_SAFETY_LIMIT: ${WEBHOOK_CLEANUP_SAFETY_LIMIT:-100000}
+
+  # Security Configuration
+  SECRET_ENCRYPTION_KEY: ${SERVICE_BASE64_64_ENCRYPTION}
+
+  # Better Auth Admin Configuration
+  MAX_PROJECTS_PER_ORG: ${MAX_PROJECTS_PER_ORG:-10}
+  DEFAULT_PROJECT_NAME: ${DEFAULT_PROJECT_NAME:-Default Project}
+
+  # SMTP Email Configuration
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+
+  # AI Features Configuration
+  AI_PROVIDER: ${AI_PROVIDER:-openai}
+  AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+  AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-90000}
+  AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
+  AI_TEMPERATURE: ${AI_TEMPERATURE:-0.1}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+
+  # Worker Location
+  WORKER_LOCATION: ${WORKER_LOCATION:-local}
+
+  # Self-Hosted Mode
+  SELF_HOSTED: true
+
+  # OAuth Configuration
+  GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+  GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+
+  # CAPTCHA Configuration
+  TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+  TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+
+services:
+  # PostgreSQL Database (same as docker-compose-secure.yml)
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: ${POSTGRES_DB:-supercheck}
+    volumes:
+      - supercheck-postgres-data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+
+  # Redis (same as docker-compose-secure.yml)
+  redis:
+    image: redis:8
+    environment:
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_REDIS}
+    command: sh -c "rm -rf /data/* && redis-server --requirepass \"${SERVICE_PASSWORD_REDIS}\" --maxmemory 512mb --maxmemory-policy noeviction --save '' --appendonly no --protected-mode yes --bind 0.0.0.0 --tcp-keepalive 300"
+    volumes:
+      - supercheck-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # MinIO (same as docker-compose-secure.yml)
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
+    command: server /data --console-address ":9001"
+    volumes:
+      - supercheck-minio-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # App (Next.js Frontend) - same as docker-compose-secure.yml
+  app:
+    image: ghcr.io/supercheck-io/supercheck/app:latest
+    environment:
+      <<: *common-env
+      # Coolify-specific: expose port for proxy
+      SERVICE_URL_SUPERCHECK_3000: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+
+  # Worker (NestJS Runner) - same as docker-compose-secure.yml
+  worker:
+    image: ghcr.io/supercheck-io/supercheck/worker:latest
+    init: true
+    environment:
+      <<: *common-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - supercheck-worker-reports:/worker/report
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  supercheck-postgres-data:
+  supercheck-redis-data:
+  supercheck-minio-data:
+  supercheck-worker-reports:
