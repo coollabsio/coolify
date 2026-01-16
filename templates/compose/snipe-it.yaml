@@ -1,0 +1,63 @@
+# documentation: https://snipe-it.readme.io/docs
+# slogan: Snipe-IT was made for IT asset management.
+# category: asset management
+# tags: asset management, snipe-it, laravel, php, open source, IT asset management, license management
+# logo: svgs/snipe-it.svg
+# port: 80
+
+services:
+  snipe-it:
+    image: 'snipe/snipe-it:${APP_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_SNIPE_80
+      - DB_HOST=mariadb
+      - DB_DATABASE=${MARIADB_DATABASE:-snipeit-db}
+      - DB_USERNAME=${SERVICE_USER_MARIADB}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - APP_KEY=$SERVICE_BASE64_SNIPE
+      - APP_URL=$SERVICE_URL_SNIPE
+      - APP_TIMEZONE=${TIMEZONE:-UTC}
+      - APP_LOCALE=${LOCALE:-en-US}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDR=${MAIL_FROM_ADDR:?}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - MAIL_REPLYTO_ADDR=${MAIL_FROM_ADDR:?}
+      - MAIL_REPLYTO_NAME=${MAIL_FROM_NAME}
+      - MAIL_AUTO_EMBED_METHOD=${EMBED_METHOD:-attachment}
+      - MAIL_TLS_VERIFY_PEER=${VERIFY_PEER:-true}
+      - IMAGE_LIB=gd
+    volumes:
+      - snipeit-data:/var/lib/snipeit
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://127.0.0.1/health"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      mariadb:
+        condition: service_healthy
+  mariadb:
+    image: 'mariadb:${MARIADB_VERSION:-latest}'
+    volumes:
+      - snipeit-db:/var/lib/mysql
+    environment:
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-snipeit-db}
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 5s
+      timeout: 20s
+      retries: 10
