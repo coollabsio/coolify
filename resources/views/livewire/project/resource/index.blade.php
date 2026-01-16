@@ -3,7 +3,7 @@
         {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
     <div class="flex flex-col">
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 flex-nowrap items-center gap-1">
             <h1>Resources</h1>
             @if ($environment->isEmpty())
                 @can('createAnyResource')
