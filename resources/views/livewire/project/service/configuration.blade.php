@@ -116,7 +116,7 @@
                                                     'The selected service application will be unavailable during the restart.',
                                                     'If the service application is currently in use data could be lost.',
                                                 ]"
-                                                :confirmWithText="false" :confirmWithPassword="false"
+confirmWithText = os.environ.get("CONFIRMWITHTEXT")
                                                 step2ButtonText="Restart Service Container" />
                                         @endcan
                                     @endif
@@ -170,7 +170,7 @@
                                                 :actions="[
                                                     'This service database will be unavailable during the restart.',
                                                     'If the service database is currently in use data could be lost.',
-                                                ]" :confirmWithText="false" :confirmWithPassword="false"
+confirmWithText = os.environ.get("CONFIRMWITHTEXT")
                                                 step2ButtonText="Restart Database" />
                                         @endcan
                                     @endif

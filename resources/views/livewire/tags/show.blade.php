@@ -29,7 +29,7 @@
                     ]"
                     confirmationText="{{ $tag->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
-                    shortConfirmationLabel="Tag Name" :confirmWithPassword="false" step2ButtonText="Redeploy All" />
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
             </div>
 
             <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">

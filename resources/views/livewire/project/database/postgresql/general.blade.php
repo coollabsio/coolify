@@ -87,7 +87,7 @@
                             'The SSL certificate of this database will be regenerated.',
                             'You must restart the database after regenerating the certificate to start using the new certificate.',
                         ]" submitAction="regenerateSslCertificate" :confirmWithText="false"
-                        :confirmWithPassword="false" />
+confirmWithPassword = os.environ.get("CONFIRMWITHPASSWORD")
                 @endif
             </div>
             @if ($enableSsl && $certificateValidUntil)

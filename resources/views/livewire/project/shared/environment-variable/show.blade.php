@@ -17,7 +17,7 @@
                     <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']" confirmationText="{{ $env->key }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                        shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                         step2ButtonText="Permanently Delete" />
                 @endcan
             </div>
@@ -199,7 +199,7 @@
                                 buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                                 confirmationText="{{ $key }}" buttonFullWidth="true"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                                shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                 step2ButtonText="Permanently Delete" />
                         @else
                             <x-forms.button type="submit">Update</x-forms.button>
@@ -208,7 +208,7 @@
                                 buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                                 confirmationText="{{ $key }}" buttonFullWidth="true"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                                shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                 step2ButtonText="Permanently Delete" />
                         @endif
                     </div>

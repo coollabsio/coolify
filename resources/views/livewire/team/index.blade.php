@@ -41,7 +41,7 @@
                         submitAction="delete({{ currentTeam()->id }})" :actions="['The current team will be permanently deleted from Coolify and the database.']"
                         confirmationText="{{ currentTeam()->name }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Team Name below"
-                        shortConfirmationLabel="Team Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                 @else
                     <div>
                         <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>

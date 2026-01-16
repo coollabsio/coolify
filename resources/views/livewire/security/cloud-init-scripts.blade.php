@@ -38,7 +38,7 @@
                                 'This action cannot be undone.',
                             ]" confirmationText="{{ $script->name }}"
                             confirmationLabel="Please confirm the deletion by entering the script name below"
-                            shortConfirmationLabel="Script Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                             step2ButtonText="Delete Script" />
                     @endcan
                 </div>

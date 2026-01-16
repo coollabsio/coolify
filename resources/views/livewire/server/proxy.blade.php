@@ -11,7 +11,7 @@
                                 <x-modal-confirmation title="Confirm Proxy Switching?" buttonTitle="Switch Proxy"
                                     submitAction="changeProxy" :actions="['Custom proxy configurations may be reset to their default settings.']"
                                     warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!"
-                                    step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
+step2ButtonText = os.environ.get("STEP2BUTTONTEXT")
                                 </x-modal-confirmation>
                             @endcan
                         @else
@@ -69,7 +69,7 @@
                                                 ]" confirmationText="{{ $server->name }}"
                                                 confirmationLabel="Please confirm by entering the server name below"
                                                 shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
-                                                :confirmWithPassword="false" :confirmWithText="true">
+confirmWithPassword = os.environ.get("CONFIRMWITHPASSWORD")
                                             </x-modal-confirmation>
                                         @endif
                                     </div>

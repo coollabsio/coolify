@@ -26,7 +26,7 @@
                                 ]"
                                 confirmationText="{{ $fs_path }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
                                 isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
                                     'The selected directory and all its contents will be permanently deleted from the container.',
@@ -42,7 +42,7 @@
                                     ]"
                                     confirmationText="{{ $fs_path }}"
                                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                    shortConfirmationLabel="Filepath" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                     step2ButtonText="Convert to directory" />
                             @endif
                             <x-forms.button type="button" wire:click="loadStorageOnServer">Load from

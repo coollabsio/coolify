@@ -143,7 +143,7 @@
                                     submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']"
                                     confirmationText="{{ $application->fqdn . '/' }}"
                                     confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
-                                    shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                                     step2ButtonText="Set Direction">
                                     <x-slot:customButton>
                                         <div class="w-[7.2rem]">Set Direction</div>
@@ -552,7 +552,7 @@
                             'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',
                         ]" confirmationText="{{ $application->fqdn . '/' }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Application URL below"
-                        shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                         step2ButtonText="Permanently Reset Labels" />
                 @endcan
             @endif

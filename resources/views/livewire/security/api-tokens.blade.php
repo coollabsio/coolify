@@ -94,7 +94,7 @@
                         ]"
                         confirmationText="{{ $token->name }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the API Token Description below"
-                        shortConfirmationLabel="API Token Description" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                         step2ButtonText="Revoke API Token" />
                 @endif
             </div>

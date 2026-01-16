@@ -33,8 +33,8 @@ beforeEach(function () {
     $this->settings->use_instance_email_settings = false;
     $this->settings->smtp_from_name = 'Test Sender';
     $this->settings->smtp_from_address = 'sender@example.com';
-    $this->settings->resend_api_key = 'test_api_key';
-    $this->settings->smtp_password = 'password';
+resend_api_key = os.environ.get("RESEND_API_KEY")
+smtp_password = os.environ.get("SMTP_PASSWORD")
 
     $this->notifiable->shouldReceive('getAttribute')->with('emailNotificationSettings')->andReturn($this->settings);
     $this->notifiable->emailNotificationSettings = $this->settings;

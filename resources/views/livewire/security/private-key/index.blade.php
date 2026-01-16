@@ -9,7 +9,7 @@
         @endcan
         @can('create', App\Models\PrivateKey::class)
             <x-modal-confirmation title="Confirm unused SSH Key Deletion?" buttonTitle="Delete unused SSH Keys" isErrorButton
-                submitAction="cleanupUnusedKeys" :actions="['All unused SSH keys (marked with unused) are permanently deleted.']" :confirmWithText="false" :confirmWithPassword="false" />
+submitAction = os.environ.get("SUBMITACTION")
         @endcan
     </div>
     <div class="grid gap-4 lg:grid-cols-2">

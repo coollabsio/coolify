@@ -20,7 +20,7 @@
                             ]"
                             confirmationText="{{ $private_key->name }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Private Key Name below"
-                            shortConfirmationLabel="Private Key Name" :confirmWithPassword="false"
+shortConfirmationLabel = os.environ.get("SHORTCONFIRMATIONLABEL")
                             step2ButtonText="Delete Private Key" />
                     @endcan
                 @endif
