@@ -1,5 +1,5 @@
 # documentation: https://docs.hatchet.run/self-hosting/docker-compose
-# slogan: Hatchet is a high-throughput, low-latency computing service. It's built on an open-source, fault-tolerant queue, allowing work to be delivered as fast as your system can handle
+# slogan: Hatchet allows you to run background tasks at scale with a high-throughput, low-latency computing service built on an open-source, fault-tolerant queue.
 # tags: ai-agents,background-tasks,data-pipelines,scheduling
 # logo: svgs/hatchet.svg
 # port: 80
