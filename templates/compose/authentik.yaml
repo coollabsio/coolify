@@ -7,12 +7,11 @@
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.6.4}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
     restart: unless-stopped
     command: server
     environment:
       - SERVICE_URL_AUTHENTIKSERVER_9000
-      - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
       - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
       - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB:-authentik}
@@ -33,14 +32,11 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
-      redis:
-        condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.6.4}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
     restart: unless-stopped
     command: worker
     environment:
-      - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
       - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}
       - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB:-authentik}
@@ -70,8 +66,6 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
-      redis:
-        condition: service_healthy
   postgresql:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -86,14 +80,3 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_DB=authentik
-  redis:
-    image: redis:alpine
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
-    volumes:
-      - redis:/data

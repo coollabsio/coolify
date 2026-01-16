@@ -19,6 +19,17 @@
                 "summary": "List",
                 "description": "List all applications.",
                 "operationId": "list-applications",
+                "parameters": [
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "Filter applications by tag name.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Get all applications.",
@@ -124,7 +135,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -141,6 +152,18 @@
                                     "is_static": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application is static."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true."
+                                    },
+                                    "is_auto_deploy_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if auto-deploy is enabled on git push. Defaults to true."
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
                                     "static_image": {
                                         "type": "string",
@@ -311,13 +334,13 @@
                                         "type": "string",
                                         "description": "The Dockerfile content."
                                     },
+                                    "dockerfile_location": {
+                                        "type": "string",
+                                        "description": "The Dockerfile location in the repository."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
-                                    },
-                                    "docker_compose_raw": {
-                                        "type": "string",
-                                        "description": "The Docker Compose raw content."
                                     },
                                     "docker_compose_custom_start_command": {
                                         "type": "string",
@@ -329,7 +352,20 @@
                                     },
                                     "docker_compose_domains": {
                                         "type": "array",
-                                        "description": "The Docker Compose domains."
+                                        "description": "Array of URLs to be applied to containers of a dockercompose application.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     },
                                     "watch_paths": {
                                         "type": "string",
@@ -366,6 +402,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -539,7 +580,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -556,6 +597,18 @@
                                     "is_static": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application is static."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true."
+                                    },
+                                    "is_auto_deploy_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if auto-deploy is enabled on git push. Defaults to true."
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
                                     "static_image": {
                                         "type": "string",
@@ -726,13 +779,13 @@
                                         "type": "string",
                                         "description": "The Dockerfile content."
                                     },
+                                    "dockerfile_location": {
+                                        "type": "string",
+                                        "description": "The Dockerfile location in the repository"
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
-                                    },
-                                    "docker_compose_raw": {
-                                        "type": "string",
-                                        "description": "The Docker Compose raw content."
                                     },
                                     "docker_compose_custom_start_command": {
                                         "type": "string",
@@ -744,7 +797,20 @@
                                     },
                                     "docker_compose_domains": {
                                         "type": "array",
-                                        "description": "The Docker Compose domains."
+                                        "description": "Array of URLs to be applied to containers of a dockercompose application.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     },
                                     "watch_paths": {
                                         "type": "string",
@@ -781,6 +847,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -954,7 +1025,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -971,6 +1042,18 @@
                                     "is_static": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application is static."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true."
+                                    },
+                                    "is_auto_deploy_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if auto-deploy is enabled on git push. Defaults to true."
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
                                     "static_image": {
                                         "type": "string",
@@ -1141,13 +1224,13 @@
                                         "type": "string",
                                         "description": "The Dockerfile content."
                                     },
+                                    "dockerfile_location": {
+                                        "type": "string",
+                                        "description": "The Dockerfile location in the repository."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
-                                    },
-                                    "docker_compose_raw": {
-                                        "type": "string",
-                                        "description": "The Docker Compose raw content."
                                     },
                                     "docker_compose_custom_start_command": {
                                         "type": "string",
@@ -1159,7 +1242,20 @@
                                     },
                                     "docker_compose_domains": {
                                         "type": "array",
-                                        "description": "The Docker Compose domains."
+                                        "description": "Array of URLs to be applied to containers of a dockercompose application.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     },
                                     "watch_paths": {
                                         "type": "string",
@@ -1196,6 +1292,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -1292,8 +1393,8 @@
                 "tags": [
                     "Applications"
                 ],
-                "summary": "Create (Dockerfile)",
-                "description": "Create new application based on a simple Dockerfile.",
+                "summary": "Create (Dockerfile without git)",
+                "description": "Create new application based on a simple Dockerfile (without git).",
                 "operationId": "create-dockerfile-application",
                 "requestBody": {
                     "description": "Application object that needs to be created.",
@@ -1357,7 +1458,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "docker_registry_image_name": {
                                         "type": "string",
@@ -1509,6 +1610,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application should be deployed instantly."
                                     },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
+                                    },
                                     "use_build_server": {
                                         "type": "boolean",
                                         "nullable": true,
@@ -1540,6 +1645,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -1636,8 +1746,8 @@
                 "tags": [
                     "Applications"
                 ],
-                "summary": "Create (Docker Image)",
-                "description": "Create new application based on a prebuilt docker image",
+                "summary": "Create (Docker Image without git)",
+                "description": "Create new application based on a prebuilt docker image (without git).",
                 "operationId": "create-dockerimage-application",
                 "requestBody": {
                     "description": "Application object that needs to be created.",
@@ -1696,7 +1806,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "ports_mappings": {
                                         "type": "string",
@@ -1836,6 +1946,10 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application should be deployed instantly."
                                     },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
+                                    },
                                     "use_build_server": {
                                         "type": "boolean",
                                         "nullable": true,
@@ -1867,6 +1981,11 @@
                                         "type": "boolean",
                                         "default": true,
                                         "description": "If true and domains is empty, auto-generate a domain using the server's wildcard domain or sslip.io fallback. Default: true."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -1963,8 +2082,8 @@
                 "tags": [
                     "Applications"
                 ],
-                "summary": "Create (Docker Compose)",
-                "description": "Create new application based on a docker-compose file.",
+                "summary": "Create (Docker Compose) (Deprecated)",
+                "description": "Create new application based on a docker-compose file (without git).",
                 "operationId": "create-dockercompose-application",
                 "requestBody": {
                     "description": "Application object that needs to be created.",
@@ -2028,6 +2147,11 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -2112,6 +2236,7 @@
                         }
                     }
                 },
+                "deprecated": true,
                 "security": [
                     {
                         "bearerAuth": []
@@ -2134,8 +2259,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2180,8 +2304,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -2272,8 +2395,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2336,7 +2458,7 @@
                                     },
                                     "domains": {
                                         "type": "string",
-                                        "description": "The application domains."
+                                        "description": "The application URLs in a comma-separated list."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -2353,6 +2475,18 @@
                                     "is_static": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the application is static."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true."
+                                    },
+                                    "is_auto_deploy_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if auto-deploy is enabled on git push. Defaults to true."
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": "boolean",
+                                        "description": "The flag to indicate if HTTPS is forced. Defaults to true."
                                     },
                                     "install_command": {
                                         "type": "string",
@@ -2516,13 +2650,13 @@
                                         "type": "string",
                                         "description": "The Dockerfile content."
                                     },
+                                    "dockerfile_location": {
+                                        "type": "string",
+                                        "description": "The Dockerfile location in the repository."
+                                    },
                                     "docker_compose_location": {
                                         "type": "string",
                                         "description": "The Docker Compose location."
-                                    },
-                                    "docker_compose_raw": {
-                                        "type": "string",
-                                        "description": "The Docker Compose raw content."
                                     },
                                     "docker_compose_custom_start_command": {
                                         "type": "string",
@@ -2534,7 +2668,20 @@
                                     },
                                     "docker_compose_domains": {
                                         "type": "array",
-                                        "description": "The Docker Compose domains."
+                                        "description": "Array of URLs to be applied to containers of a dockercompose application.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "domain": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     },
                                     "watch_paths": {
                                         "type": "string",
@@ -2552,6 +2699,11 @@
                                     "force_domain_override": {
                                         "type": "boolean",
                                         "description": "Force domain usage even if conflicts are detected. Default is false."
+                                    },
+                                    "is_container_label_escape_enabled": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off."
                                     }
                                 },
                                 "type": "object"
@@ -2661,8 +2813,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -2725,8 +2876,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2774,8 +2924,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2863,8 +3012,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2958,8 +3106,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3017,13 +3164,10 @@
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Environment variables updated."
-                                        }
-                                    },
-                                    "type": "object"
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/EnvironmentVariable"
+                                    }
                                 }
                             }
                         }
@@ -3060,8 +3204,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -3070,8 +3213,7 @@
                         "description": "UUID of the environment variable.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3124,8 +3266,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -3202,8 +3343,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3256,8 +3396,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3521,8 +3660,7 @@
                         "description": "UUID of the cloud provider token.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3730,8 +3868,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3777,8 +3914,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3910,8 +4046,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -3957,8 +4092,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -4049,8 +4183,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -4271,8 +4404,7 @@
                         "description": "UUID of the backup configuration to delete",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -4340,8 +4472,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -4350,8 +4481,7 @@
                         "description": "UUID of the backup configuration.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -5528,8 +5658,7 @@
                         "description": "UUID of the backup configuration",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -5538,8 +5667,7 @@
                         "description": "UUID of the backup execution to delete",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -5618,8 +5746,7 @@
                         "description": "UUID of the backup configuration",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -5688,8 +5815,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -5742,8 +5868,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -5796,8 +5921,7 @@
                         "description": "UUID of the database.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -6109,8 +6233,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -7522,8 +7645,7 @@
                         "description": "UUID of the application.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7577,8 +7699,7 @@
                         "description": "UUID of the project.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -8415,8 +8536,7 @@
                         "description": "UUID of the server.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -8798,96 +8918,8 @@
                                 ],
                                 "properties": {
                                     "type": {
-                                        "description": "The one-click service type",
-                                        "type": "string",
-                                        "enum": [
-                                            "activepieces",
-                                            "appsmith",
-                                            "appwrite",
-                                            "authentik",
-                                            "babybuddy",
-                                            "budge",
-                                            "changedetection",
-                                            "chatwoot",
-                                            "classicpress-with-mariadb",
-                                            "classicpress-with-mysql",
-                                            "classicpress-without-database",
-                                            "cloudflared",
-                                            "code-server",
-                                            "dashboard",
-                                            "directus",
-                                            "directus-with-postgresql",
-                                            "docker-registry",
-                                            "docuseal",
-                                            "docuseal-with-postgres",
-                                            "dokuwiki",
-                                            "duplicati",
-                                            "emby",
-                                            "embystat",
-                                            "fider",
-                                            "filebrowser",
-                                            "firefly",
-                                            "formbricks",
-                                            "ghost",
-                                            "gitea",
-                                            "gitea-with-mariadb",
-                                            "gitea-with-mysql",
-                                            "gitea-with-postgresql",
-                                            "glance",
-                                            "glances",
-                                            "glitchtip",
-                                            "grafana",
-                                            "grafana-with-postgresql",
-                                            "grocy",
-                                            "heimdall",
-                                            "homepage",
-                                            "jellyfin",
-                                            "kuzzle",
-                                            "listmonk",
-                                            "logto",
-                                            "mediawiki",
-                                            "meilisearch",
-                                            "metabase",
-                                            "metube",
-                                            "minio",
-                                            "moodle",
-                                            "n8n",
-                                            "n8n-with-postgresql",
-                                            "next-image-transformation",
-                                            "nextcloud",
-                                            "nocodb",
-                                            "odoo",
-                                            "openblocks",
-                                            "pairdrop",
-                                            "penpot",
-                                            "phpmyadmin",
-                                            "pocketbase",
-                                            "posthog",
-                                            "reactive-resume",
-                                            "rocketchat",
-                                            "shlink",
-                                            "slash",
-                                            "snapdrop",
-                                            "statusnook",
-                                            "stirling-pdf",
-                                            "supabase",
-                                            "syncthing",
-                                            "tolgee",
-                                            "trigger",
-                                            "trigger-with-external-database",
-                                            "twenty",
-                                            "umami",
-                                            "unleash-with-postgresql",
-                                            "unleash-without-database",
-                                            "uptime-kuma",
-                                            "vaultwarden",
-                                            "vikunja",
-                                            "weblate",
-                                            "whoogle",
-                                            "wordpress-with-mariadb",
-                                            "wordpress-with-mysql",
-                                            "wordpress-without-database"
-                                        ]
+                                        "description": "The one-click service type (e.g. \"actualbudget\", \"calibre-web\", \"gitea-with-mysql\" ...)",
+                                        "type": "string"
                                     },
                                     "name": {
                                         "type": "string",
@@ -8926,7 +8958,29 @@
                                     },
                                     "docker_compose_raw": {
                                         "type": "string",
-                                        "description": "The Docker Compose raw content."
+                                        "description": "The base64 encoded Docker Compose content."
+                                    },
+                                    "urls": {
+                                        "type": "array",
+                                        "description": "Array of URLs to be applied to containers of a service.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "url": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Force domain override even if conflicts are detected."
                                     }
                                 },
                                 "type": "object"
@@ -8963,6 +9017,60 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -9126,8 +9234,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9177,7 +9284,29 @@
                                     },
                                     "docker_compose_raw": {
                                         "type": "string",
-                                        "description": "The Docker Compose raw content."
+                                        "description": "The base64 encoded Docker Compose content."
+                                    },
+                                    "urls": {
+                                        "type": "array",
+                                        "description": "Array of URLs to be applied to containers of a service.",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "The service name as defined in docker-compose."
+                                                },
+                                                "url": {
+                                                    "type": "string",
+                                                    "description": "Comma-separated list of URLs (e.g. \"http:\/\/app.coolify.io,https:\/\/app2.coolify.io\")."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Force domain override even if conflicts are detected."
                                     }
                                 },
                                 "type": "object"
@@ -9218,6 +9347,60 @@
                     "404": {
                         "$ref": "#\/components\/responses\/404"
                     },
+                    "409": {
+                        "description": "Domain conflicts detected.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Domain conflicts detected. Use force_domain_override=true to proceed."
+                                        },
+                                        "warning": {
+                                            "type": "string",
+                                            "example": "Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior."
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "domain": {
+                                                        "type": "string",
+                                                        "example": "example.com"
+                                                    },
+                                                    "resource_name": {
+                                                        "type": "string",
+                                                        "example": "My Application"
+                                                    },
+                                                    "resource_uuid": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "abc123-def456"
+                                                    },
+                                                    "resource_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "application",
+                                                            "service",
+                                                            "instance"
+                                                        ],
+                                                        "example": "application"
+                                                    },
+                                                    "message": {
+                                                        "type": "string",
+                                                        "example": "Domain example.com is already in use by application 'My Application'"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
                     }
@@ -9244,8 +9427,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9293,8 +9475,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9385,8 +9566,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9483,8 +9663,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9588,8 +9767,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -9598,8 +9776,7 @@
                         "description": "UUID of the environment variable.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9652,8 +9829,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9706,8 +9882,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -9760,8 +9935,7 @@
                         "description": "UUID of the service.",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     },
                     {
@@ -10608,13 +10782,6 @@
                     },
                     "description": {
                         "type": "string"
-                    },
-                    "environments": {
-                        "description": "The environments of the project.",
-                        "type": "array",
-                        "items": {
-                            "$ref": "#\/components\/schemas\/Environment"
-                        }
                     }
                 },
                 "type": "object"

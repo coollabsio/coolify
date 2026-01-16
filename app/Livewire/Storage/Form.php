@@ -50,8 +50,6 @@ class Form extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'region.required' => 'The Region field is required.',
                 'region.max' => 'The Region may not be greater than 255 characters.',
                 'key.required' => 'The Access Key field is required.',

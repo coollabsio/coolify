@@ -86,8 +86,11 @@ function sharedDataApplications()
         'git_branch' => 'string',
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'is_spa' => 'boolean',
+        'is_auto_deploy_enabled' => 'boolean',
+        'is_force_https_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string',
+        'domains' => 'string|nullable',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => 'string',
         'docker_registry_image_name' => 'string|nullable',
@@ -129,12 +132,13 @@ function sharedDataApplications()
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
+        'dockerfile_location' => 'string|nullable',
         'docker_compose_location' => 'string',
         'docker_compose' => 'string|nullable',
-        'docker_compose_raw' => 'string|nullable',
         'docker_compose_domains' => 'array|nullable',
         'docker_compose_custom_start_command' => 'string|nullable',
         'docker_compose_custom_build_command' => 'string|nullable',
+        'is_container_label_escape_enabled' => 'boolean',
     ];
 }
 
@@ -177,6 +181,12 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('is_static');
+    $request->offsetUnset('is_spa');
+    $request->offsetUnset('is_auto_deploy_enabled');
+    $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
+    $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('docker_compose_raw');
 }
