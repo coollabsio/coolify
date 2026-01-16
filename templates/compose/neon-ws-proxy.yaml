@@ -1,5 +1,6 @@
 # documentation: https://neon.tech
 # slogan: The database you love, on a serverless platform designed to help you build reliable and scalable applications faster.
+# category: proxy
 # tags: proxy, neon, postgresql
 # logo: svgs/neon.svg
 # port: 80, 2112
@@ -8,8 +9,8 @@ services:
   neon-proxy:
     image: 'ghcr.io/neondatabase/wsproxy:latest'
     environment:
-      - SERVICE_FQDN_NEONPROXY
-      - SERVICE_FQDN_NEONPROMETHEUS_2112
+      - SERVICE_URL_NEONPROXY
+      - SERVICE_URL_NEONPROMETHEUS_2112
       - 'APPEND_PORT=postgres:5432'
       - 'ALLOW_ADDR_REGEX=.*'
       - LOG_TRAFFIC=false

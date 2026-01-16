@@ -1,5 +1,6 @@
 # documentation: https://firefly-iii.org
 # slogan: A personal finances manager that can help you save money.
+# category: productivity
 # tags: finance, money, personal, manager
 # logo: svgs/firefly.svg
 # port: 8080
@@ -8,7 +9,7 @@ services:
   firefly:
     image: fireflyiii/core:latest
     environment:
-      - SERVICE_FQDN_FIREFLY_8080
+      - SERVICE_URL_FIREFLY_8080
       - APP_KEY=$SERVICE_BASE64_APPKEY
       - DB_HOST=mysql
       - DB_PORT=3306

@@ -2,12 +2,23 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScheduledTask extends BaseModel
 {
+    use HasSafeStringAttribute;
+
     protected $guarded = [];
+
+    protected function casts(): array
+    {
+        return [
+            'enabled' => 'boolean',
+            'timeout' => 'integer',
+        ];
+    }
 
     public function service()
     {

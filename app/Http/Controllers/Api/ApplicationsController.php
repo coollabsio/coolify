@@ -15,7 +15,11 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
+use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -61,6 +65,17 @@ class ApplicationsController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'tag',
+                in: 'query',
+                description: 'Filter applications by tag name.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -91,13 +106,19 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $applications = collect();
-        $applications->push($projects->pluck('applications')->flatten());
-        $applications = $applications->flatten();
-        $applications = $applications->map(function ($application) {
-            return $this->removeSensitiveData($application);
-        });
+
+        $tagName = $request->query('tag');
+
+        $applications = Application::ownedByCurrentTeamAPI($teamId)
+            ->when($tagName, function ($query, $tagName) {
+                $query->whereHas('tags', function ($query) use ($tagName) {
+                    $query->where('name', $tagName);
+                });
+            })
+            ->get()
+            ->map(function ($application) {
+                return $this->removeSensitiveData($application);
+            });
 
         return response()->json($applications);
     }
@@ -132,11 +153,14 @@ class ApplicationsController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
+                            'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -177,17 +201,30 @@ class ApplicationsController extends Controller
                             // 'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
-                            'docker_compose_domains' => ['type' => 'array', 'description' => 'The Docker Compose domains.'],
+                            'docker_compose_domains' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a dockercompose application.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                    ],
+                                ),
+                            ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -214,6 +251,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -253,11 +319,14 @@ class ApplicationsController extends Controller
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
+                            'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -297,17 +366,30 @@ class ApplicationsController extends Controller
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
-                            'docker_compose_domains' => ['type' => 'array', 'description' => 'The Docker Compose domains.'],
+                            'docker_compose_domains' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a dockercompose application.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                    ],
+                                ),
+                            ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -334,6 +416,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -373,11 +484,14 @@ class ApplicationsController extends Controller
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
+                            'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -417,17 +531,30 @@ class ApplicationsController extends Controller
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
-                            'docker_compose_domains' => ['type' => 'array', 'description' => 'The Docker Compose domains.'],
+                            'docker_compose_domains' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a dockercompose application.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                    ],
+                                ),
+                            ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -455,6 +582,35 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function create_private_deploy_key_application(Request $request)
@@ -463,8 +619,8 @@ class ApplicationsController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Dockerfile)',
-        description: 'Create new application based on a simple Dockerfile.',
+        summary: 'Create (Dockerfile without git)',
+        description: 'Create new application based on a simple Dockerfile (without git).',
         path: '/applications/dockerfile',
         operationId: 'create-dockerfile-application',
         security: [
@@ -491,7 +647,7 @@ class ApplicationsController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
@@ -527,11 +683,15 @@ class ApplicationsController extends Controller
                             'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -559,6 +719,35 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function create_dockerfile_application(Request $request)
@@ -567,8 +756,8 @@ class ApplicationsController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Docker Image)',
-        description: 'Create new application based on a prebuilt docker image',
+        summary: 'Create (Docker Image without git)',
+        description: 'Create new application based on a prebuilt docker image (without git).',
         path: '/applications/dockerimage',
         operationId: 'create-dockerimage-application',
         security: [
@@ -595,7 +784,7 @@ class ApplicationsController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
                             'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
                             'health_check_path' => ['type' => 'string', 'description' => 'Health check path.'],
@@ -628,11 +817,15 @@ class ApplicationsController extends Controller
                             'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -660,6 +853,35 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function create_dockerimage_application(Request $request)
@@ -667,11 +889,15 @@ class ApplicationsController extends Controller
         return $this->create_application($request, 'dockerimage');
     }
 
+    /**
+     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is an unstable duplicate of POST /api/v1/services.
+     */
     #[OA\Post(
-        summary: 'Create (Docker Compose)',
-        description: 'Create new application based on a docker-compose file.',
+        summary: 'Create (Docker Compose) (Deprecated)',
+        description: 'Create new application based on a docker-compose file (without git).',
         path: '/applications/dockercompose',
         operationId: 'create-dockercompose-application',
+        deprecated: true,
         security: [
             ['bearerAuth' => []],
         ],
@@ -697,6 +923,8 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -724,6 +952,35 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function create_dockercompose_application(Request $request)
@@ -738,11 +995,13 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Application::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -755,6 +1014,7 @@ class ApplicationsController extends Controller
             'is_http_basic_auth_enabled' => 'boolean',
             'http_basic_auth_username' => 'string|nullable',
             'http_basic_auth_password' => 'string|nullable',
+            'autogenerate_domain' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -779,12 +1039,17 @@ class ApplicationsController extends Controller
         }
         $serverUuid = $request->server_uuid;
         $fqdn = $request->domains;
+        $autogenerateDomain = $request->boolean('autogenerate_domain', true);
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
         $isStatic = $request->is_static;
+        $isSpa = $request->is_spa;
+        $isAutoDeployEnabled = $request->is_auto_deploy_enabled;
+        $isForceHttpsEnabled = $request->is_force_https_enabled;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $customNginxConfiguration = $request->custom_nginx_configuration;
+        $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled', true);
 
         if (! is_null($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
@@ -796,7 +1061,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customNginxConfiguration = base64_decode($customNginxConfiguration);
-            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customNginxConfiguration, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -831,13 +1096,15 @@ class ApplicationsController extends Controller
         $destination = $destinations->first();
         if ($type === 'public') {
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'docker_compose_location' => 'string',
-                'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
+                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*.name' => 'string|required',
+                'docker_compose_domains.*.domain' => 'string|nullable',
             ];
             // ports_exposes is not required for dockercompose
             if ($request->build_pack === 'dockercompose') {
@@ -845,11 +1112,24 @@ class ApplicationsController extends Controller
                 $request->offsetSet('ports_exposes', '80');
             }
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
-            $validator = customApiValidator($request->all(), $validationRules);
+            $validationMessages = [
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+            ];
+            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
+                ], 422);
+            }
+            // For dockercompose applications, domains (fqdn) field should not be used
+            // Only docker_compose_domains should be used to set domains for individual services
+            if ($request->build_pack === 'dockercompose' && $request->has('domains')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'The domains field cannot be used for dockercompose applications. Use docker_compose_domains instead to set domains for individual services.',
+                    ],
                 ], 422);
             }
             if (! $request->has('name')) {
@@ -867,11 +1147,66 @@ class ApplicationsController extends Controller
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
                 $dockerComposeDomains = collect($request->docker_compose_domains);
-                if ($dockerComposeDomains->count() > 0) {
-                    $dockerComposeDomains->each(function ($domain, $key) use ($dockerComposeDomainsJson) {
-                        $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
-                    });
+
+                // Collect all URLs from all docker_compose_domains items
+                $urls = $dockerComposeDomains->flatMap(function ($item) {
+                    $domainValue = data_get($item, 'domain');
+                    if (blank($domainValue)) {
+                        return [];
+                    }
+
+                    return str($domainValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+                });
+
+                $errors = [];
+                $urls = $urls->map(function ($url) use (&$errors) {
+                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                        $errors[] = "Invalid URL: {$url}";
+
+                        return $url;
+                    }
+                    $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                    if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                        $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                    }
+
+                    return $url;
+                });
+
+                $duplicates = $urls->duplicates()->unique()->values();
+                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                    $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed.';
                 }
+
+                if (count($errors) > 0) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['docker_compose_domains' => $errors],
+                    ], 422);
+                }
+
+                // Check for domain conflicts
+                if ($urls->isNotEmpty()) {
+                    $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId);
+                    if (isset($result['error'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => ['docker_compose_domains' => $result['error']],
+                        ], 422);
+                    }
+
+                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $result['conflicts'],
+                            'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                        ], 409);
+                    }
+                }
+
+                $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
@@ -883,7 +1218,7 @@ class ApplicationsController extends Controller
                 $application->source_type = GithubApp::class;
                 $application->source_id = GithubApp::find(0)->id;
             }
-            $application->git_repository = $repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2);
+            $application->git_repository = str($repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2))->trim()->toString();
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -891,6 +1226,18 @@ class ApplicationsController extends Controller
             $application->save();
             if (isset($isStatic)) {
                 $application->settings->is_static = $isStatic;
+                $application->settings->save();
+            }
+            if (isset($isSpa)) {
+                $application->settings->is_spa = $isSpa;
+                $application->settings->save();
+            }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
+            if (isset($isForceHttpsEnabled)) {
+                $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
                 $application->settings->save();
             }
             if (isset($connectToDockerNetwork)) {
@@ -901,7 +1248,16 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
+                $application->settings->save();
+            }
             $application->refresh();
+            // Auto-generate domain if requested and no custom domain provided
+            if ($autogenerateDomain && blank($fqdn)) {
+                $application->fqdn = generateUrl(server: $server, random: $application->uuid);
+                $application->save();
+            }
             if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -930,26 +1286,41 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'private-gh-app') {
             $validationRules = [
                 'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
-                'docker_compose_raw' => 'string|nullable',
+                'docker_compose_domains' => 'array|nullable',
+                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*.name' => 'string|required',
+                'docker_compose_domains.*.domain' => 'string|nullable',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
-
-            $validator = customApiValidator($request->all(), $validationRules);
+            $validationMessages = [
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+            ];
+            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
+                ], 422);
+            }
+            // For dockercompose applications, domains (fqdn) field should not be used
+            // Only docker_compose_domains should be used to set domains for individual services
+            if ($request->build_pack === 'dockercompose' && $request->has('domains')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'The domains field cannot be used for dockercompose applications. Use docker_compose_domains instead to set domains for individual services.',
+                    ],
                 ], 422);
             }
 
@@ -1000,50 +1371,74 @@ class ApplicationsController extends Controller
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
-                if (! $request->has('docker_compose_raw')) {
+                $dockerComposeDomains = collect($request->docker_compose_domains);
+
+                // Collect all URLs from all docker_compose_domains items
+                $urls = $dockerComposeDomains->flatMap(function ($item) {
+                    $domainValue = data_get($item, 'domain');
+                    if (blank($domainValue)) {
+                        return [];
+                    }
+
+                    return str($domainValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+                });
+
+                $errors = [];
+                $urls = $urls->map(function ($url) use (&$errors) {
+                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                        $errors[] = "Invalid URL: {$url}";
+
+                        return $url;
+                    }
+                    $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                    if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                        $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                    }
+
+                    return $url;
+                });
+
+                $duplicates = $urls->duplicates()->unique()->values();
+                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                    $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed. ';
+                }
+
+                if (count($errors) > 0) {
                     return response()->json([
                         'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
-                        ],
+                        'errors' => ['docker_compose_domains' => $errors],
                     ], 422);
                 }
 
-                if (! isBase64Encoded($request->docker_compose_raw)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                        ],
-                    ], 422);
+                // Check for domain conflicts
+                if ($urls->isNotEmpty()) {
+                    $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId);
+                    if (isset($result['error'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => ['docker_compose_domains' => $result['error']],
+                        ], 422);
+                    }
+
+                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $result['conflicts'],
+                            'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                        ], 409);
+                    }
                 }
-                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-                if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $yaml = Yaml::parse($dockerComposeRaw);
-                $services = data_get($yaml, 'services');
-                $dockerComposeDomains = collect($request->docker_compose_domains);
-                if ($dockerComposeDomains->count() > 0) {
-                    $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
-                        $name = data_get($domain, 'name');
-                        if (data_get($services, $name)) {
-                            $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
-                        }
-                    });
-                }
+
+                $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
             $application->fqdn = $fqdn;
-            $application->git_repository = $gitRepository;
+            $application->git_repository = str($gitRepository)->trim()->toString();
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
@@ -1053,8 +1448,37 @@ class ApplicationsController extends Controller
 
             $application->save();
             $application->refresh();
+            // Auto-generate domain if requested and no custom domain provided
+            if ($autogenerateDomain && blank($fqdn)) {
+                $application->fqdn = generateUrl(server: $server, random: $application->uuid);
+                $application->save();
+            }
+            if (isset($isStatic)) {
+                $application->settings->is_static = $isStatic;
+                $application->settings->save();
+            }
+            if (isset($isSpa)) {
+                $application->settings->is_spa = $isSpa;
+                $application->settings->save();
+            }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
+            if (isset($isForceHttpsEnabled)) {
+                $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($connectToDockerNetwork)) {
+                $application->settings->connect_to_docker_network = $connectToDockerNetwork;
+                $application->settings->save();
+            }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
@@ -1085,28 +1509,44 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'private-deploy-key') {
 
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_location' => 'string',
-                'docker_compose_raw' => 'string|nullable',
+                'docker_compose_domains' => 'array|nullable',
+                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*.name' => 'string|required',
+                'docker_compose_domains.*.domain' => 'string|nullable',
             ];
 
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
-            $validator = customApiValidator($request->all(), $validationRules);
+            $validationMessages = [
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+            ];
+            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
+                ], 422);
+            }
+            // For dockercompose applications, domains (fqdn) field should not be used
+            // Only docker_compose_domains should be used to set domains for individual services
+            if ($request->build_pack === 'dockercompose' && $request->has('domains')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'The domains field cannot be used for dockercompose applications. Use docker_compose_domains instead to set domains for individual services.',
+                    ],
                 ], 422);
             }
             if (! $request->has('name')) {
@@ -1132,44 +1572,67 @@ class ApplicationsController extends Controller
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
-                if (! $request->has('docker_compose_raw')) {
+                $dockerComposeDomains = collect($request->docker_compose_domains);
+
+                // Collect all URLs from all docker_compose_domains items
+                $urls = $dockerComposeDomains->flatMap(function ($item) {
+                    $domainValue = data_get($item, 'domain');
+                    if (blank($domainValue)) {
+                        return [];
+                    }
+
+                    return str($domainValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+                });
+
+                $errors = [];
+                $urls = $urls->map(function ($url) use (&$errors) {
+                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                        $errors[] = "Invalid URL: {$url}";
+
+                        return $url;
+                    }
+                    $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                    if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                        $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                    }
+
+                    return $url;
+                });
+
+                $duplicates = $urls->duplicates()->unique()->values();
+                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                    $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed.';
+                }
+
+                if (count($errors) > 0) {
                     return response()->json([
                         'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
-                        ],
+                        'errors' => ['docker_compose_domains' => $errors],
                     ], 422);
                 }
 
-                if (! isBase64Encoded($request->docker_compose_raw)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                        ],
-                    ], 422);
+                // Check for domain conflicts
+                if ($urls->isNotEmpty()) {
+                    $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId);
+                    if (isset($result['error'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => ['docker_compose_domains' => $result['error']],
+                        ], 422);
+                    }
+
+                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $result['conflicts'],
+                            'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                        ], 409);
+                    }
                 }
-                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-                if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-                $yaml = Yaml::parse($dockerComposeRaw);
-                $services = data_get($yaml, 'services');
-                $dockerComposeDomains = collect($request->docker_compose_domains);
-                if ($dockerComposeDomains->count() > 0) {
-                    $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
-                        $name = data_get($domain, 'name');
-                        if (data_get($services, $name)) {
-                            $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
-                        }
-                    });
-                }
+
+                $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
@@ -1182,8 +1645,37 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->save();
             $application->refresh();
+            // Auto-generate domain if requested and no custom domain provided
+            if ($autogenerateDomain && blank($fqdn)) {
+                $application->fqdn = generateUrl(server: $server, random: $application->uuid);
+                $application->save();
+            }
+            if (isset($isStatic)) {
+                $application->settings->is_static = $isStatic;
+                $application->settings->save();
+            }
+            if (isset($isSpa)) {
+                $application->settings->is_spa = $isSpa;
+                $application->settings->save();
+            }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
+            if (isset($isForceHttpsEnabled)) {
+                $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($connectToDockerNetwork)) {
+                $application->settings->connect_to_docker_network = $connectToDockerNetwork;
+                $application->settings->save();
+            }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
@@ -1214,7 +1706,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerfile') {
             $validationRules = [
@@ -1246,7 +1738,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $dockerFile = base64_decode($request->dockerfile);
-            if (mb_detect_encoding($dockerFile, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerFile, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -1276,8 +1768,25 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
+            // Auto-generate domain if requested and no custom domain provided
+            if ($autogenerateDomain && blank($fqdn)) {
+                $application->fqdn = generateUrl(server: $server, random: $application->uuid);
+                $application->save();
+            }
+            if (isset($isForceHttpsEnabled)) {
+                $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($connectToDockerNetwork)) {
+                $application->settings->connect_to_docker_network = $connectToDockerNetwork;
+                $application->settings->save();
+            }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
@@ -1304,7 +1813,7 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
@@ -1328,9 +1837,33 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            if (! $request->docker_registry_image_tag) {
-                $request->offsetSet('docker_registry_image_tag', 'latest');
+            // Process docker image name and tag using DockerImageParser
+            $dockerImageName = $request->docker_registry_image_name;
+            $dockerImageTag = $request->docker_registry_image_tag;
+
+            // Build the full Docker image string for parsing
+            if ($dockerImageTag) {
+                $dockerImageString = $dockerImageName.':'.$dockerImageTag;
+            } else {
+                $dockerImageString = $dockerImageName;
             }
+
+            // Parse using DockerImageParser to normalize the image reference
+            $parser = new DockerImageParser;
+            $parser->parse($dockerImageString);
+
+            // Get normalized image name and tag
+            $normalizedImageName = $parser->getFullImageNameWithoutTag();
+
+            // Append @sha256 to image name if using digest
+            if ($parser->isImageHash() && ! str_ends_with($normalizedImageName, '@sha256')) {
+                $normalizedImageName .= '@sha256';
+            }
+
+            // Set processed values back to request
+            $request->offsetSet('docker_registry_image_name', $normalizedImageName);
+            $request->offsetSet('docker_registry_image_tag', $parser->getTag());
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
@@ -1345,8 +1878,25 @@ class ApplicationsController extends Controller
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
+            // Auto-generate domain if requested and no custom domain provided
+            if ($autogenerateDomain && blank($fqdn)) {
+                $application->fqdn = generateUrl(server: $server, random: $application->uuid);
+                $application->save();
+            }
+            if (isset($isForceHttpsEnabled)) {
+                $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($connectToDockerNetwork)) {
+                $application->settings->connect_to_docker_network = $connectToDockerNetwork;
+                $application->settings->save();
+            }
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
@@ -1373,10 +1923,10 @@ class ApplicationsController extends Controller
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
-                'domains' => data_get($application, 'domains'),
+                'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockercompose') {
-            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
+            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw', 'force_domain_override', 'is_container_label_escape_enabled'];
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -1420,7 +1970,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -1440,9 +1990,16 @@ class ApplicationsController extends Controller
             $service->server_id = $server->id;
             $service->destination_id = $destination->id;
             $service->destination_type = $destination->getMorphClass();
+            if (isset($isContainerLabelEscapeEnabled)) {
+                $service->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
+            }
             $service->save();
 
             $service->parse(isNew: true);
+
+            // Apply service-specific application prerequisites
+            applyServiceApplicationPrerequisites($service);
+
             if ($instantDeploy) {
                 StartService::dispatch($service);
             }
@@ -1473,7 +2030,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1519,6 +2075,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('view', $application);
+
         return response()->json($this->removeSensitiveData($application));
     }
 
@@ -1539,7 +2097,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1641,7 +2198,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
@@ -1682,7 +2238,6 @@ class ApplicationsController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -1697,12 +2252,14 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $application);
+
         DeleteResourceJob::dispatch(
             resource: $application,
-            deleteVolumes: $request->query->get('delete_volumes', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
-            deleteConfigurations: $request->query->get('delete_configurations', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true)
+            deleteVolumes: $request->boolean('delete_volumes', true),
+            deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
+            deleteConfigurations: $request->boolean('delete_configurations', true),
+            dockerCleanup: $request->boolean('docker_cleanup', true)
         );
 
         return response()->json([
@@ -1727,7 +2284,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1751,11 +2307,14 @@ class ApplicationsController extends Controller
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'domains' => ['type' => 'string', 'description' => 'The application domains.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
+                            'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
                             'start_command' => ['type' => 'string', 'description' => 'The start command.'],
@@ -1794,14 +2353,26 @@ class ApplicationsController extends Controller
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
-                            'docker_compose_domains' => ['type' => 'array', 'description' => 'The Docker Compose domains.'],
+                            'docker_compose_domains' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a dockercompose application.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                    ],
+                                ),
+                            ],
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -1835,6 +2406,35 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -1854,8 +2454,11 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('update', $application);
+
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network'];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1863,8 +2466,10 @@ class ApplicationsController extends Controller
             'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_location' => 'string',
-            'docker_compose_raw' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
+            'docker_compose_domains.*' => 'array:name,domain',
+            'docker_compose_domains.*.name' => 'string|required',
+            'docker_compose_domains.*.domain' => 'string|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',
             'docker_compose_custom_build_command' => 'string|nullable',
             'custom_nginx_configuration' => 'string|nullable',
@@ -1873,7 +2478,10 @@ class ApplicationsController extends Controller
             'http_basic_auth_password' => 'string',
         ];
         $validationRules = array_merge(sharedDataApplications(), $validationRules);
-        $validator = customApiValidator($request->all(), $validationRules);
+        $validationMessages = [
+            'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+        ];
+        $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         // Validate ports_exposes
         if ($request->has('ports_exposes')) {
@@ -1899,7 +2507,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customNginxConfiguration = base64_decode($request->custom_nginx_configuration);
-            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customNginxConfiguration, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -1949,84 +2557,157 @@ class ApplicationsController extends Controller
             $application->save();
         }
 
+        // For dockercompose applications, domains (fqdn) field should not be used
+        // Only docker_compose_domains should be used to set domains for individual services
+        if ($application->build_pack === 'dockercompose' && $request->has('domains')) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'domains' => 'The domains field cannot be used for dockercompose applications. Use docker_compose_domains instead to set domains for individual services.',
+                ],
+            ], 422);
+        }
+
         $domains = $request->domains;
         $requestHasDomains = $request->has('domains');
         if ($requestHasDomains && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
-            $fqdn = $request->domains;
-            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $urls = $request->domains;
+            $urls = str($urls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
             $errors = [];
-            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-                $domain = trim($domain);
-                if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
-                    $errors[] = 'Invalid domain: '.$domain;
+            $urls = str($urls)->trim()->explode(',')->map(function ($url) use (&$errors) {
+                $url = trim($url);
+
+                // If "domains" is empty clear all URLs from the fqdn column
+                if (blank($url)) {
+                    return null;
                 }
 
-                return $domain;
+                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    $errors[] = 'Invalid URL: '.$url;
+
+                    return $url;
+                }
+                $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                    $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                }
+
+                return str($url)->lower();
             });
+
             if (count($errors) > 0) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $errors,
                 ], 422);
             }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+            // Check for domain conflicts
+            $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId, $uuid);
+            if (isset($result['error'])) {
                 return response()->json([
                     'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
+                    'errors' => ['domains' => $result['error']],
                 ], 422);
+            }
+
+            // If there are conflicts and force is not enabled, return warning
+            if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $result['conflicts'],
+                    'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                ], 409);
             }
         }
 
         $dockerComposeDomainsJson = collect();
         if ($request->has('docker_compose_domains')) {
-            if (! $request->has('docker_compose_raw')) {
+            if (empty($application->docker_compose_raw)) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
-                        'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
+                        'docker_compose_domains' => 'Cannot set docker_compose_domains without docker_compose_raw. Reload the compose file from the git repository first.',
                     ],
                 ], 422);
             }
 
-            if (! isBase64Encoded($request->docker_compose_raw)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            $yaml = Yaml::parse($dockerComposeRaw);
-            $services = data_get($yaml, 'services');
             $dockerComposeDomains = collect($request->docker_compose_domains);
-            if ($dockerComposeDomains->count() > 0) {
-                $dockerComposeDomains->each(function ($domain, $key) use ($services, $dockerComposeDomainsJson) {
-                    $name = data_get($domain, 'name');
-                    if (data_get($services, $name)) {
-                        $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
-                    }
-                });
+
+            // Collect all URLs from all docker_compose_domains items
+            $urls = $dockerComposeDomains->flatMap(function ($item) {
+                $domainValue = data_get($item, 'domain');
+                if (blank($domainValue)) {
+                    return [];
+                }
+
+                return str($domainValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+            });
+
+            $errors = [];
+            $urls = $urls->map(function ($url) use (&$errors) {
+                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    $errors[] = "Invalid URL: {$url}";
+
+                    return $url;
+                }
+                $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                    $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                }
+
+                return $url;
+            });
+
+            $duplicates = $urls->duplicates()->unique()->values();
+            if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed.';
             }
+
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => $errors],
+                ], 422);
+            }
+
+            // Check for domain conflicts
+            if ($urls->isNotEmpty()) {
+                $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId, $request->uuid);
+                if (isset($result['error'])) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['docker_compose_domains' => $result['error']],
+                    ], 422);
+                }
+
+                if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                    return response()->json([
+                        'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                        'conflicts' => $result['conflicts'],
+                        'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                    ], 409);
+                }
+            }
+
+            $yaml = Yaml::parse($application->docker_compose_raw);
+            $services = data_get($yaml, 'services', []);
+            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson) {
+                $name = data_get($domain, 'name');
+                if ($name && is_array($services) && isset($services[$name])) {
+                    $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                }
+            });
             $request->offsetUnset('docker_compose_domains');
         }
         $instantDeploy = $request->instant_deploy;
         $isStatic = $request->is_static;
+        $isSpa = $request->is_spa;
+        $isAutoDeployEnabled = $request->is_auto_deploy_enabled;
+        $isForceHttpsEnabled = $request->is_force_https_enabled;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $useBuildServer = $request->use_build_server;
+        $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled');
 
         if (isset($useBuildServer)) {
             $application->settings->is_build_server_enabled = $useBuildServer;
@@ -2038,8 +2719,28 @@ class ApplicationsController extends Controller
             $application->settings->save();
         }
 
+        if (isset($isSpa)) {
+            $application->settings->is_spa = $isSpa;
+            $application->settings->save();
+        }
+
+        if (isset($isAutoDeployEnabled)) {
+            $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+            $application->settings->save();
+        }
+
+        if (isset($isForceHttpsEnabled)) {
+            $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+            $application->settings->save();
+        }
+
         if (isset($connectToDockerNetwork)) {
             $application->settings->connect_to_docker_network = $connectToDockerNetwork;
+            $application->settings->save();
+        }
+
+        if ($request->has('is_container_label_escape_enabled')) {
+            $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
             $application->settings->save();
         }
 
@@ -2054,6 +2755,9 @@ class ApplicationsController extends Controller
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }
         $application->fill($data);
+        if ($application->settings->is_container_label_readonly_enabled && $requestHasDomains && $server->isProxyShouldRun()) {
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+        }
         $application->save();
 
         if ($instantDeploy) {
@@ -2093,7 +2797,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2138,6 +2841,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('view', $application);
+
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
         $envs = $envs->map(function ($env) {
@@ -2176,7 +2882,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2193,7 +2898,6 @@ class ApplicationsController extends Controller
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2234,7 +2938,7 @@ class ApplicationsController extends Controller
     )]
     public function update_env_by_uuid(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -2252,14 +2956,18 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
+            'is_runtime' => 'boolean',
+            'is_buildtime' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -2277,16 +2985,12 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
-        $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
         $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
             $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -2298,6 +3002,12 @@ class ApplicationsController extends Controller
                 }
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
+                }
+                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
+                    $env->is_runtime = $request->is_runtime;
+                }
+                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
+                    $env->is_buildtime = $request->is_buildtime;
                 }
                 $env->save();
 
@@ -2311,9 +3021,6 @@ class ApplicationsController extends Controller
             $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -2325,6 +3032,12 @@ class ApplicationsController extends Controller
                 }
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
+                }
+                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
+                    $env->is_runtime = $request->is_runtime;
+                }
+                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
+                    $env->is_buildtime = $request->is_buildtime;
                 }
                 $env->save();
 
@@ -2358,7 +3071,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2380,7 +3092,6 @@ class ApplicationsController extends Controller
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2400,10 +3111,8 @@ class ApplicationsController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variables updated.'],
-                            ]
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
                 ]
@@ -2442,6 +3151,8 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('manageEnvironment', $application);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json([
@@ -2449,7 +3160,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
+            return collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime']);
         });
         $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
@@ -2457,10 +3168,11 @@ class ApplicationsController extends Controller
                 'key' => 'string|required',
                 'value' => 'string|nullable',
                 'is_preview' => 'boolean',
-                'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
+                'is_runtime' => 'boolean',
+                'is_buildtime' => 'boolean',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -2469,7 +3181,6 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $is_preview = $item->get('is_preview') ?? false;
-            $is_build_time = $item->get('is_build_time') ?? false;
             $is_literal = $item->get('is_literal') ?? false;
             $is_multi_line = $item->get('is_multiline') ?? false;
             $is_shown_once = $item->get('is_shown_once') ?? false;
@@ -2478,9 +3189,7 @@ class ApplicationsController extends Controller
                 $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
+
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
@@ -2490,16 +3199,23 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
+                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
+                        $env->is_runtime = $item->get('is_runtime');
+                    }
+                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
+                        $env->is_buildtime = $item->get('is_buildtime');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'is_runtime' => $item->get('is_runtime', true),
+                        'is_buildtime' => $item->get('is_buildtime', true),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2508,9 +3224,6 @@ class ApplicationsController extends Controller
                 $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
@@ -2520,16 +3233,23 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
+                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
+                        $env->is_runtime = $item->get('is_runtime');
+                    }
+                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
+                        $env->is_buildtime = $item->get('is_buildtime');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'is_runtime' => $item->get('is_runtime', true),
+                        'is_buildtime' => $item->get('is_buildtime', true),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2558,7 +3278,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2573,7 +3292,6 @@ class ApplicationsController extends Controller
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2613,7 +3331,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -2626,14 +3344,18 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
+            'is_runtime' => 'boolean',
+            'is_buildtime' => 'boolean',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -2664,10 +3386,11 @@ class ApplicationsController extends Controller
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'is_runtime' => $request->is_runtime ?? true,
+                    'is_buildtime' => $request->is_buildtime ?? true,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -2687,10 +3410,11 @@ class ApplicationsController extends Controller
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'is_runtime' => $request->is_runtime ?? true,
+                    'is_buildtime' => $request->is_buildtime ?? true,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -2719,7 +3443,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -2729,7 +3452,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2776,6 +3498,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Application::class)
             ->where('resourceable_id', $application->id)
@@ -2809,7 +3534,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -2868,8 +3592,8 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $force = $request->query->get('force') ?? false;
-        $instant_deploy = $request->query->get('instant_deploy') ?? false;
+        $force = $request->boolean('force', false);
+        $instant_deploy = $request->boolean('instant_deploy', false);
         $uuid = $request->route('uuid');
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
@@ -2878,6 +3602,8 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('deploy', $application);
 
         $deployment_uuid = new Cuid2;
 
@@ -2923,7 +3649,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -2971,6 +3696,9 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('deploy', $application);
+
         StopApplication::dispatch($application);
 
         return response()->json(
@@ -2997,7 +3725,6 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -3048,6 +3775,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('deploy', $application);
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
@@ -3069,131 +3798,6 @@ class ApplicationsController extends Controller
             ],
         );
     }
-
-    // #[OA\Post(
-    //     summary: 'Execute Command',
-    //     description: "Execute a command on the application's current container.",
-    //     path: '/applications/{uuid}/execute',
-    //     operationId: 'execute-command-application',
-    //     security: [
-    //         ['bearerAuth' => []],
-    //     ],
-    //     tags: ['Applications'],
-    //     parameters: [
-    //         new OA\Parameter(
-    //             name: 'uuid',
-    //             in: 'path',
-    //             description: 'UUID of the application.',
-    //             required: true,
-    //             schema: new OA\Schema(
-    //                 type: 'string',
-    //                 format: 'uuid',
-    //             )
-    //         ),
-    //     ],
-    //     requestBody: new OA\RequestBody(
-    //         required: true,
-    //         description: 'Command to execute.',
-    //         content: new OA\MediaType(
-    //             mediaType: 'application/json',
-    //             schema: new OA\Schema(
-    //                 type: 'object',
-    //                 properties: [
-    //                     'command' => ['type' => 'string', 'description' => 'Command to execute.'],
-    //                 ],
-    //             ),
-    //         ),
-    //     ),
-    //     responses: [
-    //         new OA\Response(
-    //             response: 200,
-    //             description: "Execute a command on the application's current container.",
-    //             content: [
-    //                 new OA\MediaType(
-    //                     mediaType: 'application/json',
-    //                     schema: new OA\Schema(
-    //                         type: 'object',
-    //                         properties: [
-    //                             'message' => ['type' => 'string', 'example' => 'Command executed.'],
-    //                             'response' => ['type' => 'string'],
-    //                         ]
-    //                     )
-    //                 ),
-    //             ]
-    //         ),
-    //         new OA\Response(
-    //             response: 401,
-    //             ref: '#/components/responses/401',
-    //         ),
-    //         new OA\Response(
-    //             response: 400,
-    //             ref: '#/components/responses/400',
-    //         ),
-    //         new OA\Response(
-    //             response: 404,
-    //             ref: '#/components/responses/404',
-    //         ),
-    //     ]
-    // )]
-    // public function execute_command_by_uuid(Request $request)
-    // {
-    //     // TODO: Need to review this from security perspective, to not allow arbitrary command execution
-    //     $allowedFields = ['command'];
-    //     $teamId = getTeamIdFromToken();
-    //     if (is_null($teamId)) {
-    //         return invalidTokenResponse();
-    //     }
-    //     $uuid = $request->route('uuid');
-    //     if (! $uuid) {
-    //         return response()->json(['message' => 'UUID is required.'], 400);
-    //     }
-    //     $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
-    //     if (! $application) {
-    //         return response()->json(['message' => 'Application not found.'], 404);
-    //     }
-    //     $return = validateIncomingRequest($request);
-    //     if ($return instanceof \Illuminate\Http\JsonResponse) {
-    //         return $return;
-    //     }
-    //     $validator = customApiValidator($request->all(), [
-    //         'command' => 'string|required',
-    //     ]);
-
-    //     $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-    //     if ($validator->fails() || ! empty($extraFields)) {
-    //         $errors = $validator->errors();
-    //         if (! empty($extraFields)) {
-    //             foreach ($extraFields as $field) {
-    //                 $errors->add($field, 'This field is not allowed.');
-    //             }
-    //         }
-
-    //         return response()->json([
-    //             'message' => 'Validation failed.',
-    //             'errors' => $errors,
-    //         ], 422);
-    //     }
-
-    //     $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
-    //     $status = getContainerStatus($application->destination->server, $container['Names']);
-
-    //     if ($status !== 'running') {
-    //         return response()->json([
-    //             'message' => 'Application is not running.',
-    //         ], 400);
-    //     }
-
-    //     $commands = collect([
-    //         executeInDocker($container['Names'], $request->command),
-    //     ]);
-
-    //     $res = instant_remote_process(command: $commands, server: $application->destination->server);
-
-    //     return response()->json([
-    //         'message' => 'Command executed.',
-    //         'response' => $res,
-    //     ]);
-    // }
 
     private function validateDataApplications(Request $request, Server $server)
     {
@@ -3226,7 +3830,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+            if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -3237,16 +3841,29 @@ class ApplicationsController extends Controller
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
-            $fqdn = $request->domains;
-            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $urls = $request->domains;
+            $urls = str($urls)->replaceEnd(',', '')->trim();
+            $urls = str($urls)->replaceStart(',', '')->trim();
             $errors = [];
-            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                    $errors[] = 'Invalid domain: '.$domain;
+            $urls = str($urls)->trim()->explode(',')->map(function ($url) use (&$errors) {
+                $url = trim($url);
+
+                // If "domains" is empty clear all URLs from the fqdn column
+                if (blank($url)) {
+                    return null;
                 }
 
-                return str($domain)->trim()->lower();
+                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    $errors[] = 'Invalid URL: '.$url;
+
+                    return str($url)->lower();
+                }
+                $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+                if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                    $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+                }
+
+                return str($url)->lower();
             });
             if (count($errors) > 0) {
                 return response()->json([
@@ -3254,13 +3871,22 @@ class ApplicationsController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+            // Check for domain conflicts
+            $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId, $uuid);
+            if (isset($result['error'])) {
                 return response()->json([
                     'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
+                    'errors' => ['domains' => $result['error']],
                 ], 422);
+            }
+
+            // If there are conflicts and force is not enabled, return warning
+            if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $result['conflicts'],
+                    'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                ], 409);
             }
         }
     }

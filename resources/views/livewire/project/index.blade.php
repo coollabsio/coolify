@@ -4,54 +4,45 @@
     </x-slot>
     <div class="flex gap-2">
         <h1>Projects</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Project">
-            <livewire:project.add-empty />
-        </x-modal-input>
+        @can('createAnyResource')
+            <x-modal-input buttonTitle="+ Add" title="New Project">
+                <livewire:project.add-empty />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="subtitle">All your projects are here.</div>
-    <div x-data="searchComponent()">
-        <x-forms.input placeholder="Search for name, description..." x-model="search" id="null" />
-        <div class="grid grid-cols-2 gap-4 pt-4">
-            <template x-if="filteredProjects.length === 0">
-                <div>No project found with the search term "<span x-text="search"></span>".</div>
-            </template>
-
-            <template x-for="project in filteredProjects" :key="project.uuid">
-                <div class="box group cursor-pointer" @click="$wire.navigateToProject(project.uuid)">
-                    <div class="flex flex-col justify-center flex-1 mx-6">
-                        <div class="box-title" x-text="project.name"></div>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 -mt-1">
+        @foreach ($projects as $project)
+            <div class="relative gap-2 cursor-pointer coolbox group">
+                <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }} class="absolute inset-0"></a>
+                <div class="flex flex-1 mx-6">
+                    <div class="flex flex-col justify-center flex-1">
+                        <div class="box-title">{{ $project->name }}</div>
                         <div class="box-description">
-                            <div x-text="project.description"></div>
+                            {{ $project->description }}
                         </div>
                     </div>
-                    <div
-                        class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
-                        <a class="mx-4 font-bold hover:underline" wire:click.stop
-                            :href="`/project/${project.uuid}/edit`">
-                            Settings
-                        </a>
+                    <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
+                        @if ($project->environments->first())
+                            @can('createAnyResource')
+                                <a class="hover:underline" {{ wireNavigate() }}
+                                    href="{{ route('project.resource.create', [
+                                        'project_uuid' => $project->uuid,
+                                        'environment_uuid' => $project->environments->first()->uuid,
+                                    ]) }}">
+                                    + Add Resource
+                                </a>
+                            @endcan
+                        @endif
+                        @can('update', $project)
+                            <a class="hover:underline" {{ wireNavigate() }}
+                                href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                Settings
+                            </a>
+                        @endcan
                     </div>
                 </div>
-            </template>
-        </div>
+            </div>
+        @endforeach
     </div>
-
-    <script>
-        function searchComponent() {
-            return {
-                search: '',
-                get filteredProjects() {
-                    const projects = @js($projects);
-                    if (this.search === '') {
-                        return projects;
-                    }
-                    const searchLower = this.search.toLowerCase();
-                    return projects.filter(project => {
-                        return (project.name?.toLowerCase().includes(searchLower) ||
-                            project.description?.toLowerCase().includes(searchLower))
-                    });
-                }
-            }
-        }
-    </script>
 </div>

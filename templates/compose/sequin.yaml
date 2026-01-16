@@ -1,5 +1,6 @@
 # documentation: https://sequinstream.com/docs/
 # slogan: The fastest Postgres change data capture
+# category: analytics
 # tags: postgres, sync, data
 # logo: svgs/sequin.svg
 # port: 7376
@@ -8,8 +9,8 @@ services:
   sequin:
     image: sequin/sequin:latest
     environment:
-      - SERVICE_FQDN_SEQUIN_7376
-      - SERVER_HOST=${SERVICE_URL_SEQUIN}
+      - SERVICE_URL_SEQUIN_7376
+      - SERVER_HOST=${SERVICE_FQDN_SEQUIN}
       - PG_HOSTNAME=postgres
       - PG_DATABASE=${POSTGRES_DB:-sequin-db}
       - PG_PORT=5432

@@ -1,5 +1,6 @@
 # documentation: https://docs.linuxserver.io/images/docker-plex/
 # slogan: Plex organizes video, music and photos from personal media libraries and streams them to smart TVs, streaming boxes and mobile devices.
+# category: media
 # tags: media, server, movies, tv, music
 # logo: svgs/plex.svg
 # port: 32400
@@ -8,8 +9,8 @@ services:
   plex:
     image: lscr.io/linuxserver/plex:latest
     environment:
-      - SERVICE_FQDN_PLEX_32400
-      - _APP_URL=$SERVICE_FQDN_PLEX
+      - SERVICE_URL_PLEX_32400
+      - _APP_URL=$SERVICE_URL_PLEX
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/Toronto}

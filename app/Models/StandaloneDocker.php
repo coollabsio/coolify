@@ -2,8 +2,13 @@
 
 namespace App\Models;
 
+use App\Jobs\ConnectProxyToNetworksJob;
+use App\Traits\HasSafeStringAttribute;
+
 class StandaloneDocker extends BaseModel
 {
+    use HasSafeStringAttribute;
+
     protected $guarded = [];
 
     protected static function boot()
@@ -14,8 +19,7 @@ class StandaloneDocker extends BaseModel
             instant_remote_process([
                 "docker network inspect $newStandaloneDocker->network >/dev/null 2>&1 || docker network create --driver overlay --attachable $newStandaloneDocker->network >/dev/null",
             ], $server, false);
-            $connectProxyToDockerNetworks = connectProxyToNetworks($server);
-            instant_remote_process($connectProxyToDockerNetworks, $server, false);
+            ConnectProxyToNetworksJob::dispatchSync($server);
         });
     }
 
@@ -67,6 +71,28 @@ class StandaloneDocker extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * Get the server attribute using identity map caching.
+     * This intercepts lazy-loading to use cached Server lookups.
+     */
+    public function getServerAttribute(): ?Server
+    {
+        // Use eager loaded data if available
+        if ($this->relationLoaded('server')) {
+            return $this->getRelation('server');
+        }
+
+        // Use identity map for lazy loading
+        $server = Server::findCached($this->server_id);
+
+        // Cache in relation for future access on this instance
+        if ($server) {
+            $this->setRelation('server', $server);
+        }
+
+        return $server;
     }
 
     public function services()

@@ -1,0 +1,20 @@
+# documentation: https://linkding.link/
+# slogan: A self-hosted bookmark manager designed to be minimal, fast, and easy to set up. (Includes feature for archiving websites as HTML snapshots)
+# category: RSS
+# tags: rss, feed
+# logo: svgs/linkding.svg
+# port: 9090
+
+services:
+  linkding-plus:
+    image: sissbruecker/linkding:latest-plus
+    volumes:
+      - 'linkding_data:/etc/linkding/data'
+    environment:
+      - SERVICE_URL_LINKDING_9090
+      - LD_SUPERUSER_NAME=${SERVICE_USER_LINKDING}
+      - LD_SUPERUSER_PASSWORD=${SERVICE_PASSWORD_LINKDING}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/9090' || exit 1"]
+      interval: 5s
+      timeout: 5s

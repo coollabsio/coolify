@@ -5,7 +5,7 @@
 ])>
     @if ($activity)
         @if (isset($header))
-            <div class="flex gap-2 pb-2 flex-shrink-0">
+            <div class="flex gap-2 pb-2 flex-shrink-0" @if ($isPollingActive) wire:poll.1000ms @endif>
                 <h3>{{ $header }}</h3>
                 @if ($isPollingActive)
                     <x-loading />

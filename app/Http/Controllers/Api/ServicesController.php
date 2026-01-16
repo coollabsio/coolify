@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 
@@ -35,6 +36,100 @@ class ServicesController extends Controller
         }
 
         return serializeApiResponse($service);
+    }
+
+    private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
+    {
+        $errors = [];
+        $conflicts = [];
+
+        $urls = collect($urlsArray)->flatMap(function ($item) {
+            $urlValue = data_get($item, 'url');
+            if (blank($urlValue)) {
+                return [];
+            }
+
+            return str($urlValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+        });
+
+        $urls = $urls->map(function ($url) use (&$errors) {
+            if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                $errors[] = "Invalid URL: {$url}";
+
+                return $url;
+            }
+            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+            if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+            }
+
+            return $url;
+        });
+
+        $duplicates = $urls->duplicates()->unique()->values();
+        if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
+            $errors[] = 'The current request contains conflicting URLs across containers: '.implode(', ', $duplicates->toArray()).'. Use force_domain_override=true to proceed.';
+        }
+
+        if (count($errors) > 0) {
+            return ['errors' => $errors];
+        }
+
+        collect($urlsArray)->each(function ($item) use ($service, $teamId, $forceDomainOverride, &$errors, &$conflicts) {
+            $name = data_get($item, 'name');
+            $containerUrls = data_get($item, 'url');
+
+            if (blank($name)) {
+                $errors[] = 'Service container name is required to apply URLs.';
+
+                return;
+            }
+
+            $application = $service->applications()->where('name', $name)->first();
+            if (! $application) {
+                $errors[] = "Service container with '{$name}' not found.";
+
+                return;
+            }
+
+            if (filled($containerUrls)) {
+                $containerUrls = str($containerUrls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
+                $containerUrls = str($containerUrls)->explode(',')->map(fn ($url) => str(trim($url))->lower());
+
+                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrls, $teamId, $application->uuid);
+                if (isset($result['error'])) {
+                    $errors[] = $result['error'];
+
+                    return;
+                }
+
+                if ($result['hasConflicts'] && ! $forceDomainOverride) {
+                    $conflicts = array_merge($conflicts, $result['conflicts']);
+
+                    return;
+                }
+
+                $containerUrls = $containerUrls->filter(fn ($u) => filled($u))->unique()->implode(',');
+            } else {
+                $containerUrls = null;
+            }
+
+            $application->fqdn = $containerUrls;
+            $application->save();
+        });
+
+        if (! empty($errors)) {
+            return ['errors' => $errors];
+        }
+
+        if (! empty($conflicts)) {
+            return [
+                'conflicts' => $conflicts,
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ];
+        }
+
+        return null;
     }
 
     #[OA\Get(
@@ -105,98 +200,7 @@ class ServicesController extends Controller
                     type: 'object',
                     required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
                     properties: [
-                        'type' => [
-                            'description' => 'The one-click service type',
-                            'type' => 'string',
-                            'enum' => [
-                                'activepieces',
-                                'appsmith',
-                                'appwrite',
-                                'authentik',
-                                'babybuddy',
-                                'budge',
-                                'changedetection',
-                                'chatwoot',
-                                'classicpress-with-mariadb',
-                                'classicpress-with-mysql',
-                                'classicpress-without-database',
-                                'cloudflared',
-                                'code-server',
-                                'dashboard',
-                                'directus',
-                                'directus-with-postgresql',
-                                'docker-registry',
-                                'docuseal',
-                                'docuseal-with-postgres',
-                                'dokuwiki',
-                                'duplicati',
-                                'emby',
-                                'embystat',
-                                'fider',
-                                'filebrowser',
-                                'firefly',
-                                'formbricks',
-                                'ghost',
-                                'gitea',
-                                'gitea-with-mariadb',
-                                'gitea-with-mysql',
-                                'gitea-with-postgresql',
-                                'glance',
-                                'glances',
-                                'glitchtip',
-                                'grafana',
-                                'grafana-with-postgresql',
-                                'grocy',
-                                'heimdall',
-                                'homepage',
-                                'jellyfin',
-                                'kuzzle',
-                                'listmonk',
-                                'logto',
-                                'mediawiki',
-                                'meilisearch',
-                                'metabase',
-                                'metube',
-                                'minio',
-                                'moodle',
-                                'n8n',
-                                'n8n-with-postgresql',
-                                'next-image-transformation',
-                                'nextcloud',
-                                'nocodb',
-                                'odoo',
-                                'openblocks',
-                                'pairdrop',
-                                'penpot',
-                                'phpmyadmin',
-                                'pocketbase',
-                                'posthog',
-                                'reactive-resume',
-                                'rocketchat',
-                                'shlink',
-                                'slash',
-                                'snapdrop',
-                                'statusnook',
-                                'stirling-pdf',
-                                'supabase',
-                                'syncthing',
-                                'tolgee',
-                                'trigger',
-                                'trigger-with-external-database',
-                                'twenty',
-                                'umami',
-                                'unleash-with-postgresql',
-                                'unleash-without-database',
-                                'uptime-kuma',
-                                'vaultwarden',
-                                'vikunja',
-                                'weblate',
-                                'whoogle',
-                                'wordpress-with-mariadb',
-                                'wordpress-with-mysql',
-                                'wordpress-without-database',
-                            ],
-                        ],
+                        'type' => ['description' => 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)', 'type' => 'string'],
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
                         'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
@@ -205,7 +209,19 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
-                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
+                        'urls' => [
+                            'type' => 'array',
+                            'description' => 'Array of URLs to be applied to containers of a service.',
+                            'items' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                ],
+                            ),
+                        ],
+                        'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                     ],
                 ),
             ),
@@ -235,22 +251,57 @@ class ServicesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Service::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $validator = customApiValidator($request->all(), [
+        $validationRules = [
             'type' => 'string|required_without:docker_compose_raw',
             'docker_compose_raw' => 'string|required_without:type',
             'project_uuid' => 'string|required',
@@ -261,7 +312,16 @@ class ServicesController extends Controller
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
-        ]);
+            'urls' => 'array|nullable',
+            'urls.*' => 'array:name,url',
+            'urls.*.name' => 'string|required',
+            'urls.*.url' => 'string|nullable',
+            'force_domain_override' => 'boolean',
+        ];
+        $validationMessages = [
+            'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+        ];
+        $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -277,6 +337,13 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+
+        if (filled($request->type) && filled($request->docker_compose_raw)) {
+            return response()->json([
+                'message' => 'You cannot provide both service type and docker_compose_raw. Use one or the other.',
+            ], 422);
+        }
+
         $environmentUuid = $request->environment_uuid;
         $environmentName = $request->environment_name;
         if (blank($environmentUuid) && blank($environmentName)) {
@@ -322,20 +389,35 @@ class ServicesController extends Controller
                 });
             }
             if ($oneClickService) {
-                $service_payload = [
+                $dockerComposeRaw = base64_decode($oneClickService);
+
+                // Validate for command injection BEFORE creating service
+                try {
+                    validateDockerComposeForInjection($dockerComposeRaw);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => $e->getMessage(),
+                        ],
+                    ], 422);
+                }
+
+                $servicePayload = [
                     'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
                     'server_id' => $server->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
                 ];
-                if ($oneClickServiceName === 'cloudflared') {
-                    data_set($service_payload, 'connect_to_docker_network', true);
+                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
+                    data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = Service::create($service_payload);
-                $service->name = "$oneClickServiceName-".$service->uuid;
+                $service = Service::create($servicePayload);
+                $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
+                $service->description = $request->description;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
@@ -351,42 +433,197 @@ class ServicesController extends Controller
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
                             'resourceable_type' => $service->getMorphClass(),
-                            'is_build_time' => false,
                             'is_preview' => false,
                         ]);
                     });
                 }
                 $service->parse(isNew: true);
+
+                // Apply service-specific application prerequisites
+                applyServiceApplicationPrerequisites($service);
+
+                if ($request->has('urls') && is_array($request->urls)) {
+                    $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+                    if ($urlResult !== null) {
+                        $service->delete();
+                        if (isset($urlResult['errors'])) {
+                            return response()->json([
+                                'message' => 'Validation failed.',
+                                'errors' => $urlResult['errors'],
+                            ], 422);
+                        }
+                        if (isset($urlResult['conflicts'])) {
+                            return response()->json([
+                                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                                'conflicts' => $urlResult['conflicts'],
+                                'warning' => $urlResult['warning'],
+                            ], 409);
+                        }
+                    }
+                }
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
-                $domains = $service->applications()->get()->pluck('fqdn')->sort();
-                $domains = $domains->map(function ($domain) {
-                    if (count(explode(':', $domain)) > 2) {
-                        return str($domain)->beforeLast(':')->value();
-                    }
-
-                    return $domain;
-                });
 
                 return response()->json([
                     'uuid' => $service->uuid,
-                    'domains' => $domains,
-                ]);
+                    'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
+                ])->setStatusCode(201);
             }
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
 
-            $service = new Service;
-            $result = $this->upsert_service($request, $service, $teamId);
-            if ($result instanceof \Illuminate\Http\JsonResponse) {
-                return $result;
+            $validationRules = [
+                'project_uuid' => 'string|required',
+                'environment_name' => 'string|nullable',
+                'environment_uuid' => 'string|nullable',
+                'server_uuid' => 'string|required',
+                'destination_uuid' => 'string',
+                'name' => 'string|max:255',
+                'description' => 'string|nullable',
+                'instant_deploy' => 'boolean',
+                'connect_to_docker_network' => 'boolean',
+                'docker_compose_raw' => 'string|required',
+                'urls' => 'array|nullable',
+                'urls.*' => 'array:name,url',
+                'urls.*.name' => 'string|required',
+                'urls.*.url' => 'string|nullable',
+                'force_domain_override' => 'boolean',
+            ];
+            $validationMessages = [
+                'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+            ];
+            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
+
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
             }
 
-            return response()->json(serializeApiResponse($result))->setStatusCode(201);
-        } else {
-            return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
+            $environmentUuid = $request->environment_uuid;
+            $environmentName = $request->environment_name;
+            if (blank($environmentUuid) && blank($environmentName)) {
+                return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+            }
+            $serverUuid = $request->server_uuid;
+            $projectUuid = $request->project_uuid;
+            $project = Project::whereTeamId($teamId)->whereUuid($projectUuid)->first();
+            if (! $project) {
+                return response()->json(['message' => 'Project not found.'], 404);
+            }
+            $environment = $project->environments()->where('name', $environmentName)->first();
+            if (! $environment) {
+                $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+            }
+            if (! $environment) {
+                return response()->json(['message' => 'Environment not found.'], 404);
+            }
+            $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
+            if (! $server) {
+                return response()->json(['message' => 'Server not found.'], 404);
+            }
+            $destinations = $server->destinations();
+            if ($destinations->count() == 0) {
+                return response()->json(['message' => 'Server has no destinations.'], 400);
+            }
+            if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
+                return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+            }
+            $destination = $destinations->first();
+            if (! isBase64Encoded($request->docker_compose_raw)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose_raw);
+            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+
+            $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
+            $instantDeploy = $request->instant_deploy ?? false;
+
+            $service = new Service;
+            $service->name = $request->name ?? 'service-'.str()->random(10);
+            $service->description = $request->description;
+            $service->docker_compose_raw = $dockerComposeRaw;
+            $service->environment_id = $environment->id;
+            $service->server_id = $server->id;
+            $service->destination_id = $destination->id;
+            $service->destination_type = $destination->getMorphClass();
+            $service->connect_to_docker_network = $connectToDockerNetwork;
+            $service->save();
+
+            $service->parse(isNew: true);
+
+            if ($request->has('urls') && is_array($request->urls)) {
+                $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+                if ($urlResult !== null) {
+                    $service->delete();
+                    if (isset($urlResult['errors'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => $urlResult['errors'],
+                        ], 422);
+                    }
+                    if (isset($urlResult['conflicts'])) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $urlResult['conflicts'],
+                            'warning' => $urlResult['warning'],
+                        ], 409);
+                    }
+                }
+            }
+
+            if ($instantDeploy) {
+                StartService::dispatch($service);
+            }
+
+            return response()->json([
+                'uuid' => $service->uuid,
+                'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
+            ])->setStatusCode(201);
+        } elseif (filled($request->type)) {
+            return response()->json([
+                'message' => 'Invalid service type.',
+                'valid_service_types' => $serviceKeys,
+            ], 404);
         }
     }
 
@@ -442,6 +679,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('view', $service);
 
         $service = $service->load(['applications', 'databases']);
 
@@ -508,12 +747,14 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('delete', $service);
+
         DeleteResourceJob::dispatch(
             resource: $service,
-            deleteVolumes: $request->query->get('delete_volumes', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
-            deleteConfigurations: $request->query->get('delete_configurations', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true)
+            deleteVolumes: $request->boolean('delete_volumes', true),
+            deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
+            deleteConfigurations: $request->boolean('delete_configurations', true),
+            dockerCleanup: $request->boolean('docker_cleanup', true)
         );
 
         return response()->json([
@@ -538,7 +779,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -550,7 +790,6 @@ class ServicesController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
                         properties: [
                             'name' => ['type' => 'string', 'description' => 'The service name.'],
                             'description' => ['type' => 'string', 'description' => 'The service description.'],
@@ -561,7 +800,19 @@ class ServicesController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
+                            'urls' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a service.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                    ],
+                                ),
+                            ],
+                            'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                         ],
                     )
                 ),
@@ -596,6 +847,39 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -615,29 +899,26 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $result = $this->upsert_service($request, $service, $teamId);
-        if ($result instanceof \Illuminate\Http\JsonResponse) {
-            return $result;
-        }
+        $this->authorize('update', $service);
 
-        return response()->json(serializeApiResponse($result))->setStatusCode(200);
-    }
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
 
-    private function upsert_service(Request $request, Service $service, string $teamId)
-    {
-        $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
-        $validator = customApiValidator($request->all(), [
-            'project_uuid' => 'string|required',
-            'environment_name' => 'string|nullable',
-            'environment_uuid' => 'string|nullable',
-            'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
+        $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
-            'docker_compose_raw' => 'string|required',
-        ]);
+            'docker_compose_raw' => 'string|nullable',
+            'urls' => 'array|nullable',
+            'urls.*' => 'array:name,url',
+            'urls.*.name' => 'string|required',
+            'urls.*.url' => 'string|nullable',
+            'force_domain_override' => 'boolean',
+        ];
+        $validationMessages = [
+            'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+        ];
+        $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -653,86 +934,82 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        if ($request->has('docker_compose_raw')) {
+            if (! isBase64Encoded($request->docker_compose_raw)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose_raw);
+            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
-        $environmentUuid = $request->environment_uuid;
-        $environmentName = $request->environment_name;
-        if (blank($environmentUuid) && blank($environmentName)) {
-            return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
-        }
-        $serverUuid = $request->server_uuid;
-        $instantDeploy = $request->instant_deploy ?? false;
-        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-        if (! $project) {
-            return response()->json(['message' => 'Project not found.'], 404);
-        }
-        $environment = $project->environments()->where('name', $environmentName)->first();
-        if (! $environment) {
-            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
-        }
-        if (! $environment) {
-            return response()->json(['message' => 'Environment not found.'], 404);
-        }
-        $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-        $destinations = $server->destinations();
-        if ($destinations->count() == 0) {
-            return response()->json(['message' => 'Server has no destinations.'], 400);
-        }
-        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
-        }
-        $destination = $destinations->first();
-        if (! isBase64Encoded($request->docker_compose_raw)) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-        if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $dockerCompose = base64_decode($request->docker_compose_raw);
-        $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-        $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
+            // Validate for command injection BEFORE saving to database
+            try {
+                validateDockerComposeForInjection($dockerComposeRaw);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
 
-        $service->name = $request->name ?? null;
-        $service->description = $request->description ?? null;
-        $service->docker_compose_raw = $dockerComposeRaw;
-        $service->environment_id = $environment->id;
-        $service->server_id = $server->id;
-        $service->destination_id = $destination->id;
-        $service->destination_type = $destination->getMorphClass();
-        $service->connect_to_docker_network = $connectToDockerNetwork;
+            $service->docker_compose_raw = $dockerComposeRaw;
+        }
+
+        if ($request->has('name')) {
+            $service->name = $request->name;
+        }
+        if ($request->has('description')) {
+            $service->description = $request->description;
+        }
+        if ($request->has('connect_to_docker_network')) {
+            $service->connect_to_docker_network = $request->connect_to_docker_network;
+        }
         $service->save();
 
         $service->parse();
-        if ($instantDeploy) {
+
+        if ($request->has('urls') && is_array($request->urls)) {
+            $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+            if ($urlResult !== null) {
+                if (isset($urlResult['errors'])) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => $urlResult['errors'],
+                    ], 422);
+                }
+                if (isset($urlResult['conflicts'])) {
+                    return response()->json([
+                        'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                        'conflicts' => $urlResult['conflicts'],
+                        'warning' => $urlResult['warning'],
+                    ], 409);
+                }
+            }
+        }
+
+        if ($request->instant_deploy) {
             StartService::dispatch($service);
         }
 
-        $domains = $service->applications()->get()->pluck('fqdn')->sort();
-        $domains = $domains->map(function ($domain) {
-            if (count(explode(':', $domain)) > 2) {
-                return str($domain)->beforeLast(':')->value();
-            }
-
-            return $domain;
-        })->values();
-
-        return [
+        return response()->json([
             'uuid' => $service->uuid,
-            'domains' => $domains,
-        ];
+            'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
+        ])->setStatusCode(200);
     }
 
     #[OA\Get(
@@ -752,7 +1029,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -795,6 +1071,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $envs = $service->environment_variables->map(function ($env) {
             $env->makeHidden([
                 'application_id',
@@ -831,7 +1109,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -848,7 +1125,6 @@ class ServicesController extends Controller
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -885,6 +1161,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_env_by_uuid(Request $request)
@@ -899,10 +1179,11 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -944,7 +1225,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -966,7 +1246,6 @@ class ServicesController extends Controller
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1006,6 +1285,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_bulk_envs(Request $request)
@@ -1020,6 +1303,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json(['message' => 'Bulk data is required.'], 400);
@@ -1030,7 +1315,6 @@ class ServicesController extends Controller
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
                 'value' => 'string|nullable',
-                'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
@@ -1071,7 +1355,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1086,7 +1369,6 @@ class ServicesController extends Controller
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1122,6 +1404,10 @@ class ServicesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_env(Request $request)
@@ -1136,10 +1422,11 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -1182,7 +1469,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1192,7 +1478,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1238,6 +1523,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Service::class)
             ->where('resourceable_id', $service->id)
@@ -1269,7 +1556,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1317,6 +1603,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
@@ -1347,7 +1636,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1395,6 +1683,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('stop', $service);
+
         if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
@@ -1425,7 +1716,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1482,6 +1772,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         $pullLatest = $request->boolean('latest');
         RestartService::dispatch($service, $pullLatest);
 

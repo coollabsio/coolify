@@ -3,17 +3,17 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Jobs\DeleteResourceJob;
-use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $resourceName;
@@ -33,6 +33,8 @@ class Danger extends Component
     public ?string $modalId = null;
 
     public string $resourceDomain = '';
+
+    public bool $canDelete = false;
 
     public function mount()
     {
@@ -77,16 +79,19 @@ class Danger extends Component
             'service-database' => $this->resource->name ?? 'Service Database',
             default => 'Unknown Resource',
         };
+
+        // Check if user can delete this resource
+        try {
+            $this->canDelete = auth()->user()->can('delete', $this->resource);
+        } catch (\Exception $e) {
+            $this->canDelete = false;
+        }
     }
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         if (! $this->resource) {
@@ -96,6 +101,7 @@ class Danger extends Component
         }
 
         try {
+            $this->authorize('delete', $this->resource);
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
@@ -105,7 +111,7 @@ class Danger extends Component
                 $this->docker_cleanup
             );
 
-            return redirect()->route('project.resource.index', [
+            return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,
                 'environment_uuid' => $this->environmentUuid,
             ]);
