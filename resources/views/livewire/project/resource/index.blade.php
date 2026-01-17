@@ -29,9 +29,6 @@
                 <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
             @endcan
         </div>
-        @php
-            $projects = auth()->user()->currentTeam()->projects()->get();
-        @endphp
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
                 <li class="inline-flex items-center" x-data="{ projectOpen: false, toggle() { this.projectOpen = !this.projectOpen }, open() { this.projectOpen = true }, close() { this.projectOpen = false } }">
@@ -53,7 +50,7 @@
                             x-transition:leave="transition ease-in duration-75"
                             x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
                             class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                            @foreach ($projects as $proj)
+                            @foreach ($allProjects as $proj)
                                 <a href="{{ route('project.show', ['project_uuid' => $proj->uuid]) }}"
                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $proj->uuid === $project->uuid ? 'dark:text-warning font-semibold' : '' }}"
                                     title="{{ $proj->name }}">
@@ -63,12 +60,6 @@
                         </div>
                     </div>
                 </li>
-                @php
-                    $allEnvironments = $project
-                        ->environments()
-                        ->with(['applications', 'services'])
-                        ->get();
-                @endphp
                 <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null;
                             this.activeRes = null;
                             this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout);
@@ -162,6 +153,16 @@
                             <!-- Resources Sub-dropdown (2nd level) -->
                             @foreach ($allEnvironments as $env)
                                 @php
+                                    // Use pre-loaded relations instead of databases() method to avoid N+1 queries
+                                    $envDatabases = collect()
+                                        ->merge($env->postgresqls ?? collect())
+                                        ->merge($env->redis ?? collect())
+                                        ->merge($env->mongodbs ?? collect())
+                                        ->merge($env->mysqls ?? collect())
+                                        ->merge($env->mariadbs ?? collect())
+                                        ->merge($env->keydbs ?? collect())
+                                        ->merge($env->dragonflies ?? collect())
+                                        ->merge($env->clickhouses ?? collect());
                                     $envResources = collect()
                                         ->merge(
                                             $env->applications->map(
@@ -169,9 +170,7 @@
                                             ),
                                         )
                                         ->merge(
-                                            $env
-                                                ->databases()
-                                                ->map(fn($db) => ['type' => 'database', 'resource' => $db]),
+                                            $envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]),
                                         )
                                         ->merge(
                                             $env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]),
@@ -208,10 +207,11 @@
                                                             'database_uuid' => $res->uuid,
                                                         ]),
                                                     };
+                                                    // Use loaded relation to check additional_servers (avoids N+1 query)
                                                     $resHasMultipleServers =
                                                         $resType === 'application' &&
                                                         method_exists($res, 'additional_servers') &&
-                                                        $res->additional_servers()->count() > 0;
+                                                        ($res->relationLoaded('additional_servers') ? $res->additional_servers->count() > 0 : false);
                                                     $resServerName = $resHasMultipleServers
                                                         ? null
                                                         : data_get($res, 'destination.server.name');

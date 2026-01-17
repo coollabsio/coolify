@@ -103,6 +103,10 @@ Route::group([
     Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
+
+    /**
+     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is a unstable duplicate of POST /api/v1/services.
+     */    
     Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);

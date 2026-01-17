@@ -97,7 +97,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -110,6 +110,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -234,12 +243,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -248,7 +257,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -371,7 +381,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -384,6 +394,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -508,12 +527,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -522,7 +541,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -645,7 +665,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -658,6 +678,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 static_image:
                   type: string
                   enum: ['nginx:alpine']
@@ -782,12 +811,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -796,7 +825,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -860,8 +890,8 @@ paths:
     post:
       tags:
         - Applications
-      summary: 'Create (Dockerfile)'
-      description: 'Create new application based on a simple Dockerfile.'
+      summary: 'Create (Dockerfile without git)'
+      description: 'Create new application based on a simple Dockerfile (without git).'
       operationId: create-dockerfile-application
       requestBody:
         description: 'Application object that needs to be created.'
@@ -909,7 +939,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 docker_registry_image_name:
                   type: string
                   description: 'The docker registry image name.'
@@ -1021,6 +1051,9 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1081,8 +1114,8 @@ paths:
     post:
       tags:
         - Applications
-      summary: 'Create (Docker Image)'
-      description: 'Create new application based on a prebuilt docker image'
+      summary: 'Create (Docker Image without git)'
+      description: 'Create new application based on a prebuilt docker image (without git).'
       operationId: create-dockerimage-application
       requestBody:
         description: 'Application object that needs to be created.'
@@ -1130,7 +1163,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 ports_mappings:
                   type: string
                   description: 'The ports mappings.'
@@ -1233,6 +1266,9 @@ paths:
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 use_build_server:
                   type: boolean
                   nullable: true
@@ -1294,7 +1330,7 @@ paths:
       tags:
         - Applications
       summary: 'Create (Docker Compose)'
-      description: 'Create new application based on a docker-compose file.'
+      description: 'Deprecated: Use POST /api/v1/services instead.'
       operationId: create-dockercompose-application
       requestBody:
         description: 'Application object that needs to be created.'
@@ -1374,6 +1410,7 @@ paths:
                   warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
                   conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
                 type: object
+      deprecated: true
       security:
         -
           bearerAuth: []
@@ -1529,7 +1566,7 @@ paths:
                   description: 'The application description.'
                 domains:
                   type: string
-                  description: 'The application domains.'
+                  description: 'The application URLs in a comma-separated list.'
                 git_commit_sha:
                   type: string
                   description: 'The git commit SHA.'
@@ -1542,6 +1579,15 @@ paths:
                 is_static:
                   type: boolean
                   description: 'The flag to indicate if the application is static.'
+                is_spa:
+                  type: boolean
+                  description: 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'
+                is_auto_deploy_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'
+                is_force_https_enabled:
+                  type: boolean
+                  description: 'The flag to indicate if HTTPS is forced. Defaults to true.'
                 install_command:
                   type: string
                   description: 'The install command.'
@@ -1662,12 +1708,12 @@ paths:
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
+                dockerfile_location:
+                  type: string
+                  description: 'The Dockerfile location in the repository.'
                 docker_compose_location:
                   type: string
                   description: 'The Docker Compose location.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
                 docker_compose_custom_start_command:
                   type: string
                   description: 'The Docker Compose custom start command.'
@@ -1676,7 +1722,8 @@ paths:
                   description: 'The Docker Compose custom build command.'
                 docker_compose_domains:
                   type: array
-                  description: 'The Docker Compose domains.'
+                  description: 'Array of URLs to be applied to containers of a dockercompose application.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, domain: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")' } }, type: object }
                 watch_paths:
                   type: string
                   description: 'The watch paths.'
@@ -5581,9 +5628,8 @@ paths:
                 - environment_uuid
               properties:
                 type:
-                  description: 'The one-click service type'
+                  description: 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)'
                   type: string
-                  enum: [activepieces, appsmith, appwrite, authentik, babybuddy, budge, changedetection, chatwoot, classicpress-with-mariadb, classicpress-with-mysql, classicpress-without-database, cloudflared, code-server, dashboard, directus, directus-with-postgresql, docker-registry, docuseal, docuseal-with-postgres, dokuwiki, duplicati, emby, embystat, fider, filebrowser, firefly, formbricks, ghost, gitea, gitea-with-mariadb, gitea-with-mysql, gitea-with-postgresql, glance, glances, glitchtip, grafana, grafana-with-postgresql, grocy, heimdall, homepage, jellyfin, kuzzle, listmonk, logto, mediawiki, meilisearch, metabase, metube, minio, moodle, n8n, n8n-with-postgresql, next-image-transformation, nextcloud, nocodb, odoo, openblocks, pairdrop, penpot, phpmyadmin, pocketbase, posthog, reactive-resume, rocketchat, shlink, slash, snapdrop, statusnook, stirling-pdf, supabase, syncthing, tolgee, trigger, trigger-with-external-database, twenty, umami, unleash-with-postgresql, unleash-without-database, uptime-kuma, vaultwarden, vikunja, weblate, whoogle, wordpress-with-mariadb, wordpress-with-mysql, wordpress-without-database]
                 name:
                   type: string
                   maxLength: 255
@@ -5613,7 +5659,15 @@ paths:
                   description: 'Start the service immediately after creation.'
                 docker_compose_raw:
                   type: string
-                  description: 'The Docker Compose raw content.'
+                  description: 'The base64 encoded Docker Compose content.'
+                urls:
+                  type: array
+                  description: 'Array of URLs to be applied to containers of a service.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, url: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").' } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+                  description: 'Force domain override even if conflicts are detected.'
               type: object
       responses:
         '201':
@@ -5629,6 +5683,16 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '409':
+          description: 'Domain conflicts detected.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Domain conflicts detected. Use force_domain_override=true to proceed.' }
+                  warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
+                  conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
+                type: object
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -5780,7 +5844,15 @@ paths:
                   description: 'Connect the service to the predefined docker network.'
                 docker_compose_raw:
                   type: string
-                  description: 'The Docker Compose raw content.'
+                  description: 'The base64 encoded Docker Compose content.'
+                urls:
+                  type: array
+                  description: 'Array of URLs to be applied to containers of a service.'
+                  items: { properties: { name: { type: string, description: 'The service name as defined in docker-compose.' }, url: { type: string, description: 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").' } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+                  description: 'Force domain override even if conflicts are detected.'
               type: object
       responses:
         '200':
@@ -5798,6 +5870,16 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflicts detected.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Domain conflicts detected. Use force_domain_override=true to proceed.' }
+                  warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
+                  conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
+                type: object
         '422':
           $ref: '#/components/responses/422'
       security:

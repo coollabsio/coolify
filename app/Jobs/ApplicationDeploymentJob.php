@@ -1390,13 +1390,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
-            ],
-            [
-                executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
-                'hidden' => true,
-
             ]
         );
+
+        if (isDev()) {
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
+                    'hidden' => true,
+                ]
+            );
+        }
 
         // Write .env file to configuration directory
         if ($this->use_build_server) {
@@ -1649,12 +1653,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
-                    'hidden' => true,
-                ],
+                ]
             );
+
+            if (isDev()) {
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
+                        'hidden' => true,
+                    ]
+                );
+            }
         } elseif ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerfile') {
             // For Docker Compose and Dockerfile, create an empty .env file even if there are no build-time variables
             // This ensures the file exists when referenced in build commands
@@ -2264,7 +2273,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->nixpacks_plan_json = collect($parsed);
-                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+
+                if (isDev()) {
+                    $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                } else {
+                    $parsedForLog = $parsed;
+                    unset($parsedForLog['variables']); // remove variables section to avoid exposing ENVs in production logs
+                    $this->application_deployment_queue->addLogEntry('Final Nixpacks plan: '.json_encode($parsedForLog, JSON_PRETTY_PRINT), hidden: true);
+                }
                 if ($this->nixpacks_type === 'rust') {
                     // temporary: disable healthcheck for rust because the start phase does not have curl/wget
                     $this->application->health_check_enabled = false;

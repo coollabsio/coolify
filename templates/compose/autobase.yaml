@@ -6,7 +6,7 @@
 
 services:
   autobase:
-    image: autobase/console_ui:2.4.1
+    image: autobase/console_ui:2.5.2
     platform: linux/amd64
     environment:
       - SERVICE_FQDN_AUTOBASE_80
@@ -22,7 +22,7 @@ services:
         condition: service_healthy
 
   autobase-db:
-    image: autobase/console_db:2.4.1
+    image: autobase/console_db:2.5.2
     platform: linux/amd64
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -35,7 +35,7 @@ services:
       retries: 10
 
   autobase-api:
-    image: autobase/console_api:2.4.1
+    image: autobase/console_api:2.5.2
     platform: linux/amd64
     environment:
       - PG_CONSOLE_DB_HOST=autobase-db
