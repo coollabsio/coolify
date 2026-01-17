@@ -8,6 +8,9 @@
         this.mounted();
         // Load all entries when component initializes
         this.allEntries = @js($entries->toArray());
+        window.addEventListener('changelog-entries', (event) => {
+            this.allEntries = event.detail.entries ?? [];
+        });
     },
     markEntryAsRead(tagName) {
         // Update the entry in our local Alpine data
@@ -103,7 +106,10 @@
             return new Date(b.published_at) - new Date(a.published_at);
         });
     }
-}" @click.outside="dropdownOpen = false">
+}" @click.outside="dropdownOpen = false" wire:init="prefetchChangelog">
+    @if ($shouldPollChangelog)
+        <span class="hidden" wire:poll.1s="refreshChangelog"></span>
+    @endif
     <!-- Custom Dropdown without arrow -->
     <div class="relative">
         <button @click="dropdownOpen = !dropdownOpen"
