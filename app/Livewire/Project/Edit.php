@@ -17,14 +17,14 @@ class Edit extends Component
     protected function rules(): array
     {
         return [
-            'name' => ValidationPatterns::nameRules(),
+            'name' => ValidationPatterns::projectNameRules(),
             'description' => ValidationPatterns::descriptionRules(),
         ];
     }
 
     protected function messages(): array
     {
-        return ValidationPatterns::combinedMessages();
+        return ValidationPatterns::projectCombinedMessages();
     }
 
     public function mount(string $project_uuid)

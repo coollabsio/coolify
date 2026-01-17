@@ -9,8 +9,13 @@ class ValidationPatterns
 {
     /**
      * Pattern for names excluding all dangerous characters
-    */
+     */
     public const NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.]+$/u';
+
+    /**
+     * Pattern for project names allowing slashes and at signs
+     */
+    public const PROJECT_NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.\/@]+$/u';
 
     /**
      * Pattern for descriptions excluding all dangerous characters with some additional allowed characters
@@ -34,6 +39,27 @@ class ValidationPatterns
         $rules[] = "min:$minLength";
         $rules[] = "max:$maxLength";
         $rules[] = 'regex:'.self::NAME_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation rules for project name fields
+     */
+    public static function projectNameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "min:$minLength";
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::PROJECT_NAME_PATTERN;
 
         return $rules;
     }
@@ -64,7 +90,19 @@ class ValidationPatterns
     public static function nameMessages(): array
     {
         return [
-            'name.regex' => "The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).",
+            'name.regex' => 'The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).',
+            'name.min' => 'The name must be at least :min characters.',
+            'name.max' => 'The name may not be greater than :max characters.',
+        ];
+    }
+
+    /**
+     * Get validation messages for project name fields
+     */
+    public static function projectNameMessages(): array
+    {
+        return [
+            'name.regex' => 'The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), and at signs (@).',
             'name.min' => 'The name must be at least :min characters.',
             'name.max' => 'The name may not be greater than :max characters.',
         ];
@@ -81,11 +119,19 @@ class ValidationPatterns
         ];
     }
 
-    /** 
+    /**
      * Get combined validation messages for both name and description fields
      */
     public static function combinedMessages(): array
     {
         return array_merge(self::nameMessages(), self::descriptionMessages());
+    }
+
+    /**
+     * Get combined validation messages for project name and description fields
+     */
+    public static function projectCombinedMessages(): array
+    {
+        return array_merge(self::projectNameMessages(), self::descriptionMessages());
     }
 }

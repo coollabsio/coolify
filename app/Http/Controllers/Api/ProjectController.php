@@ -238,9 +238,9 @@ class ProjectController extends Controller
             return $return;
         }
         $validator = Validator::make($request->all(), [
-            'name' => ValidationPatterns::nameRules(),
+            'name' => ValidationPatterns::projectNameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-        ], ValidationPatterns::combinedMessages());
+        ], ValidationPatterns::projectCombinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -351,9 +351,9 @@ class ProjectController extends Controller
             return $return;
         }
         $validator = Validator::make($request->all(), [
-            'name' => ValidationPatterns::nameRules(required: false),
+            'name' => ValidationPatterns::projectNameRules(required: false),
             'description' => ValidationPatterns::descriptionRules(),
-        ], ValidationPatterns::combinedMessages());
+        ], ValidationPatterns::projectCombinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {

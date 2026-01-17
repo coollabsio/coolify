@@ -91,9 +91,13 @@ class CloneMe extends Component
     public function clone(string $type)
     {
         try {
+            $nameRules = $type === 'project'
+                ? ValidationPatterns::projectNameRules()
+                : ValidationPatterns::nameRules();
+
             $this->validate([
                 'selectedDestination' => 'required',
-                'newName' => ValidationPatterns::nameRules(),
+                'newName' => $nameRules,
             ]);
             if ($type === 'project') {
                 $foundProject = Project::where('name', $this->newName)->first();
