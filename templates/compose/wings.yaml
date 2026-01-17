@@ -7,7 +7,7 @@
 
 services:
   wings:
-    image: "ghcr.io/pterodactyl/wings:latest"
+    image: "ghcr.io/pterodactyl/wings:v1.12.1"
     environment:
       - SERVICE_URL_WINGS_8443
       - "TZ=${TIMEZONE:-UTC}"
