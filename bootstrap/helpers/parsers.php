@@ -1317,15 +1317,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
+        // Prevent automatic .env injection.
+        // This avoids leaking environment variables between services.
+        // User-defined env_file entries are preserved, except for .env.
 
-        $payload['env_file'] = $envFiles;
+        $existingEnvFiles = data_get($service, 'env_file');
+        if ($existingEnvFiles !== null) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->filter(fn ($file) => $file !== '.env')
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -2416,15 +2420,19 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Do NOT auto-inject .env file to containers
+        // This was causing all environment variables to leak to every container in Docker Compose projects
+        // Environment variables are already correctly set per-container in the 'environment' section above
+        // Preserve user-specified env_file entries but filter out .env to prevent leakage
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if ($existingEnvFiles !== null) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->filter(fn ($file) => $file !== '.env')
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         $parsedServices->put($serviceName, $payload);
     }
