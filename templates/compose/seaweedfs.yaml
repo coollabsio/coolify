@@ -2,7 +2,7 @@
 # slogan: SeaweedFS is a simple and highly scalable distributed file system. Compatible with S3, with an admin web interface.
 # category: storage
 # tags: object, storage, server, s3, api
-# logo: svgs/garage.svg
+# logo: svgs/seaweedfs.svg
 # port: 8333
 
 services:
