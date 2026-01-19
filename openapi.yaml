@@ -4765,6 +4765,9 @@ paths:
                 description:
                   type: string
                   description: 'The description of the project.'
+                skip_default_environment:
+                  type: boolean
+                  description: 'When true, do not create the default production environment.'
               type: object
       responses:
         '201':
