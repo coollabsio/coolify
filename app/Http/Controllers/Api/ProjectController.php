@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Actions\Project\CreateProject;
 use App\Models\Project;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\Request;
@@ -226,7 +227,7 @@ class ProjectController extends Controller
     )]
     public function create_project(Request $request)
     {
-        $allowedFields = ['name', 'description'];
+        $allowedFields = ['name', 'description', 'skip_default_environment'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -240,6 +241,7 @@ class ProjectController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'skip_default_environment' => 'sometimes|boolean',
         ], ValidationPatterns::combinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -257,11 +259,11 @@ class ProjectController extends Controller
             ], 422);
         }
 
-        $project = Project::create([
+        $project = app(CreateProject::class)->handle([
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
-        ]);
+        ], ! $request->boolean('skip_default_environment', false));
 
         return response()->json([
             'uuid' => $project->uuid,
