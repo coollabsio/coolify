@@ -7,7 +7,7 @@
 
 services:
   snipe-it:
-    image: 'snipe/snipe-it:${APP_VERSION:-latest}'
+    image: 'snipe/snipe-it:${APP_VERSION:-v8.3.7}'
     environment:
       - SERVICE_URL_SNIPE_80
       - DB_HOST=mariadb
@@ -44,7 +44,7 @@ services:
       mariadb:
         condition: service_healthy
   mariadb:
-    image: 'mariadb:${MARIADB_VERSION:-latest}'
+    image: 'mariadb:${MARIADB_VERSION:-11.4}'
     volumes:
       - snipeit-db:/var/lib/mysql
     environment:
