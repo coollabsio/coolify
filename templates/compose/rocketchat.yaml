@@ -7,7 +7,7 @@
 
 services:
   rocketchat:
-    image: 'registry.rocket.chat/rocketchat/rocket.chat:latest'
+    image: 'registry.rocket.chat/rocketchat/rocket.chat:8.0.1'
     environment:
       - SERVICE_URL_ROCKETCHAT_3000
       - 'MONGO_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/${MONGODB_DATABASE:-rocketchat}?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}'
@@ -43,5 +43,3 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
-volumes:
-  mongodb_data: null
