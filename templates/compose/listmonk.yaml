@@ -47,7 +47,7 @@ services:
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
     volumes:
-      - "pg-data:/var/lib/postgresql/data"
+      - "pg-data:/var/lib/postgresql"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
