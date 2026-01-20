@@ -29,6 +29,11 @@ services:
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - DASHBOARD_USERNAME=${SERVICE_USER_ADMIN}
       - DASHBOARD_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - 'KONG_STORAGE_CONNECT_TIMEOUT=${KONG_STORAGE_CONNECT_TIMEOUT:-60}'
+      - 'KONG_STORAGE_WRITE_TIMEOUT=${KONG_STORAGE_WRITE_TIMEOUT:-3600}'
+      - 'KONG_STORAGE_READ_TIMEOUT=${KONG_STORAGE_READ_TIMEOUT:-3600}'
+      - 'KONG_STORAGE_REQUEST_BUFFERING=${KONG_STORAGE_REQUEST_BUFFERING:-false}'
+      - 'KONG_STORAGE_RESPONSE_BUFFERING=${KONG_STORAGE_RESPONSE_BUFFERING:-false}' 
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - type: bind
@@ -215,12 +220,17 @@ services:
             ## Storage routes: the storage server manages its own auth
             - name: storage-v1
               _comment: 'Storage: /storage/v1/* -> http://supabase-storage:5000/*'
+              connect_timeout: $KONG_STORAGE_CONNECT_TIMEOUT
+              write_timeout: $KONG_STORAGE_WRITE_TIMEOUT
+              read_timeout: $KONG_STORAGE_READ_TIMEOUT
               url: http://supabase-storage:5000/
               routes:
                 - name: storage-v1-all
                   strip_path: true
                   paths:
                     - /storage/v1/
+                  request_buffering: $KONG_STORAGE_REQUEST_BUFFERING
+                  response_buffering: $KONG_STORAGE_RESPONSE_BUFFERING
               plugins:
                 - name: cors
 
