@@ -8,15 +8,12 @@
 services:
   langflow:
     image: langflowai/langflow:1.7.2
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       - SERVICE_URL_LANGFLOW_7860
       - LANGFLOW_AUTO_LOGIN=${LANGFLOW_AUTO_LOGIN:-false}
-      - LANGFLOW_SUPERUSER=administrator
-      - LANGFLOW_SUPERUSER_PASSWORD=securepassword
-      - LANGFLOW_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-langflow}
+      - LANGFLOW_SUPERUSER=$SERVICE_USER_LANGFLOW
+      - LANGFLOW_SUPERUSER_PASSWORD=$SERVICE_PASSWORD_LANGFLOW
+      - LANGFLOW_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-langflow-db}
       - LANGFLOW_CONFIG_DIR=app/langflow
       - LANGFLOW_HOST=0.0.0.0
       - PORT=7860
@@ -25,15 +22,18 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - langflow-data:/app/langflow
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-langflow}
+      - POSTGRES_DB=${POSTGRES_DB:-langflow-db}
     volumes:
       - langflow-postgres:/var/lib/postgres/data
     healthcheck:
@@ -41,7 +41,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
-volumes:
-  langflow-postgres:
-  langflow-data:
