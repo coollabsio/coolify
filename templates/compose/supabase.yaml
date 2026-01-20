@@ -314,6 +314,9 @@ services:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
       - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}'
+      # Next.js client-side environment variables (required for browser access)
+      - 'NEXT_PUBLIC_SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}'
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
