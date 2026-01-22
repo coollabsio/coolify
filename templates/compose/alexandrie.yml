@@ -7,8 +7,6 @@
 services:
   mysql:
     image: "mysql:8.0"
-    container_name: alexandrie-mysql
-    restart: unless-stopped
     environment:
       - "MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}"
       - "MYSQL_DATABASE=${MYSQL_DATABASE:-alexandrie}"
@@ -30,9 +28,7 @@ services:
       retries: 5
       start_period: 30s
   rustfs:
-    image: "rustfs/rustfs:latest"
-    container_name: alexandrie-rustfs
-    restart: unless-stopped
+    image: "rustfs/rustfs:1.0.0-alpha.81"
     environment:
       - SERVICE_URL_RUSTFS_9000
       - "RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}"
@@ -51,8 +47,7 @@ services:
       retries: 3
       start_period: 20s
   backend:
-    image: "ghcr.io/smaug6739/alexandrie-backend:latest"
-    container_name: alexandrie-backend
+    image: "ghcr.io/smaug6739/alexandrie-backend:v8.4.1"
     environment:
       - SERVICE_URL_BACKEND_8201
       - BACKEND_PORT=8201
@@ -81,9 +76,7 @@ services:
       rustfs:
         condition: service_healthy
   frontend:
-    image: "ghcr.io/smaug6739/alexandrie-frontend:latest"
-    container_name: alexandrie-frontend
-    restart: unless-stopped
+    image: "ghcr.io/smaug6739/alexandrie-frontend:v8.4.1"
     environment:
       - SERVICE_URL_FRONTEND_8200
       - PORT=8200
@@ -95,7 +88,3 @@ services:
       - "NUXT_PUBLIC_BASE_URL=${SERVICE_URL_FRONTEND}"
     depends_on:
       - backend
-volumes:
-  mysql_data: null
-  rustfs_data: null
-  rustfs_logs: null
