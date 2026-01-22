@@ -1,13 +1,13 @@
-# documentation: https://formbricks.com/docs/self-hosting/configuration
+# documentation: https://formbricks.com/docs/self-hosting/setup/docker
 # slogan: Open Source Survey Platform
 # category: analytics
-# tags: form, builder, forms, survey, open source, experience, management, self-hosted, docker
+# tags: form, builder, forms, survey
 # logo: svgs/formbricks.png
 # port: 3000
 
 services:
   formbricks:
-    image: ghcr.io/formbricks/formbricks:latest
+    image: ghcr.io/formbricks/formbricks:4.5.0 # Released on Jan 5 2026
     environment:
       - SERVICE_URL_FORMBRICKS_3000
       - WEBAPP_URL=$SERVICE_URL_FORMBRICKS
@@ -57,15 +57,25 @@ services:
       - IMPRINT_URL=${IMPRINT_URL}
       - RATE_LIMITING_DISABLED=${RATE_LIMITING_DISABLED:-0}
       - OPENTELEMETRY_LISTENER_URL=${OPENTELEMETRY_LISTENER_URL}
-      - REDIS_URL=${REDIS_URL}
-      - REDIS_HTTP_URL=${REDIS_HTTP_URL}
+      - 'REDIS_URL=redis://valkey:6379'
       - DEFAULT_ORGANIZATION_ID=${DEFAULT_ORGANIZATION_ID}
       - DEFAULT_ORGANIZATION_ROLE=${DEFAULT_ORGANIZATION_ROLE:-owner}
+      - S3_ACCESS_KEY=$SERVICE_USER_MINIO
+      - S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - S3_REGION=us-east-1
+      - S3_BUCKET_NAME=formbricks
+      - S3_ENDPOINT_URL=$MINIO_SERVER_URL # This has to be publically accessible by frombricks frontend, using http://minio:9000 doesn't work!!
+      - 'S3_FORCE_PATH_STYLE=1'
     volumes:
       - formbricks-uploads:/apps/web/uploads/
     depends_on:
       postgresql:
         condition: service_healthy
+      valkey:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
       interval: 2s
@@ -85,3 +95,47 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - formbricks-valkey:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'valkey-cli ping | grep PONG'
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 3s
+
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - formbricks-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        mc alias set local http://minio:9000 ${SERVICE_USER_MINIO} ${SERVICE_PASSWORD_MINIO} &&
+        mc mb -p local/formbricks || true &&
+        mc anonymous set private local/formbricks
+      "
+    restart: "no"
+    exclude_from_hc: true
