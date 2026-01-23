@@ -10,12 +10,12 @@ class ValidationPatterns
     /**
      * Pattern for names excluding all dangerous characters
     */
-    public const NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.]+$/u';
+    public const NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.@\/&]+$/u';
 
     /**
      * Pattern for descriptions excluding all dangerous characters with some additional allowed characters
      */
-    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*]+$/u';
+    public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*@\/&]+$/u';
 
     /**
      * Get validation rules for name fields
@@ -64,7 +64,7 @@ class ValidationPatterns
     public static function nameMessages(): array
     {
         return [
-            'name.regex' => "The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).",
+            'name.regex' => "The name may only contain letters (including Unicode), numbers, spaces, and these characters: - _ . / @ &",
             'name.min' => 'The name must be at least :min characters.',
             'name.max' => 'The name may not be greater than :max characters.',
         ];
@@ -76,7 +76,7 @@ class ValidationPatterns
     public static function descriptionMessages(): array
     {
         return [
-            'description.regex' => "The description may only contain letters (including Unicode), numbers, spaces, and common punctuation (- _ . , ! ? ( ) ' \" + = *).",
+            'description.regex' => "The description may only contain letters (including Unicode), numbers, spaces, and common punctuation: - _ . , ! ? ( ) ' \" + = * / @ &",
             'description.max' => 'The description may not be greater than :max characters.',
         ];
     }

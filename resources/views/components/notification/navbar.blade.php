@@ -2,7 +2,7 @@
     <h1>Notifications</h1>
     <div class="subtitle">Get notified about your infrastructure.</div>
     <div class="navbar-main">
-        <nav class="flex items-center gap-6 min-h-10">
+        <nav class="flex items-center gap-3.5 min-h-10">
             <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.email') }}">
                 <button>Email</button>
