@@ -1,0 +1,15 @@
+# documentation: https://www.goatcounter.com/help
+# slogan: GoatCounter is an open source web analytics platform. It aims to offer easy to use and meaningful privacy-friendly web analytics.
+# category: analytics
+# tags: analytics, insights, privacy
+# logo: svgs/goatcounter.svg
+# port: 8080
+
+name: goatcounter
+volumes:
+  goatcounter-data: {  }
+services:
+  goatcounter-sqlite:
+    image: 'arp242/goatcounter:latest'
+    volumes:
+      - 'goatcounter-data:/home/goatcounter/goatcounter-data'
