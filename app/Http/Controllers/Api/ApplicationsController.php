@@ -893,8 +893,8 @@ class ApplicationsController extends Controller
      * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is an unstable duplicate of POST /api/v1/services.
      */
     #[OA\Post(
-        summary: 'Create (Docker Compose) (Deprecated)',
-        description: 'Create new application based on a docker-compose file (without git).',
+        summary: 'Create (Docker Compose)',
+        description: 'Deprecated: Use POST /api/v1/services instead.',
         path: '/applications/dockercompose',
         operationId: 'create-dockercompose-application',
         deprecated: true,

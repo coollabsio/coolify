@@ -33,7 +33,7 @@ services:
       timeout: 1s
       retries: 3
   pterodactyl:
-    image: 'ghcr.io/pterodactyl/panel:v1.11.11'
+    image: 'ghcr.io/pterodactyl/panel:v1.12.0'
     volumes:
       - 'panel-var:/app/var/'
       - 'panel-nginx:/etc/nginx/http.d/'
@@ -109,7 +109,7 @@ services:
       - MAIL_PASSWORD=$MAIL_PASSWORD
       - MAIL_ENCRYPTION=$MAIL_ENCRYPTION
   wings:
-    image: 'ghcr.io/pterodactyl/wings:v1.11.13'
+    image: 'ghcr.io/pterodactyl/wings:v1.12.1'
     restart: unless-stopped
     ports:
       - "2022:2022"
