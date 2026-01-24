@@ -7,7 +7,7 @@
 
 services:
   goatcounter-sqlite:
-    image: 'arp242/goatcounter:latest'
+    image: 'arp242/goatcounter:2.7'
     environment:
       - SERVICE_URL_GOATCOUNTER_8080
     volumes:
