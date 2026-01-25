@@ -1,0 +1,26 @@
+# documentation: https://github.com/happyDomain/happyDeliver
+# slogan: Open-source email deliverability testing platform
+# category: email
+# tags: email, deliverability, smtp, testing, spam, dkim, dmarc, spf, bimi
+# logo: svgs/happydeliver.svg
+# port: 8080
+
+services:
+  happydeliver:
+    image: happydomain/happydeliver:1
+    hostname: ${SERVICE_FQDN_HAPPYDELIVER}
+    environment:
+      - SERVICE_URL_HAPPYDELIVER
+      - HAPPYDELIVER_DOMAIN=${SERVICE_FQDN_HAPPYDELIVER}
+      - EMAIL_ADDRESS_PREFIX=${EMAIL_ADDRESS_PREFIX:-test-}
+      - DATABASE_TYPE=${DATABASE_TYPE:?sqlite}
+      - DATABASE_DSN=${DATABASE_DSN:?/var/lib/happydeliver/happydeliver.db}
+      - RBLS=${RBLS:-zen.spamhaus.org,bl.spamcop.net,dnsbl.sorbs.net}
+      - REPORT_RETENTION=${REPORT_RETENTION:-720h}
+      - RATE_LIMIT=${RATE_LIMIT:-50}
+      - CUSTOM_LOGO_URL=${CUSTOM_LOGO_URL:-}
+      - SURVEY_URL=${SURVEY_URL:-}
+    ports:
+      - "25:25"
+    volumes:
+      - happydeliver-data:/var/lib/happydeliver
