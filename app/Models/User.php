@@ -55,6 +55,7 @@ class User extends Authenticatable implements SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'password_login_disabled' => 'boolean',
     ];
 
     /**
@@ -473,5 +474,22 @@ class User extends Authenticatable implements SendsEmail
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    /**
+     * Check if the user is an OAuth user.
+     */
+    public function isOAuthUser(): bool
+    {
+        return ! empty($this->oauth_provider);
+    }
+
+    /**
+     * Check if password login is disabled for this user.
+     * This is true for OAuth-only users.
+     */
+    public function isPasswordLoginDisabled(): bool
+    {
+        return $this->password_login_disabled === true;
     }
 }
