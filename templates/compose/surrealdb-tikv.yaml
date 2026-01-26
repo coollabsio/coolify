@@ -1,0 +1,51 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/tikv
+# category: Database
+# tags: surrealdb, tikv, database, distributed
+# port: 8000
+
+services:
+  pd:
+    image: pingcap/pd:latest
+    command: >
+      --name=pd0
+      --data-dir=/data
+      --client-urls=http://0.0.0.0:2379
+      --peer-urls=http://0.0.0.0:2380
+      --advertise-client-urls=http://pd:2379
+      --advertise-peer-urls=http://pd:2380
+      --initial-cluster=pd0=http://pd:2380
+    volumes:
+      - pd_data:/data
+
+  tikv:
+    image: pingcap/tikv:latest
+    depends_on:
+      - pd
+    command: >
+      --addr=0.0.0.0:20160
+      --advertise-addr=tikv:20160
+      --data-dir=/data
+      --pd=pd:2379
+    volumes:
+      - tikv_data:/data
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    depends_on:
+      - pd
+      - tikv
+    command: >
+      start
+      --bind 0.0.0.0:8000
+      --user ${SERVICE_USER_SURREALDB}
+      --pass ${SERVICE_PASSWORD_SURREALDB}
+      tikv://pd:2379
+    healthcheck:
+      test: ["CMD", "surreal", "isready", "--conn", "http://127.0.0.1:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pd_data:
+  tikv_data:
