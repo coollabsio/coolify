@@ -1,0 +1,64 @@
+# documentation: https://docs.joinmobilizon.org
+# slogan: A free and federated tool to organize events and manage groups.
+# category: social
+# tags: events,federation,activitypub,groups,fediverse
+# logo: svgs/mobilizon.svg
+# port: 4000
+
+services:
+  mobilizon:
+    image: kaihuri/mobilizon:5.2.2
+    environment:
+      - SERVICE_FQDN_MOBILIZON_4000
+      - MOBILIZON_INSTANCE_NAME=${MOBILIZON_INSTANCE_NAME:-My Mobilizon Instance}
+      - MOBILIZON_INSTANCE_HOST=$SERVICE_FQDN_MOBILIZON
+      - MOBILIZON_INSTANCE_PORT=4000
+      - MOBILIZON_INSTANCE_LISTEN_IP=0.0.0.0
+      - MOBILIZON_INSTANCE_EMAIL=${MOBILIZON_INSTANCE_EMAIL:-admin@example.com}
+      - MOBILIZON_REPLY_EMAIL=${MOBILIZON_REPLY_EMAIL:-noreply@example.com}
+      - MOBILIZON_INSTANCE_REGISTRATIONS_OPEN=${MOBILIZON_INSTANCE_REGISTRATIONS_OPEN:-true}
+      - MOBILIZON_DATABASE_USERNAME=mobilizon
+      - MOBILIZON_DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - MOBILIZON_DATABASE_DBNAME=mobilizon
+      - MOBILIZON_DATABASE_HOST=db
+      - MOBILIZON_DATABASE_PORT=5432
+      - MOBILIZON_DATABASE_SSL=false
+      - MOBILIZON_INSTANCE_SECRET_KEY_BASE=$SERVICE_PASSWORD_64_SECRET
+      - MOBILIZON_INSTANCE_SECRET_KEY=$SERVICE_PASSWORD_64_KEY
+      - MOBILIZON_LOGLEVEL=${MOBILIZON_LOGLEVEL:-info}
+      - MOBILIZON_SMTP_SERVER=${MOBILIZON_SMTP_SERVER:-localhost}
+      - MOBILIZON_SMTP_PORT=${MOBILIZON_SMTP_PORT:-25}
+      - MOBILIZON_SMTP_SSL=${MOBILIZON_SMTP_SSL:-false}
+      - MOBILIZON_SMTP_TLS=${MOBILIZON_SMTP_TLS:-if_available}
+      - MOBILIZON_SMTP_USERNAME=${MOBILIZON_SMTP_USERNAME}
+      - MOBILIZON_SMTP_PASSWORD=${MOBILIZON_SMTP_PASSWORD}
+      - MOBILIZON_UPLOADS=/var/lib/mobilizon/uploads
+      - MOBILIZON_UPLOADS_EXPORTS=/var/lib/mobilizon/uploads/exports
+      - MOBILIZON_TIMEZONES_DIR=/var/lib/mobilizon/timezones
+      - MOBILIZON_TZDATA_DIR=/var/lib/mobilizon/tzdata
+    volumes:
+      - mobilizon-uploads:/var/lib/mobilizon/uploads
+      - mobilizon-tzdata:/var/lib/mobilizon/tzdata
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  db:
+    image: postgis/postgis:15-3.4
+    volumes:
+      - mobilizon-db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=mobilizon
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=mobilizon
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
