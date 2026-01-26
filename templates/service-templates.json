@@ -5196,5 +5196,25 @@
         "logo": "svgs/marimo.svg",
         "minversion": "0.0.0",
         "port": "8080"
-    }
+    },
+      "surrealdb": {
+    "documentation": "https://surrealdb.com/docs",
+    "slogan": "Multi-model database (graph, document, key-value) with built-in web UI.",
+    "compose": "c2VydmljZXM6CiAgc3VycmVhbGRiOgogICAgaW1hZ2U6IHN1cnJlYWxkYi9zdXJyZWFsZGI6bGF0ZXN0CiAgICBjb21tYW5kOiA+CiAgICAgIHN0YXJ0CiAgICAgIC0tYmluZCAwLjAuMC4wOjgwMDAKICAgICAgLS11c2VyICR7U0VSVklDRV9VU0VSX1NVUlJFQUxEQn0KICAgICAgLS1wYXNzICR7U0VSVklDRV9QQVNTV09SRF9TVVJSRUFMREJ9CiAgICAgIHJvY2tzZGI6L2RhdGEKICAgIHZvbHVtZXM6CiAgICAgIC0gc3VycmVhbGRiX2RhdGE6L2RhdGEKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJzdXJyZWFsIiwgImlzcmVhZHkiLCAiLS1jb25uIiwgImh0dHA6Ly8xMjcuMC4wLjE6ODAwMCJdCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKCnZvbHVtZXM6CiAgc3VycmVhbGRiX2RhdGE6Cg==",
+    "tags": ["database", "nosql", "graph", "document", "kv"],
+    "category": "database",
+    "logo": "svgs/surrealdb.svg",
+    "minversion": "0.0.0",
+    "port": "8000"
+  },
+  "surrealdb-tikv": {
+    "documentation": "https://surrealdb.com/docs/surrealdb/installation/running/tikv",
+    "slogan": "SurrealDB backed by TiKV (distributed storage).",
+    "compose": "c2VydmljZXM6CiAgcGQ6CiAgICBpbWFnZTogcGluZ2NhcC9wZDpsYXRlc3QKICAgIGNvbW1hbmQ6ID4KICAgICAgLS1uYW1lPXBkMAogICAgICAtLWRhdGEtZGlyPS9kYXRhCiAgICAgIC0tY2xpZW50LXVybHM9aHR0cDovLzAuMC4wLjA6MjM3OQogICAgICAtLXBlZXItdXJscz1odHRwOi8vMC4wLjAuMDoyMzgwCiAgICAgIC0tYWR2ZXJ0aXNlLWNsaWVudC11cmxzPWh0dHA6Ly9wZDoyMzc5CiAgICAgIC0tYWR2ZXJ0aXNlLXBlZXItdXJscz1odHRwOi8vcGQ6MjM4MAogICAgICAtLWluaXRpYWwtY2x1c3Rlcj1wZDA9aHR0cDovL3BkOjIzODAKICAgIHZvbHVtZXM6CiAgICAgIC0gc3VycmVhbGRiX3BkX2RhdGE6L2RhdGEKCiAgdGlrdjoKICAgIGltYWdlOiBwaW5nY2FwL3Rpa3Y6bGF0ZXN0CiAgICBkZXBlbmRzX29uOgogICAgICAtIHBkCiAgICBjb21tYW5kOiA+CiAgICAgIC0tYWRkcj0wLjAuMC4wOjIwMTYwCiAgICAgIC0tYWR2ZXJ0aXNlLWFkZHI9dGlrdjoyMDE2MAogICAgICAtLWRhdGEtZGlyPS9kYXRhCiAgICAgIC0tcGQ9cGQ6MjM3OQogICAgdm9sdW1lczoKICAgICAgLSBzdXJyZWFsZGJfdGlrdl9kYXRhOi9kYXRhCgogIHN1cnJlYWxkYjoKICAgIGltYWdlOiBzdXJyZWFsZGIvc3VycmVhbGRiOmxhdGVzdAogICAgZGVwZW5kc19vbjoKICAgICAgLSBwZAogICAgICAtIHRpa3YKICAgIGNvbW1hbmQ6ID4KICAgICAgc3RhcnQKICAgICAgLS1iaW5kIDAuMC4wLjA6ODAwMAogICAgICAtLXVzZXIgJHtTRVJWSUNFX1VTRVJfU1VSUkVBTERCfQogICAgICAtLXBhc3MgJHtTRVJWSUNFX1BBU1NXT1JEX1NVUlJFQUxEQn0KICAgICAgdGlrdjovL3BkOjIzNzkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJzdXJyZWFsIiwgImlzcmVhZHkiLCAiLS1jb25uIiwgImh0dHA6Ly8xMjcuMC4wLjE6ODAwMCJdCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKCnZvbHVtZXM6CiAgc3VycmVhbGRiX3BkX2RhdGE6CiAgc3VycmVhbGRiX3Rpa3ZfZGF0YToK",
+    "tags": ["database", "nosql", "graph", "document", "kv", "tikv"],
+    "category": "database",
+    "logo": "svgs/surrealdb.svg",
+    "minversion": "0.0.0",
+    "port": "8000"
+  }
 }
