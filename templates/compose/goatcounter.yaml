@@ -6,14 +6,14 @@
 # port: 8080
 
 services:
-  goatcounter-sqlite:
-    image: 'arp242/goatcounter:2.7'
+  goatcounter:
+    image: arp242/goatcounter:2.7
     environment:
       - SERVICE_URL_GOATCOUNTER_8080
     volumes:
-      - 'goatcounter-data:/home/goatcounter/goatcounter-data'
+      - goatcounter-data:/home/goatcounter/goatcounter-data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/status >/dev/null 2>&1 || exit 1"]
-      interval: 5s
-      timeout: 20s
+      interval: 10s
+      timeout: 5s
       retries: 10
