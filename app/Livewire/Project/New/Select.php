@@ -243,6 +243,12 @@ class Select extends Component
                 'description' => 'ClickHouse is a column-oriented database that supports real-time analytics, business intelligence, observability, ML and GenAI, and more.',
                 'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="215" height="90" viewBox="0 0 100 43" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_378_10860)"><rect x="2.70837" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="7.2085" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="11.7086" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="16.2076" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="20.7087" y="10.7502" width="2.24992" height="4.49985" rx="0.236664" fill="currentColor"/></g></svg></div>',
             ],
+            [
+                'id' => 'surrealdb',
+                'name' => 'SurrealDB',
+                'description' => 'SurrealDB is a multi-model database that combines the best of relational, document, graph, and time-series databases.',
+                'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.4c5.302 0 9.6 4.298 9.6 9.6s-4.298 9.6-9.6 9.6S2.4 17.302 2.4 12 6.698 2.4 12 2.4zm0 2.4a7.2 7.2 0 100 14.4 7.2 7.2 0 000-14.4zm0 2.4a4.8 4.8 0 110 9.6 4.8 4.8 0 010-9.6z"/></svg></div>',
+            ],
 
         ];
 

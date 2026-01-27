@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSurrealdb;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Visus\Cuid2\Cuid2;
@@ -174,6 +175,24 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
     $database->uuid = (new Cuid2);
     $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+function create_standalone_surrealdb($environment_id, $destination_uuid, ?array $otherData = null): StandaloneSurrealdb
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
+    $database = new StandaloneSurrealdb;
+    $database->uuid = (new Cuid2);
+    $database->name = 'surrealdb-database-'.$database->uuid;
+    $database->surrealdb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

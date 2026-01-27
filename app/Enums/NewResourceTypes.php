@@ -19,4 +19,5 @@ enum NewResourceTypes: string
     case KEYDB = 'keydb';
     case DRAGONFLY = 'dragonfly';
     case CLICKHOUSE = 'clickhouse';
+    case SURREALDB = 'surrealdb';
 }
