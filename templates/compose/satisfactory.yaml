@@ -7,15 +7,13 @@
 
 services:
   satisfactory-server:
-    container_name: satisfactory-server
-    hostname: satisfactory-server
-    image: 'wolveix/satisfactory-server:latest'
+    image: 'wolveix/satisfactory-server:v1.9.10'
     ports:
       - '${SERVER_GAME_PORT}:7777/tcp'
       - '${SERVER_GAME_PORT}:7777/udp'
       - '${SERVER_MESSAGING_PORT}:8888/tcp'
     volumes:
-      - './satisfactory-server:/config'
+      - 'satisfactory-server:/config'
     environment:
       - 'AUTOSAVENUM=${AUTOSAVE_NUM:-5}'
       - 'DEBUG=${DEBUG:-false}'
@@ -33,7 +31,6 @@ services:
       - 'SKIPUPDATE=${SKIP_UPDATE:-false}'
       - 'STEAMBETA=${STEAM_BETA:-false}'
       - 'TIMEOUT=${TIMEOUT:-30}'
-    restart: unless-stopped
     deploy:
       resources:
         limits:
