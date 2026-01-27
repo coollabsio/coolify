@@ -7,7 +7,7 @@
 
 services:
   openpanel-dashboard:
-    image: lindesvard/openpanel-dashboard:2.0.0
+    image: lindesvard/openpanel-dashboard:2
     environment:
       - NODE_ENV=production
       - SELF_HOSTED=true
@@ -37,7 +37,7 @@ services:
       start_period: 15s
 
   openpanel-api:
-    image: lindesvard/openpanel-api:2.0.0
+    image: lindesvard/openpanel-api:2
     command: >
       sh -c "
         echo 'Running migrations...'
@@ -74,7 +74,7 @@ services:
       retries: 5
 
   openpanel-worker:
-    image: lindesvard/openpanel-worker:2.0.0
+    image: lindesvard/openpanel-worker:2
     environment:
       - DISABLE_BULLBOARD=${DISABLE_BULLBOARD:-1}
       - NODE_ENV=production
