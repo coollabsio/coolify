@@ -1349,8 +1349,7 @@ class ApplicationsController extends Controller
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            // Remove trailing .git if present
-            $gitRepository = str($gitRepository)->trim('/')->replace('.git', '')->toString();
+            $gitRepository = str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
 
             // Use direct API call to verify repository access instead of loading all repositories
             // This is much faster and avoids timeouts for GitHub Apps with many repositories
@@ -1359,7 +1358,7 @@ class ApplicationsController extends Controller
                 ->retry(3, 200, throw: false)
                 ->get("/repos/{$gitRepository}");
 
-            if ($response->status() === 404) {
+            if ($response->status() === 404 || $response->status() === 403) {
                 return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
             }
 
