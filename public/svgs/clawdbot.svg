@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="lobsterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C92A2A;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="shellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8787;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E03131;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#1a1a2e" stroke="#FF6B6B" stroke-width="2"/>
+  
+  <!-- Lobster body (simplified) -->
+  <ellipse cx="50" cy="55" rx="22" ry="18" fill="url(#lobsterGrad)"/>
+  
+  <!-- Lobster head -->
+  <ellipse cx="50" cy="38" rx="15" ry="12" fill="url(#shellGrad)"/>
+  
+  <!-- Eyes -->
+  <circle cx="43" cy="35" r="4" fill="#fff"/>
+  <circle cx="57" cy="35" r="4" fill="#fff"/>
+  <circle cx="43" cy="35" r="2" fill="#1a1a2e"/>
+  <circle cx="57" cy="35" r="2" fill="#1a1a2e"/>
+  
+  <!-- Antennae -->
+  <path d="M 42 28 Q 35 18 28 15" stroke="#FF6B6B" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 58 28 Q 65 18 72 15" stroke="#FF6B6B" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Claws -->
+  <ellipse cx="25" cy="50" rx="10" ry="7" fill="url(#lobsterGrad)" transform="rotate(-30 25 50)"/>
+  <ellipse cx="75" cy="50" rx="10" ry="7" fill="url(#lobsterGrad)" transform="rotate(30 75 50)"/>
+  
+  <!-- Claw pincers -->
+  <path d="M 18 42 L 12 38 M 18 42 L 14 48" stroke="#FF6B6B" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 82 42 L 88 38 M 82 42 L 86 48" stroke="#FF6B6B" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- Tail segments -->
+  <ellipse cx="50" cy="70" rx="16" ry="6" fill="url(#shellGrad)"/>
+  <ellipse cx="50" cy="78" rx="12" ry="5" fill="url(#lobsterGrad)"/>
+  <ellipse cx="50" cy="85" rx="8" ry="4" fill="url(#shellGrad)"/>
+  
+  <!-- AI sparkle accent -->
+  <circle cx="75" cy="25" r="3" fill="#4dabf7"/>
+  <circle cx="78" cy="22" r="1.5" fill="#4dabf7"/>
+  <circle cx="72" cy="28" r="1.5" fill="#4dabf7"/>
+</svg>

@@ -1,0 +1,213 @@
+# documentation: https://github.com/clawdbot/clawdbot
+# slogan: Personal AI assistant for WhatsApp, Telegram, Discord and more
+# category: ai
+# tags: ai, assistant, chatbot, whatsapp, telegram, discord, slack, automation, llm, claude, openai, anthropic, gemini
+# logo: svgs/clawdbot.svg
+# port: 18789
+# minversion: 4.0.0
+
+services:
+  clawdbot:
+    image: node:22-bookworm
+    working_dir: /app
+    command: >
+      /bin/bash -c "
+        set -e;
+
+        # === First run: clone and build Clawdbot from source ===
+        if [ ! -f /app/dist/index.js ]; then
+          echo '=== First run: Installing Clawdbot (this may take ~10 minutes) ===';
+          apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates ffmpeg;
+          corepack enable;
+          git clone --depth 1 https://github.com/clawdbot/clawdbot.git /tmp/clawdbot;
+          cp -r /tmp/clawdbot/* /tmp/clawdbot/.* /app/ 2>/dev/null || true;
+          rm -rf /tmp/clawdbot;
+          pnpm install;
+          pnpm build;
+          pnpm ui:install;
+          pnpm ui:build;
+          echo '=== Clawdbot installed successfully ===';
+        else
+          echo 'Clawdbot already installed, starting...';
+        fi;
+
+        # === Install optional CLI tools (gog, goplaces, wacli) ===
+        if [ ! -f /usr/local/bin/wacli ]; then
+          ARCH=$$(dpkg --print-architecture);
+          if [ \"$$ARCH\" = 'amd64' ]; then ARCH='x86_64'; fi;
+          curl -sL \"https://github.com/steipete/gog/releases/latest/download/gog_Linux_$${ARCH}.tar.gz\" | tar -xz -C /usr/local/bin 2>/dev/null || true;
+          curl -sL \"https://github.com/steipete/goplaces/releases/latest/download/goplaces_Linux_$${ARCH}.tar.gz\" | tar -xz -C /usr/local/bin 2>/dev/null || true;
+          curl -sL \"https://github.com/steipete/wacli/releases/latest/download/wacli_Linux_$${ARCH}.tar.gz\" | tar -xz -C /usr/local/bin 2>/dev/null || true;
+        fi;
+
+        # === Build trusted proxies JSON array ===
+        DEFAULT_PROXIES='10.0.0.1,10.0.1.1,10.0.1.2,10.0.2.1,10.0.2.2,10.0.3.1,10.0.3.2,10.0.4.1,172.17.0.1,172.18.0.1,127.0.0.1';
+        TRUSTED_PROXIES=$${CLAWDBOT_TRUSTED_PROXIES:-$$DEFAULT_PROXIES};
+        PROXIES_JSON=$$(echo \"$$TRUSTED_PROXIES\" | sed 's/,/\", \"/g' | sed 's/^/[\"/' | sed 's/$$/\"]/');
+
+        # === Auto-detect default model from available API keys ===
+        DEFAULT_MODEL='anthropic/claude-sonnet-4-5';
+        if [ -n \"$$ANTHROPIC_API_KEY\" ]; then
+          DEFAULT_MODEL='anthropic/claude-sonnet-4-5';
+        elif [ -n \"$$GEMINI_API_KEY\" ]; then
+          DEFAULT_MODEL='google/gemini-3-pro-preview';
+        elif [ -n \"$$OPENAI_API_KEY\" ]; then
+          DEFAULT_MODEL='openai/gpt-4o';
+        elif [ -n \"$$OPENROUTER_API_KEY\" ]; then
+          DEFAULT_MODEL='openrouter/anthropic/claude-sonnet-4';
+        fi;
+        echo \"Default model: $$DEFAULT_MODEL\";
+
+        # === Generate gateway config (always regenerate to pick up env changes) ===
+        mkdir -p /data/.clawdbot;
+        cat > /data/.clawdbot/clawdbot.json <<EOFCONFIG
+      {
+        \"gateway\": {
+          \"mode\": \"local\",
+          \"bind\": \"lan\",
+          \"port\": 18789,
+          \"auth\": {
+            \"mode\": \"token\",
+            \"token\": \"$$CLAWDBOT_GATEWAY_TOKEN\"
+          },
+          \"trustedProxies\": $$PROXIES_JSON,
+          \"controlUi\": {
+            \"allowInsecureAuth\": true
+          }
+        },
+        \"web\": {
+          \"enabled\": true
+        },
+        \"channels\": {
+          \"whatsapp\": {
+            \"dmPolicy\": \"open\",
+            \"allowFrom\": [\"*\"]
+          },
+          \"discord\": {
+            \"groupPolicy\": \"open\",
+            \"dm\": {
+              \"enabled\": true,
+              \"policy\": \"open\",
+              \"allowFrom\": [\"*\"]
+            },
+            \"guilds\": {
+              \"*\": {
+                \"requireMention\": false
+              }
+            }
+          }
+        },
+        \"agents\": {
+          \"defaults\": {
+            \"workspace\": \"/data/clawd\",
+            \"model\": {
+              \"primary\": \"$$DEFAULT_MODEL\"
+            }
+          }
+        }
+      }
+      EOFCONFIG
+        echo 'Config written to /data/.clawdbot/clawdbot.json';
+
+        # === Generate auth-profiles.json for API keys ===
+        AUTH_DIR='/data/.clawdbot/agents/main/agent';
+        mkdir -p \"$$AUTH_DIR\";
+        AUTH_JSON='{';
+        FIRST=true;
+        if [ -n \"$$ANTHROPIC_API_KEY\" ]; then
+          [ \"$$FIRST\" = false ] && AUTH_JSON=\"$${AUTH_JSON},\";
+          AUTH_JSON=\"$${AUTH_JSON}\\\"anthropic:api\\\":{\\\"provider\\\":\\\"anthropic\\\",\\\"mode\\\":\\\"api_key\\\",\\\"apiKey\\\":\\\"$$ANTHROPIC_API_KEY\\\"}\";
+          FIRST=false;
+        fi;
+        if [ -n \"$$OPENAI_API_KEY\" ]; then
+          [ \"$$FIRST\" = false ] && AUTH_JSON=\"$${AUTH_JSON},\";
+          AUTH_JSON=\"$${AUTH_JSON}\\\"openai:api\\\":{\\\"provider\\\":\\\"openai\\\",\\\"mode\\\":\\\"api_key\\\",\\\"apiKey\\\":\\\"$$OPENAI_API_KEY\\\"}\";
+          FIRST=false;
+        fi;
+        if [ -n \"$$OPENROUTER_API_KEY\" ]; then
+          [ \"$$FIRST\" = false ] && AUTH_JSON=\"$${AUTH_JSON},\";
+          AUTH_JSON=\"$${AUTH_JSON}\\\"openrouter:api\\\":{\\\"provider\\\":\\\"openrouter\\\",\\\"mode\\\":\\\"api_key\\\",\\\"apiKey\\\":\\\"$$OPENROUTER_API_KEY\\\"}\";
+          FIRST=false;
+        fi;
+        if [ -n \"$$GEMINI_API_KEY\" ]; then
+          [ \"$$FIRST\" = false ] && AUTH_JSON=\"$${AUTH_JSON},\";
+          AUTH_JSON=\"$${AUTH_JSON}\\\"google:api\\\":{\\\"provider\\\":\\\"google\\\",\\\"mode\\\":\\\"api_key\\\",\\\"apiKey\\\":\\\"$$GEMINI_API_KEY\\\"}\";
+          FIRST=false;
+        fi;
+        AUTH_JSON=\"$${AUTH_JSON}}\";
+        if [ \"$$FIRST\" = false ]; then
+          echo \"$$AUTH_JSON\" > \"$$AUTH_DIR/auth-profiles.json\";
+          echo 'Auth profiles written';
+        else
+          echo 'WARNING: No API keys configured! Set ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY.';
+        fi;
+
+        # === Start the gateway ===
+        echo '=== Starting Clawdbot Gateway ===';
+        exec node dist/index.js gateway --bind lan --port 18789 --allow-unconfigured
+      "
+    environment:
+      - SERVICE_FQDN_CLAWDBOT_18789
+      - NODE_ENV=production
+      - HOME=/home/node
+      - TERM=xterm-256color
+      - CLAWDBOT_CONFIG_PATH=/data/.clawdbot/clawdbot.json
+      - CLAWDBOT_STATE_DIR=/data/.clawdbot
+      - XDG_CONFIG_HOME=/data/.clawdbot
+      - CLAWDBOT_GATEWAY_TOKEN=$SERVICE_PASSWORD_CLAWDBOT
+      - CLAWDBOT_TRUSTED_PROXIES=${CLAWDBOT_TRUSTED_PROXIES:-}
+      # Model API keys (set at least one)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Channel tokens (optional)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN:-}
+      # Browser and search (optional)
+      - CLAWDBOT_BROWSER_ENABLED=${CLAWDBOT_BROWSER_ENABLED:-true}
+      - CLAWDBOT_BROWSER_URL=http://clawdbot-browser:9222
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      # Redis
+      - REDIS_URL=redis://clawdbot-redis:6379
+      # Gmail integration (optional)
+      - GOG_KEYRING_PASSWORD=${GOG_KEYRING_PASSWORD:-}
+    volumes:
+      - clawdbot-app:/app
+      - clawdbot-config:/data/.clawdbot
+      - clawdbot-workspace:/data/clawd
+    depends_on:
+      clawdbot-redis:
+        condition: service_healthy
+      clawdbot-browser:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+  clawdbot-redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - clawdbot-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  clawdbot-browser:
+    image: chromedp/headless-shell:latest
+    shm_size: 2gb
+
+volumes:
+  clawdbot-app:
+  clawdbot-config:
+  clawdbot-workspace:
+  clawdbot-redis-data:
