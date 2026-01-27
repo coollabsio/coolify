@@ -1,4 +1,4 @@
-# documentation: https://docs.usertour.io/self-hosting/docker
+# documentation: https://docs.usertour.io/open-source/coolify-deployment
 # slogan: Open-source user onboarding platform for product tours, checklists, and surveys.
 # category: productivity
 # tags: onboarding, product tours, user experience, surveys, checklists, open source, self-hosted
@@ -12,10 +12,10 @@ services:
       - SERVICE_URL_USERTOUR
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-usertour}?schema=usertour&sslmode=prefer
       - DATABASE_DIRECT_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-usertour}?schema=usertour&sslmode=prefer
+      - NEST_SERVER_PORT=3000
       - Redis_HOST=redis
       - Redis_PORT=6379
       - Redis_PASS=
-      - Redis_USER=
       - APP_HOMEPAGE_URL=${SERVICE_URL_USERTOUR}
       - NODE_ENV=${NODE_ENV:-production}
       - JWT_SECRET=$SERVICE_PASSWORD_64_JWT
@@ -23,7 +23,7 @@ services:
       - JWT_REFRESH_EXPIRATION_TIME=${JWT_REFRESH_EXPIRATION_TIME:-7d}
       - LOGIN_REDIRECT_URL=${LOGIN_REDIRECT_URL:-/env/1/flows}
       - EMAIL_AUTH_ENABLED=${EMAIL_AUTH_ENABLED:-true}
-      - EMAIL_SENDER=${EMAIL_SENDER:-YourApp <your-email@example.com>}
+      - EMAIL_SENDER=${EMAIL_SENDER:-Usertour <support@usertour.io>}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=${EMAIL_USER}
@@ -57,10 +57,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   postgres:
     image: postgres:15-alpine
@@ -74,7 +75,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
       start_period: 10s
 
   redis:
@@ -85,5 +86,5 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
       start_period: 10s
