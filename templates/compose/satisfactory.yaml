@@ -31,9 +31,3 @@ services:
       - 'SKIPUPDATE=${SKIP_UPDATE:-false}'
       - 'STEAMBETA=${STEAM_BETA:-false}'
       - 'TIMEOUT=${TIMEOUT:-30}'
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 4G
