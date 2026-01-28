@@ -78,11 +78,23 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'string', 'in:pg_dump,pgbackrest'])]
+    public string $backupEngine = 'pg_dump';
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $backupType = 'full';
+
+    public bool $isPostgresql = false;
+
+    public bool $pgbackrestAvailable = false;
+
     public function mount()
     {
         try {
             $this->authorize('view', $this->backup->database);
             $this->parameters = get_route_parameters();
+            $this->isPostgresql = $this->backup->database instanceof \App\Models\StandalonePostgresql;
+            $this->pgbackrestAvailable = $this->isPostgresql && $this->backup->database->isPgBackRestEnabled();
             $this->syncData();
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -125,6 +137,8 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->backup_engine = $this->backupEngine;
+            $this->backup->backup_type = $this->backupEngine === 'pgbackrest' ? $this->backupType : 'full';
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +157,8 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->backupEngine = $this->backup->backup_engine ?? 'pg_dump';
+            $this->backupType = $this->backup->backup_type ?? 'full';
         }
     }
 

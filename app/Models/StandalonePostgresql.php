@@ -23,6 +23,7 @@ class StandalonePostgresql extends BaseModel
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',
+        'pgbackrest_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -324,6 +325,16 @@ class StandalonePostgresql extends BaseModel
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    public function pgbackrestS3()
+    {
+        return $this->belongsTo(S3Storage::class, 'pgbackrest_s3_storage_id');
+    }
+
+    public function isPgBackRestEnabled(): bool
+    {
+        return (bool) $this->pgbackrest_enabled;
     }
 
     public function isBackupSolutionAvailable()

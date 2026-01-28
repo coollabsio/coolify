@@ -151,6 +151,9 @@ Route::group([
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}', [DatabasesController::class, 'delete_backup_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}', [DatabasesController::class, 'delete_execution_by_uuid'])->middleware(['api.ability:write']);
 
+    Route::get('/databases/{uuid}/pgbackrest/info', [DatabasesController::class, 'pgbackrest_info'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/pgbackrest/setup', [DatabasesController::class, 'pgbackrest_setup'])->middleware(['api.ability:write']);
+
     Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/databases/{uuid}/stop', [DatabasesController::class, 'action_stop'])->middleware(['api.ability:write']);

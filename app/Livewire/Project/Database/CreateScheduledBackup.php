@@ -27,7 +27,17 @@ class CreateScheduledBackup extends Component
     #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = null;
 
+    #[Validate(['required', 'string', 'in:pg_dump,pgbackrest'])]
+    public string $backupEngine = 'pg_dump';
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $backupType = 'full';
+
     public Collection $definedS3s;
+
+    public bool $isPostgresql = false;
+
+    public bool $pgbackrestAvailable = false;
 
     public function mount()
     {
@@ -36,6 +46,8 @@ class CreateScheduledBackup extends Component
             if ($this->definedS3s->count() > 0) {
                 $this->s3StorageId = $this->definedS3s->first()->id;
             }
+            $this->isPostgresql = $this->database instanceof \App\Models\StandalonePostgresql;
+            $this->pgbackrestAvailable = $this->isPostgresql && $this->database->isPgBackRestEnabled();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -55,6 +67,13 @@ class CreateScheduledBackup extends Component
                 return;
             }
 
+            // Validate pgBackRest is enabled on the database if selected
+            if ($this->backupEngine === 'pgbackrest' && ! $this->pgbackrestAvailable) {
+                $this->dispatch('error', 'pgBackRest must be enabled and configured on the database first.');
+
+                return;
+            }
+
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
@@ -63,6 +82,8 @@ class CreateScheduledBackup extends Component
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
+                'backup_engine' => $this->backupEngine,
+                'backup_type' => $this->backupEngine === 'pgbackrest' ? $this->backupType : 'full',
             ];
 
             if ($this->database->type() === 'standalone-postgresql') {

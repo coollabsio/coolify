@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Database\Postgresql;
 
+use App\Actions\Database\PgBackRest\GetPgBackRestInfo;
+use App\Actions\Database\PgBackRest\SetupPgBackRest;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
@@ -65,6 +67,25 @@ class General extends Component
     public ?string $db_url_public = null;
 
     public ?Carbon $certificateValidUntil = null;
+
+    // pgBackRest properties
+    public bool $pgbackrestEnabled = false;
+
+    public ?string $pgbackrestStanza = null;
+
+    public string $pgbackrestRepoType = 'posix';
+
+    public ?int $pgbackrestS3StorageId = null;
+
+    public int $pgbackrestRetentionFull = 2;
+
+    public int $pgbackrestRetentionDiff = 7;
+
+    public ?array $pgbackrestInfo = null;
+
+    public bool $pgbackrestSetupLoading = false;
+
+    public $s3Storages;
 
     public function getListeners()
     {
@@ -152,6 +173,14 @@ class General extends Component
             if ($existingCert) {
                 $this->certificateValidUntil = $existingCert->valid_until;
             }
+
+            // Load S3 storages for pgBackRest configuration
+            $this->s3Storages = currentTeam()->s3s;
+
+            // Load pgBackRest info if enabled and running
+            if ($this->pgbackrestEnabled && str($this->database->status)->startsWith('running')) {
+                $this->loadPgBackRestInfo();
+            }
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -178,6 +207,12 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->enable_ssl = $this->enableSsl;
             $this->database->ssl_mode = $this->sslMode;
+            $this->database->pgbackrest_enabled = $this->pgbackrestEnabled;
+            $this->database->pgbackrest_stanza = $this->pgbackrestStanza;
+            $this->database->pgbackrest_repo_type = $this->pgbackrestRepoType;
+            $this->database->pgbackrest_s3_storage_id = $this->pgbackrestS3StorageId;
+            $this->database->pgbackrest_retention_full = $this->pgbackrestRetentionFull;
+            $this->database->pgbackrest_retention_diff = $this->pgbackrestRetentionDiff;
             $this->database->save();
 
             $this->db_url = $this->database->internal_db_url;
@@ -202,6 +237,12 @@ class General extends Component
             $this->sslMode = $this->database->ssl_mode;
             $this->db_url = $this->database->internal_db_url;
             $this->db_url_public = $this->database->external_db_url;
+            $this->pgbackrestEnabled = (bool) $this->database->pgbackrest_enabled;
+            $this->pgbackrestStanza = $this->database->pgbackrest_stanza ?? 'db-'.$this->database->uuid;
+            $this->pgbackrestRepoType = $this->database->pgbackrest_repo_type ?? 'posix';
+            $this->pgbackrestS3StorageId = $this->database->pgbackrest_s3_storage_id;
+            $this->pgbackrestRetentionFull = $this->database->pgbackrest_retention_full ?? 2;
+            $this->pgbackrestRetentionDiff = $this->database->pgbackrest_retention_diff ?? 7;
         }
     }
 
@@ -461,6 +502,83 @@ class General extends Component
             } else {
                 $this->dispatch('configurationChanged');
             }
+        }
+    }
+
+    public function savePgBackRestSettings()
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            $this->database->pgbackrest_enabled = $this->pgbackrestEnabled;
+            $this->database->pgbackrest_stanza = $this->pgbackrestStanza;
+            $this->database->pgbackrest_repo_type = $this->pgbackrestRepoType;
+            $this->database->pgbackrest_s3_storage_id = $this->pgbackrestRepoType === 's3' ? $this->pgbackrestS3StorageId : null;
+            $this->database->pgbackrest_retention_full = $this->pgbackrestRetentionFull;
+            $this->database->pgbackrest_retention_diff = $this->pgbackrestRetentionDiff;
+            $this->database->save();
+
+            $this->dispatch('success', 'pgBackRest settings saved.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function setupPgBackRest()
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            if (! str($this->database->status)->startsWith('running')) {
+                $this->dispatch('error', 'Database must be running to setup pgBackRest.');
+
+                return;
+            }
+
+            $this->pgbackrestSetupLoading = true;
+
+            // Save settings first
+            $this->savePgBackRestSettings();
+
+            $containerName = $this->database->uuid;
+
+            $result = SetupPgBackRest::run(
+                database: $this->database,
+                server: $this->server,
+                containerName: $containerName,
+            );
+
+            $this->pgbackrestEnabled = true;
+            $this->database->refresh();
+            $this->syncData();
+
+            // Reload info
+            $this->loadPgBackRestInfo();
+
+            $this->dispatch('success', $result['message'] ?? 'pgBackRest setup completed successfully.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->pgbackrestSetupLoading = false;
+        }
+    }
+
+    public function loadPgBackRestInfo()
+    {
+        try {
+            if (! $this->server || ! str($this->database->status)->startsWith('running')) {
+                return;
+            }
+
+            $containerName = $this->database->uuid;
+
+            $this->pgbackrestInfo = GetPgBackRestInfo::run(
+                database: $this->database,
+                server: $this->server,
+                containerName: $containerName,
+            );
+        } catch (Exception $e) {
+            $this->pgbackrestInfo = null;
         }
     }
 }

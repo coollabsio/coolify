@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Database\PgBackRest\RunPgBackRestBackup;
 use App\Events\BackupCreated;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -308,19 +309,38 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
-                        $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
-                        if ($this->backup->dump_all) {
-                            $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                        // pgBackRest engine: uses native pgBackRest for incremental backups
+                        if ($this->backup->backup_engine === 'pgbackrest'
+                            && $this->database instanceof StandalonePostgresql
+                            && $this->database->isPgBackRestEnabled()
+                        ) {
+                            $backupType = $this->backup->backup_type ?? 'full';
+                            $this->backup_file = "/pgbackrest-{$backupType}-".Carbon::now()->timestamp;
+                            $this->backup_location = "pgbackrest://{$this->database->pgbackrest_stanza}/{$backupType}/".Carbon::now()->timestamp;
+                            $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                                'uuid' => $this->backup_log_uuid,
+                                'database_name' => $database,
+                                'filename' => $this->backup_location,
+                                'scheduled_database_backup_id' => $this->backup->id,
+                                'local_storage_deleted' => false,
+                            ]);
+                            $this->backup_standalone_postgresql_pgbackrest($backupType);
+                        } else {
+                            // Default pg_dump engine
+                            $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                            if ($this->backup->dump_all) {
+                                $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            }
+                            $this->backup_location = $this->backup_dir.$this->backup_file;
+                            $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                                'uuid' => $this->backup_log_uuid,
+                                'database_name' => $database,
+                                'filename' => $this->backup_location,
+                                'scheduled_database_backup_id' => $this->backup->id,
+                                'local_storage_deleted' => false,
+                            ]);
+                            $this->backup_standalone_postgresql($database);
                         }
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
-                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
-                            'uuid' => $this->backup_log_uuid,
-                            'database_name' => $database,
-                            'filename' => $this->backup_location,
-                            'scheduled_database_backup_id' => $this->backup->id,
-                            'local_storage_deleted' => false,
-                        ]);
-                        $this->backup_standalone_postgresql($database);
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
@@ -374,10 +394,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
 
-                    $size = $this->calculate_size();
+                    // For pgBackRest, size is set by the backup method; for others, calculate from file
+                    if ($this->backup->backup_engine === 'pgbackrest' && $this->size > 0) {
+                        $size = $this->size;
+                    } else {
+                        $size = $this->calculate_size();
+                    }
 
                     // Verify local backup succeeded
                     if ($size > 0) {
+                        $localBackupSucceeded = true;
+                    } elseif ($this->backup->backup_engine === 'pgbackrest') {
+                        // pgBackRest may report 0 size for incremental with no changes; still valid
                         $localBackupSucceeded = true;
                     } else {
                         throw new \Exception('Local backup file is empty or was not created');
@@ -399,8 +427,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 // Step 2: Upload to S3 if enabled (independent of local backup)
+                // pgBackRest handles S3 natively via its repo configuration — skip MinIO upload
                 $localStorageDeleted = false;
-                if ($this->backup->save_s3 && $localBackupSucceeded) {
+                if ($this->backup->save_s3 && $localBackupSucceeded && $this->backup->backup_engine !== 'pgbackrest') {
                     try {
                         $this->upload_to_s3();
 
@@ -415,6 +444,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
 
+                // pgBackRest with S3 repo handles upload natively
+                if ($this->backup->backup_engine === 'pgbackrest'
+                    && $localBackupSucceeded
+                    && $this->database instanceof StandalonePostgresql
+                    && $this->database->pgbackrest_repo_type === 's3'
+                ) {
+                    $this->s3_uploaded = true;
+                }
+
                 // Step 3: Update status and send notifications based on results
                 if ($localBackupSucceeded) {
                     $message = $this->backup_output;
@@ -425,11 +463,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             : 'Warning: S3 upload failed: '.$s3UploadError;
                     }
 
+                    // For pgBackRest, determine s3_uploaded based on repo type
+                    $s3UploadedStatus = $this->backup->save_s3 ? $this->s3_uploaded : null;
+                    if ($this->backup->backup_engine === 'pgbackrest' && $this->database instanceof StandalonePostgresql) {
+                        $s3UploadedStatus = $this->database->pgbackrest_repo_type === 's3' ? true : null;
+                    }
+
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $message,
                         'size' => $size,
-                        's3_uploaded' => $this->backup->save_s3 ? $this->s3_uploaded : null,
+                        's3_uploaded' => $s3UploadedStatus,
                         'local_storage_deleted' => $localStorageDeleted,
                     ]);
 
@@ -542,6 +586,26 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backup_standalone_postgresql_pgbackrest(string $backupType): void
+    {
+        try {
+            $result = RunPgBackRestBackup::run(
+                database: $this->database,
+                server: $this->server,
+                containerName: $this->container_name,
+                backupType: $backupType,
+                timeout: $this->timeout,
+            );
+
+            $this->backup_output = $result['output'];
+            $this->backup_location = $result['location'];
+            $this->size = $result['size'];
         } catch (\Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;

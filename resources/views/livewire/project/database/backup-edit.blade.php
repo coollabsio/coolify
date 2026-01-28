@@ -46,6 +46,36 @@
     @endif
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
+
+        @if ($isPostgresql && $backup->database_id !== 0)
+            <div class="flex gap-2 flex-col">
+                <h4 class="font-medium">Backup Engine</h4>
+                <div class="flex gap-2">
+                    <x-forms.select id="backupEngine" label="Engine" wire:model.live="backupEngine">
+                        <option value="pg_dump">pg_dump (default)</option>
+                        @if ($pgbackrestAvailable)
+                            <option value="pgbackrest">pgBackRest (incremental)</option>
+                        @else
+                            <option value="pgbackrest" disabled>pgBackRest (enable in database settings first)</option>
+                        @endif
+                    </x-forms.select>
+                    @if ($backupEngine === 'pgbackrest')
+                        <x-forms.select id="backupType" label="Backup Type"
+                            helper="Full: complete backup. Differential: changes since last full. Incremental: changes since last backup of any type.">
+                            <option value="full">Full</option>
+                            <option value="diff">Differential</option>
+                            <option value="incr">Incremental</option>
+                        </x-forms.select>
+                    @endif
+                </div>
+                @if ($backupEngine === 'pgbackrest')
+                    <div class="text-sm dark:text-gray-400">
+                        pgBackRest manages backups and S3 storage natively. Retention is configured in the database's pgBackRest settings.
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <div class="flex gap-2 flex-col ">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
                 <div class="w-48">
