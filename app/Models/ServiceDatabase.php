@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        $serviceOwned = ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId);
+        $applicationOwned = ServiceDatabase::whereRelation('application.environment.project.team', 'id', $teamId);
+
+        return $serviceOwned->union($applicationOwned)->orderBy('name');
     }
 
     /**
@@ -36,7 +39,11 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+        $serviceOwned = ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId);
+        $applicationOwned = ServiceDatabase::whereRelation('application.environment.project.team', 'id', $teamId);
+
+        return $serviceOwned->union($applicationOwned)->orderBy('name');
     }
 
     /**
@@ -49,10 +56,70 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Check if this database belongs to a Docker Compose Application (not a Service).
+     */
+    public function isApplicationDatabase(): bool
+    {
+        return filled($this->application_id) && is_null($this->service_id);
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        if ($this->isApplicationDatabase()) {
+            $container_id = $this->getContainerName();
+            remote_process(["docker restart {$container_id}"], $this->application->destination->server);
+        } else {
+            $container_id = $this->name.'-'.$this->service->uuid;
+            remote_process(["docker restart {$container_id}"], $this->service->server);
+        }
+    }
+
+    /**
+     * Get the container name for this database.
+     * For Service databases: {name}-{serviceUuid}
+     * For Application compose databases: {name}-{applicationUuid} (consistent naming)
+     *   or resolved dynamically if the container has a timestamp suffix.
+     */
+    public function getContainerName(): string
+    {
+        if ($this->isApplicationDatabase()) {
+            // Try to find the actual running container by matching name prefix.
+            // Docker Compose apps may use timestamps in container names if
+            // consistent naming is not enabled.
+            $server = $this->getServer();
+            if ($server) {
+                try {
+                    $prefix = $this->name.'-'.$this->application->uuid;
+                    $result = instant_remote_process(
+                        ["docker ps -f 'name={$prefix}' --format '{{.Names}}' | head -1"],
+                        $server,
+                        throwError: false
+                    );
+                    if (filled($result)) {
+                        return trim($result);
+                    }
+                } catch (\Throwable) {
+                    // Fall through to default
+                }
+            }
+
+            return $this->name.'-'.$this->application->uuid;
+        }
+
+        return $this->name.'-'.$this->service->uuid;
+    }
+
+    /**
+     * Get the server this database runs on.
+     */
+    public function getServer(): ?Server
+    {
+        if ($this->isApplicationDatabase()) {
+            return $this->application->destination->server ?? null;
+        }
+
+        return $this->service->destination->server ?? null;
     }
 
     public function isRunning()
@@ -82,6 +149,10 @@ class ServiceDatabase extends BaseModel
 
     public function type()
     {
+        if ($this->isApplicationDatabase()) {
+            return 'application';
+        }
+
         return 'service';
     }
 
@@ -114,8 +185,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        if (! $server) {
+            return null;
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +199,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->isApplicationDatabase()) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->isApplicationDatabase()) {
+            return base_configuration_dir().'/applications/'.$this->application->uuid;
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

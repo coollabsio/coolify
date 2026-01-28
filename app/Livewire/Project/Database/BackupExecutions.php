@@ -78,9 +78,11 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class
-            ? $execution->scheduledDatabaseBackup->database->service->destination->server
-            : $execution->scheduledDatabaseBackup->database->destination->server;
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $server = $execution->scheduledDatabaseBackup->database->getServer();
+        } else {
+            $server = $execution->scheduledDatabaseBackup->database->destination->server;
+        }
 
         try {
             if ($execution->filename) {
@@ -182,7 +184,7 @@ class BackupExecutions extends Component
             $server = null;
 
             if ($this->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->database->service->destination->server;
+                $server = $this->database->getServer();
             } elseif ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;
             }

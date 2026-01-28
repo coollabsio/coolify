@@ -29,6 +29,7 @@ use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
+use App\Livewire\Project\Application\ComposeDatabaseBackups as ApplicationComposeDatabaseBackups;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
@@ -208,6 +209,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+        Route::get('/database-backups', ApplicationConfiguration::class)->name('project.application.database-backups');
+        Route::get('/database-backups/{compose_database_uuid}', ApplicationComposeDatabaseBackups::class)->name('project.application.compose-database.backups');
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
@@ -328,7 +331,7 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                $server = $execution->scheduledDatabaseBackup->database->getServer();
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }

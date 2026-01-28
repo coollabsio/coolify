@@ -281,6 +281,8 @@ EOD;
         $databaseUuid = data_get($this->parameters, 'database_uuid');
         $stackServiceUuid = data_get($this->parameters, 'stack_service_uuid');
 
+        $composeDatabaseUuid = data_get($this->parameters, 'compose_database_uuid');
+
         $resource = null;
         if ($databaseUuid) {
             // Standalone database route
@@ -299,6 +301,17 @@ EOD;
             if (is_null($resource)) {
                 abort(404);
             }
+        } elseif ($composeDatabaseUuid) {
+            // Application compose database route
+            $applicationUuid = data_get($this->parameters, 'application_uuid');
+            $application = \App\Models\Application::whereUuid($applicationUuid)->first();
+            if (! $application) {
+                abort(404);
+            }
+            $resource = $application->composeDatabases()->whereUuid($composeDatabaseUuid)->first();
+            if (is_null($resource)) {
+                abort(404);
+            }
         } else {
             abort(404);
         }
@@ -314,12 +327,12 @@ EOD;
 
         // Handle ServiceDatabase server access differently
         if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $server = $resource->service?->server;
+            $server = $resource->getServer();
             if (! $server) {
                 abort(404, 'Server not found for this service database.');
             }
             $this->serverId = $server->id;
-            $this->container = $resource->name.'-'.$resource->service->uuid;
+            $this->container = $resource->getContainerName();
             $this->resourceUuid = $resource->uuid; // Use ServiceDatabase's own UUID
 
             // Determine database type for ServiceDatabase
@@ -633,7 +646,11 @@ EOD;
 
             // Get the database destination network
             if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
+                if ($this->resource->isApplicationDatabase()) {
+                    $destinationNetwork = $this->resource->application->destination->network ?? 'coolify';
+                } else {
+                    $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
+                }
             } else {
                 $destinationNetwork = $this->resource->destination->network ?? 'coolify';
             }

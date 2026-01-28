@@ -556,9 +556,16 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     }
 
     // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // or application->environment->project->team_id for Application compose databases
     if ($resource instanceof \App\Models\ServiceDatabase) {
-        if ($resource->service?->environment?->project?->team_id === $teamId) {
-            return $resource;
+        if ($resource->isApplicationDatabase()) {
+            if ($resource->application?->environment?->project?->team_id === $teamId) {
+                return $resource;
+            }
+        } else {
+            if ($resource->service?->environment?->project?->team_id === $teamId) {
+                return $resource;
+            }
         }
 
         return null;
@@ -2114,7 +2121,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $detectedDatabaseServiceNames = collect([]);
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $detectedDatabaseServiceNames) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2417,6 +2425,27 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+
+            // Create or update ServiceDatabase records for detected database services
+            // This enables backup scheduling for databases in Docker Compose Applications
+            if ($isDatabase && $pull_request_id === 0) {
+                $detectedDatabaseServiceNames->push($serviceName);
+
+                $existingDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->first();
+
+                if (is_null($existingDb)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($existingDb->image !== (string) $image) {
+                    $existingDb->image = $image;
+                    $existingDb->save();
+                }
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -2801,6 +2830,23 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_forget($services, $serviceName);
             });
         }
+        // Remove stale ServiceDatabase records for databases no longer in the compose file
+        if ($pull_request_id === 0 && $detectedDatabaseServiceNames->isNotEmpty()) {
+            ServiceDatabase::where('application_id', $resource->id)
+                ->whereNotIn('name', $detectedDatabaseServiceNames->toArray())
+                ->each(function ($staleDb) {
+                    $staleDb->scheduledBackups()->delete();
+                    $staleDb->delete();
+                });
+        } elseif ($pull_request_id === 0 && $detectedDatabaseServiceNames->isEmpty()) {
+            // No databases detected, clean up all Application-based ServiceDatabase records
+            ServiceDatabase::where('application_id', $resource->id)
+                ->each(function ($staleDb) {
+                    $staleDb->scheduledBackups()->delete();
+                    $staleDb->delete();
+                });
+        }
+
         $finalServices = [
             'services' => $services->toArray(),
             'volumes' => $topLevelVolumes->toArray(),

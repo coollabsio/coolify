@@ -96,6 +96,14 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
             $this->resource->environment_variables()->delete();
 
+            // Clean up compose database records and their backups when deleting an Application
+            if ($this->resource instanceof Application) {
+                foreach ($this->resource->composeDatabases as $composeDatabase) {
+                    $composeDatabase->scheduledBackups()->delete();
+                    $composeDatabase->delete();
+                }
+            }
+
             if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
                 $this->resource->deleteConnectedNetworks();
             }

@@ -500,6 +500,15 @@ class Application extends BaseModel
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
 
+    /**
+     * Get database services detected in Docker Compose files deployed via GitHub App.
+     * These ServiceDatabase records allow backup scheduling for compose databases.
+     */
+    public function composeDatabases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function type()
     {
         return 'application';

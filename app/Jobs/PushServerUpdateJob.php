@@ -311,6 +311,19 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $application->status = $aggregatedStatus;
                 $application->save();
             }
+
+            // Update status for compose database records associated with this application.
+            // Application compose databases use the docker-compose service name as their name,
+            // which matches the container name key in applicationContainerStatuses.
+            if ($application->build_pack === 'dockercompose') {
+                foreach ($application->composeDatabases as $composeDb) {
+                    $dbStatus = $containerStatuses->get($composeDb->name);
+                    if ($dbStatus && $composeDb->status !== $dbStatus) {
+                        $composeDb->status = $dbStatus;
+                        $composeDb->save();
+                    }
+                }
+            }
         }
     }
 
