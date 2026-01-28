@@ -20,6 +20,8 @@
                 href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Environment Variables</span></a>
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Persistent Storage</span></a>
+            <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                href="{{ route('project.application.file-browser', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">File Browser</span></a>
             @if ($application->git_based())
                 <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.source', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Git Source</span></a>
@@ -78,6 +80,8 @@
                 <livewire:project.shared.environment-variable.all :resource="$application" />
             @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
+            @elseif ($currentRoute === 'project.application.file-browser')
+                <livewire:project.shared.container-file-browser :resource="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())
                 <livewire:project.application.source :application="$application" />
             @elseif ($currentRoute === 'project.application.servers')

@@ -212,6 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
+        Route::get('/file-browser', ApplicationConfiguration::class)->name('project.application.file-browser');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
@@ -229,6 +230,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
         Route::get('/logs', Logs::class)->name('project.database.logs');
+        Route::get('/file-browser', DatabaseConfiguration::class)->name('project.database.file-browser');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
@@ -243,6 +245,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
+        Route::get('/file-browser', ServiceConfiguration::class)->name('project.service.file-browser');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
@@ -372,6 +375,70 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');
+
+    Route::get('/download/container-file/{token}', function () {
+        try {
+            $user = auth()->user();
+            $team = $user->currentTeam();
+            if (is_null($team)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+
+            $token = request()->route('token');
+            $downloadInfo = \Illuminate\Support\Facades\Cache::pull("container-file-download:{$token}");
+            if (is_null($downloadInfo)) {
+                return response()->json(['message' => 'Download link expired or invalid.'], 404);
+            }
+
+            if ($team->id !== data_get($downloadInfo, 'team_id')) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+
+            $server = \App\Models\Server::findOrFail(data_get($downloadInfo, 'server_id'));
+            $tempPath = data_get($downloadInfo, 'temp_path');
+            $filename = data_get($downloadInfo, 'filename');
+
+            $privateKeyLocation = $server->privateKey->getKeyLocation();
+            $disk = Storage::build([
+                'driver' => 'sftp',
+                'host' => $server->ip,
+                'port' => (int) $server->port,
+                'username' => $server->user,
+                'privateKey' => $privateKeyLocation,
+                'root' => '/',
+            ]);
+
+            if (! $disk->exists($tempPath)) {
+                return response()->json(['message' => 'File not found on server.'], 404);
+            }
+
+            return new StreamedResponse(function () use ($disk, $tempPath, $server) {
+                if (ob_get_level()) {
+                    ob_end_clean();
+                }
+                $stream = $disk->readStream($tempPath);
+                if ($stream === false || is_null($stream)) {
+                    abort(500, 'Failed to open stream for the requested file.');
+                }
+                while (! feof($stream)) {
+                    echo fread($stream, 2048);
+                    flush();
+                }
+                fclose($stream);
+
+                // Cleanup temp file on server
+                try {
+                    instant_remote_process(['rm -f '.escapeshellarg($tempPath)], $server, throwError: false);
+                } catch (\Throwable) {
+                }
+            }, 200, [
+                'Content-Type' => 'application/octet-stream',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    })->name('download.container-file');
 
 });
 
