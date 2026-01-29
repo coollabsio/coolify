@@ -1,0 +1,37 @@
+# documentation: https://github.com/nickheyer/DiscoPanel
+# slogan: A Minecraft server management panel, proxy, and mod manager.
+# category: gaming
+# tags: minecraft,game-server,docker,management,panel
+# logo: svgs/discopanel.svg
+# port: 8082
+
+services:
+  discopanel:
+    image: 'nickheyer/discopanel:v1.0.28'
+    network_mode: host
+    environment:
+      - SERVICE_URL_DISCOPANEL_8082
+      - DISCOPANEL_DATA_DIR=/app/data
+      - DISCOPANEL_HOST_DATA_PATH=/var/lib/discopanel/data
+      - DISCOPANEL_SERVER_PORT=8082
+      - 'TZ=${TZ:-UTC}'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/var/lib/discopanel/data:/app/data'
+      - 'discopanel-backups:/app/backups'
+      - 'discopanel-tmp:/app/tmp'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--spider'
+        - 'http://localhost:8082'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+
