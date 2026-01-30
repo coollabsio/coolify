@@ -7,7 +7,7 @@
 
 services:
   bento-pdf:
-    image: ghcr.io/alam00000/bentopdf:latest
+    image: ghcr.io/alam00000/bentopdf:v1.16.1
     environment:
       - SERVICE_URL_BENTOPDF_8080
     healthcheck:
