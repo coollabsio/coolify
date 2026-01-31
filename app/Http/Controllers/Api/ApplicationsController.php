@@ -1344,21 +1344,20 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Failed to generate Github App token.'], 400);
             }
 
-            $repositories = collect();
-            $page = 1;
-            $repositories = loadRepositoryByPage($githubApp, $token, $page);
-            if ($repositories['total_count'] > 0) {
-                while (count($repositories['repositories']) < $repositories['total_count']) {
-                    $page++;
-                    $repositories = loadRepositoryByPage($githubApp, $token, $page);
-                }
-            }
-
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $gitRepositoryFound = collect($repositories['repositories'])->firstWhere('full_name', $gitRepository);
+
+            $repoResponse = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => "Bearer {$token}",
+                'Accept' => 'application/vnd.github+json',
+            ])->get("{$githubApp->api_url}/repos/{$gitRepository}");
+
+            if (! $repoResponse->successful()) {
+                return response()->json(['message' => 'Repository not found or not accessible via this GitHub App.'], 404);
+            }
+            $gitRepositoryFound = $repoResponse->json();
             if (! $gitRepositoryFound) {
                 return response()->json(['message' => 'Repository not found.'], 404);
             }
