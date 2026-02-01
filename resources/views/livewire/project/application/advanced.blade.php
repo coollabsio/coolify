@@ -68,6 +68,13 @@
                         :canResource="$application" />
                     <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
                 </form>
+                <form class="flex items-end gap-2 " wire:submit.prevent='saveCustomNamePrefix'>
+                    <x-forms.input
+                        helper="Set a custom prefix for your container name. The final name will be: <span class='font-bold'>your-prefix-randomGibberish</span>.<br><br>The name will be converted to slug format when you save it.<br><br>This option <span class='font-bold dark:text-success'>keeps rolling updates working!</span>"
+                        id="customContainerNamePrefix" label="Custom Container Name Prefix" canGate="update"
+                        :canResource="$application" placeholder="e.g. my-nextjs-app" />
+                    <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+                </form>
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <h3 class="pt-4">Network</h3>

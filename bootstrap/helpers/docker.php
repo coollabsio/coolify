@@ -180,6 +180,7 @@ function generateApplicationContainerName(Application $application, $pull_reques
     // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
 
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
+    $custom_container_name_prefix = $application->settings->custom_container_name_prefix;
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         return $application->uuid.'-pr-'.$pull_request_id;
@@ -188,7 +189,10 @@ function generateApplicationContainerName(Application $application, $pull_reques
             return $application->uuid;
         }
 
-        return $application->uuid.'-'.$now;
+        // Use custom prefix if set, otherwise use uuid
+        $prefix = $custom_container_name_prefix ?? $application->uuid;
+
+        return $prefix.'-'.$now;
     }
 }
 function get_port_from_dockerfile($dockerfile): ?int
