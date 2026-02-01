@@ -189,7 +189,7 @@ function generateApplicationContainerName(Application $application, $pull_reques
             return $application->uuid;
         }
 
-        // Use custom prefix if set, otherwise use uuid
+        
         $prefix = $custom_container_name_prefix ?? $application->uuid;
 
         return $prefix.'-'.$now;
