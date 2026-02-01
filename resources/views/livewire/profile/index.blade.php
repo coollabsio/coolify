@@ -55,20 +55,38 @@
             </form>
         @endif
     </div>
-    <form wire:submit='resetPassword' class="flex flex-col pt-4">
-        <div class="flex items-center gap-2 pb-2">
-            <h2>Change Password</h2>
-            <x-forms.button type="submit" label="Save">Save</x-forms.button>
-        </div>
-        <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
-        <div class="flex flex-col gap-2">
-            <x-forms.input id="current_password" label="Current Password" required type="password" />
-            <div class="flex gap-2">
-                <x-forms.input id="new_password" label="New Password" required type="password" />
-                <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+    @if ($is_oauth_only)
+        <div class="flex flex-col pt-4">
+            <h2>Password</h2>
+            <div class="p-4 mt-2 border rounded-lg dark:border-coolgray-300 border-neutral-200 bg-neutral-50 dark:bg-coolgray-100">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-medium">OAuth-Only Account</span>
+                </div>
+                <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+                    Your account is configured to use OAuth authentication only. Password login is not available.
+                    Please use your OAuth provider to sign in.
+                </p>
             </div>
         </div>
-    </form>
+    @else
+        <form wire:submit='resetPassword' class="flex flex-col pt-4">
+            <div class="flex items-center gap-2 pb-2">
+                <h2>Change Password</h2>
+                <x-forms.button type="submit" label="Save">Save</x-forms.button>
+            </div>
+            <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
+            <div class="flex flex-col gap-2">
+                <x-forms.input id="current_password" label="Current Password" required type="password" />
+                <div class="flex gap-2">
+                    <x-forms.input id="new_password" label="New Password" required type="password" />
+                    <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+                </div>
+            </div>
+        </form>
+    @endif
     <h2 class="py-4">Two-factor Authentication</h2>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">

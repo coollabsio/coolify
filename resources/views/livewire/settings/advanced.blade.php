@@ -16,11 +16,23 @@
                 <div class="pb-4">Advanced settings for your Coolify instance.</div>
 
                 <div class="flex flex-col gap-1">
+                    <h4>Registration Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
+                            helper="Allow users to self-register with email and password. If disabled, only administrators can create accounts (unless OAuth registration is enabled)."
                             label="Registration Allowed" />
                     </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register via OAuth providers (e.g., Authentik, GitHub, Google) even when general registration is disabled. This enables centralized identity management through your OAuth provider."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only_login_forced"
+                            helper="Force new OAuth users to use only OAuth for authentication. They cannot set a password or login with email/password. Useful for organizations that want to enforce single sign-on (SSO) and centrally manage user access through their identity provider (e.g., Authentik, Okta, Azure AD)."
+                            label="Force OAuth-Only Login for New Users" />
+                    </div>
+                    <h4 class="pt-4">Privacy Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."

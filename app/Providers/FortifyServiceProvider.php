@@ -74,6 +74,13 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
+
+            // Check if user is OAuth-only and should be blocked from password login
+            if ($user && $user->is_oauth_only) {
+                // OAuth-only users cannot login with password
+                return null;
+            }
+
             if (
                 $user &&
                 Hash::check($request->password, $user->password)

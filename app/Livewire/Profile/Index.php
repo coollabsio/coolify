@@ -32,11 +32,14 @@ class Index extends Component
 
     public bool $show_verification = false;
 
+    public bool $is_oauth_only = false;
+
     public function mount()
     {
         $this->userId = Auth::id();
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->is_oauth_only = Auth::user()->is_oauth_only ?? false;
 
         // Check if there's a pending email change
         if (Auth::user()->hasEmailChangeRequest()) {
@@ -240,6 +243,13 @@ class Index extends Component
     public function resetPassword()
     {
         try {
+            // OAuth-only users cannot set/update passwords
+            if (Auth::user()->is_oauth_only) {
+                $this->dispatch('error', 'OAuth-only users cannot set a password. Please use your OAuth provider to login.');
+
+                return;
+            }
+
             $this->validate([
                 'current_password' => ['required'],
                 'new_password' => ['required', Password::defaults(), 'confirmed'],

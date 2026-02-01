@@ -53,6 +53,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'is_oauth_only' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
     ];
