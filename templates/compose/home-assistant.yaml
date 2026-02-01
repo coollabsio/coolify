@@ -32,6 +32,7 @@ services:
             ip_ban_enabled: true
             login_attempts_threshold: 5
     privileged: true
+    network_mode: host
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123"]
       interval: 30s
