@@ -64,10 +64,10 @@
                 <div class="flex flex-col gap-2 pt-4">
                     <h3>Import Options</h3>
                     <div class="flex flex-col gap-1 w-96">
-                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
-                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use this for pg_dump custom format backups from older versions."></x-forms.checkbox>
-                        <x-forms.checkbox label="Legacy Single DB (pg_restore)" wire:model.live='legacySingleDb'
-                            helper="Uses pg_restore for single database custom format (.dmp) backups."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Backup all databases Backups" wire:model.live='legacyDumpAll'
+                            helper="For legacy backups created with the 'Backup all databases' option."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB Backups" wire:model.live='legacySingleDb'
+                            helper="Uses pg_restore for single database restores for backups with the format .dmp."></x-forms.checkbox>
                     </div>
                     <x-forms.input label="Restore Command" wire:model='postgresqlRestoreCommand'
                         helper="Default uses psql to restore from pg_dumpall backups. Modify if needed."></x-forms.input>
@@ -79,10 +79,10 @@
                 <div class="flex flex-col gap-2 pt-4">
                     <h3>Import Options</h3>
                     <div class="flex flex-col gap-1 w-96">
-                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
-                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use for older backup formats."></x-forms.checkbox>
-                        <x-forms.checkbox label="Legacy Single DB (mysql with credentials)" wire:model.live='legacySingleDb'
-                            helper="Uses mysql command with user credentials for single database backups."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Backup all databases Backups" wire:model.live='legacyDumpAll'
+                            helper="For legacy backups created with the 'Backup all databases' option."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB Backups" wire:model.live='legacySingleDb'
+                            helper="Uses mysql for single database restores for backups with the format .sql."></x-forms.checkbox>
                     </div>
                     <x-forms.input label="Restore Command" wire:model='mysqlRestoreCommand'
                         helper="Default restores from mysqldump --all-databases backups. Modify if needed."></x-forms.input>
@@ -94,10 +94,10 @@
                 <div class="flex flex-col gap-2 pt-4">
                     <h3>Import Options</h3>
                     <div class="flex flex-col gap-1 w-96">
-                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
-                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use for older backup formats."></x-forms.checkbox>
-                        <x-forms.checkbox label="Legacy Single DB (mariadb with credentials)" wire:model.live='legacySingleDb'
-                            helper="Uses mariadb command with user credentials for single database backups."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Backup all databases Backups" wire:model.live='legacyDumpAll'
+                            helper="For legacy backups created with the 'Backup all databases' option."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB Backups" wire:model.live='legacySingleDb'
+                            helper="Uses mariadb for single database restores for backups with the format .sql."></x-forms.checkbox>
                     </div>
                     <x-forms.input label="Restore Command" wire:model='mariadbRestoreCommand'
                         helper="Default restores from mariadb-dump --all-databases backups. Modify if needed."></x-forms.input>
