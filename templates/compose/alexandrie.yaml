@@ -1,0 +1,93 @@
+# documentation: https://github.com/Smaug6739/Alexandrie/tree/main/docs
+# slogan: A powerful Markdown workspace designed for speed, clarity, and creativity.
+# category: productivity
+# tags: note-taking, markdown, knowledge-management, personal-wiki, productivity
+# logo: svgs/alexandrie.svg
+# port: 8200
+
+services:
+  frontend:
+    image: ghcr.io/smaug6739/alexandrie-frontend:v8.4.1
+    environment:
+      - SERVICE_URL_FRONTEND_8200
+      - PORT=8200
+      - NUXT_PUBLIC_CONFIG_DISABLE_SIGNUP_PAGE=${CONFIG_DISABLE_SIGNUP:-false}
+      - NUXT_PUBLIC_CONFIG_DISABLE_LANDING_PAGE=${CONFIG_DISABLE_LANDING:-false}
+      - NUXT_PUBLIC_BASE_API=${SERVICE_URL_BACKEND}
+      - NUXT_PUBLIC_BASE_CDN=${SERVICE_URL_RUSTFS}
+      - NUXT_PUBLIC_CDN_ENDPOINT=${CDN_ENDPOINT:-/alexandrie/}
+      - NUXT_PUBLIC_BASE_URL=${SERVICE_URL_FRONTEND}
+    depends_on:
+      - backend
+
+  backend:
+    image: ghcr.io/smaug6739/alexandrie-backend:v8.4.1
+    environment:
+      - SERVICE_URL_BACKEND_8201
+      - BACKEND_PORT=8201
+      - GIN_MODE=release
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - COOKIE_DOMAIN=${SERVICE_URL_FRONTEND}
+      - FRONTEND_URL=${SERVICE_URL_FRONTEND}
+      - ALLOW_UNSECURE=${ALLOW_UNSECURE:-false}
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=${MYSQL_DATABASE:-alexandrie-db}
+      - DATABASE_USER=${SERVICE_USER_MYSQL}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MINIO_ENDPOINT=rustfs:9000
+      - MINIO_PUBLIC_URL=${SERVICE_URL_RUSTFS}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
+      - MINIO_ACCESSKEY=${SERVICE_USER_RUSTFS}
+      - MINIO_SECRETKEY=${SERVICE_PASSWORD_RUSTFS}
+      - MINIO_BUCKET=${MINIO_BUCKET:-alexandrie}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_MAIL=${SMTP_MAIL:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+  
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-alexandrie-db}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - "-h"
+        - localhost
+        - "-u"
+        - root
+        - "-p${SERVICE_PASSWORD_MYSQLROOT}"
+      timeout: 5s
+      interval: 10s
+      retries: 5
+
+  rustfs:
+    image: rustfs/rustfs:1.0.0-alpha.81
+    environment:
+      - SERVICE_URL_RUSTFS_9000
+      - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - RUSTFS_CONSOLE_ENABLE=${RUSTFS_CONSOLE_ENABLE:-false}
+      - RUSTFS_LOG_LEVEL=${RUSTFS_LOG_LEVEL:-info}
+    volumes:
+      - rustfs-data:/data
+      - rustfs-logs:/logs
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "nc -z localhost 9000 || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
