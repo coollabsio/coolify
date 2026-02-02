@@ -14,6 +14,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',
+            'legacy' => 'boolean',
         ];
     }
 
