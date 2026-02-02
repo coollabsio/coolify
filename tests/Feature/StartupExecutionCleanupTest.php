@@ -101,20 +101,17 @@ test('app:init marks stuck database backup executions as failed', function () {
     $runningBackup1 = ScheduledDatabaseBackupExecution::create([
         'scheduled_database_backup_id' => $scheduledBackup->id,
         'status' => 'running',
-        'database_name' => 'test_db',
     ]);
 
     $runningBackup2 = ScheduledDatabaseBackupExecution::create([
         'scheduled_database_backup_id' => $scheduledBackup->id,
         'status' => 'running',
-        'database_name' => 'test_db_2',
     ]);
 
     // Create a successful backup (should not be affected)
     $successfulBackup = ScheduledDatabaseBackupExecution::create([
         'scheduled_database_backup_id' => $scheduledBackup->id,
         'status' => 'success',
-        'database_name' => 'test_db_3',
         'finished_at' => Carbon::now()->subMinutes(20),
     ]);
 
