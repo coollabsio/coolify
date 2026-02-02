@@ -202,6 +202,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
         Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
         Route::get('/healthcheck', ApplicationConfiguration::class)->name('project.application.healthcheck');
+        Route::get('/database-backups', ApplicationConfiguration::class)->name('project.application.database-backups');
         Route::get('/rollback', ApplicationConfiguration::class)->name('project.application.rollback');
         Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');

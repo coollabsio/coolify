@@ -54,6 +54,10 @@
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Healthcheck</span></a>
             @endif
+            @if ($application->build_pack === 'dockercompose' && $application->databases()->exists())
+                <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.database-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Database Backups</span></a>
+            @endif
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Rollback</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
@@ -90,6 +94,8 @@
                 <livewire:project.application.previews :application="$application" />
             @elseif ($currentRoute === 'project.application.healthcheck' && $application->build_pack !== 'dockercompose')
                 <livewire:project.shared.health-checks :resource="$application" />
+            @elseif ($currentRoute === 'project.application.database-backups' && $application->build_pack === 'dockercompose')
+                <livewire:project.application.database-backups :application="$application" />
             @elseif ($currentRoute === 'project.application.rollback')
                 <livewire:project.application.rollback :application="$application" />
             @elseif ($currentRoute === 'project.application.resource-limits')
