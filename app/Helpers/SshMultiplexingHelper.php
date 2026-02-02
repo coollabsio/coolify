@@ -44,6 +44,16 @@ class SshMultiplexingHelper
             return self::establishNewMultiplexedConnection($server);
         }
 
+        // Connection exists - check if the SSH key has changed since connection was established
+        // This prevents using a multiplexed connection that was made with a different key
+        if (self::isKeyMismatch($server)) {
+            Log::warning('SSH key mismatch detected for multiplexed connection, refreshing', [
+                'server' => $server->name ?? $server->uuid,
+                'server_uuid' => $server->uuid,
+            ]);
+            return self::refreshMultiplexedConnection($server);
+        }
+
         // Connection exists, ensure we have metadata for age tracking
         if (self::getConnectionAge($server) === null) {
             // Existing connection but no metadata, store current time as fallback
@@ -204,10 +214,46 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
+        
+        // Check if the key file exists
         $checkKeyCommand = "ls $keyLocation 2>/dev/null";
         $keyCheckProcess = Process::run($checkKeyCommand);
-
-        if ($keyCheckProcess->exitCode() !== 0) {
+        $keyFileExists = $keyCheckProcess->exitCode() === 0;
+        
+        if (! $keyFileExists) {
+            // File doesn't exist, create it
+            Log::debug('SSH key file does not exist, creating it', [
+                'key_uuid' => $privateKey->uuid,
+                'location' => $keyLocation,
+            ]);
+            $privateKey->storeInFileSystem();
+            return;
+        }
+        
+        // File exists - verify the content matches the database
+        // This prevents using stale/wrong keys when the key was updated
+        $readKeyCommand = "cat $keyLocation 2>/dev/null";
+        $readKeyProcess = Process::run($readKeyCommand);
+        
+        if ($readKeyProcess->exitCode() === 0) {
+            $fileContent = trim($readKeyProcess->output());
+            $expectedContent = trim($privateKey->private_key);
+            
+            if ($fileContent !== $expectedContent) {
+                Log::warning('SSH key file content mismatch detected, refreshing key file', [
+                    'key_uuid' => $privateKey->uuid,
+                    'location' => $keyLocation,
+                    'file_fingerprint' => substr(md5($fileContent), 0, 8),
+                    'expected_fingerprint' => substr(md5($expectedContent), 0, 8),
+                ]);
+                $privateKey->storeInFileSystem();
+            }
+        } else {
+            // Couldn't read the file, try to recreate it
+            Log::warning('Could not read SSH key file, recreating', [
+                'key_uuid' => $privateKey->uuid,
+                'location' => $keyLocation,
+            ]);
             $privateKey->storeInFileSystem();
         }
     }
@@ -265,6 +311,45 @@ class SshMultiplexingHelper
     }
 
     /**
+     * Check if the server's current SSH key is different from the one used to establish the multiplexed connection.
+     * This detects when a user has changed the server's SSH key and the old connection should not be reused.
+     */
+    public static function isKeyMismatch(Server $server): bool
+    {
+        $fingerprintCacheKey = "ssh_mux_key_fingerprint_{$server->uuid}";
+        $cachedFingerprint = Cache::get($fingerprintCacheKey);
+        
+        // If no cached fingerprint, we can't verify - assume it's okay but log it
+        if ($cachedFingerprint === null) {
+            return false;
+        }
+        
+        // Get the current key's fingerprint
+        $privateKey = PrivateKey::find($server->private_key_id);
+        if (! $privateKey) {
+            Log::warning('Server has no valid private key', [
+                'server_uuid' => $server->uuid,
+                'private_key_id' => $server->private_key_id,
+            ]);
+            return true; // Force refresh to get proper error
+        }
+        
+        $currentFingerprint = $privateKey->fingerprint;
+        
+        // Compare fingerprints
+        if ($cachedFingerprint !== $currentFingerprint) {
+            Log::info('SSH key fingerprint mismatch detected', [
+                'server_uuid' => $server->uuid,
+                'cached_fingerprint' => substr($cachedFingerprint ?? '', 0, 16) . '...',
+                'current_fingerprint' => substr($currentFingerprint ?? '', 0, 16) . '...',
+            ]);
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
      * Get the age of the current connection in seconds
      */
     public static function getConnectionAge(Server $server): ?int
@@ -298,6 +383,14 @@ class SshMultiplexingHelper
     {
         $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
         Cache::put($cacheKey, time(), config('constants.ssh.mux_persist_time') + 300); // Cache slightly longer than persist time
+        
+        // Also store the key fingerprint used for this connection
+        // This allows us to detect when a different key should be used
+        $privateKey = PrivateKey::find($server->private_key_id);
+        if ($privateKey) {
+            $fingerprintCacheKey = "ssh_mux_key_fingerprint_{$server->uuid}";
+            Cache::put($fingerprintCacheKey, $privateKey->fingerprint, config('constants.ssh.mux_persist_time') + 300);
+        }
     }
 
     /**
@@ -307,5 +400,9 @@ class SshMultiplexingHelper
     {
         $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
         Cache::forget($cacheKey);
+        
+        // Also clear the key fingerprint cache
+        $fingerprintCacheKey = "ssh_mux_key_fingerprint_{$server->uuid}";
+        Cache::forget($fingerprintCacheKey);
     }
 }

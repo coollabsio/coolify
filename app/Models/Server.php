@@ -134,8 +134,21 @@ class Server extends BaseModel
             $server->forceFill($payload);
         });
         static::saved(function ($server) {
+            // Refresh SSH connection if the key content changed
             if ($server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            }
+            
+            // Also refresh if the server switched to a different key (private_key_id changed)
+            // This fixes the bug where changing a server's SSH key wouldn't invalidate
+            // the existing multiplexed connection, causing "Permission denied" errors
+            if ($server->wasChanged('private_key_id')) {
+                \App\Helpers\SshMultiplexingHelper::removeMuxFile($server);
+                \Illuminate\Support\Facades\Log::info('SSH multiplexed connection invalidated due to key change', [
+                    'server_uuid' => $server->uuid,
+                    'old_key_id' => $server->getOriginal('private_key_id'),
+                    'new_key_id' => $server->private_key_id,
+                ]);
             }
         });
         static::created(function ($server) {
