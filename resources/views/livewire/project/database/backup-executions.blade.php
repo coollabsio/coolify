@@ -66,6 +66,11 @@
                             @endphp
                             {{ $statusText }}
                         </span>
+                        @if (data_get($execution, 'legacy', false))
+                            <span class="px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
+                                Legacy
+                            </span>
+                        @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         @if (data_get($execution, 'status') === 'running')
@@ -79,7 +84,6 @@
                                 • {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->format('M j, H:i') }}
                             </span>
                         @endif
-                        • Database: {{ data_get($execution, 'database_name', 'N/A') }}
                         @if(data_get($execution, 'size'))
                             • Size: {{ formatBytes(data_get($execution, 'size')) }}
                         @endif
