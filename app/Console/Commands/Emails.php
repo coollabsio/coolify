@@ -54,7 +54,6 @@ class Emails extends Command
             options: [
                 'updates' => 'Send Update Email to all users',
                 'emails-test' => 'Test',
-                'database-backup-statuses-daily' => 'Database - Backup Statuses (Daily)',
                 'application-deployment-success-daily' => 'Application - Deployment Success (Daily)',
                 'application-deployment-success' => 'Application - Deployment Success',
                 'application-deployment-failed' => 'Application - Deployment Failed',
@@ -167,7 +166,7 @@ class Emails extends Command
                     ]);
                 }
                 $output = 'Because of an error, the backup of the database '.$db->name.' failed.';
-                $this->mail = (new BackupFailed($backup, $db, $output, $backup->database_name ?? 'unknown'))->toMail();
+                $this->mail = (new BackupFailed($backup, $db, $output))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-success':

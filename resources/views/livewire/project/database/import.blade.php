@@ -61,39 +61,49 @@
         @if (str($resourceStatus)->startsWith('running'))
             {{-- Restore Command Configuration --}}
             @if ($resourceDbType === 'standalone-postgresql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
-                    <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
+                <div class="flex flex-col gap-2 pt-4">
+                    <h3>Import Options</h3>
+                    <div class="flex flex-col gap-1 w-96">
+                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
+                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use this for pg_dump custom format backups from older versions."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB (pg_restore)" wire:model.live='legacySingleDb'
+                            helper="Uses pg_restore for single database custom format (.dmp) backups."></x-forms.checkbox>
                     </div>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                    <x-forms.input label="Restore Command" wire:model='postgresqlRestoreCommand'
+                        helper="Default uses psql to restore from pg_dumpall backups. Modify if needed."></x-forms.input>
+                    @if ($restoreCommandText)
+                        <div class="text-xs text-neutral-500">{{ $restoreCommandText }}</div>
+                    @endif
                 </div>
             @elseif ($resourceDbType === 'standalone-mysql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                <div class="flex flex-col gap-2 pt-4">
+                    <h3>Import Options</h3>
+                    <div class="flex flex-col gap-1 w-96">
+                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
+                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use for older backup formats."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB (mysql with credentials)" wire:model.live='legacySingleDb'
+                            helper="Uses mysql command with user credentials for single database backups."></x-forms.checkbox>
+                    </div>
+                    <x-forms.input label="Restore Command" wire:model='mysqlRestoreCommand'
+                        helper="Default restores from mysqldump --all-databases backups. Modify if needed."></x-forms.input>
+                    @if ($restoreCommandText)
+                        <div class="text-xs text-neutral-500">{{ $restoreCommandText }}</div>
+                    @endif
                 </div>
             @elseif ($resourceDbType === 'standalone-mariadb')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText'></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                <div class="flex flex-col gap-2 pt-4">
+                    <h3>Import Options</h3>
+                    <div class="flex flex-col gap-1 w-96">
+                        <x-forms.checkbox label="Legacy Import All (complex restore with DB cleanup)" wire:model.live='legacyImportAll'
+                            helper="Uses advanced restore that drops all databases, terminates connections, and restores. Use for older backup formats."></x-forms.checkbox>
+                        <x-forms.checkbox label="Legacy Single DB (mariadb with credentials)" wire:model.live='legacySingleDb'
+                            helper="Uses mariadb command with user credentials for single database backups."></x-forms.checkbox>
+                    </div>
+                    <x-forms.input label="Restore Command" wire:model='mariadbRestoreCommand'
+                        helper="Default restores from mariadb-dump --all-databases backups. Modify if needed."></x-forms.input>
+                    @if ($restoreCommandText)
+                        <div class="text-xs text-neutral-500">{{ $restoreCommandText }}</div>
+                    @endif
                 </div>
             @endif
 

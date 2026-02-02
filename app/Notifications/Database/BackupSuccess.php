@@ -15,7 +15,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
+    public function __construct(ScheduledDatabaseBackup $backup, public $database)
     {
         $this->onQueue('high');
 
@@ -34,7 +34,6 @@ class BackupSuccess extends CustomEmailNotification
         $mail->subject("Coolify: Backup successfully done for {$this->database->name}");
         $mail->view('emails.backup-success', [
             'name' => $this->name,
-            'database_name' => $this->database_name,
             'frequency' => $this->frequency,
         ]);
 
@@ -45,7 +44,7 @@ class BackupSuccess extends CustomEmailNotification
     {
         $message = new DiscordMessage(
             title: ':white_check_mark: Database backup successful',
-            description: "Database backup for {$this->name} (db:{$this->database_name}) was successful.",
+            description: "Database backup for {$this->name} was successful.",
             color: DiscordMessage::successColor(),
         );
 
@@ -56,7 +55,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
+        $message = "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
 
         return [
             'message' => $message,
@@ -68,14 +67,14 @@ class BackupSuccess extends CustomEmailNotification
         return new PushoverMessage(
             title: 'Database backup successful',
             level: 'success',
-            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
+            message: "Database backup for {$this->name} was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
         );
     }
 
     public function toSlack(): SlackMessage
     {
         $title = 'Database backup successful';
-        $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
+        $description = "Database backup for {$this->name} was successful.";
 
         $description .= "\n\n*Frequency:* {$this->frequency}";
 
@@ -96,7 +95,6 @@ class BackupSuccess extends CustomEmailNotification
             'event' => 'backup_success',
             'database_name' => $this->name,
             'database_uuid' => $this->database->uuid,
-            'database_type' => $this->database_name,
             'frequency' => $this->frequency,
             'url' => $url,
         ];
