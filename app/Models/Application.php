@@ -247,6 +247,11 @@ class Application extends BaseModel
             foreach ($application->deployment_queue as $deployment) {
                 $deployment->delete();
             }
+            // Delete service databases detected in Docker Compose deployments
+            // @see https://github.com/coollabsio/coolify/issues/7528
+            foreach ($application->serviceDatabases as $serviceDatabase) {
+                $serviceDatabase->delete();
+            }
         });
     }
 
@@ -498,6 +503,35 @@ class Application extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    /**
+     * Get the service databases detected in Docker Compose deployments.
+     * These databases support backup scheduling.
+     * 
+     * @see https://github.com/coollabsio/coolify/issues/7528
+     */
+    public function serviceDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
+    /**
+     * Check if this application has any detected databases (for Docker Compose deployments).
+     */
+    public function hasServiceDatabases(): bool
+    {
+        return $this->serviceDatabases()->exists();
+    }
+
+    /**
+     * Get databases that have backup solution available.
+     */
+    public function getBackupableDatabases()
+    {
+        return $this->serviceDatabases->filter(function ($db) {
+            return $db->isBackupSolutionAvailable();
+        });
     }
 
     public function type()

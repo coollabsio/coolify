@@ -27,16 +27,37 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            // Service-based databases
+            $query->whereHas('service.environment.project.team', function ($q) use ($teamId) {
+                $q->where('id', $teamId);
+            })
+            // Application-based databases (Docker Compose via GitHub App)
+            ->orWhereHas('application.environment.project.team', function ($q) use ($teamId) {
+                $q->where('id', $teamId);
+            });
+        })->orderBy('name');
     }
 
     /**
      * Get query builder for service databases owned by current team.
+     * Supports both Service-based and Application-based (Docker Compose via GitHub App) databases.
      * If you need all service databases without further query chaining, use ownedByCurrentTeamCached() instead.
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+        
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            // Service-based databases
+            $query->whereHas('service.environment.project.team', function ($q) use ($teamId) {
+                $q->where('id', $teamId);
+            })
+            // Application-based databases (Docker Compose via GitHub App)
+            ->orWhereHas('application.environment.project.team', function ($q) use ($teamId) {
+                $q->where('id', $teamId);
+            });
+        })->orderBy('name');
     }
 
     /**
@@ -51,8 +72,8 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $container_id = $this->name.'-'.$this->getParentResourceUuid();
+        remote_process(["docker restart {$container_id}"], $this->getServer());
     }
 
     public function isRunning()
@@ -114,27 +135,122 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
         return "{$realIp}:{$port}";
     }
 
+    /**
+     * Get the team that owns this database.
+     * Works for both Service-based and Application-based databases.
+     */
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->service_id) {
+            return data_get($this, 'service.environment.project.team');
+        }
+        
+        if ($this->application_id) {
+            return data_get($this, 'application.environment.project.team');
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get the server where this database runs.
+     * Works for both Service-based and Application-based databases.
+     */
+    public function getServer()
+    {
+        if ($this->service_id && $this->service) {
+            return $this->service->server;
+        }
+        
+        if ($this->application_id && $this->application) {
+            return $this->application->destination->server;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get the parent resource UUID (Service or Application).
+     */
+    public function getParentResourceUuid()
+    {
+        if ($this->service_id && $this->service) {
+            return $this->service->uuid;
+        }
+        
+        if ($this->application_id && $this->application) {
+            return $this->application->uuid;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get the parent resource (Service or Application).
+     */
+    public function getParentResource()
+    {
+        if ($this->service_id) {
+            return $this->service;
+        }
+        
+        if ($this->application_id) {
+            return $this->application;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Check if this database belongs to an Application (Docker Compose via GitHub App).
+     */
+    public function isApplicationDatabase(): bool
+    {
+        return filled($this->application_id);
+    }
+
+    /**
+     * Check if this database belongs to a Service (Empty Docker Compose or one-click).
+     */
+    public function isServiceDatabase(): bool
+    {
+        return filled($this->service_id);
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service_id && $this->service) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        }
+        
+        if ($this->application_id && $this->application) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+        
+        return null;
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * Relationship to Application model.
+     * Used for Docker Compose deployments via GitHub App.
+     */
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

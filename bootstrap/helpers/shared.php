@@ -2415,8 +2415,57 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             // Decide if the service is a database
             $image = data_get_str($service, 'image');
-            $isDatabase = isDatabaseImage($image, $service);
+            
+            // Check for coolify.service.subType label to allow manual override
+            $subTypeLabel = null;
+            foreach ($serviceLabels as $label) {
+                if (is_string($label) && str($label)->startsWith('coolify.service.subType=')) {
+                    $subTypeLabel = str($label)->after('coolify.service.subType=')->trim()->lower()->value();
+                    break;
+                }
+            }
+            
+            // Determine if this is a database based on label or image detection
+            if ($subTypeLabel === 'database') {
+                $isDatabase = true;
+            } elseif ($subTypeLabel === 'application') {
+                $isDatabase = false;
+            } else {
+                // Fall back to automatic image detection
+                $isDatabase = isDatabaseImage($image, $service);
+            }
+            
             data_set($service, 'is_database', $isDatabase);
+            
+            // Create ServiceDatabase records for detected databases (enables backup support)
+            // This is needed for Docker Compose deployments via GitHub App
+            // @see https://github.com/coollabsio/coolify/issues/7528
+            if ($isDatabase && $pull_request_id === 0) {
+                // Check if ServiceDatabase already exists for this application
+                $existingDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->first();
+                    
+                if ($isNew && is_null($existingDb)) {
+                    // Create new ServiceDatabase record
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif (is_null($existingDb)) {
+                    // Create ServiceDatabase if it doesn't exist (e.g., compose file updated with new db)
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($existingDb->image !== $image) {
+                    // Update image if it changed
+                    $existingDb->image = $image;
+                    $existingDb->save();
+                }
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {

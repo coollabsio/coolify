@@ -67,6 +67,14 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         if ($this->database) {
             if ($this->database instanceof ServiceDatabase) {
+                // ServiceDatabase can belong to either Service or Application
+                // @see https://github.com/coollabsio/coolify/issues/7528
+                $server = $this->database->getServer();
+                if ($server) {
+                    return $server;
+                }
+                
+                // Fallback for legacy behavior
                 $destination = data_get($this->database->service, 'destination');
                 $server = data_get($destination, 'server');
             } else {
