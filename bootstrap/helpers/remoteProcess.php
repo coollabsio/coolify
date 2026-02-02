@@ -130,7 +130,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return \App\Helpers\SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, $effectiveTimeout);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
@@ -249,116 +249,34 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
                 ]);
             }
 
-            $lines = explode(PHP_EOL, data_get($logItem, 'output'));
-
-            foreach ($lines as $line) {
-                $deploymentLogLines->push([
-                    'line' => $line,
-                    'timestamp' => data_get($logItem, 'timestamp'),
-                    'stderr' => $isStderr,
-                    'hidden' => data_get($logItem, 'hidden'),
-                ]);
+            $output = data_get($logItem, 'output');
+            if (! is_null($output)) {
+                $outputLines = explode("\n", $output);
+                foreach ($outputLines as $line) {
+                    $deploymentLogLines->push([
+                        'line' => $line,
+                        'timestamp' => data_get($logItem, 'timestamp'),
+                        'stderr' => $isStderr,
+                        'hidden' => data_get($logItem, 'hidden'),
+                        'command' => false,
+                    ]);
+                }
             }
 
             return $deploymentLogLines;
-        }, collect());
+        }, collect([]));
 }
 
-function remove_iip($text)
+function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
-    // Ensure the input is valid UTF-8 before processing
-    $text = sanitize_utf8_text($text);
-
-    // Git access tokens
-    $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
-
-    // ANSI color codes
-    $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
-
-    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, etc.)
-    // (protocol://user:password@host → protocol://user:<REDACTED>@host)
-    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
-
-    // Email addresses
-    $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
-
-    // Bearer/JWT tokens
-    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
-
-    // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
-    $text = preg_replace('/\b(gh[pousr]_[A-Za-z0-9_]{36,})\b/', REDACTED, $text);
-
-    // GitLab tokens (glpat- = personal access token, glcbt- = CI build token, glrt- = runner token)
-    $text = preg_replace('/\b(gl(?:pat|cbt|rt)-[A-Za-z0-9\-_]{20,})\b/', REDACTED, $text);
-
-    // AWS credentials (Access Key ID starts with AKIA, ABIA, ACCA, ASIA)
-    $text = preg_replace('/\b(A(?:KIA|BIA|CCA|SIA)[A-Z0-9]{16})\b/', REDACTED, $text);
-
-    // AWS Secret Access Key (40 character base64-ish string, typically follows access key)
-    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1='.REDACTED, $text);
-
-    // API keys (common patterns)
-    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
-
-    // Private key blocks
-    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
-
-    return $text;
-}
-
-/**
- * Sanitizes text to ensure it contains valid UTF-8 encoding.
- *
- * This function is crucial for preventing "Malformed UTF-8 characters" errors
- * that can occur when Docker build output contains binary data mixed with text,
- * especially during image processing or builds with many assets.
- *
- * @param  string|null  $text  The text to sanitize
- * @return string Valid UTF-8 encoded text
- */
-function sanitize_utf8_text(?string $text): string
-{
-    if (empty($text)) {
-        return '';
-    }
-
-    // Convert to UTF-8, replacing invalid sequences
-    $sanitized = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
-
-    // Additional fallback: use SUBSTITUTE flag to replace invalid sequences with substitution character
-    if (! mb_check_encoding($sanitized, 'UTF-8')) {
-        $sanitized = mb_convert_encoding($text, 'UTF-8', mb_detect_encoding($text, mb_detect_order(), true) ?: 'UTF-8');
-    }
-
-    return $sanitized;
-}
-
-function refresh_server_connection(?PrivateKey $private_key = null)
-{
-    if (is_null($private_key)) {
-        return;
-    }
-    foreach ($private_key->servers as $server) {
-        SshMultiplexingHelper::removeMuxFile($server);
-    }
-}
-
-function checkRequiredCommands(Server $server)
-{
-    $commands = collect(['jq', 'jc']);
-    foreach ($commands as $command) {
-        $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
-        if ($commandFound) {
-            continue;
+    $commands = $commands->map(function ($line) use ($server) {
+        $line = str_replace("\n", '', $line);
+        if (! Str::startsWith($line, 'cd') && ! Str::startsWith($line, 'sudo')) {
+            $line = "sudo $line";
         }
-        try {
-            instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
-        } catch (\Throwable) {
-            break;
-        }
-        $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
-        if (! $commandFound) {
-            break;
-        }
-    }
+
+        return $line;
+    });
+
+    return $commands->toArray();
 }
