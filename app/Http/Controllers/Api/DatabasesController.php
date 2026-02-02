@@ -627,8 +627,6 @@ class DatabasesController extends Controller
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled', 'default' => true],
                         'save_s3' => ['type' => 'boolean', 'description' => 'Whether to save backups to S3', 'default' => false],
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
-                        'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
-                        'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
@@ -672,7 +670,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'frequency', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -689,10 +687,8 @@ class DatabasesController extends Controller
             'frequency' => 'required|string',
             'enabled' => 'boolean',
             'save_s3' => 'boolean',
-            'dump_all' => 'boolean',
             'backup_now' => 'boolean|nullable',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
-            'databases_to_backup' => 'string|nullable',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
             'database_backup_retention_max_storage_locally' => 'integer|min:0',
@@ -777,17 +773,6 @@ class DatabasesController extends Controller
             unset($backupData['s3_storage_uuid']);
         }
 
-        // Set default databases_to_backup based on database type if not provided
-        if (! isset($backupData['databases_to_backup']) || empty($backupData['databases_to_backup'])) {
-            if ($database->type() === 'standalone-postgresql') {
-                $backupData['databases_to_backup'] = $database->postgres_db;
-            } elseif ($database->type() === 'standalone-mysql') {
-                $backupData['databases_to_backup'] = $database->mysql_database;
-            } elseif ($database->type() === 'standalone-mariadb') {
-                $backupData['databases_to_backup'] = $database->mariadb_database;
-            }
-        }
-
         // Add required fields
         $backupData['database_id'] = $database->id;
         $backupData['database_type'] = $database->getMorphClass();
@@ -852,8 +837,6 @@ class DatabasesController extends Controller
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID'],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to take a backup now or not'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled or not'],
-                        'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
-                        'dump_all' => ['type' => 'boolean', 'description' => 'Whether all databases are dumped or not'],
                         'frequency' => ['type' => 'string', 'description' => 'Frequency of the backup'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Retention amount of the backup locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Retention days of the backup locally'],
@@ -890,7 +873,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'frequency', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -905,9 +888,7 @@ class DatabasesController extends Controller
             'save_s3' => 'boolean',
             'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
-            'dump_all' => 'boolean',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
-            'databases_to_backup' => 'string|nullable',
             'frequency' => 'string|in:every_minute,hourly,daily,weekly,monthly,yearly',
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
