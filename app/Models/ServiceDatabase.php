@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,12 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +57,51 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Get the parent resource (Service or Application) that owns this database.
+     */
+    public function getParentResource()
+    {
+        return $this->service ?? $this->application;
+    }
+
+    /**
+     * Get the server this database runs on.
+     */
+    public function getServer()
+    {
+        if ($this->service) {
+            return $this->service->server;
+        }
+        if ($this->application) {
+            return $this->application->destination->server;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the parent resource UUID (Service or Application).
+     */
+    public function getParentUuid()
+    {
+        return $this->getParentResource()?->uuid;
+    }
+
+    /**
+     * Check if this database belongs to an Application (dockercompose buildpack).
+     */
+    public function isApplicationDatabase(): bool
+    {
+        return ! is_null($this->application_id);
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $parentUuid = $this->getParentUuid();
+        $server = $this->getServer();
+        $container_id = $this->name.'-'.$parentUuid;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -114,8 +163,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -129,12 +179,21 @@ class ServiceDatabase extends BaseModel
 
     public function workdir()
     {
+        if ($this->application) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

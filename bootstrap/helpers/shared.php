@@ -556,8 +556,12 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     }
 
     // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // or application->environment->project->team_id for dockercompose Application databases
     if ($resource instanceof \App\Models\ServiceDatabase) {
         if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+        if ($resource->application?->environment?->project?->team_id === $teamId) {
             return $resource;
         }
 
@@ -1419,8 +1423,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $isDatabase = (bool) $migratedDb;
                     $savedService = $migratedApp ?: $migratedDb;
                 } else {
-                    // Use image detection for non-migrated services
-                    $isDatabase = isDatabaseImage($image, $service);
+                    // Check for label-based override: coolify.service.subType=database
+                    $subTypeLabel = $serviceLabels->first(function ($label) {
+                        return str($label)->startsWith('coolify.service.subType=');
+                    });
+                    if ($subTypeLabel && str($subTypeLabel)->after('=')->lower()->value() === 'database') {
+                        $isDatabase = true;
+                    } else {
+                        // Use image detection for non-migrated services
+                        $isDatabase = isDatabaseImage($image, $service);
+                    }
 
                     // Create new serviceApplication or serviceDatabase
                     if ($isDatabase) {
@@ -2415,8 +2427,53 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             // Decide if the service is a database
             $image = data_get_str($service, 'image');
-            $isDatabase = isDatabaseImage($image, $service);
+
+            // Check for label-based override: coolify.service.subType=database
+            $subTypeLabel = $serviceLabels->first(function ($label) {
+                return str($label)->startsWith('coolify.service.subType=');
+            });
+            if ($subTypeLabel && str($subTypeLabel)->after('=')->lower()->value() === 'database') {
+                $isDatabase = true;
+            } else {
+                $isDatabase = isDatabaseImage($image, $service);
+            }
             data_set($service, 'is_database', $isDatabase);
+
+            // Create or update ServiceDatabase records for detected database services
+            if ($isDatabase) {
+                if ($isNew) {
+                    $savedDatabase = ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } else {
+                    $savedDatabase = ServiceDatabase::where([
+                        'name' => $serviceName,
+                        'application_id' => $resource->id,
+                    ])->first();
+                    if (is_null($savedDatabase)) {
+                        $savedDatabase = ServiceDatabase::create([
+                            'name' => $serviceName,
+                            'image' => $image,
+                            'application_id' => $resource->id,
+                        ]);
+                    } elseif ($savedDatabase->image !== $image) {
+                        $savedDatabase->image = $image;
+                        $savedDatabase->save();
+                    }
+                }
+            } else {
+                // If a service was previously detected as database but image changed,
+                // clean up the old ServiceDatabase record
+                $existingDb = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if ($existingDb) {
+                    $existingDb->delete();
+                }
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {

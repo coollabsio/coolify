@@ -187,6 +187,11 @@ class Application extends BaseModel
                     $application->docker_compose_domains = null;
                     $application->docker_compose_raw = null;
 
+                    // Remove associated ServiceDatabase records
+                    $application->databases()->each(function ($db) {
+                        $db->delete();
+                    });
+
                     // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
                     $application->environment_variables()
                         ->where(function ($q) {
@@ -242,6 +247,10 @@ class Application extends BaseModel
             foreach ($application->scheduled_tasks as $task) {
                 $task->delete();
             }
+            // Clean up ServiceDatabase records for dockercompose applications
+            $application->databases()->each(function ($db) {
+                $db->delete();
+            });
             $application->tags()->detach();
             $application->previews()->delete();
             foreach ($application->deployment_queue as $deployment) {
@@ -498,6 +507,15 @@ class Application extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    /**
+     * Get the database services detected in this application's Docker Compose file.
+     * Only relevant for applications with build_pack === 'dockercompose'.
+     */
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function type()
