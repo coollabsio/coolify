@@ -69,12 +69,6 @@ class BackupEdit extends Component
     #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = 1;
 
-    #[Validate(['nullable', 'string'])]
-    public ?string $databasesToBackup = null;
-
-    #[Validate(['required', 'boolean'])]
-    public bool $dumpAll = false;
-
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
@@ -103,27 +97,6 @@ class BackupEdit extends Component
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->disable_local_backup = $this->disableLocalBackup;
             $this->backup->s3_storage_id = $this->s3StorageId;
-
-            // Validate databases_to_backup to prevent command injection
-            if (filled($this->databasesToBackup)) {
-                $databases = str($this->databasesToBackup)->explode(',');
-                foreach ($databases as $index => $db) {
-                    $dbName = trim($db);
-                    try {
-                        validateShellSafePath($dbName, 'database name');
-                    } catch (\Exception $e) {
-                        // Provide specific error message indicating which database failed validation
-                        $position = $index + 1;
-                        throw new \Exception(
-                            "Database #{$position} ('{$dbName}') validation failed: ".
-                            $e->getMessage()
-                        );
-                    }
-                }
-            }
-
-            $this->backup->databases_to_backup = $this->databasesToBackup;
-            $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
             $this->customValidate();
             $this->backup->save();
@@ -140,8 +113,6 @@ class BackupEdit extends Component
             $this->saveS3 = $this->backup->save_s3;
             $this->disableLocalBackup = $this->backup->disable_local_backup ?? false;
             $this->s3StorageId = $this->backup->s3_storage_id;
-            $this->databasesToBackup = $this->backup->databases_to_backup;
-            $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
         }
     }

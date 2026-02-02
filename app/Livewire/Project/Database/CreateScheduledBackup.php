@@ -65,14 +65,6 @@ class CreateScheduledBackup extends Component
                 'team_id' => currentTeam()->id,
             ];
 
-            if ($this->database->type() === 'standalone-postgresql') {
-                $payload['databases_to_backup'] = $this->database->postgres_db;
-            } elseif ($this->database->type() === 'standalone-mysql') {
-                $payload['databases_to_backup'] = $this->database->mysql_database;
-            } elseif ($this->database->type() === 'standalone-mariadb') {
-                $payload['databases_to_backup'] = $this->database->mariadb_database;
-            }
-
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
             if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
