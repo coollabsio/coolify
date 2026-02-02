@@ -23,6 +23,10 @@
                     href="{{ route('project.service.command', $parameters) }}">
                     <button>Terminal</button>
                 </a>
+                <a class="{{ request()->routeIs('project.service.files') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.service.files', $parameters) }}">
+                    <button>Files</button>
+                </a>
             @endcan
             <x-services.links :service="$service" />
         </nav>
