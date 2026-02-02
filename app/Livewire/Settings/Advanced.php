@@ -65,7 +65,7 @@ class Advanced extends Component
         $this->custom_dns_servers = $this->settings->custom_dns_servers;
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
-        $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_registration_enabled = $this->settings->is_registration_enabled ?? false;
         $this->is_oauth_registration_enabled = $this->settings->is_oauth_registration_enabled ?? false;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;

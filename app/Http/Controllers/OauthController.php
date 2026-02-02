@@ -27,6 +27,11 @@ class OauthController extends Controller
                     abort(403, 'Registration is disabled');
                 }
 
+                // Validate email from OAuth provider
+                if (! filter_var($oauthUser->email, FILTER_VALIDATE_EMAIL)) {
+                    abort(422, 'Invalid email address from OAuth provider');
+                }
+
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
