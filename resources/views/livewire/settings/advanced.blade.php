@@ -16,11 +16,18 @@
                 <div class="pb-4">Advanced settings for your Coolify instance.</div>
 
                 <div class="flex flex-col gap-1">
+                    <h4>Registration Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
                             helper="Allow users to self-register. If disabled, only administrators can create accounts."
                             label="Registration Allowed" />
                     </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register using OAuth providers (e.g., GitHub, Authentik, Keycloak) even when general registration is disabled. This enables you to control access via external identity providers."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <h4 class="pt-4">Privacy Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."
