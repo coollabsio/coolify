@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -201,14 +202,67 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
+    /**
+     * Validate that the SSH key file exists and contains the correct content.
+     *
+     * This method addresses sporadic "Permission denied (publickey)" errors caused by:
+     * 1. Stale Eloquent model cache - relationship may return outdated key data
+     * 2. File content mismatch - key file may not match current database value
+     * 3. Stale multiplexed connections - existing connections may use old keys
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7724
+     */
     private static function validateSshKey(PrivateKey $privateKey): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        // CRITICAL: Refresh the model from database to avoid stale cached data
+        // This prevents using outdated keys when the Server model was loaded earlier
+        // and the key was subsequently changed in the database
+        $freshPrivateKey = PrivateKey::find($privateKey->id);
+        if (! $freshPrivateKey) {
+            Log::error('SSH key not found in database during validation', [
+                'key_id' => $privateKey->id,
+            ]);
+            throw new \RuntimeException('SSH key not found');
+        }
 
-        if ($keyCheckProcess->exitCode() !== 0) {
-            $privateKey->storeInFileSystem();
+        $disk = Storage::disk('ssh-keys');
+        $filename = "ssh_key@{$freshPrivateKey->uuid}";
+
+        // Check if key file exists
+        if (! $disk->exists($filename)) {
+            Log::debug('SSH key file not found, storing key', [
+                'key_uuid' => $freshPrivateKey->uuid,
+            ]);
+            $freshPrivateKey->storeInFileSystem();
+
+            return;
+        }
+
+        // Verify file content matches database to prevent stale key issues
+        $storedContent = $disk->get($filename);
+        if ($storedContent !== $freshPrivateKey->private_key) {
+            Log::warning('SSH key file content mismatch detected, re-storing key and invalidating connections', [
+                'key_uuid' => $freshPrivateKey->uuid,
+            ]);
+            $freshPrivateKey->storeInFileSystem();
+
+            // Invalidate any multiplexed connections that may be using the old key
+            // This is critical to prevent "Permission denied" errors from stale mux sockets
+            foreach ($freshPrivateKey->servers as $server) {
+                try {
+                    self::removeMuxFile($server);
+                    Log::debug('Invalidated mux connection due to key content mismatch', [
+                        'server_uuid' => $server->uuid,
+                        'key_uuid' => $freshPrivateKey->uuid,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to invalidate mux connection during key validation', [
+                        'server_uuid' => $server->uuid,
+                        'key_uuid' => $freshPrivateKey->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
         }
     }
 
