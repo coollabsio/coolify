@@ -235,6 +235,10 @@
                                 </div>
                                 <x-forms.input canGate="update" :canResource="$serviceDatabase" placeholder="5432"
                                     disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
+                                <x-forms.input canGate="update" :canResource="$serviceDatabase" placeholder="0"
+                                    disabled="{{ $serviceDatabase->is_public }}" id="publicPortTimeout"
+                                    label="Connection Timeout (seconds)"
+                                    helper="Timeout for idle connections in seconds. Set to 0 for no timeout (recommended for long-running queries)." />
                                 @if ($db_url_public)
                                     <x-forms.input label="Database IP:PORT (public)"
                                         helper="Your credentials are available in your environment variables." type="password"
