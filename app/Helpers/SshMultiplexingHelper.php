@@ -213,6 +213,10 @@ class SshMultiplexingHelper
 
     private static function validateSshKey(PrivateKey $privateKey): void
     {
+        // Refresh from database to bypass Eloquent's in-memory caching
+        // This ensures we always have the latest key content after updates
+        $privateKey = PrivateKey::find($privateKey->id);
+        
         $keyLocation = $privateKey->getKeyLocation();
         
         // Check if the key file exists
