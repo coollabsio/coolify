@@ -31,38 +31,88 @@ class SshMultiplexingHelper
 
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
+        $maxRetries = 3;
+        $attempt = 0;
 
-        // Check if connection exists
-        $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
-        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
-            $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
-        }
-        $checkCommand .= "{$server->user}@{$server->ip}";
-        $process = Process::run($checkCommand);
+        while ($attempt < $maxRetries) {
+            try {
+                $attempt++;
+                
+                // Ensure SSH key is valid before attempting connection
+                self::validateSshKey($server->privateKey);
 
-        if ($process->exitCode() !== 0) {
-            return self::establishNewMultiplexedConnection($server);
-        }
+                // Check if connection exists
+                $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
+                if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+                    $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+                }
+                $checkCommand .= "{$server->user}@{$server->ip}";
+                $process = Process::run($checkCommand);
 
-        // Connection exists, ensure we have metadata for age tracking
-        if (self::getConnectionAge($server) === null) {
-            // Existing connection but no metadata, store current time as fallback
-            self::storeConnectionMetadata($server);
-        }
+                if ($process->exitCode() === 0) {
+                    // Connection exists and is healthy
+                    
+                    // Ensure we have metadata for age tracking
+                    if (self::getConnectionAge($server) === null) {
+                        self::storeConnectionMetadata($server);
+                    }
 
-        // Connection exists, check if it needs refresh due to age
-        if (self::isConnectionExpired($server)) {
-            return self::refreshMultiplexedConnection($server);
-        }
+                    // Check if connection needs refresh due to age
+                    if (self::isConnectionExpired($server)) {
+                        return self::refreshMultiplexedConnection($server);
+                    }
 
-        // Perform health check if enabled
-        if (config('constants.ssh.mux_health_check_enabled')) {
-            if (! self::isConnectionHealthy($server)) {
-                return self::refreshMultiplexedConnection($server);
+                    // Perform health check if enabled
+                    if (config('constants.ssh.mux_health_check_enabled')) {
+                        if (! self::isConnectionHealthy($server)) {
+                            // Connection unhealthy, try to refresh
+                            if ($attempt < $maxRetries) {
+                                self::removeMuxFile($server);
+                                sleep(1);
+                                continue;
+                            }
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+
+                // Connection doesn't exist, try to establish
+                if (self::establishNewMultiplexedConnection($server)) {
+                    return true;
+                }
+
+                // If establishment failed, retry with cleanup
+                if ($attempt < $maxRetries) {
+                    Log::warning('SSH multiplexing attempt '.$attempt.' failed, cleaning up and retrying', [
+                        'server' => $server->name ?? $server->ip,
+                        'attempt' => $attempt,
+                        'max_retries' => $maxRetries
+                    ]);
+                    self::removeMuxFile($server);
+                    sleep(1);
+                }
+            } catch (\Exception $e) {
+                Log::warning('SSH multiplexing exception', [
+                    'server' => $server->name ?? $server->ip,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage()
+                ]);
+
+                if ($attempt < $maxRetries) {
+                    self::removeMuxFile($server);
+                    sleep(1);
+                }
             }
         }
 
-        return true;
+        // All retries exhausted, log final failure
+        Log::error('SSH multiplexing failed after '.$maxRetries.' attempts', [
+            'server' => $server->name ?? $server->ip
+        ]);
+        
+        return false;
     }
 
     public static function establishNewMultiplexedConnection(Server $server): bool
@@ -204,10 +254,49 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
+        
+        // Check if key file exists
+        if (!file_exists($keyLocation)) {
+            Log::warning('SSH key file not found, regenerating', ['key_path' => $keyLocation]);
+            $privateKey->storeInFileSystem();
+            return;
+        }
+        
+        // Validate file permissions (SSH requires 0600)
+        $perms = substr(sprintf('%o', fileperms($keyLocation)), -4);
+        if ($perms !== '0600') {
+            Log::warning('SSH key has incorrect permissions, fixing', [
+                'key_path' => $keyLocation,
+                'current_perms' => $perms,
+                'expected_perms' => '0600'
+            ]);
+            chmod($keyLocation, 0600);
+        }
+        
+        // Validate key content is valid
+        $keyContent = file_get_contents($keyLocation);
+        if (empty($keyContent)) {
+            Log::warning('SSH key file is empty, regenerating', ['key_path' => $keyLocation]);
+            $privateKey->storeInFileSystem();
+            return;
+        }
+        
+        // Check for valid PEM format
+        if (!preg_match('/BEGIN.*PRIVATE KEY/', $keyContent)) {
+            Log::error('SSH key file is malformed, regenerating', ['key_path' => $keyLocation]);
+            $privateKey->storeInFileSystem();
+            return;
+        }
+        
+        // Test key accessibility
+        $checkKeyCommand = "ssh-keygen -y -f $keyLocation >/dev/null 2>&1";
         $keyCheckProcess = Process::run($checkKeyCommand);
-
+        
         if ($keyCheckProcess->exitCode() !== 0) {
+            Log::error('SSH key validation failed, regenerating', [
+                'key_path' => $keyLocation,
+                'error' => $keyCheckProcess->errorOutput()
+            ]);
             $privateKey->storeInFileSystem();
         }
     }
@@ -249,6 +338,28 @@ class SshMultiplexingHelper
 
         $process = Process::run($healthCommand);
         $isHealthy = $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
+
+        if (!$isHealthy) {
+            Log::warning('SSH connection health check failed', [
+                'server' => $server->name ?? $server->ip,
+                'error' => $process->errorOutput(),
+                'exit_code' => $process->exitCode()
+            ]);
+            
+            // Attempt to recover the connection
+            self::removeMuxFile($server);
+            sleep(1);
+            
+            // Try to re-establish
+            if (self::establishNewMultiplexedConnection($server)) {
+                Log::info('SSH connection recovered after health check failure', [
+                    'server' => $server->name ?? $server->ip
+                ]);
+                return true;
+            }
+            
+            return false;
+        }
 
         return $isHealthy;
     }
