@@ -35,7 +35,10 @@
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="relative gap-2 cursor-pointer coolbox group">
+                    <div @class([
+                        'relative gap-2 cursor-pointer coolbox group',
+                        'border-l-4' => $project->color,
+                    ]) @if($project->color) style="border-left-color: {{ $project->color }}" @endif>
                         <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }} class="absolute inset-0"></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">

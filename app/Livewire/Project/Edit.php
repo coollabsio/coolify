@@ -14,17 +14,25 @@ class Edit extends Component
 
     public ?string $description = null;
 
+    public ?string $color = null;
+
     protected function rules(): array
     {
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ];
     }
 
     protected function messages(): array
     {
-        return ValidationPatterns::combinedMessages();
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'color.regex' => 'The color must be a valid hex color code (e.g., #FF5733).',
+            ]
+        );
     }
 
     public function mount(string $project_uuid)
@@ -44,10 +52,12 @@ class Edit extends Component
             $this->project->update([
                 'name' => $this->name,
                 'description' => $this->description,
+                'color' => $this->color,
             ]);
         } else {
             $this->name = $this->project->name;
             $this->description = $this->project->description;
+            $this->color = $this->project->color;
         }
     }
 
