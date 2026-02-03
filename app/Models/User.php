@@ -474,4 +474,20 @@ class User extends Authenticatable implements SendsEmail
     {
         return ! empty($this->password);
     }
+
+    /**
+     * Check if the user was created via OAuth.
+     */
+    public function isOauthUser(): bool
+    {
+        return ! empty($this->oauth_provider);
+    }
+
+    /**
+     * Get the OAuth provider the user registered with.
+     */
+    public function getOauthProvider(): ?string
+    {
+        return $this->oauth_provider;
+    }
 }
