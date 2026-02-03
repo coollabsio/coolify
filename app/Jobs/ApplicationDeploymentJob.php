@@ -1797,18 +1797,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
                 }
                 if ($this->container_name) {
-                    $counter = 1;
+                    $attempt = 0;
+                    $failureCounter = 0;
+                    $startPeriodSeconds = (int) $this->application->health_check_start_period;
+                    $startPeriodStartedAt = now();
+                    $startPeriodEndsAt = $startPeriodStartedAt->copy()->addSeconds($startPeriodSeconds);
+                    $isStarted = $startPeriodSeconds === 0;
+                    $status = null;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                     if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
                         $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                     }
-                    $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
-                    $sleeptime = 0;
-                    while ($sleeptime < $this->application->health_check_start_period) {
-                        Sleep::for(1)->seconds();
-                        $sleeptime++;
+                    if ($startPeriodSeconds > 0) {
+                        $this->application_deployment_queue->addLogEntry(
+                            "Healthcheck start period is {$startPeriodSeconds}s. Failures during this period won't count towards retries unless the container becomes healthy first.",
+                        );
                     }
-                    while ($counter <= $this->application->health_check_retries) {
+                    while ($failureCounter <= $this->application->health_check_retries) {
+                        $attempt++;
                         $this->execute_remote_command(
                             [
                                 "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
@@ -1823,7 +1829,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                                 'append' => false,
                             ],
                         );
-                        $this->application_deployment_queue->addLogEntry("Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}");
+
+                        $status = str($this->saved_outputs->get('health_check'))->replace('"', '')->value();
+
+                        if (! $isStarted && now()->greaterThanOrEqualTo($startPeriodEndsAt)) {
+                            $isStarted = true;
+                            $this->application_deployment_queue->addLogEntry('Healthcheck start period elapsed. Counting failures towards retries now.');
+                        }
+
+                        $this->application_deployment_queue->addLogEntry(
+                            "Attempt {$attempt} | Failures {$failureCounter}/{$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}",
+                        );
                         $health_check_logs = data_get(collect(json_decode($this->saved_outputs->get('health_check_logs')))->last(), 'Output', '(no logs)');
                         if (empty($health_check_logs)) {
                             $health_check_logs = '(no logs)';
@@ -1833,25 +1849,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                         }
 
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                        if ($status === 'healthy') {
                             $this->newVersionIsHealthy = true;
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
-                            $this->newVersionIsHealthy = false;
-                            $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
-                            $this->query_logs();
-                            break;
+                        } elseif ($status === 'unhealthy') {
+                            // Docker semantics: failures during start period don't count unless we already succeeded.
+                            if (! $isStarted) {
+                                $this->application_deployment_queue->addLogEntry(
+                                    'Healthcheck failed during start period. Ignoring failure for retry counter.',
+                                );
+                            } else {
+                                $failureCounter++;
+                                if ($failureCounter > $this->application->health_check_retries) {
+                                    $this->newVersionIsHealthy = false;
+                                    $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
+                                    $this->query_logs();
+                                    break;
+                                }
+                            }
                         }
-                        $counter++;
                         $sleeptime = 0;
                         while ($sleeptime < $this->application->health_check_interval) {
                             Sleep::for(1)->seconds();
                             $sleeptime++;
                         }
                     }
-                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    if ($status === 'starting') {
                         $this->query_logs();
                     }
                 }
