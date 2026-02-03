@@ -137,8 +137,11 @@
                 <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                     canGate="update" :canResource="$database" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
+            <x-forms.input placeholder="3306" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="0" id="publicProxyTimeout" type="number"
+                label="Proxy Timeout (seconds)" canGate="update" :canResource="$database"
+                helper="Connection timeout in seconds. 0 = no timeout (recommended for long-running queries)." />
         </div>
         <x-forms.textarea label="Custom MariaDB Configuration" rows="10" id="mariadbConf"
             canGate="update" :canResource="$database" />
