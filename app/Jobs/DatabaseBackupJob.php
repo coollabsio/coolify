@@ -451,9 +451,34 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 BackupCreated::dispatch($this->team->id);
             }
             if ($this->backup_log) {
-                $this->backup_log->update([
-                    'finished_at' => Carbon::now()->toImmutable(),
-                ]);
+                // Ensure finished_at is always set
+                $updateData = ['finished_at' => Carbon::now()->toImmutable()];
+                
+                // If status is still 'running', it means the backup completed but status wasn't updated
+                // This can happen with long-running backups that timeout or are killed
+                if ($this->backup_log->status === 'running') {
+                    // Check if backup file exists and has size > 0
+                    if ($this->backup_location && $this->size > 0) {
+                        $updateData['status'] = 'success';
+                        $updateData['size'] = $this->size;
+                        $updateData['message'] = $this->backup_output ?? 'Backup completed successfully';
+                    } else {
+                        $updateData['status'] = 'failed';
+                        $updateData['message'] = 'Backup job completed but status was not updated properly. This may indicate a timeout or unexpected termination.';
+                    }
+                }
+                
+                $this->backup_log->update($updateData);
+            } elseif ($this->backup_log_uuid) {
+                // Fallback: Try to find and update the backup log by UUID if backup_log is null
+                $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+                if ($log && $log->status === 'running') {
+                    $log->update([
+                        'status' => 'failed',
+                        'message' => 'Backup job completed but backup_log reference was lost. This may indicate a timeout or unexpected termination.',
+                        'finished_at' => Carbon::now()->toImmutable(),
+                    ]);
+                }
             }
         }
     }
