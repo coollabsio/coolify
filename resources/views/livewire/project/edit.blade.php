@@ -32,7 +32,7 @@
                             @click="showPicker = true; $nextTick(() => document.getElementById('colorPicker').click())"
                             class="flex items-center justify-center w-20 h-8 text-xs font-medium border rounded cursor-pointer border-coolgray-300 dark:border-coolgray-500 hover:border-coolgray-400 dark:hover:border-coolgray-400"
                             :style="$wire.color ? 'background-color: ' + $wire.color : ''">
-                            <span :class="$wire.color ? 'text-white mix-blend-difference' : 'dark:text-white'">
+                            <span :class="$wire.color ? getContrastTextColor($wire.color) : 'dark:text-white'">
                                 Select
                             </span>
                         </button>
