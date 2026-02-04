@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ProjectUser;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
 class PermissionsController extends Controller
@@ -57,11 +58,8 @@ class PermissionsController extends Controller
             return invalidTokenResponse();
         }
 
-        $project = Project::where('team_id', $teamId)
-            ->where('uuid', $request->uuid)
-            ->first();
-
-        if (is_null($project)) {
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
@@ -120,29 +118,49 @@ class PermissionsController extends Controller
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function grantProjectAccess(Request $request)
     {
+        $allowedFields = ['user_id', 'permission_level'];
+
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
-        $validated = $request->validate([
-            'user_id' => 'required|integer|exists:users,id',
-            'permission_level' => 'sometimes|string|in:view_only,deploy,full_access',
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'permission_level' => ['sometimes', 'string', 'in:view_only,deploy,full_access'],
         ]);
 
-        $project = Project::where('team_id', $teamId)
-            ->where('uuid', $request->uuid)
-            ->first();
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
 
-        if (is_null($project)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
-        $user = User::find($validated['user_id']);
+        $user = User::find($request->user_id);
 
         // Check if user is part of the team
         if (! $user->teams()->where('teams.id', $teamId)->exists()) {
@@ -158,7 +176,7 @@ class PermissionsController extends Controller
             return response()->json(['message' => 'User already has access to this project.'], 400);
         }
 
-        $permissionLevel = $validated['permission_level'] ?? 'view_only';
+        $permissionLevel = $request->permission_level ?? 'view_only';
 
         $projectUser = ProjectUser::create([
             'project_id' => $project->id,
@@ -211,24 +229,44 @@ class PermissionsController extends Controller
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function updateProjectAccess(Request $request)
     {
+        $allowedFields = ['permission_level'];
+
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
-        $validated = $request->validate([
-            'permission_level' => 'required|string|in:view_only,deploy,full_access',
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'permission_level' => ['required', 'string', 'in:view_only,deploy,full_access'],
         ]);
 
-        $project = Project::where('team_id', $teamId)
-            ->where('uuid', $request->uuid)
-            ->first();
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
 
-        if (is_null($project)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
@@ -236,11 +274,11 @@ class PermissionsController extends Controller
             ->where('user_id', $request->user_id)
             ->first();
 
-        if (is_null($projectUser)) {
+        if (! $projectUser) {
             return response()->json(['message' => 'User access not found.'], 404);
         }
 
-        $projectUser->setPermissions(ProjectUser::getPermissionsForLevel($validated['permission_level']))->save();
+        $projectUser->setPermissions(ProjectUser::getPermissionsForLevel($request->permission_level))->save();
 
         return response()->json(['message' => 'Access updated successfully.']);
     }
@@ -279,11 +317,8 @@ class PermissionsController extends Controller
             return invalidTokenResponse();
         }
 
-        $project = Project::where('team_id', $teamId)
-            ->where('uuid', $request->uuid)
-            ->first();
-
-        if (is_null($project)) {
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
@@ -339,16 +374,13 @@ class PermissionsController extends Controller
             return response()->json(['message' => 'Invalid permission type.'], 400);
         }
 
-        $project = Project::where('team_id', $teamId)
-            ->where('uuid', $request->uuid)
-            ->first();
-
-        if (is_null($project)) {
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
         $user = User::find($request->user_id);
-        if (is_null($user)) {
+        if (! $user) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
