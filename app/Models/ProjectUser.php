@@ -213,4 +213,33 @@ class ProjectUser extends Pivot
     {
         return $this->canView() && ! $this->canDeploy() && ! $this->canManage() && ! $this->canDelete();
     }
+
+    /**
+     * Get permissions array from a permission level string.
+     *
+     * @param  string  $level  One of: view_only, deploy, full_access
+     */
+    public static function getPermissionsForLevel(string $level): array
+    {
+        return match ($level) {
+            'full_access' => self::FULL_ACCESS_PERMISSIONS,
+            'deploy' => self::DEPLOY_PERMISSIONS,
+            default => self::VIEW_ONLY_PERMISSIONS,
+        };
+    }
+
+    /**
+     * Get permission level string from permissions array.
+     */
+    public function getPermissionLevel(): string
+    {
+        if ($this->hasFullAccess()) {
+            return 'full_access';
+        }
+        if ($this->canDeploy()) {
+            return 'deploy';
+        }
+
+        return 'view_only';
+    }
 }

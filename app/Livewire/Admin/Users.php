@@ -165,10 +165,11 @@ class Users extends Component
                 throw new \Exception("User is already a member of {$team->name}");
             }
 
-            $user->teams()->attach($team->id, ['role' => $this->assignRole]);
+            $role = $this->assignRole;
+            $user->teams()->attach($team->id, ['role' => $role]);
 
             $this->reset(['selectedUserId', 'assignTeamId', 'assignRole']);
-            $this->dispatch('success', "User assigned to {$team->name} as {$this->assignRole}");
+            $this->dispatch('success', "User assigned to {$team->name} as {$role}");
             $this->dispatch('refreshUsers');
         } catch (\Exception $e) {
             return handleError(error: $e, livewire: $this);

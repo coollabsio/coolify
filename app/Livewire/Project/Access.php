@@ -71,21 +71,9 @@ class Access extends Component
                 'can_deploy' => $projectUser->canDeploy(),
                 'can_manage' => $projectUser->canManage(),
                 'can_delete' => $projectUser->canDelete(),
-                'permission_level' => $this->getPermissionLevel($projectUser),
+                'permission_level' => $projectUser->getPermissionLevel(),
             ])
             ->toArray();
-    }
-
-    private function getPermissionLevel(ProjectUser $projectUser): string
-    {
-        if ($projectUser->hasFullAccess()) {
-            return 'full_access';
-        }
-        if ($projectUser->canDeploy()) {
-            return 'deploy';
-        }
-
-        return 'view_only';
     }
 
     public function grantAccess()
@@ -101,16 +89,10 @@ class Access extends Component
                 throw new \Exception('User is not a member of this team.');
             }
 
-            $permissions = match ($this->selectedPermissionLevel) {
-                'full_access' => ProjectUser::FULL_ACCESS_PERMISSIONS,
-                'deploy' => ProjectUser::DEPLOY_PERMISSIONS,
-                default => ProjectUser::VIEW_ONLY_PERMISSIONS,
-            };
-
             ProjectUser::create([
                 'project_id' => $this->project->id,
                 'user_id' => $user->id,
-                'permissions' => $permissions,
+                'permissions' => ProjectUser::getPermissionsForLevel($this->selectedPermissionLevel),
             ]);
 
             $this->selectedUserId = '';
@@ -132,13 +114,7 @@ class Access extends Component
                 ->where('project_id', $this->project->id)
                 ->firstOrFail();
 
-            $permissions = match ($level) {
-                'full_access' => ProjectUser::FULL_ACCESS_PERMISSIONS,
-                'deploy' => ProjectUser::DEPLOY_PERMISSIONS,
-                default => ProjectUser::VIEW_ONLY_PERMISSIONS,
-            };
-
-            $projectUser->setPermissions($permissions)->save();
+            $projectUser->setPermissions(ProjectUser::getPermissionsForLevel($level))->save();
             $this->loadData();
 
             $this->dispatch('success', 'Permissions updated.');

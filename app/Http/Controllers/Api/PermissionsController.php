@@ -159,16 +159,11 @@ class PermissionsController extends Controller
         }
 
         $permissionLevel = $validated['permission_level'] ?? 'view_only';
-        $permissions = match ($permissionLevel) {
-            'full_access' => ProjectUser::FULL_ACCESS_PERMISSIONS,
-            'deploy' => ProjectUser::DEPLOY_PERMISSIONS,
-            default => ProjectUser::VIEW_ONLY_PERMISSIONS,
-        };
 
         $projectUser = ProjectUser::create([
             'project_id' => $project->id,
             'user_id' => $user->id,
-            'permissions' => $permissions,
+            'permissions' => ProjectUser::getPermissionsForLevel($permissionLevel),
         ]);
 
         return response()->json([
@@ -245,13 +240,7 @@ class PermissionsController extends Controller
             return response()->json(['message' => 'User access not found.'], 404);
         }
 
-        $permissions = match ($validated['permission_level']) {
-            'full_access' => ProjectUser::FULL_ACCESS_PERMISSIONS,
-            'deploy' => ProjectUser::DEPLOY_PERMISSIONS,
-            default => ProjectUser::VIEW_ONLY_PERMISSIONS,
-        };
-
-        $projectUser->setPermissions($permissions)->save();
+        $projectUser->setPermissions(ProjectUser::getPermissionsForLevel($validated['permission_level']))->save();
 
         return response()->json(['message' => 'Access updated successfully.']);
     }
