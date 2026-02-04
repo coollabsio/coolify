@@ -1,8 +1,21 @@
 # User Role & Access Management Refactoring Proposal
 
-> **Status**: Draft - Awaiting Validation
+> **Status**: VALIDATED
 > **Date**: 2026-02-04
 > **Author**: Claude Code Analysis
+
+## Validated Design Decisions
+
+| Question | Decision |
+|----------|----------|
+| **Default Member Behavior** | Option B: Members require explicit project assignment |
+| **Viewer Role** | Yes, add 4th role "viewer" (read-only) |
+| **Permission Inheritance** | Cascade: Project permissions apply to all environments |
+| **Global Admin Approach** | Use `is_global_admin` flag (deprecate Root Team concept) |
+| **Priority Features** | Environment-level access is priority (moved to Phase 2) |
+| **Audit Trail** | Nice-to-have (deferred to future phase) |
+
+---
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
@@ -89,6 +102,15 @@ Coolify's current user and role management system lacks the flexibility needed f
 | **owner** | 3 | Full team control, can promote to owner, delete team |
 | **admin** | 2 | Manage members (not owner), invite at same/lower level |
 | **member** | 1 | Read-only team access, cannot manage team |
+
+### New Role System (After Refactoring)
+
+| Role | Rank | Capabilities |
+|------|------|--------------|
+| **owner** | 4 | Full team control, can promote to owner, delete team |
+| **admin** | 3 | Manage members (not owner), invite at same/lower level, full resource access |
+| **member** | 2 | Requires explicit project assignment, can perform assigned actions |
+| **viewer** | 1 | Read-only access to assigned projects, cannot modify anything |
 
 ### Current Limitations
 
@@ -619,11 +641,13 @@ CREATE INDEX idx_users_status ON users(status);
 │                              │                                               │
 │                              ▼                                               │
 │   ┌─────────────────────────────────────────────────────────────────────┐  │
-│   │  PHASE 2: Enable Authorization (Gradual)                            │  │
-│   │  ────────────────────────────────────                                │  │
+│   │  PHASE 2: Authorization + Environment Access (Priority)             │  │
+│   │  ───────────────────────────────────────────────                     │  │
+│   │  • Add viewer role to Role enum                                     │  │
+│   │  • Create environment_user pivot table                              │  │
 │   │  • Enable policies one by one (ApplicationPolicy first)            │  │
 │   │  • Add authorization checks to Livewire components                  │  │
-│   │  • Update form components with canGate                              │  │
+│   │  • Implement permission cascade (project → environments)           │  │
 │   │  • Feature flag for new permission system                           │  │
 │   │                                                                      │  │
 │   │  Rollback: Disable feature flag                                     │  │
@@ -643,12 +667,12 @@ CREATE INDEX idx_users_status ON users(status);
 │                              │                                               │
 │                              ▼                                               │
 │   ┌─────────────────────────────────────────────────────────────────────┐  │
-│   │  PHASE 4: Advanced Features (Optional)                               │  │
-│   │  ─────────────────────────────────                                   │  │
-│   │  • Environment-level permissions                                    │  │
-│   │  • Viewer role addition                                             │  │
-│   │  • Audit trail logging                                              │  │
-│   │  • Permission inheritance                                           │  │
+│   │  PHASE 4: Future Enhancements (Nice-to-Have)                        │  │
+│   │  ─────────────────────────────────────────                           │  │
+│   │  • Audit trail logging for permission changes                       │  │
+│   │  • API token granular permissions                                   │  │
+│   │  • Custom role definitions                                          │  │
+│   │  • Permission templates for quick setup                             │  │
 │   │                                                                      │  │
 │   └─────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
@@ -662,9 +686,34 @@ CREATE INDEX idx_users_status ON users(status);
 | User login | Works | Works (unchanged) |
 | Team switching | Works | Works (unchanged) |
 | Role-based access | owner/admin bypass | owner/admin bypass (same) |
-| Member access | All team resources | All team resources (default) |
-| Invitations | Role only | Role + optional permissions |
+| Member access | All team resources | **Requires explicit project assignment** (migration auto-grants existing access) |
+| Invitations | Role only | Role + project permissions |
 | API tokens | Team scoped | Team scoped (unchanged) |
+
+### Migration Data Transformation
+
+To ensure zero disruption for existing users:
+
+```php
+// Migration: Auto-grant existing members access to all current projects
+foreach ($teams as $team) {
+    $members = $team->members()->where('role', 'member')->get();
+    $projects = $team->projects;
+
+    foreach ($members as $member) {
+        foreach ($projects as $project) {
+            // Grant full access to maintain current behavior
+            ProjectUser::create([
+                'user_id' => $member->id,
+                'project_id' => $project->id,
+                'permissions' => ['view' => true, 'deploy' => true, 'manage' => true, 'delete' => true],
+            ]);
+        }
+    }
+}
+```
+
+This ensures existing members retain their current access levels after migration.
 
 ### Feature Flag Implementation
 
@@ -730,7 +779,19 @@ if (config('coolify.features.granular_permissions')) {
 - Migration tests (up/down)
 - Model relationship tests
 
-### Phase 2: Enable Authorization (Estimated: 2 sprints)
+### Phase 2: Authorization + Environment Access (Estimated: 3 sprints)
+
+#### New Role Implementation
+
+1. **Update Role Enum** (`app/Enums/Role.php`)
+   - Add `VIEWER` case with rank 1
+   - Update other ranks: MEMBER=2, ADMIN=3, OWNER=4
+
+2. **Create environment_user pivot table**
+   ```
+   2024_XX_XX_create_environment_user_table.php
+   - Create pivot table for environment-level permissions
+   ```
 
 #### Policy Updates
 
@@ -739,6 +800,7 @@ if (config('coolify.features.granular_permissions')) {
 3. **ServerPolicy** - Enable with team checks
 4. **ServicePolicy** - Enable with project checks
 5. **DatabasePolicy** - Enable with project checks
+6. **EnvironmentPolicy** - Enable with cascaded project permissions
 
 #### Middleware Updates
 
@@ -749,6 +811,25 @@ if (config('coolify.features.granular_permissions')) {
 
 - Add `$this->authorize()` calls to Livewire components
 - Add `canGate` and `canResource` to form components
+
+#### Permission Cascade Implementation
+
+```php
+// Project permissions cascade to all environments by default
+public function hasEnvironmentPermission(Environment $env, string $permission): bool
+{
+    // Check explicit environment permission first
+    if ($this->environmentPermissions()->where('environment_id', $env->id)->exists()) {
+        return $this->environmentPermissions()
+            ->where('environment_id', $env->id)
+            ->first()
+            ->permissions[$permission] ?? false;
+    }
+
+    // Fall back to project permission (cascade)
+    return $this->hasProjectPermission($env->project, $permission);
+}
+```
 
 ### Phase 3: UI & Management (Estimated: 3 sprints)
 
@@ -777,12 +858,12 @@ if (config('coolify.features.granular_permissions')) {
 4. `DELETE /api/v1/projects/{id}/access/{userId}` - Revoke access
 5. `PUT /api/v1/projects/{id}/access/{userId}` - Update permissions
 
-### Phase 4: Advanced Features (Estimated: 2 sprints)
+### Phase 4: Future Enhancements (Estimated: 2 sprints, Nice-to-Have)
 
-1. **Environment-level permissions**
-2. **Viewer role**
-3. **Audit trail**
-4. **Permission inheritance**
+1. **Audit trail logging** - Track permission changes with timestamps and actors
+2. **API token granular permissions** - Allow fine-grained API access control
+3. **Custom role definitions** - Allow teams to define custom roles
+4. **Permission templates** - Pre-defined permission sets for common scenarios
 
 ---
 
@@ -1051,31 +1132,85 @@ it('migrates existing users without breaking access', function () {
 
 ---
 
-## Open Questions for Validation
+## Validated Design Decisions (Answered Questions)
 
-1. **Default Member Behavior**: Should members have access to all projects by default, or require explicit project assignment?
-
-2. **Viewer Role**: Should we add a "viewer" role that's read-only, or use permission-based read-only access?
-
-3. **Permission Inheritance**: Should project permissions automatically apply to all environments, or require environment-level settings?
-
-4. **Global Admin vs Root Team**: Keep "Root Team" concept or switch to "global admin" flag on users?
-
-5. **API Token Permissions**: Should API tokens have granular permissions or inherit from user?
-
-6. **Audit Trail Priority**: How important is audit logging for permission changes?
+| # | Question | Decision | Rationale |
+|---|----------|----------|-----------|
+| 1 | **Default Member Behavior** | Option B: Require explicit project assignment | Provides better security and control |
+| 2 | **Viewer Role** | Yes, add as 4th role | Clean separation between read-only and action-capable users |
+| 3 | **Permission Inheritance** | Cascade from project to environments | Simpler UX, reduces configuration overhead |
+| 4 | **Global Admin** | Use `is_global_admin` flag | Cleaner than Root Team concept, more intuitive |
+| 5 | **API Token Permissions** | Inherit from user (future enhancement) | Keep current behavior, enhance later |
+| 6 | **Audit Trail** | Nice-to-have (deferred) | Focus on core permission system first |
 
 ---
 
 ## Next Steps
 
-1. **Review and Validate**: Please review this proposal and provide feedback
-2. **Prioritize Features**: Identify must-haves vs nice-to-haves
-3. **Technical Spike**: Prototype permission checking trait
-4. **Migration Testing**: Test migration on staging environment
-5. **Documentation**: Update user documentation
+1. ~~**Review and Validate**~~: ✅ Completed - decisions validated
+2. ~~**Prioritize Features**~~: ✅ Completed - env-level is priority
+3. **Create Implementation Tasks**: Break down into atomic PRs
+4. **Technical Spike**: Prototype permission checking trait
+5. **Migration Testing**: Test migration on staging environment
+6. **Documentation**: Update user documentation
 
 ---
 
-*Document Version: 1.0*
+## Implementation Checklist
+
+### Phase 1: Foundation
+- [ ] Migration: Add `is_global_admin` and `status` columns to users table
+- [ ] Migration: Add `permissions` JSON column to team_user table
+- [ ] Migration: Create `permissions` reference table with seed data
+- [ ] Migration: Create `project_user` pivot table
+- [ ] Migration: Auto-grant existing members access to all projects (backward compat)
+- [ ] Model: Create `Permission` model
+- [ ] Model: Create `ProjectUser` pivot model
+- [ ] Trait: Create `HasProjectAccess` trait for User model
+- [ ] Trait: Create `ChecksPermissions` trait for authorization logic
+- [ ] Tests: Unit tests for permission checking
+- [ ] Tests: Migration rollback tests
+
+### Phase 2: Authorization + Environment Access
+- [ ] Enum: Add `VIEWER` role to `Role` enum
+- [ ] Migration: Create `environment_user` pivot table
+- [ ] Model: Create `EnvironmentUser` pivot model
+- [ ] Implement permission cascade (project → environments)
+- [ ] Policy: Enable `ApplicationPolicy` with project checks
+- [ ] Policy: Enable `ProjectPolicy` with team/project checks
+- [ ] Policy: Enable `ServerPolicy` with team checks
+- [ ] Policy: Enable `ServicePolicy` with project checks
+- [ ] Policy: Enable `DatabasePolicy` with project checks
+- [ ] Policy: Enable `EnvironmentPolicy` with cascaded permissions
+- [ ] Middleware: Enable `CanUpdateResource`
+- [ ] Middleware: Enable `CanCreateResources`
+- [ ] Components: Add `authorize()` calls to Livewire components
+- [ ] Components: Add `canGate`/`canResource` to form components
+- [ ] Tests: Feature tests for all policies
+- [ ] Tests: Integration tests for permission cascade
+
+### Phase 3: UI & Management
+- [ ] View: Global user management (`/admin/users`)
+- [ ] View: Project access management (`/project/{id}/access`)
+- [ ] View: Team permission settings (`/team/settings/permissions`)
+- [ ] Component: User creation form (global)
+- [ ] Component: User-to-team assignment
+- [ ] Component: Project permission editor
+- [ ] API: `POST /api/v1/users` - Create global user
+- [ ] API: `GET /api/v1/users` - List all users
+- [ ] API: `POST /api/v1/projects/{id}/access` - Grant access
+- [ ] API: `DELETE /api/v1/projects/{id}/access/{userId}` - Revoke access
+- [ ] API: `PUT /api/v1/projects/{id}/access/{userId}` - Update permissions
+- [ ] Documentation: User guide for permission management
+- [ ] Tests: E2E tests for UI flows
+
+### Phase 4: Future Enhancements (Nice-to-Have)
+- [ ] Audit trail logging
+- [ ] API token granular permissions
+- [ ] Custom role definitions
+- [ ] Permission templates
+
+---
+
+*Document Version: 2.0 (Validated)*
 *Last Updated: 2026-02-04*
