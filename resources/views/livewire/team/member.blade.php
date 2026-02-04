@@ -9,34 +9,53 @@
         {{ $member->email }}
     </td>
     <td class="px-5 py-4 text-sm whitespace-nowrap">
-        {{ data_get($member, 'pivot.role') }}
+        {{ ucfirst(data_get($member, 'pivot.role')) }}
     </td>
     <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
         @can('manageMembers', currentTeam())
             @if ($member->id !== Auth::id())
+                @php
+                    $memberRole = data_get($member, 'pivot.role');
+                @endphp
                 @if (Auth::user()->isOwner())
-                    @if (data_get($member, 'pivot.role') === 'owner')
+                    @if ($memberRole === 'owner')
                         <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
+                        <x-forms.button wire:click="makeMember">To Member</x-forms.button>
+                        <x-forms.button wire:click="makeViewer">To Viewer</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
-                    @if (data_get($member, 'pivot.role') === 'admin')
+                    @if ($memberRole === 'admin')
                         <x-forms.button wire:click="makeOwner">To Owner</x-forms.button>
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
+                        <x-forms.button wire:click="makeMember">To Member</x-forms.button>
+                        <x-forms.button wire:click="makeViewer">To Viewer</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
-                    @if (data_get($member, 'pivot.role') === 'member')
+                    @if ($memberRole === 'member')
                         <x-forms.button wire:click="makeOwner">To Owner</x-forms.button>
                         <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
+                        <x-forms.button wire:click="makeViewer">To Viewer</x-forms.button>
+                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
+                    @endif
+                    @if ($memberRole === 'viewer')
+                        <x-forms.button wire:click="makeOwner">To Owner</x-forms.button>
+                        <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
+                        <x-forms.button wire:click="makeMember">To Member</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
                 @elseif (Auth::user()->isAdmin())
-                    @if (data_get($member, 'pivot.role') === 'admin')
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
+                    @if ($memberRole === 'admin')
+                        <x-forms.button wire:click="makeMember">To Member</x-forms.button>
+                        <x-forms.button wire:click="makeViewer">To Viewer</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
-                    @if (data_get($member, 'pivot.role') === 'member')
+                    @if ($memberRole === 'member')
                         <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
+                        <x-forms.button wire:click="makeViewer">To Viewer</x-forms.button>
+                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
+                    @endif
+                    @if ($memberRole === 'viewer')
+                        <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
+                        <x-forms.button wire:click="makeMember">To Member</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
                 @endif

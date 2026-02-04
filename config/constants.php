@@ -23,6 +23,13 @@ return [
         'contact' => 'https://coolify.io/docs/contact',
     ],
 
+    'features' => [
+        // Enable granular project-level permissions for members/viewers
+        // When false, members have access to all team resources (current behavior)
+        // When true, members require explicit project assignment
+        'granular_permissions' => env('COOLIFY_GRANULAR_PERMISSIONS', false),
+    ],
+
     'services' => [
         // Temporary disabled until cache is implemented
         // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',

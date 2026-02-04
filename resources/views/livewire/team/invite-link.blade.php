@@ -6,8 +6,11 @@
                 @if (auth()->user()->role() === 'owner')
                     <option value="owner">Owner</option>
                 @endif
-                <option value="admin">Admin</option>
+                @if (in_array(auth()->user()->role(), ['owner', 'admin']))
+                    <option value="admin">Admin</option>
+                @endif
                 <option value="member">Member</option>
+                <option value="viewer">Viewer (Read-only)</option>
             </x-forms.select>
         </div>
         <div class="flex gap-2 lg:w-fit w-full">

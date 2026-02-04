@@ -9,14 +9,18 @@ use Illuminate\Auth\Access\Response;
 class ApplicationPolicy
 {
     /**
+     * Check if granular permissions feature is enabled.
+     */
+    protected function isGranularPermissionsEnabled(): bool
+    {
+        return config('constants.features.granular_permissions', false);
+    }
+
+    /**
      * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
         return true;
     }
 
@@ -25,11 +29,11 @@ class ApplicationPolicy
      */
     public function view(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('view', $application);
     }
 
     /**
@@ -37,15 +41,12 @@ class ApplicationPolicy
      */
     public function create(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
+        if (! $this->isGranularPermissionsEnabled()) {
             return true;
         }
 
-        return false;
-        */
-        return true;
+        // Creation requires at least admin role or project-level manage permission
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -53,15 +54,15 @@ class ApplicationPolicy
      */
     public function update(User $user, Application $application): Response
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
+        if (! $this->isGranularPermissionsEnabled()) {
             return Response::allow();
         }
 
-        return Response::deny('As a member, you cannot update this application.<br/><br/>You need at least admin or owner permissions.');
-        */
-        return Response::allow();
+        if ($user->canPerform('update', $application)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You do not have permission to update this application. You need manage permission for this project.');
     }
 
     /**
@@ -69,15 +70,11 @@ class ApplicationPolicy
      */
     public function delete(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
+        if (! $this->isGranularPermissionsEnabled()) {
             return true;
         }
 
-        return false;
-        */
-        return true;
+        return $user->canPerform('delete', $application);
     }
 
     /**
@@ -85,11 +82,11 @@ class ApplicationPolicy
      */
     public function restore(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('update', $application);
     }
 
     /**
@@ -97,11 +94,11 @@ class ApplicationPolicy
      */
     public function forceDelete(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('delete', $application);
     }
 
     /**
@@ -109,11 +106,11 @@ class ApplicationPolicy
      */
     public function deploy(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('deploy', $application);
     }
 
     /**
@@ -121,11 +118,11 @@ class ApplicationPolicy
      */
     public function manageDeployments(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('deploy', $application);
     }
 
     /**
@@ -133,11 +130,12 @@ class ApplicationPolicy
      */
     public function manageEnvironment(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Environment variables require manage permission
+        return $user->canPerform('update', $application);
     }
 
     /**
@@ -145,10 +143,10 @@ class ApplicationPolicy
      */
     public function cleanupDeploymentQueue(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin();
-        */
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 }

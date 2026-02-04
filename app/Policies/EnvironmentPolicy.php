@@ -8,6 +8,14 @@ use App\Models\User;
 class EnvironmentPolicy
 {
     /**
+     * Check if granular permissions feature is enabled.
+     */
+    protected function isGranularPermissionsEnabled(): bool
+    {
+        return config('constants.features.granular_permissions', false);
+    }
+
+    /**
      * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
@@ -20,8 +28,11 @@ class EnvironmentPolicy
      */
     public function view(User $user, Environment $environment): bool
     {
-        // return $user->teams->contains('id', $environment->project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->hasEnvironmentPermission($environment, 'view');
     }
 
     /**
@@ -29,8 +40,12 @@ class EnvironmentPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Only admins and owners can create environments
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -38,8 +53,13 @@ class EnvironmentPolicy
      */
     public function update(User $user, Environment $environment): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Uses project permission cascade
+        return $user->hasEnvironmentPermission($environment, 'manage') ||
+               $user->hasProjectPermission($environment->project, 'manage');
     }
 
     /**
@@ -47,8 +67,11 @@ class EnvironmentPolicy
      */
     public function delete(User $user, Environment $environment): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->hasProjectPermission($environment->project, 'delete');
     }
 
     /**
@@ -56,8 +79,11 @@ class EnvironmentPolicy
      */
     public function restore(User $user, Environment $environment): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->hasProjectPermission($environment->project, 'manage');
     }
 
     /**
@@ -65,7 +91,34 @@ class EnvironmentPolicy
      */
     public function forceDelete(User $user, Environment $environment): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $environment->project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->hasProjectPermission($environment->project, 'delete');
+    }
+
+    /**
+     * Determine whether the user can deploy to the environment.
+     */
+    public function deploy(User $user, Environment $environment): bool
+    {
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->hasEnvironmentPermission($environment, 'deploy');
+    }
+
+    /**
+     * Determine whether the user can access secrets in the environment.
+     */
+    public function accessSecrets(User $user, Environment $environment): bool
+    {
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canAccessEnvironmentSecrets($environment);
     }
 }

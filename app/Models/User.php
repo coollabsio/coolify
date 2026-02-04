@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Traits\ChecksPermissions;
 use App\Traits\DeletesUserSessions;
+use App\Traits\HasProjectAccess;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -39,7 +41,7 @@ use OpenApi\Attributes as OA;
 )]
 class User extends Authenticatable implements SendsEmail
 {
-    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use ChecksPermissions, DeletesUserSessions, HasApiTokens, HasFactory, HasProjectAccess, Notifiable, TwoFactorAuthenticatable;
 
     protected $guarded = [];
 
@@ -55,6 +57,7 @@ class User extends Authenticatable implements SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'is_global_admin' => 'boolean',
     ];
 
     /**
@@ -296,6 +299,12 @@ class User extends Authenticatable implements SendsEmail
 
     public function isInstanceAdmin()
     {
+        // Check the new is_global_admin flag first
+        if ($this->is_global_admin) {
+            return true;
+        }
+
+        // Fall back to legacy root team check for backward compatibility
         $found_root_team = $this->teams->filter(function ($team) {
             if ($team->id == 0) {
                 $role = $team->pivot->role;

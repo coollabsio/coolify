@@ -48,9 +48,18 @@ class InviteLink extends Component
 
             // Prevent privilege escalation: users cannot invite someone with higher privileges
             $userRole = auth()->user()->role();
-            if (is_null($userRole) || ($userRole === 'member' && in_array($this->role, ['admin', 'owner']))) {
+            if (is_null($userRole)) {
+                throw new \Exception('You do not have permission to invite members.');
+            }
+            // Viewers cannot invite anyone
+            if ($userRole === 'viewer') {
+                throw new \Exception('Viewers cannot invite members.');
+            }
+            // Members can only invite viewers or members
+            if ($userRole === 'member' && in_array($this->role, ['admin', 'owner'])) {
                 throw new \Exception('Members cannot invite admins or owners.');
             }
+            // Admins cannot invite owners
             if ($userRole === 'admin' && $this->role === 'owner') {
                 throw new \Exception('Admins cannot invite owners.');
             }

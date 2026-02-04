@@ -2,11 +2,28 @@
 
 namespace App\Policies;
 
+use App\Enums\Role;
 use App\Models\Server;
 use App\Models\User;
 
 class ServerPolicy
 {
+    /**
+     * Check if granular permissions feature is enabled.
+     */
+    protected function isGranularPermissionsEnabled(): bool
+    {
+        return config('constants.features.granular_permissions', false);
+    }
+
+    /**
+     * Check if user is in the server's team.
+     */
+    protected function userInTeam(User $user, Server $server): bool
+    {
+        return $user->teams->contains('id', $server->team_id);
+    }
+
     /**
      * Determine whether the user can view any models.
      */
@@ -20,7 +37,7 @@ class ServerPolicy
      */
     public function view(User $user, Server $server): bool
     {
-        return $user->teams->contains('id', $server->team_id);
+        return $this->userInTeam($user, $server);
     }
 
     /**
@@ -28,8 +45,12 @@ class ServerPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Only admins and owners can create servers
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -37,8 +58,16 @@ class ServerPolicy
      */
     public function update(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Must be in team and have admin/owner role
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -46,8 +75,16 @@ class ServerPolicy
      */
     public function delete(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Must be in team and have admin/owner role
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -71,8 +108,15 @@ class ServerPolicy
      */
     public function manageProxy(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -80,8 +124,15 @@ class ServerPolicy
      */
     public function manageSentinel(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -89,8 +140,15 @@ class ServerPolicy
      */
     public function manageCaCertificate(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -98,7 +156,30 @@ class ServerPolicy
      */
     public function viewSecurity(User $user, Server $server): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $server->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        // Viewers can view security, but members/admins/owners can also view
+        $role = $user->roleInTeam($server->team_id);
+
+        return $role !== null;
+    }
+
+    /**
+     * Determine whether the user can access the server terminal.
+     */
+    public function terminal(User $user, Server $server): bool
+    {
+        if (! $this->userInTeam($user, $server)) {
+            return false;
+        }
+
+        // Terminal access is always restricted to admin/owner
+        return $user->isAdmin() || $user->isOwner();
     }
 }

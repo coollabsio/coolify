@@ -46,7 +46,7 @@ class Member extends Component
         }
     }
 
-    public function makeReadonly()
+    public function makeMember()
     {
         try {
             $this->authorize('manageMembers', currentTeam());
@@ -60,6 +60,30 @@ class Member extends Component
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
+    }
+
+    public function makeViewer()
+    {
+        try {
+            $this->authorize('manageMembers', currentTeam());
+
+            if (Role::from(auth()->user()->role())->lt(Role::ADMIN)
+                || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => Role::VIEWER->value]);
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * @deprecated Use makeMember() instead
+     */
+    public function makeReadonly()
+    {
+        $this->makeMember();
     }
 
     public function remove()

@@ -8,6 +8,14 @@ use App\Models\User;
 class ProjectPolicy
 {
     /**
+     * Check if granular permissions feature is enabled.
+     */
+    protected function isGranularPermissionsEnabled(): bool
+    {
+        return config('constants.features.granular_permissions', false);
+    }
+
+    /**
      * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
@@ -20,8 +28,11 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
-        // return $user->teams->contains('id', $project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('view', $project);
     }
 
     /**
@@ -29,8 +40,12 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        // Only admins and owners can create projects
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -38,8 +53,11 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('update', $project);
     }
 
     /**
@@ -47,8 +65,11 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('delete', $project);
     }
 
     /**
@@ -56,8 +77,11 @@ class ProjectPolicy
      */
     public function restore(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('update', $project);
     }
 
     /**
@@ -65,7 +89,23 @@ class ProjectPolicy
      */
     public function forceDelete(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        if (! $this->isGranularPermissionsEnabled()) {
+            return true;
+        }
+
+        return $user->canPerform('delete', $project);
+    }
+
+    /**
+     * Determine whether the user can manage project access.
+     */
+    public function manageAccess(User $user, Project $project): bool
+    {
+        if (! $this->isGranularPermissionsEnabled()) {
+            return $user->isAdmin() || $user->isOwner();
+        }
+
+        // Only admins and owners can manage project access
+        return $user->isAdmin() || $user->isOwner();
     }
 }
