@@ -1,0 +1,159 @@
+# documentation: https://github.com/taigaio/taiga-docker
+# slogan: The free and open-source project management tool
+# category: productivity
+# tags: taiga,project-management,tool,open,source,angularjs,postgresql
+# logo: svgs/taiga.svg
+
+services:
+  taiga-db:
+    image: 'postgres:16'
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-taiga}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-taiga}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Database password required}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    volumes:
+      - 'taiga-db:/var/lib/postgresql/data'
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER}'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  taiga-back:
+    image: 'taigaio/taiga-back:latest'
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-taiga}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-taiga}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?}'
+      - POSTGRES_HOST=taiga-db
+      - POSTGRES_PORT=5432
+      - 'TAIGA_SCHEME=${TAIGA_SCHEME:-https}'
+      - 'TAIGA_DOMAIN=${TAIGA_DOMAIN:?}'
+      - 'SUBPATH=${SUBPATH:-}'
+      - 'SECRET_KEY=${SECRET_KEY:?}'
+      - 'TAIGA_SECRET_KEY=${SECRET_KEY:?}'
+      - 'RABBITMQ_USER=${RABBITMQ_USER:-taiga}'
+      - 'RABBITMQ_PASS=${RABBITMQ_PASS:-taiga}'
+      - 'RABBITMQ_VHOST=${RABBITMQ_VHOST:-taiga}'
+      - 'RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE:-secret-erlang-cookie}'
+      - 'EMAIL_BACKEND=${EMAIL_BACKEND:-console}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    volumes:
+      - 'taiga-static:/taiga-back/static'
+      - 'taiga-media:/taiga-back/media'
+    depends_on:
+      taiga-db:
+        condition: service_healthy
+    restart: unless-stopped
+    expose:
+      - '8000'
+    labels:
+      - traefik.enable=true
+      - coolify.fqdn=
+      - 'traefik.http.routers.taiga-api.rule=Host(`${TAIGA_DOMAIN:?}`) && (PathPrefix(`/api/`) || PathPrefix(`/admin/`))'
+      - traefik.http.routers.taiga-api.entrypoints=https
+      - traefik.http.routers.taiga-api.tls=true
+      - traefik.http.routers.taiga-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.taiga-api.priority=20
+      - traefik.http.services.taiga-back.loadbalancer.server.port=8000
+  taiga-async:
+    image: 'taigaio/taiga-back:latest'
+    entrypoint:
+      - /taiga-back/docker/async_entrypoint.sh
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-taiga}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-taiga}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?}'
+      - POSTGRES_HOST=taiga-db
+      - POSTGRES_PORT=5432
+      - 'TAIGA_SCHEME=${TAIGA_SCHEME:-https}'
+      - 'TAIGA_DOMAIN=${TAIGA_DOMAIN:?}'
+      - 'SUBPATH=${SUBPATH:-}'
+      - 'SECRET_KEY=${SECRET_KEY:?}'
+      - 'TAIGA_SECRET_KEY=${SECRET_KEY:?}'
+      - 'RABBITMQ_USER=${RABBITMQ_USER:-taiga}'
+      - 'RABBITMQ_PASS=${RABBITMQ_PASS:-taiga}'
+      - 'RABBITMQ_VHOST=${RABBITMQ_VHOST:-taiga}'
+      - 'RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE:-secret-erlang-cookie}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    volumes:
+      - 'taiga-static:/taiga-back/static'
+      - 'taiga-media:/taiga-back/media'
+    depends_on:
+      - taiga-async-rabbitmq
+      - taiga-db
+    restart: unless-stopped
+  taiga-async-rabbitmq:
+    image: 'rabbitmq:3.13-management-alpine'
+    environment:
+      - 'RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE:-secret-erlang-cookie}'
+      - 'RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-taiga}'
+      - 'RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-taiga}'
+      - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-taiga}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    volumes:
+      - 'taiga-async-rabbitmq:/var/lib/rabbitmq'
+    restart: unless-stopped
+  taiga-front:
+    image: 'taigaio/taiga-front:latest'
+    environment:
+      - 'TAIGA_URL=${TAIGA_SCHEME:-https}://${TAIGA_DOMAIN:?}'
+      - 'TAIGA_WEBSOCKETS_URL=${WEBSOCKETS_SCHEME:-wss}://${TAIGA_EVENTS_DOMAIN:?}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    volumes:
+      - 'taiga-static:/taiga-front/dist/static'
+      - 'taiga-media:/taiga-front/dist/media'
+    restart: unless-stopped
+    ports:
+      - '80'
+    labels:
+      - traefik.enable=true
+      - 'coolify.fqdn=${TAIGA_DOMAIN:?}'
+      - 'traefik.http.routers.taiga-front.rule=Host(`${TAIGA_DOMAIN:?}`) && !PathPrefix(`/events`) && !PathPrefix(`/api/`) && !PathPrefix(`/admin/`)'
+      - traefik.http.routers.taiga-front.entrypoints=https
+      - traefik.http.routers.taiga-front.tls=true
+      - traefik.http.routers.taiga-front.tls.certresolver=letsencrypt
+      - traefik.http.routers.taiga-front.priority=1
+      - traefik.http.services.taiga-front.loadbalancer.server.port=80
+  taiga-events:
+    image: 'taigaio/taiga-events:latest'
+    environment:
+      - 'SECRET_KEY=${SECRET_KEY:?}'
+      - 'TAIGA_SECRET_KEY=${SECRET_KEY:?}'
+      - 'RABBITMQ_USER=${RABBITMQ_USER:-taiga}'
+      - 'RABBITMQ_PASS=${RABBITMQ_PASS:-taiga}'
+      - 'RABBITMQ_VHOST=${RABBITMQ_VHOST:-taiga}'
+      - 'RABBITMQ_ERLANG_COOKIE=${RABBITMQ_ERLANG_COOKIE:-secret-erlang-cookie}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    depends_on:
+      - taiga-async-rabbitmq
+    restart: unless-stopped
+    ports:
+      - '3023'
+      - '8088'
+    labels:
+      - traefik.enable=true
+      - 'coolify.fqdn=${TAIGA_EVENTS_DOMAIN:?}'
+      - 'traefik.http.routers.taiga-events.rule=Host(`${TAIGA_EVENTS_DOMAIN:?}`) && PathPrefix(`/events`)'
+      - traefik.http.routers.taiga-events.entrypoints=https
+      - traefik.http.routers.taiga-events.tls=true
+      - traefik.http.routers.taiga-events.tls.certresolver=letsencrypt
+      - traefik.http.routers.taiga-events.priority=100
+      - traefik.http.services.taiga-events.loadbalancer.server.port=8888
+  taiga-protected:
+    image: 'taigaio/taiga-protected:latest'
+    environment:
+      - 'MAX_AGE=${ATTACHMENTS_MAX_AGE:-360}'
+      - 'SECRET_KEY=${SECRET_KEY:?}'
+      - 'TAIGA_SECRET_KEY=${SECRET_KEY:?}'
+      - 'TZ=${TIMEZONE:-America/Monterrey}'
+    restart: unless-stopped
+volumes:
+  taiga-static: null
+  taiga-media: null
+  taiga-db: null
+  taiga-async-rabbitmq: null
+
