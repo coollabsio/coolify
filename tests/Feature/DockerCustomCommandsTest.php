@@ -223,3 +223,15 @@ test('RuntimeWithOtherOptions', function () {
         ->and($output['cap_drop'])->toBe(['ALL'])
         ->and($output['security_opt'])->toBe(['no-new-privileges']);
 });
+
+test('PidsLimitWithEquals', function () {
+    $input = '--pids-limit=1024';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe(['pids_limit' => '1024']);
+});
+
+test('PidsLimitWithoutEquals', function () {
+    $input = '--pids-limit 256';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe(['pids_limit' => '256']);
+});
