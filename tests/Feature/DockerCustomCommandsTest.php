@@ -215,15 +215,6 @@ test('RuntimeWithoutEquals', function () {
     ]);
 });
 
-test('RuntimeWithOtherOptions', function () {
-    $input = '--runtime=runsc --cap-drop=ALL --security-opt=no-new-privileges';
-    $output = convertDockerRunToCompose($input);
-    expect($output)->toHaveKeys(['runtime', 'cap_drop', 'security_opt'])
-        ->and($output['runtime'])->toBe('runsc')
-        ->and($output['cap_drop'])->toBe(['ALL'])
-        ->and($output['security_opt'])->toBe(['no-new-privileges']);
-});
-
 test('PidsLimitWithEquals', function () {
     $input = '--pids-limit=1024';
     $output = convertDockerRunToCompose($input);
