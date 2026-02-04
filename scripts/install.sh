@@ -331,7 +331,7 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos | tencentos) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
     exit
@@ -380,7 +380,7 @@ else
         APT_UPDATED=true
         apt-get install -y curl wget git jq openssl >/dev/null
         ;;
-    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
         if [ "$OS_TYPE" = "amzn" ]; then
             dnf install -y wget git jq openssl >/dev/null
         else
@@ -451,7 +451,7 @@ if [ "$SSH_DETECTED" = "false" ]; then
         systemctl enable ssh >/dev/null 2>&1
         systemctl start ssh >/dev/null 2>&1
         ;;
-    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
         if [ "$OS_TYPE" = "amzn" ]; then
             dnf install -y openssh-server >/dev/null
         else
@@ -591,7 +591,7 @@ if ! [ -x "$(command -v docker)" ]; then
             exit 1
         fi
         ;;
-    "centos" | "fedora" | "rhel")
+    "centos" | "fedora" | "rhel" | "tencentos")
         if [ -x "$(command -v dnf5)" ]; then
             # dnf5 is available
             dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1

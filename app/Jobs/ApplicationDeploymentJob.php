@@ -1208,7 +1208,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             }
 
@@ -1265,8 +1265,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyUrl->__toString());
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyFqdn);
                     }
                 }
 
@@ -1274,7 +1274,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
             }
 
@@ -1476,7 +1476,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($serviceName)->upper()] = escapeBashEnvValue($serviceName);
+                    $envs_dict['SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($serviceName);
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
@@ -1489,8 +1489,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             } else {
@@ -1498,7 +1498,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -1511,8 +1511,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             }
