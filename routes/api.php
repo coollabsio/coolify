@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\OtherController;
+use App\Http\Controllers\Api\PermissionsController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\SecurityController;
@@ -57,6 +58,13 @@ Route::group([
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);
+
+    // Project access/permissions management
+    Route::get('/projects/{uuid}/access', [PermissionsController::class, 'listProjectAccess'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/access', [PermissionsController::class, 'grantProjectAccess'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/access/{user_id}', [PermissionsController::class, 'updateProjectAccess'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/access/{user_id}', [PermissionsController::class, 'revokeProjectAccess'])->middleware(['api.ability:write']);
+    Route::get('/projects/{uuid}/access/{user_id}/check', [PermissionsController::class, 'checkPermission'])->middleware(['api.ability:read']);
 
     Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware(['api.ability:write']);
