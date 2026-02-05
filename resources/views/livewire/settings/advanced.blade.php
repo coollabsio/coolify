@@ -22,6 +22,11 @@
                             label="Registration Allowed" />
                     </div>
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register via OAuth providers (GitHub, GitLab, etc.) even when general registration is disabled. Useful for controlling access through external identity providers."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."
                             label="Do Not Track" />
