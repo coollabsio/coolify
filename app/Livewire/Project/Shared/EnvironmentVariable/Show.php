@@ -54,6 +54,11 @@ class Show extends Component
 
     public array $problematicVariables = [];
 
+    /**
+     * Container name this variable is scoped to (null = all containers).
+     */
+    public ?string $container_name = null;
+
     protected $listeners = [
         'refreshEnvs' => 'refresh',
         'refresh',
@@ -70,6 +75,7 @@ class Show extends Component
         'is_buildtime' => 'required|boolean',
         'real_value' => 'nullable',
         'is_required' => 'required|boolean',
+        'container_name' => 'nullable|string',
     ];
 
     public function mount()
@@ -115,6 +121,12 @@ class Show extends Component
                 $this->env->is_runtime = $this->is_runtime;
                 $this->env->is_buildtime = $this->is_buildtime;
                 $this->env->is_shared = $this->is_shared;
+                // Handle container_name (empty string or 'all' means null = all containers)
+                $containerName = $this->container_name;
+                if ($containerName === '' || $containerName === 'all') {
+                    $containerName = null;
+                }
+                $this->env->container_name = $containerName;
             }
             $this->env->key = $this->key;
             $this->env->value = $this->value;
@@ -134,6 +146,7 @@ class Show extends Component
             $this->is_really_required = $this->env->is_really_required ?? false;
             $this->is_shared = $this->env->is_shared ?? false;
             $this->real_value = $this->env->real_value;
+            $this->container_name = $this->env->container_name;
         }
     }
 

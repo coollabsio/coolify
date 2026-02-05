@@ -1511,42 +1511,89 @@ class Service extends BaseModel
         Storage::disk('local')->delete("tmp/{$filename}");
 
         $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        // Remove old env files (main .env and any per-container .env.* files)
+        $commands[] = 'rm -f .env .env.* || true';
 
-        $envs = collect([]);
-
-        // Generate SERVICE_NAME_* environment variables from docker-compose services
+        // Parse docker-compose to get service names
+        $serviceNames = collect([]);
         if ($this->docker_compose) {
             try {
                 $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
-                foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
-                }
+                $serviceNames = collect(array_keys($services));
             } catch (\Exception $e) {
                 ray($e->getMessage());
             }
         }
 
+        // Get all environment variables
         $envs_from_coolify = $this->environment_variables()->get();
-        $sorted = $envs_from_coolify->sortBy(function ($env) {
-            if (str($env->key)->startsWith('SERVICE_')) {
-                return 1;
-            }
-            if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
-                return 2;
+
+        // Sort function for env vars (SERVICE_* first, then $SERVICE_* references, then others)
+        $sortEnvs = function ($envs) {
+            return $envs->sortBy(function ($env) {
+                if (str($env->key)->startsWith('SERVICE_')) {
+                    return 1;
+                }
+                if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
+                    return 2;
+                }
+
+                return 3;
+            });
+        };
+
+        // Separate global vars (container_name = null) from container-specific vars
+        $globalVars = $envs_from_coolify->whereNull('container_name');
+        $containerVars = $envs_from_coolify->whereNotNull('container_name')->groupBy('container_name');
+
+        // Generate SERVICE_NAME_* variables for all containers (these are always global)
+        $serviceNameVars = collect([]);
+        foreach ($serviceNames as $serviceName) {
+            $serviceNameVars->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+        }
+
+        // Create per-container env files
+        foreach ($serviceNames as $serviceName) {
+            $containerEnvs = collect([]);
+
+            // Add SERVICE_NAME_* vars
+            $containerEnvs = $containerEnvs->merge($serviceNameVars);
+
+            // Add global vars (available to all containers)
+            foreach ($sortEnvs($globalVars) as $env) {
+                $containerEnvs->push("{$env->key}={$env->real_value}");
             }
 
-            return 3;
-        });
-        foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            // Add container-specific vars
+            if ($containerVars->has($serviceName)) {
+                foreach ($sortEnvs($containerVars->get($serviceName)) as $env) {
+                    $containerEnvs->push("{$env->key}={$env->real_value}");
+                }
+            }
+
+            // Write per-container env file
+            $envFileName = ".env.{$serviceName}";
+            if ($containerEnvs->count() === 0) {
+                $commands[] = "touch {$envFileName}";
+            } else {
+                $envs_base64 = base64_encode($containerEnvs->implode("\n"));
+                $commands[] = "echo '{$envs_base64}' | base64 -d | tee {$envFileName} > /dev/null";
+            }
         }
-        if ($envs->count() === 0) {
+
+        // Also create a main .env with only global vars for backward compatibility
+        // (some tools may expect a .env file to exist)
+        $globalEnvs = collect([]);
+        $globalEnvs = $globalEnvs->merge($serviceNameVars);
+        foreach ($sortEnvs($globalVars) as $env) {
+            $globalEnvs->push("{$env->key}={$env->real_value}");
+        }
+        if ($globalEnvs->count() === 0) {
             $commands[] = 'touch .env';
         } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $envs_base64 = base64_encode($globalEnvs->implode("\n"));
+            $commands[] = "echo '{$envs_base64}' | base64 -d | tee .env > /dev/null";
         }
 
         instant_remote_process($commands, $this->server);

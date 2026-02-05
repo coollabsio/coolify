@@ -33,6 +33,17 @@ class Add extends Component
 
     public array $problematicVariables = [];
 
+    /**
+     * Container names from Docker Compose services.
+     * Empty array for non-Docker Compose resources.
+     */
+    public array $containerNames = [];
+
+    /**
+     * Selected container name. Empty string means "all containers".
+     */
+    public string $container_name = '';
+
     protected $listeners = ['clearAddEnv' => 'clear'];
 
     protected $rules = [
@@ -42,6 +53,7 @@ class Add extends Component
         'is_literal' => 'required|boolean',
         'is_runtime' => 'required|boolean',
         'is_buildtime' => 'required|boolean',
+        'container_name' => 'nullable|string',
     ];
 
     protected $validationAttributes = [
@@ -51,6 +63,7 @@ class Add extends Component
         'is_literal' => 'literal',
         'is_runtime' => 'runtime',
         'is_buildtime' => 'buildtime',
+        'container_name' => 'container',
     ];
 
     public function mount()
@@ -136,6 +149,7 @@ class Add extends Component
             'is_runtime' => $this->is_runtime,
             'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
+            'container_name' => $this->container_name,
         ]);
         $this->clear();
     }
@@ -148,5 +162,6 @@ class Add extends Component
         $this->is_literal = false;
         $this->is_runtime = true;
         $this->is_buildtime = true;
+        $this->container_name = '';
     }
 }

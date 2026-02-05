@@ -16,6 +16,16 @@
         </div>
     @endif
 
+    @if (count($containerNames) > 0)
+        <x-forms.select id="container_name" label="Available To"
+            helper="Select which container(s) should have access to this variable. 'All Containers' makes it available everywhere, while selecting a specific container restricts access for security.">
+            <option value="">All Containers</option>
+            @foreach ($containerNames as $name)
+                <option value="{{ $name }}">{{ $name }}</option>
+            @endforeach
+        </x-forms.select>
+    @endif
+
     @if (!$shared)
         <x-forms.checkbox id="is_buildtime"
             helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."

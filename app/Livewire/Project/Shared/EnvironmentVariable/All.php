@@ -5,7 +5,9 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\Yaml\Yaml;
 
 class All extends Component
 {
@@ -32,6 +34,33 @@ class All extends Component
         'refreshEnvs',
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
+
+    /**
+     * Get available container names for Docker Compose services.
+     * Returns empty array for non-Docker Compose resources.
+     */
+    #[Computed]
+    public function containerNames(): array
+    {
+        // Only Services and Docker Compose Applications have multiple containers
+        if ($this->resource->type() !== 'service' && data_get($this->resource, 'build_pack') !== 'dockercompose') {
+            return [];
+        }
+
+        $dockerCompose = data_get($this->resource, 'docker_compose');
+        if (! $dockerCompose) {
+            return [];
+        }
+
+        try {
+            $parsed = Yaml::parse($dockerCompose);
+            $services = data_get($parsed, 'services', []);
+
+            return array_keys($services);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
 
     public function mount()
     {
@@ -242,6 +271,13 @@ class All extends Component
         $environment->is_preview = $data['is_preview'] ?? false;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
+
+        // Set container_name for Docker Compose services (null means all containers)
+        $containerName = $data['container_name'] ?? null;
+        if ($containerName === '' || $containerName === 'all') {
+            $containerName = null;
+        }
+        $environment->container_name = $containerName;
 
         return $environment;
     }

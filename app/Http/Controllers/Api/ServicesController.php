@@ -1128,6 +1128,7 @@ class ServicesController extends Controller
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'container_name' => ['type' => 'string', 'nullable' => true, 'description' => 'The container name this variable is scoped to. Null or empty means all containers (default).'],
                         ],
                     ),
                 ),
@@ -1249,6 +1250,7 @@ class ServicesController extends Controller
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'container_name' => ['type' => 'string', 'nullable' => true, 'description' => 'The container name this variable is scoped to. Null or empty means all containers (default).'],
                                     ],
                                 ),
                             ],
@@ -1318,6 +1320,7 @@ class ServicesController extends Controller
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
+                'container_name' => 'string|nullable',
             ]);
 
             if ($validator->fails()) {
@@ -1372,6 +1375,7 @@ class ServicesController extends Controller
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'container_name' => ['type' => 'string', 'nullable' => true, 'description' => 'The container name this variable is scoped to. Null or empty means all containers (default).'],
                     ],
                 ),
             ),
@@ -1430,6 +1434,7 @@ class ServicesController extends Controller
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
+            'container_name' => 'string|nullable',
         ]);
 
         if ($validator->fails()) {

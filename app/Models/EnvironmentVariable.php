@@ -25,6 +25,7 @@ use OpenApi\Attributes as OA;
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
         'version' => ['type' => 'string'],
+        'container_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Container name this variable is scoped to. Null means all containers.'],
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
     ]
@@ -43,6 +44,7 @@ class EnvironmentVariable extends BaseModel
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
+        'container_name' => 'string',
     ];
 
     protected $appends = ['real_value', 'is_shared', 'is_really_required', 'is_nixpacks', 'is_coolify'];

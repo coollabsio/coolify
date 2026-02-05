@@ -4,6 +4,19 @@
         'border-error' => $is_really_required,
         'dark:border-coolgray-300 border-neutral-200' => !$is_really_required,
     ])>
+        @if ($type === 'service' && $container_name)
+            <div class="flex items-center gap-2 text-xs">
+                <span class="px-2 py-1 rounded bg-coolgray-200 dark:bg-coolgray-400 text-neutral-600 dark:text-neutral-200">
+                    Container: {{ $container_name }}
+                </span>
+            </div>
+        @elseif ($type === 'service' && !$container_name)
+            <div class="flex items-center gap-2 text-xs">
+                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                    All Containers
+                </span>
+            </div>
+        @endif
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">
                 <x-forms.input disabled id="key" />

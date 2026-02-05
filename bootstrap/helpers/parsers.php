@@ -1317,11 +1317,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // Auto-inject per-container .env file so Coolify environment variables are available inside containers
+        // Each container gets its own env file (.env.<serviceName>) with only the variables scoped to it
+        // This prevents container A from accessing container B's secrets (security fix for issue #7655)
         $existingEnvFiles = data_get($service, 'env_file');
+        $containerEnvFile = ".env.{$serviceName}";
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push($containerEnvFile)
             ->unique()
             ->values();
 
@@ -2416,11 +2418,13 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Auto-inject per-container .env file so Coolify environment variables are available inside containers
+        // Each container gets its own env file (.env.<serviceName>) with only the variables scoped to it
+        // This prevents container A from accessing container B's secrets (security fix for issue #7655)
         $existingEnvFiles = data_get($service, 'env_file');
+        $containerEnvFile = ".env.{$serviceName}";
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push($containerEnvFile)
             ->unique()
             ->values();
 
