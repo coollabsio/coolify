@@ -1190,7 +1190,16 @@ All notable changes to this project will be documented in this file.
 - *(service)* Update autobase to version 2.5 (#7923)
 - *(service)* Add chibisafe template (#5808)
 - *(ui)* Improve sidebar menu items styling (#7928)
-- *(service)* Improve open-archiver
+- *(template)* Add open archiver template (#6593)
+- *(service)* Add linkding template (#6651)
+- *(service)* Add glip template (#7937)
+- *(templates)* Add Sessy docker compose template (#7951)
+- *(api)* Add update urls support to services api
+- *(api)* Improve service urls update
+- *(api)* Add url update support to services api (#7929)
+- *(api)* Improve docker_compose_domains
+- *(api)* Add more allowed fields
+- *(notifications)* Add mattermost notifications (#7963)
 
 ### 🐛 Bug Fixes
 
@@ -3773,6 +3782,7 @@ All notable changes to this project will be documented in this file.
 - *(scheduling)* Change redis cleanup command frequency from hourly to weekly for better resource management
 - *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.5 and 4.0.0-beta.420.6
 - *(database)* Ensure internal port defaults correctly for unsupported database types in StartDatabaseProxy
+- *(git)* Tracking issue due to case sensitivity
 - *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.6 and 4.0.0-beta.420.7
 - *(scheduling)* Remove unnecessary padding from scheduled task form layout for improved UI consistency
 - *(horizon)* Update queue configuration to use environment variable for dynamic queue management
@@ -3796,7 +3806,6 @@ All notable changes to this project will be documented in this file.
 - *(service)* Triliumnext platform and link
 - *(application)* Update service environment variables when generating domain for Docker Compose
 - *(application)* Add option to suppress toast notifications when loading compose file
-- *(git)* Tracking issue due to case sensitivity
 - *(git)* Tracking issue due to case sensitivity
 - *(git)* Tracking issue due to case sensitivity
 - *(ui)* Delete button width on small screens (#6308)
@@ -4422,6 +4431,23 @@ All notable changes to this project will be documented in this file.
 - *(api)* Deprecate applications compose endpoint
 - *(api)* Applications post and patch endpoints
 - *(api)* Applications create and patch endpoints (#7917)
+- *(service)* Sftpgo port
+- *(env)* Only cat .env file in dev
+- *(api)* Encoding checks (#7944)
+- *(env)* Only show nixpacks plan variables section in dev
+- Switch custom labels check to UTF-8
+- *(api)* One click service name and description cannot be set during creation
+- *(ui)* Improve volume mount warning for compose applications (#7947)
+- *(api)* Show an error if the same 2 urls are provided
+- *(preview)* Docker compose preview URLs (#7959)
+- *(api)* Check domain conflicts within the request
+- *(api)* Include docker_compose_domains in domain conflict check
+- *(api)* Is_static and docker network missing
+- *(api)* If domains field is empty clear the fqdn column
+- *(api)* Application endpoint issues part 2 (#7948)
+- Optimize queries and caching for projects and environments
+- *(perf)* Eliminate N+1 queries from InstanceSettings and Server lookups (#7966)
+- Update version numbers to 4.0.0-beta.462 and 4.0.0-beta.463
 
 ### 💼 Other
 
@@ -5510,6 +5536,7 @@ All notable changes to this project will be documented in this file.
 - Move all env sorting to one place
 - *(api)* Make docker_compose_raw description more clear
 - *(api)* Update application create endpoints docs
+- *(api)* Application urls validation
 
 ### 📚 Documentation
 
@@ -5616,7 +5643,6 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - *(tests)* Update testing guidelines for unit and feature tests
 - *(sync)* Create AI Instructions Synchronization Guide and update CLAUDE.md references
-- Update changelog
 - *(database-patterns)* Add critical note on mass assignment protection for new columns
 - Clarify cloud-init script compatibility
 - Update changelog
@@ -5647,7 +5673,9 @@ All notable changes to this project will be documented in this file.
 - Update application architecture and database patterns for request-level caching best practices
 - Remove git worktree symlink instructions from CLAUDE.md
 - Remove git worktree symlink instructions from CLAUDE.md (#7908)
-- Update changelog
+- Add transcript lol link and logo to readme (#7331)
+- *(api)* Change domains to urls
+- *(api)* Improve domains API docs
 
 ### ⚡ Performance
 
@@ -6293,10 +6321,10 @@ All notable changes to this project will be documented in this file.
 - *(versions)* Update Coolify versions to 4.0.0-beta.420.2 and 4.0.0-beta.420.3 in multiple files
 - *(versions)* Bump coolify and nightly versions to 4.0.0-beta.420.3 and 4.0.0-beta.420.4 respectively
 - *(versions)* Update coolify and nightly versions to 4.0.0-beta.420.4 and 4.0.0-beta.420.5 respectively
-- *(service)* Update Nitropage template (#6181)
-- *(versions)* Update all version
 - *(bump)* Update composer deps
 - *(version)* Bump Coolify version to 4.0.0-beta.420.6
+- *(service)* Update Nitropage template (#6181)
+- *(versions)* Update all version
 - *(service)* Improve matrix service
 - *(service)* Format runner service
 - *(service)* Improve sequin
@@ -6399,6 +6427,10 @@ All notable changes to this project will be documented in this file.
 - *(services)* Upgrade service template json files
 - *(api)* Update openapi json and yaml
 - *(api)* Regenerate openapi docs
+- Prepare for PR
+- *(api)* Improve current request error message
+- *(api)* Improve current request error message
+- *(api)* Update openapi files
 
 ### ◀️ Revert
 
