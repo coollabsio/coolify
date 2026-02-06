@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use App\Rules\ValidGithubUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -204,8 +205,8 @@ class GithubController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
             'organization' => 'nullable|string|max:255',
-            'api_url' => 'required|string|url',
-            'html_url' => 'required|string|url',
+            'api_url' => ['required', 'string', 'url', new ValidGithubUrl],
+            'html_url' => ['required', 'string', 'url', new ValidGithubUrl],
             'custom_user' => 'nullable|string|max:255',
             'custom_port' => 'nullable|integer|min:1|max:65535',
             'app_id' => 'required|integer',
@@ -587,10 +588,10 @@ class GithubController extends Controller
                 $rules['organization'] = 'nullable|string';
             }
             if (isset($payload['api_url'])) {
-                $rules['api_url'] = 'url';
+                $rules['api_url'] = ['url', new ValidGithubUrl];
             }
             if (isset($payload['html_url'])) {
-                $rules['html_url'] = 'url';
+                $rules['html_url'] = ['url', new ValidGithubUrl];
             }
             if (isset($payload['custom_user'])) {
                 $rules['custom_user'] = 'string';
