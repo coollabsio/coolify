@@ -8,6 +8,7 @@ use Livewire\Component;
 class SettingsOauth extends Component
 {
     public $oauth_settings_map;
+    public $oauth_auto_redirect;
 
     protected function rules()
     {
@@ -28,6 +29,7 @@ class SettingsOauth extends Component
         if (! isInstanceAdmin()) {
             return redirect()->route('home');
         }
+        $this->oauth_auto_redirect = instanceSettings()->oauth_auto_redirect;
         $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
             $carry[$setting->provider] = [
                 'id' => $setting->id,
@@ -83,6 +85,9 @@ class SettingsOauth extends Component
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
         } else {
+            $settings = instanceSettings();
+            $settings->update(['oauth_auto_redirect' => $this->oauth_auto_redirect]);
+
             $errors = [];
             foreach (array_values($this->oauth_settings_map) as $settingData) {
                 $oauth = OauthSetting::find($settingData['id']);
