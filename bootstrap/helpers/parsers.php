@@ -647,6 +647,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $serviceNameEnvironments = generateDockerComposeServiceName($services, $pullRequestId);
     }
 
+    $persistComposeDatabases = $resource->build_pack === 'dockercompose' && ! $isPullRequest;
+
     // Parse the rest of the services
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
@@ -681,6 +683,26 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage($image, $service);
+        if ($persistComposeDatabases) {
+            if ($isDatabase) {
+                ServiceDatabase::withTrashed()
+                    ->where('application_id', $resource->id)
+                    ->where('name', $serviceName)
+                    ->restore();
+
+                ServiceDatabase::updateOrCreate([
+                    'application_id' => $resource->id,
+                    'name' => $serviceName,
+                ], [
+                    'service_id' => null,
+                    'image' => $image,
+                ]);
+            } else {
+                ServiceDatabase::where('application_id', $resource->id)
+                    ->where('name', $serviceName)
+                    ->delete();
+            }
+        }
         $volumesParsed = collect([]);
 
         $baseName = generateApplicationContainerName(
@@ -1345,6 +1367,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         $parsedServices->put($serviceName, $payload);
+    }
+
+    if ($persistComposeDatabases) {
+        // Remove stale database records if a service was removed or no longer detected as a database.
+        $currentServiceNames = collect($services)->keys()->values();
+        ServiceDatabase::where('application_id', $resource->id)
+            ->whereNotIn('name', $currentServiceNames->toArray())
+            ->delete();
     }
     $topLevel->put('services', $parsedServices);
 

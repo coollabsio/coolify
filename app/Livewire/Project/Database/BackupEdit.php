@@ -155,12 +155,7 @@ class BackupEdit extends Component
         }
 
         try {
-            $server = null;
-            if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
-            } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
-                $server = $this->backup->database->destination->server;
-            }
+            $server = $this->backup->server();
 
             $filenames = $this->backup->executions()
                 ->whereNotNull('filename')
@@ -185,12 +180,23 @@ class BackupEdit extends Component
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
 
-                return redirect()->route('project.service.database.backups', [
-                    'project_uuid' => $this->parameters['project_uuid'],
-                    'environment_uuid' => $this->parameters['environment_uuid'],
-                    'service_uuid' => $serviceDatabase->service->uuid,
-                    'stack_service_uuid' => $serviceDatabase->uuid,
-                ]);
+                if ($serviceDatabase->service) {
+                    return redirect()->route('project.service.database.backups', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'service_uuid' => $serviceDatabase->service->uuid,
+                        'stack_service_uuid' => $serviceDatabase->uuid,
+                    ]);
+                }
+                if ($serviceDatabase->application) {
+                    return redirect()->route('project.application.backups', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'application_uuid' => $serviceDatabase->application->uuid,
+                    ]);
+                }
+
+                return redirect()->route('project.resource.index', $this->parameters);
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }

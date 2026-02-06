@@ -196,6 +196,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+        Route::get('/backups', ApplicationConfiguration::class)->name('project.application.backups');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
@@ -327,10 +328,9 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
-            } else {
-                $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            $server = $execution->scheduledDatabaseBackup->server();
+            if (! $server) {
+                return response()->json(['message' => 'Server not found.'], 404);
             }
 
             $privateKeyLocation = $server->privateKey->getKeyLocation();

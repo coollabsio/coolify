@@ -20,6 +20,10 @@
                 href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Environment Variables</span></a>
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Persistent Storage</span></a>
+            @if ($application->build_pack === 'dockercompose')
+                <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Backups</span></a>
+            @endif
             @if ($application->git_based())
                 <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.source', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Git Source</span></a>
@@ -78,6 +82,8 @@
                 <livewire:project.shared.environment-variable.all :resource="$application" />
             @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
+            @elseif ($currentRoute === 'project.application.backups' && $application->build_pack === 'dockercompose')
+                <livewire:project.application.backups :application="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())
                 <livewire:project.application.source :application="$application" />
             @elseif ($currentRoute === 'project.application.servers')

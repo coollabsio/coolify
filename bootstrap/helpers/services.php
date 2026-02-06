@@ -29,8 +29,8 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
-            $workdir = $oneService->service->workdir();
-            $server = $oneService->service->server;
+            $workdir = $oneService->workdir();
+            $server = $oneService->service?->server ?? $oneService->application?->destination?->server;
         }
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([

@@ -90,10 +90,18 @@ class GetContainersStatus
         $databases = $this->server->databases();
         $services = $this->server->services()->get();
         $previews = $this->server->previews();
+        $composeServiceDatabases = ServiceDatabase::query()
+            ->whereNotNull('application_id')
+            ->whereIn('application_id', $this->applications->pluck('id'))
+            ->get();
+        $composeServiceDatabasesByKey = $composeServiceDatabases->keyBy(function (ServiceDatabase $db) {
+            return "{$db->application_id}:{$db->name}";
+        });
         $foundApplications = [];
         $foundApplicationPreviews = [];
         $foundDatabases = [];
         $foundServices = [];
+        $foundComposeServiceDatabaseIds = [];
 
         foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
@@ -153,6 +161,19 @@ class GetContainersStatus
                         }
                         if ($containerName) {
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                        }
+                        if ($containerName) {
+                            $composeDbKey = "{$applicationId}:{$containerName}";
+                            $composeDb = $composeServiceDatabasesByKey->get($composeDbKey);
+                            if ($composeDb) {
+                                $foundComposeServiceDatabaseIds[] = $composeDb->id;
+                                $statusFromDb = $composeDb->status;
+                                if ($statusFromDb !== $containerStatus) {
+                                    $composeDb->update(['status' => $containerStatus]);
+                                } else {
+                                    $composeDb->update(['last_online_at' => now()]);
+                                }
+                            }
                         }
 
                         // Track restart counts for applications
@@ -408,6 +429,21 @@ class GetContainersStatus
                 $url = null;
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+        }
+
+        // Mark docker-compose Application databases as exited if no matching container is running.
+        if ($composeServiceDatabases->isNotEmpty()) {
+            $notRunningComposeDatabaseIds = $composeServiceDatabases->pluck('id')->diff(collect($foundComposeServiceDatabaseIds));
+            foreach ($notRunningComposeDatabaseIds as $composeDbId) {
+                $composeDb = $composeServiceDatabases->firstWhere('id', $composeDbId);
+                if (! $composeDb) {
+                    continue;
+                }
+                if (str($composeDb->status)->startsWith('exited')) {
+                    continue;
+                }
+                $composeDb->update(['status' => 'exited']);
+            }
         }
 
         // Aggregate multi-container application statuses

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
@@ -27,7 +28,11 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query
+                ->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +41,11 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query
+                ->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -51,8 +60,29 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        if ($this->service) {
+            $container_id = $this->name.'-'.$this->service->uuid;
+            remote_process(["docker restart {$container_id}"], $this->service->server);
+
+            return;
+        }
+        if ($this->application) {
+            // For docker-compose Applications, the container name can include a deployment suffix,
+            // so we resolve it on the server from the stable prefix "<serviceName>-<applicationUuid>".
+            $prefix = "{$this->name}-{$this->application->uuid}";
+            $server = $this->application->destination?->server;
+            if (! $server) {
+                return;
+            }
+            $container_id = instant_remote_process([
+                "docker ps --format '{{.Names}}' --filter \"name={$prefix}\" | grep -v -- '-pr-' | head -n 1",
+            ], $server, false);
+            $container_id = trim((string) $container_id);
+            if ($container_id === '') {
+                return;
+            }
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
 
     public function isRunning()
@@ -114,8 +144,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->service?->server ?? $this->application?->destination?->server;
+        if (! $server) {
+            return '';
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +158,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return $this->service?->environment?->project?->team
+            ?? $this->application?->environment?->project?->team;
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        if ($this->service) {
+            return service_configuration_dir()."/{$this->service->uuid}";
+        }
+        if ($this->application) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
+        return service_configuration_dir().'/';
     }
 
-    public function service()
+    public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

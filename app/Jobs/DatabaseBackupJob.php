@@ -93,7 +93,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                $this->server = $this->database->service?->server
+                    ?? $this->database->application?->destination?->server;
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -110,16 +111,40 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             BackupCreated::dispatch($this->team->id);
 
             $status = str(data_get($this->database, 'status'));
-            if (! $status->startsWith('running') && $this->database->id !== 0) {
-                return;
+            $serviceDatabaseIsFromApplication =
+                data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class &&
+                $this->database instanceof ServiceDatabase &&
+                $this->database->application &&
+                ! $this->database->service;
+
+            // For docker-compose Application databases, status updates are best-effort; resolve running container instead.
+            if (! $serviceDatabaseIsFromApplication) {
+                if (! $status->startsWith('running') && $this->database->id !== 0) {
+                    return;
+                }
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
-                if (str($databaseType)->contains('postgres')) {
+                if ($this->database->service) {
+                    $serviceUuid = $this->database->service->uuid;
+                    $parentName = str($this->database->service->name)->slug();
                     $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->directory_name = $parentName.'-'.$this->container_name;
+                } elseif ($this->database->application) {
+                    $parentName = str($this->database->application->name)->slug();
+                    $prefix = "{$this->database->name}-{$this->database->application->uuid}";
+                    $this->container_name = instant_remote_process([
+                        "docker ps --format '{{.Names}}' --filter \"name={$prefix}\" | grep -v -- '-pr-' | head -n 1",
+                    ], $this->server, false, false, null, disableMultiplexing: true);
+                    $this->container_name = trim((string) $this->container_name);
+                    if ($this->container_name === '') {
+                        return;
+                    }
+                    $this->directory_name = $parentName.'-'.$this->container_name;
+                } else {
+                    throw new \Exception('ServiceDatabase parent not found (Service or Application).');
+                }
+                if (str($databaseType)->contains('postgres')) {
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -149,8 +174,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -172,8 +195,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('MYSQL_DATABASE not found');
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -210,8 +231,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
 
                     // Try to extract MongoDB credentials from environment variables
                     try {
@@ -630,9 +649,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                $network = data_get($this->database, 'service.destination.network')
+                    ?? data_get($this->database, 'application.destination.network');
             } else {
                 $network = $this->database->destination->network;
+            }
+            if (blank($network)) {
+                throw new \Exception('Network not found?!');
             }
 
             $fullImageName = $this->getFullImageName();

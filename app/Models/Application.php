@@ -905,6 +905,11 @@ class Application extends BaseModel
         return $this->belongsTo(Environment::class);
     }
 
+    public function serviceDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function previews()
     {
         return $this->hasMany(ApplicationPreview::class)->orderBy('pull_request_id', 'desc');
