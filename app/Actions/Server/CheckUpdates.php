@@ -67,7 +67,7 @@ class CheckUpdates
             $packageManager = match ($osType) {
                 'arch' => 'pacman',
                 'alpine' => 'apk',
-                'ubuntu', 'debian', 'raspbian' => 'apt',
+                'ubuntu', 'debian', 'raspbian', 'trixie' => 'apt',
                 'centos', 'fedora', 'rhel', 'ol', 'rocky', 'almalinux', 'amzn' => 'dnf',
                 'sles', 'opensuse-leap', 'opensuse-tumbleweed' => 'zypper',
                 default => null
@@ -162,7 +162,7 @@ class CheckUpdates
             return [
                 'total_updates' => 0,
                 'updates' => [],
-                'error' => 'Error parsing zypper output: '.$e->getMessage(),
+                'error' => 'Error parsing zypper output: ' . $e->getMessage(),
             ];
         }
     }
@@ -264,7 +264,7 @@ class CheckUpdates
         ];
 
         // Include unparsed lines in the result for debugging if any exist
-        if (! empty($unparsedLines)) {
+        if (!empty($unparsedLines)) {
             $result['unparsed_lines'] = $unparsedLines;
             \Illuminate\Support\Facades\Log::debug('Pacman output contained unparsed lines', [
                 'unparsed_lines' => $unparsedLines,

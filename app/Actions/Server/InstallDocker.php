@@ -17,18 +17,18 @@ class InstallDocker
     {
         $this->dockerVersion = config('constants.docker.minimum_required_version');
         $supported_os_type = $server->validateOS();
-        if (! $supported_os_type) {
+        if (!$supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
         }
 
-        if (! $server->sslCertificates()->where('is_ca_certificate', true)->exists()) {
+        if (!$server->sslCertificates()->where('is_ca_certificate', true)->exists()) {
             $serverCert = SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $server->id,
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+            $caCertPath = config('constants.coolify.base_config_path') . '/ssl/';
 
             $commands = collect([
                 "mkdir -p $caCertPath",
@@ -116,35 +116,41 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
-        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
-            '. /etc/os-release && '.
-            'install -m 0755 -d /etc/apt/keyrings && '.
-            'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
-            'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
-            'apt-get update && '.
-            'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
+        return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (" .
+            '. /etc/os-release && ' .
+            'install -m 0755 -d /etc/apt/keyrings && ' .
+            'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && ' .
+            'chmod a+r /etc/apt/keyrings/docker.asc && ' .
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && ' .
+            'apt-get update && ' .
+            'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || ' .
+            '(' .
+            'echo "Failed to install Docker for ${VERSION_CODENAME}. Fallback to bookworm repo." && ' .
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} bookworm stable" > /etc/apt/sources.list.d/docker.list && ' .
+            'apt-get update && ' .
+            'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin' .
+            ')' .
             ')';
     }
 
     private function getRhelDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
-            'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
-            'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
-            'systemctl start docker && '.
-            'systemctl enable docker'.
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (" .
+            'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && ' .
+            'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && ' .
+            'systemctl start docker && ' .
+            'systemctl enable docker' .
             ')';
     }
 
     private function getSuseDockerInstallCommand(): string
     {
-        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
-            'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && '.
-            'zypper refresh && '.
-            'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
-            'systemctl start docker && '.
-            'systemctl enable docker'.
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (" .
+            'zypper addrepo https://download.docker.com/linux/sles/docker-ce.repo && ' .
+            'zypper refresh && ' .
+            'zypper install -y --no-confirm docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && ' .
+            'systemctl start docker && ' .
+            'systemctl enable docker' .
             ')';
     }
 
@@ -154,8 +160,8 @@ class InstallDocker
         // Partial upgrades (-Sy without -u) are discouraged on Arch Linux
         // as they can lead to broken dependencies and system instability
         // Use --needed to skip reinstalling packages that are already up-to-date (idempotent)
-        return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
-            'systemctl enable docker.service && '.
+        return 'pacman -Syu --noconfirm --needed docker docker-compose && ' .
+            'systemctl enable docker.service && ' .
             'systemctl start docker.service';
     }
 
