@@ -30,17 +30,19 @@ class Backups extends Component
 
         $this->parameters = get_route_parameters();
 
-        // Ensure compose databases are detected and persisted.
-        // This is idempotent and keeps the Backups UI in sync with the compose file.
-        try {
-            if ($this->application->build_pack === 'dockercompose' && filled($this->application->docker_compose_raw)) {
-                $this->application->parse();
-            }
-        } catch (\Throwable) {
-            // Parsing errors are shown on the General page; backups can still render with whatever is available.
-        }
-
         $this->databases = $this->application->serviceDatabases()->orderBy('name')->get();
+        if ($this->databases->isEmpty()) {
+            // Ensure compose databases are detected and persisted.
+            // This is idempotent and keeps the Backups UI in sync with the compose file.
+            try {
+                if ($this->application->build_pack === 'dockercompose' && filled($this->application->docker_compose_raw)) {
+                    $this->application->parse();
+                }
+            } catch (\Throwable) {
+                // Parsing errors are shown on the General page; backups can still render with whatever is available.
+            }
+            $this->databases = $this->application->serviceDatabases()->orderBy('name')->get();
+        }
 
         if (! $this->selectedDatabaseUuid && $this->databases->isNotEmpty()) {
             $this->selectedDatabaseUuid = $this->databases->first()->uuid;
@@ -61,4 +63,3 @@ class Backups extends Component
         return view('livewire.project.application.backups');
     }
 }
-
