@@ -349,7 +349,7 @@ class DeployController extends Controller
 
         $uuids = $request->input('uuid');
         $tags = $request->input('tag');
-        $force = $request->input('force') ?? false;
+        $force = filter_var($request->input('force', false), FILTER_VALIDATE_BOOLEAN);
         $pr = $request->input('pr') ? max((int) $request->input('pr'), 0) : 0;
 
         if ($uuids && $tags) {
