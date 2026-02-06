@@ -2418,29 +2418,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
-            // For docker-compose Applications (GitHub App path), persist detected databases so backups can be scheduled.
-            // Previews are excluded from backups, so we only create records for the main deployment.
-            if ($resource instanceof Application && $resource->build_pack === 'dockercompose' && $pull_request_id === 0) {
-                if ($isDatabase) {
-                    ServiceDatabase::withTrashed()
-                        ->where('application_id', $resource->id)
-                        ->where('name', $serviceName)
-                        ->restore();
-
-                    ServiceDatabase::updateOrCreate([
-                        'application_id' => $resource->id,
-                        'name' => $serviceName,
-                    ], [
-                        'service_id' => null,
-                        'image' => $image,
-                    ]);
-                } else {
-                    ServiceDatabase::where('application_id', $resource->id)
-                        ->where('name', $serviceName)
-                        ->delete();
-                }
-            }
-
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -2818,13 +2795,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             return $service;
         });
-        if ($resource instanceof Application && $resource->build_pack === 'dockercompose' && $pull_request_id === 0) {
-            // Remove stale database records if a service was removed or no longer detected as a database.
-            $currentServiceNames = $services->keys()->values();
-            ServiceDatabase::where('application_id', $resource->id)
-                ->whereNotIn('name', $currentServiceNames->toArray())
-                ->delete();
-        }
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
                 $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
