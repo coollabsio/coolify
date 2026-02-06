@@ -319,7 +319,7 @@ EOD;
                 abort(404, 'Server not found for this service database.');
             }
             $this->serverId = $server->id;
-            $this->container = $resource->name.'-'.$resource->service->uuid;
+            $this->container = $resource->name.'-'.$resource->parentUuid();
             $this->resourceUuid = $resource->uuid; // Use ServiceDatabase's own UUID
 
             // Determine database type for ServiceDatabase
@@ -633,7 +633,8 @@ EOD;
 
             // Get the database destination network
             if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
+                $destination = $this->resource->destination();
+                $destinationNetwork = $destination ? ($destination->network ?? 'coolify') : 'coolify';
             } else {
                 $destinationNetwork = $this->resource->destination->network ?? 'coolify';
             }

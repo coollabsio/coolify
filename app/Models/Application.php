@@ -490,6 +490,11 @@ class Application extends BaseModel
         return $this->hasOne(ApplicationSetting::class);
     }
 
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');

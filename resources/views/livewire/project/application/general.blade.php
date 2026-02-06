@@ -68,6 +68,28 @@
                         @endif
                     @endif
 
+                    @if ($application->databases()->count() > 0)
+                        <h3 class="pt-6">Databases</h3>
+                        <div class="flex flex-col gap-2">
+                            @foreach ($application->databases as $db)
+                                <div class="flex items-center gap-2">
+                                    <span>{{ $db->name }} ({{ $db->databaseType() }})</span>
+                                    @if ($db->isBackupSolutionAvailable())
+                                        <a href="{{ route('project.application.database.backups', [
+                                            'project_uuid' => $application->environment->project->uuid,
+                                            'environment_uuid' => $application->environment->uuid,
+                                            'application_uuid' => $application->uuid,
+                                            'database_uuid' => $db->uuid,
+                                        ]) }}"
+                                            class="text-xs underline">
+                                            Backups
+                                        </a>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
                 </div>
             @endif
             @if ($isStatic || $buildPack === 'static')

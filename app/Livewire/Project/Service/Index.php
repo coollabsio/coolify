@@ -137,7 +137,7 @@ class Index extends Component
 
     private function initializeDatabaseProperties(): void
     {
-        $this->server = $this->serviceDatabase->service->destination->server;
+        $this->server = $this->serviceDatabase->server();
         if ($this->serviceDatabase->is_public) {
             $this->db_url_public = $this->serviceDatabase->getServiceDatabaseUrl();
         }
@@ -221,7 +221,7 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceDatabase);
-            if (! $this->serviceDatabase->service->destination->server->isLogDrainEnabled()) {
+            if (! $this->serviceDatabase->server()->isLogDrainEnabled()) {
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
