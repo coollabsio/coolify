@@ -29,6 +29,8 @@ class OauthSetting extends Model
             case 'authentik':
             case 'clerk':
                 return filled($this->client_id) && filled($this->client_secret) && filled($this->base_url);
+            case 'keycloak':
+                return filled($this->client_id) && filled($this->client_secret) && filled($this->base_url) && filled($this->tenant);
             default:
                 return filled($this->client_id) && filled($this->client_secret);
         }

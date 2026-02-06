@@ -43,6 +43,7 @@
         "socialiteproviders/discord": "^4.2",
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/infomaniak": "^4.0",
+        "socialiteproviders/keycloak": "^5.3",
         "socialiteproviders/microsoft-azure": "^5.2",
         "socialiteproviders/zitadel": "^4.2",
         "spatie/laravel-activitylog": "^4.10.2",
