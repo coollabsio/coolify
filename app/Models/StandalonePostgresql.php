@@ -28,9 +28,23 @@ class StandalonePostgresql extends BaseModel
     protected static function booted()
     {
         static::created(function ($database) {
+            // This is really stupid and it took me 1h to figure out why the image was not loading properly. This is exactly the reason why we need to use the action pattern because Model events and Accessors are a fragile mess!
+            $image = (string) ($database->getAttributes()['image'] ?? '');
+            $majorVersion = 0;
+
+            if (preg_match('/:(?:pg)?(\d+)/i', $image, $matches)) {
+                $majorVersion = (int) $matches[1];
+            }
+
+            // PostgreSQL 18+ uses /var/lib/postgresql as mount path
+            // Older versions use /var/lib/postgresql/data
+            $mountPath = $majorVersion >= 18
+                ? '/var/lib/postgresql'
+                : '/var/lib/postgresql/data';
+
             LocalPersistentVolume::create([
                 'name' => 'postgres-data-'.$database->uuid,
-                'mount_path' => '/var/lib/postgresql/data',
+                'mount_path' => $mountPath,
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),

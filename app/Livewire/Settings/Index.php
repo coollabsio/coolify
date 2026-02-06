@@ -14,7 +14,7 @@ class Index extends Component
 
     public ?Server $server = null;
 
-    #[Validate('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
     #[Validate('required|integer|min:1025|max:65535')]
@@ -45,6 +45,11 @@ class Index extends Component
     public bool $forceSaveDomains = false;
 
     public $buildActivityId = null;
+
+    protected array $messages = [
+        'fqdn.url' => 'Invalid instance URL.',
+        'fqdn.max' => 'URL must not exceed 255 characters.',
+    ];
 
     public function render()
     {

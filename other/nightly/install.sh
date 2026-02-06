@@ -331,7 +331,7 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos | tencentos) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
     exit
@@ -370,7 +370,7 @@ else
     arch)
         pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
         ;;
-    alpine)
+    alpine | postmarketos)
         sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
         apk update >/dev/null
         apk add curl wget git jq openssl >/dev/null
@@ -380,7 +380,7 @@ else
         APT_UPDATED=true
         apt-get install -y curl wget git jq openssl >/dev/null
         ;;
-    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
         if [ "$OS_TYPE" = "amzn" ]; then
             dnf install -y wget git jq openssl >/dev/null
         else
@@ -437,7 +437,7 @@ if [ "$SSH_DETECTED" = "false" ]; then
         systemctl enable sshd >/dev/null 2>&1
         systemctl start sshd >/dev/null 2>&1
         ;;
-    alpine)
+    alpine | postmarketos)
         apk add openssh >/dev/null
         rc-update add sshd default >/dev/null 2>&1
         service sshd start >/dev/null 2>&1
@@ -451,7 +451,7 @@ if [ "$SSH_DETECTED" = "false" ]; then
         systemctl enable ssh >/dev/null 2>&1
         systemctl start ssh >/dev/null 2>&1
         ;;
-    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
         if [ "$OS_TYPE" = "amzn" ]; then
             dnf install -y openssh-server >/dev/null
         else
@@ -558,7 +558,7 @@ if ! [ -x "$(command -v docker)" ]; then
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
         ;;
-    "alpine")
+    "alpine" | "postmarketos")
         apk add docker docker-cli-compose >/dev/null 2>&1
         rc-update add docker default >/dev/null 2>&1
         service docker start >/dev/null 2>&1
@@ -591,7 +591,7 @@ if ! [ -x "$(command -v docker)" ]; then
             exit 1
         fi
         ;;
-    "centos" | "fedora" | "rhel")
+    "centos" | "fedora" | "rhel" | "tencentos")
         if [ -x "$(command -v dnf5)" ]; then
             # dnf5 is available
             dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
