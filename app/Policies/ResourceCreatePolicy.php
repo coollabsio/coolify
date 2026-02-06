@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\Application;
+use App\Models\GithubApp;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -38,8 +39,7 @@ class ResourceCreatePolicy
      */
     public function createAny(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -51,8 +51,7 @@ class ResourceCreatePolicy
             return false;
         }
 
-        //  return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
