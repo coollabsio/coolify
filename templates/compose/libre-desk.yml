@@ -1,0 +1,111 @@
+# documentation: https://docs.libredesk.io
+# slogan: Modern, open source, self-hosted customer support desk. Single binary app.
+# tags: helpdesk, support, ticketing, customer-support
+# logo: svgs/libredesk-dark.svg
+# port: 9000
+
+services:
+  libredesk:
+    image: 'libredesk/libredesk:latest'
+    container_name: libredesk_app
+    restart: unless-stopped
+    ports:
+      - '9000:9000'
+    environment:
+      - 'LIBREDESK_SYSTEM_USER_PASSWORD=${SERVICE_PASSWORD_LIBREDESK:?}'
+      - LIBREDESK_APP__LOG_LEVEL=debug
+      - LIBREDESK_APP__ENV=dev
+      - LIBREDESK_APP__CHECK_UPDATES=true
+      - 'LIBREDESK_APP__ENCRYPTION_KEY=${SERVICE_BASE64_LIBREDESK:?}'
+      - 'LIBREDESK_APP__SERVER__ADDRESS=0.0.0.0:9000'
+      - LIBREDESK_APP__SERVER__SOCKET=
+      - LIBREDESK_APP__SERVER__DISABLE_SECURE_COOKIES=false
+      - LIBREDESK_APP__SERVER__READ_TIMEOUT=5s
+      - LIBREDESK_APP__SERVER__WRITE_TIMEOUT=5s
+      - LIBREDESK_APP__SERVER__MAX_BODY_SIZE=104857600
+      - LIBREDESK_APP__SERVER__READ_BUFFER_SIZE=4096
+      - LIBREDESK_APP__SERVER__KEEPALIVE_TIMEOUT=10s
+      - LIBREDESK_UPLOAD__PROVIDER=fs
+      - LIBREDESK_UPLOAD__FS__UPLOAD_PATH=uploads
+      - LIBREDESK_UPLOAD__S3__URL=
+      - LIBREDESK_UPLOAD__S3__ACCESS_KEY=
+      - LIBREDESK_UPLOAD__S3__SECRET_KEY=
+      - LIBREDESK_UPLOAD__S3__REGION=us-east-1
+      - LIBREDESK_UPLOAD__S3__BUCKET=
+      - LIBREDESK_UPLOAD__S3__BUCKET_PATH=uploads
+      - LIBREDESK_UPLOAD__S3__EXPIRY=30m
+      - LIBREDESK_DB__HOST=db
+      - LIBREDESK_DB__PORT=5432
+      - 'LIBREDESK_DB__USER=${SERVICE_USER_DB:?}'
+      - 'LIBREDESK_DB__PASSWORD=${SERVICE_PASSWORD_DB:?}'
+      - LIBREDESK_DB__DATABASE=libredesk
+      - LIBREDESK_DB__SSL_MODE=disable
+      - LIBREDESK_DB__MAX_OPEN=30
+      - LIBREDESK_DB__MAX_IDLE=30
+      - LIBREDESK_DB__MAX_LIFETIME=300s
+      - 'LIBREDESK_REDIS__ADDRESS=redis:6379'
+      - LIBREDESK_REDIS__USER=
+      - LIBREDESK_REDIS__PASSWORD=
+      - LIBREDESK_REDIS__DB=0
+      - LIBREDESK_MESSAGE__OUTGOING_QUEUE_WORKERS=10
+      - LIBREDESK_MESSAGE__INCOMING_QUEUE_WORKERS=10
+      - LIBREDESK_MESSAGE__MESSAGE_OUTGOING_SCAN_INTERVAL=50ms
+      - LIBREDESK_MESSAGE__INCOMING_QUEUE_SIZE=5000
+      - LIBREDESK_MESSAGE__OUTGOING_QUEUE_SIZE=5000
+      - LIBREDESK_NOTIFICATION__CONCURRENCY=2
+      - LIBREDESK_NOTIFICATION__QUEUE_SIZE=2000
+      - LIBREDESK_AUTOMATION__WORKER_COUNT=10
+      - LIBREDESK_AUTOASSIGNER__AUTOASSIGN_INTERVAL=5m
+      - LIBREDESK_WEBHOOK__WORKERS=5
+      - LIBREDESK_WEBHOOK__QUEUE_SIZE=10000
+      - LIBREDESK_WEBHOOK__TIMEOUT=15s
+      - LIBREDESK_CONVERSATION__UNSNOOZE_INTERVAL=5m
+      - LIBREDESK_CONVERSATION__DRAFT_RETENTION_PERIOD=360h
+      - LIBREDESK_SLA__EVALUATION_INTERVAL=5m
+    networks:
+      - libredesk
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - './uploads:/libredesk/uploads:rw'
+    command:
+      - sh
+      - '-c'
+      - './libredesk --install --idempotent-install --yes --config="" && ./libredesk --upgrade --yes --config="" && ./libredesk --config=""'
+  db:
+    image: 'postgres:17-alpine'
+    container_name: libredesk_db
+    restart: unless-stopped
+    networks:
+      - libredesk
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_DB:?}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB:?}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-libredesk}'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${SERVICE_USER_DB:?} -d ${POSTGRES_DB:-libredesk}'
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+  redis:
+    image: 'redis:7-alpine'
+    container_name: libredesk_redis
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6379:6379'
+    networks:
+      - libredesk
+    volumes:
+      - 'redis-data:/data'
+networks:
+  libredesk: null
+volumes:
+  postgres-data: null
+  redis-data: null
