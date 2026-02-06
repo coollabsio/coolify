@@ -18,8 +18,10 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex flex-wrap items-end gap-2">
                         <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="Domain"
-                                helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
+                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
+                                helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br>
+                                <span class='dark:text-warning text-coollabs'>Important: </span>
+                                If you want the dashboard to be accessible over HTTPS, you must include <b>https://</b> at the start of the URL. Without it, the dashboard will use HTTP and won’t be secured."
                                 placeholder="https://coolify.yourdomain.com" />
                             <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name" placeholder="Coolify"
                                 helper="Custom name for your Coolify instance, shown in the URL." />

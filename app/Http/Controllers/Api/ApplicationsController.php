@@ -20,6 +20,7 @@ use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -893,8 +894,8 @@ class ApplicationsController extends Controller
      * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is an unstable duplicate of POST /api/v1/services.
      */
     #[OA\Post(
-        summary: 'Create (Docker Compose) (Deprecated)',
-        description: 'Create new application based on a docker-compose file (without git).',
+        summary: 'Create (Docker Compose)',
+        description: 'Deprecated: Use POST /api/v1/services instead.',
         path: '/applications/dockercompose',
         operationId: 'create-dockercompose-application',
         deprecated: true,
@@ -1344,24 +1345,28 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Failed to generate Github App token.'], 400);
             }
 
-            $repositories = collect();
-            $page = 1;
-            $repositories = loadRepositoryByPage($githubApp, $token, $page);
-            if ($repositories['total_count'] > 0) {
-                while (count($repositories['repositories']) < $repositories['total_count']) {
-                    $page++;
-                    $repositories = loadRepositoryByPage($githubApp, $token, $page);
-                }
-            }
-
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
-            $gitRepositoryFound = collect($repositories['repositories'])->firstWhere('full_name', $gitRepository);
-            if (! $gitRepositoryFound) {
-                return response()->json(['message' => 'Repository not found.'], 404);
+            $gitRepository = str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+
+            // Use direct API call to verify repository access instead of loading all repositories
+            // This is much faster and avoids timeouts for GitHub Apps with many repositories
+            $response = Http::GitHub($githubApp->api_url, $token)
+                ->timeout(20)
+                ->retry(3, 200, throw: false)
+                ->get("/repos/{$gitRepository}");
+
+            if ($response->status() === 404 || $response->status() === 403) {
+                return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
             }
+
+            if (! $response->successful()) {
+                return response()->json(['message' => 'Failed to verify repository access: '.($response->json()['message'] ?? 'Unknown error')], 400);
+            }
+
+            $gitRepositoryFound = $response->json();
             $repository_project_id = data_get($gitRepositoryFound, 'id');
 
             $application = new Application;
