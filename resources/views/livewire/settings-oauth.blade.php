@@ -14,7 +14,7 @@
             <div class="pb-4 ">Custom authentication (OAuth) configurations.</div>
         </div>
         <div class="mb-5">
-            <x-forms.select label="Forced OAuth Login" id="oauth_auto_redirect" helper="If selected, users will be automatically redirected to this provider when visiting the login page.<br>To bypass this, use <code>/login?skip_oauth=true</code> (not implemented yet, but good practice to know).">
+            <x-forms.select label="Forced OAuth Login" id="oauth_auto_redirect" helper="If selected, users will be automatically redirected to this provider when visiting the login page.<br>To bypass this, use <code>/login?skip_oauth=true</code>.">
                 <option value="">None</option>
                 @foreach ($oauth_settings_map as $oauth_setting)
                     @if ($oauth_setting['enabled'])
