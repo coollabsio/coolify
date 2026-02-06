@@ -115,8 +115,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->parentUuid();
                 $parentResource = $this->database->parentResource();
+                if (is_null($parentResource)) {
+                    throw new \Exception('Parent resource (Service or Application) not found for ServiceDatabase #'.$this->database->id);
+                }
+                $serviceUuid = $parentResource->uuid;
                 $serviceName = str($parentResource->name)->slug();
                 if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
@@ -631,7 +634,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
-                $network = $this->database->destination()->network;
+                $network = $this->database->getDestination()->network;
             } else {
                 $network = $this->database->destination->network;
             }

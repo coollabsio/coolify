@@ -191,13 +191,10 @@ class ServiceDatabase extends BaseModel
     /**
      * Get the destination (network) for this database.
      */
-    public function destination()
+    public function getDestination()
     {
         $parent = $this->parentResource();
-        if ($parent instanceof Service) {
-            return $parent->destination;
-        }
-        if ($parent instanceof Application) {
+        if ($parent) {
             return $parent->destination;
         }
 

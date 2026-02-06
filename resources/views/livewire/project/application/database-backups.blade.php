@@ -1,10 +1,10 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($application, 'name')->limit(10) }} >
+        {{ data_get_str($serviceDatabase, 'name')->limit(10) }} > Backups | Coolify
+    </x-slot>
     <livewire:project.application.heading :application="$application" :parameters="$parameters" />
     <div class="w-full">
-        <x-slot:title>
-            {{ data_get_str($application, 'name')->limit(10) }} >
-            {{ data_get_str($serviceDatabase, 'name')->limit(10) }} > Backups | Coolify
-        </x-slot>
         <div class="flex gap-2">
             <h2 class="pb-4">Scheduled Backups</h2>
             @can('update', $serviceDatabase)

@@ -28,6 +28,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         if ($oneService->getMorphClass() === \App\Models\Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
+        } elseif ($oneService instanceof \App\Models\ServiceDatabase) {
+            $workdir = $oneService->workdir();
+            $server = $oneService->server();
         } else {
             $workdir = $oneService->service->workdir();
             $server = $oneService->service->server;

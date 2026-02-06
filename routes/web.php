@@ -329,10 +329,11 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+            $database = $execution->scheduledDatabaseBackup->database;
+            if ($database instanceof \App\Models\ServiceDatabase) {
+                $server = $database->server();
             } else {
-                $server = $execution->scheduledDatabaseBackup->database->destination->server;
+                $server = $database->destination->server;
             }
 
             $privateKeyLocation = $server->privateKey->getKeyLocation();

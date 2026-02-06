@@ -68,7 +68,7 @@
                         @endif
                     @endif
 
-                    @if ($application->databases()->count() > 0)
+                    @if ($application->databases->count() > 0)
                         <h3 class="pt-6">Databases</h3>
                         <div class="flex flex-col gap-2">
                             @foreach ($application->databases as $db)

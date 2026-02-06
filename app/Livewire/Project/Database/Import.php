@@ -633,7 +633,7 @@ EOD;
 
             // Get the database destination network
             if ($this->resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $destination = $this->resource->destination();
+                $destination = $this->resource->getDestination();
                 $destinationNetwork = $destination ? ($destination->network ?? 'coolify') : 'coolify';
             } else {
                 $destinationNetwork = $this->resource->destination->network ?? 'coolify';
