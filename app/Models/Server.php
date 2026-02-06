@@ -1054,7 +1054,7 @@ $schema://$host {
         // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
         // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
         $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
+            if (str($supportedOs)->explode(' ')->contains($ID)) {
                 return str($ID);
             }
         });
