@@ -1047,18 +1047,25 @@ $schema://$host {
         $releaseLines = collect(explode("\n", $os_release));
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
-            $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
+            $parts = explode('=', $line, 2);
+            if (count($parts) === 2) {
+                $key = trim($parts[0]);
+                $value = trim($parts[1], " \t\n\r\0\x0B\"");
+                $collectedData->put($key, strtolower($value));
+            }
         }
         $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
-            }
+        $ID_LIKE = data_get($collectedData, 'ID_LIKE', '');
+
+        $idsToCheck = collect([$ID])->concat(explode(' ', $ID_LIKE))->filter()->unique();
+
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOsGroup) use ($idsToCheck) {
+            return $idsToCheck->contains(function ($id) use ($supportedOsGroup) {
+                return str_contains($supportedOsGroup, $id);
+            });
         });
-        if ($supported->count() === 1) {
+
+        if ($supported->isNotEmpty()) {
             return str($supported->first());
         } else {
             return false;
