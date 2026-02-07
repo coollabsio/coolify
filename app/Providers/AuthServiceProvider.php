@@ -38,6 +38,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\StandaloneKeydb::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneDragonfly::class => \App\Policies\DatabasePolicy::class,
         \App\Models\StandaloneClickhouse::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneSurrealdb::class => \App\Policies\DatabasePolicy::class,
 
         // Notification policies - all use the shared NotificationPolicy
         \App\Models\EmailNotificationSettings::class => \App\Policies\NotificationPolicy::class,

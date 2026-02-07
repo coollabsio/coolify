@@ -243,6 +243,12 @@ class Select extends Component
                 'description' => 'ClickHouse is a column-oriented database that supports real-time analytics, business intelligence, observability, ML and GenAI, and more.',
                 'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="215" height="90" viewBox="0 0 100 43" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_378_10860)"><rect x="2.70837" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="7.2085" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="11.7086" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="16.2076" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="20.7087" y="10.7502" width="2.24992" height="4.49985" rx="0.236664" fill="currentColor"/></g></svg></div>',
             ],
+            [
+                'id' => 'surrealdb',
+                'name' => 'SurrealDB',
+                'description' => 'SurrealDB is a scalable, distributed, document-graph database for modern applications.',
+                'logo' => '<svg class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><path fill="currentColor" d="M64 0C28.7 0 0 28.7 0 64s28.7 64 64 64 64-28.7 64-64S99.3 0 64 0zm0 120c-30.9 0-56-25.1-56-56S33.1 8 64 8s56 25.1 56 56-25.1 56-56 56z"/><path fill="currentColor" d="M64 24c-22.1 0-40 17.9-40 40s17.9 40 40 40 40-17.9 40-40-17.9-40-40-40zm0 72c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"/><circle fill="currentColor" cx="64" cy="64" r="16"/></svg>',
+            ],
 
         ];
 
@@ -284,6 +290,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'surrealdb':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;

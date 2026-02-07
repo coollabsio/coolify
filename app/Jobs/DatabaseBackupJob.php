@@ -12,6 +12,7 @@ use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSurrealdb;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
@@ -38,7 +39,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneSurrealdb|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -255,6 +256,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mysql_database];
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $databasesToBackup = [$this->database->mariadb_database];
+                } elseif (str($databaseType)->contains('surrealdb')) {
+                    $databasesToBackup = ['*'];
                 } else {
                     return;
                 }
@@ -276,6 +279,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = array_map('trim', $databasesToBackup);
                 } elseif (str($databaseType)->contains('mariadb')) {
                     // Format: db1,db2,db3
+                    $databasesToBackup = explode(',', $databasesToBackup);
+                    $databasesToBackup = array_map('trim', $databasesToBackup);
+                } elseif (str($databaseType)->contains('surrealdb')) {
+                    // Format: namespace1/database1,namespace2/database2
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
                 } else {
@@ -370,6 +377,22 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mariadb($database);
+                    } elseif (str($databaseType)->contains('surrealdb')) {
+                        if ($database === '*') {
+                            $databaseName = 'all';
+                        } else {
+                            $databaseName = str($database)->replace('/', '-');
+                        }
+                        $this->backup_file = "/surrealdb-dump-$databaseName-".Carbon::now()->timestamp.'.surql';
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $databaseName,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        $this->backup_standalone_surrealdb($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -583,6 +606,54 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec $this->container_name mariadb-dump -u root -p\"{$this->database->mariadb_root_password}\" $escapedDatabase > $this->backup_location";
             }
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function backup_standalone_surrealdb(string $database): void
+    {
+        try {
+            $commands[] = 'mkdir -p '.$this->backup_dir;
+            
+            // Build the export command
+            $exportCmd = '/surreal export';
+            $exportCmd .= ' --endpoint http://localhost:8000';
+            $exportCmd .= ' --username '.escapeshellarg($this->database->surrealdb_user);
+            $exportCmd .= ' --password '.escapeshellarg($this->database->surrealdb_password);
+            
+            if ($database === '*') {
+                // Export all namespaces and databases
+                $exportCmd .= ' --namespace "*"';
+                $exportCmd .= ' --database "*"';
+            } else {
+                // Export specific namespace/database
+                // Format: namespace/database or just database
+                if (str($database)->contains('/')) {
+                    $namespace = str($database)->before('/');
+                    $db = str($database)->after('/');
+                    $exportCmd .= ' --namespace '.escapeshellarg($namespace);
+                    $exportCmd .= ' --database '.escapeshellarg($db);
+                } else {
+                    // If only database name provided, use default namespace
+                    $exportCmd .= ' --namespace "*"';
+                    $exportCmd .= ' --database '.escapeshellarg($database);
+                }
+            }
+            
+            $exportCmd .= ' /tmp/backup.surql';
+            
+            // Execute export inside container and copy to host
+            $commands[] = "docker exec $this->container_name $exportCmd";
+            $commands[] = "docker cp $this->container_name:/tmp/backup.surql $this->backup_location";
+            $commands[] = "docker exec $this->container_name rm -f /tmp/backup.surql";
+            
             $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {

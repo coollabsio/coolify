@@ -354,7 +354,8 @@ EOD;
             $resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
             $resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
             $resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $resource->getMorphClass() === \App\Models\StandaloneClickhouse::class ||
+            $resource->getMorphClass() === \App\Models\StandaloneSurrealdb::class
         ) {
             $this->unsupported = true;
         }
@@ -363,7 +364,8 @@ EOD;
         if ($resource->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $dbType = $resource->databaseType();
             if (str_contains($dbType, 'redis') || str_contains($dbType, 'keydb') ||
-                str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse')) {
+                str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse') ||
+                str_contains($dbType, 'surrealdb')) {
                 $this->unsupported = true;
             }
         }

@@ -23,6 +23,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSurrealdb;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -605,6 +606,10 @@ function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
     if ($clickhouse && $clickhouse->team()->id == $teamId) {
         return $clickhouse->unsetRelation('environment');
     }
+    $surrealdb = StandaloneSurrealdb::whereUuid($uuid)->first();
+    if ($surrealdb && $surrealdb->team()->id == $teamId) {
+        return $surrealdb->unsetRelation('environment');
+    }
 
     return null;
 }
@@ -650,6 +655,10 @@ function queryResourcesByUuid(string $uuid)
     $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
     if ($clickhouse) {
         return $clickhouse;
+    }
+    $surrealdb = StandaloneSurrealdb::whereUuid($uuid)->first();
+    if ($surrealdb) {
+        return $surrealdb;
     }
 
     // Check for ServiceDatabase by its own UUID
@@ -2858,7 +2867,7 @@ function isAssociativeArray($array)
  *
  *  Theses variables are added in place to the $where_to_add array.
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSurrealdb|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
     // Currently disabled
     return;

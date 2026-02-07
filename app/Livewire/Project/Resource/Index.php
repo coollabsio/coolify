@@ -31,6 +31,8 @@ class Index extends Component
 
     public Collection $clickhouses;
 
+    public Collection $surrealdbs;
+
     public Collection $services;
 
     public Collection $allProjects;
@@ -41,7 +43,7 @@ class Index extends Component
 
     public function mount()
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->surrealdbs = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -79,6 +81,8 @@ class Index extends Component
                 'dragonflies.destination.server',
                 'clickhouses',
                 'clickhouses.destination.server',
+                'surrealdbs',
+                'surrealdbs.destination.server',
             ])->get();
 
         $this->environment = $environment->loadCount([
@@ -89,6 +93,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'surrealdbs',
             'mariadbs',
             'mongodbs',
             'services',
@@ -124,6 +129,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'surrealdbs' => 'surrealdbs',
         ];
 
         foreach ($databaseTypes as $property => $relation) {

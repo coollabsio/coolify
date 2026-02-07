@@ -162,7 +162,8 @@
                                         ->merge($env->mariadbs ?? collect())
                                         ->merge($env->keydbs ?? collect())
                                         ->merge($env->dragonflies ?? collect())
-                                        ->merge($env->clickhouses ?? collect());
+                                        ->merge($env->clickhouses ?? collect())
+                                        ->merge($env->surrealdbs ?? collect());
                                     $envResources = collect()
                                         ->merge(
                                             $env->applications->map(
@@ -665,6 +666,7 @@
             keydbs: @js($keydbs),
             dragonflies: @js($dragonflies),
             clickhouses: @js($clickhouses),
+            surrealdbs: @js($surrealdbs),
             services: @js($services),
             filterAndSort(items) {
                 if (this.search === '') {
@@ -691,6 +693,7 @@
                     this.keydbs,
                     this.dragonflies,
                     this.clickhouses,
+                    this.surrealdbs,
                 ].flatMap((items) => this.filterAndSort(items))
             },
             get filteredServices() {

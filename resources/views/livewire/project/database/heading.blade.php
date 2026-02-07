@@ -30,7 +30,8 @@
                 $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMariadb')
+                    $database->getMorphClass() === 'App\Models\StandaloneMariadb' ||
+                    $database->getMorphClass() === 'App\Models\StandaloneSurrealdb')
                 <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     Backups
