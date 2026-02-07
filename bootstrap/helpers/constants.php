@@ -70,6 +70,13 @@ const SUPPORTED_OS = [
     'alpine',
 ];
 
+// Debian VERSION_ID => VERSION_CODENAME (used by /etc/os-release)
+const SUPPORTED_DEBIAN_VERSION_CODENAMES = [
+    '11' => 'bullseye',
+    '12' => 'bookworm',
+    '13' => 'trixie',
+];
+
 const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
     'pgadmin',
     'databasus',

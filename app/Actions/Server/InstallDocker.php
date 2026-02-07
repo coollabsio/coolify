@@ -116,11 +116,15 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
+        // Source /etc/os-release for ID, VERSION_ID, VERSION_CODENAME. Docker APT repo requires
+        // codename (e.g. trixie) not version number (13). Prefer VERSION_CODENAME; if missing or
+        // numeric, map VERSION_ID to codename so the repo URL never uses a number.
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
+            'if [ -z "${VERSION_CODENAME:-}" ] || case "${VERSION_CODENAME:-}" in 11|12|13) true ;; *) false ;; esac; then v="${VERSION_ID:-${VERSION_CODENAME:-}}"; v="${v%%.*}"; case "$v" in 11) VERSION_CODENAME=bullseye ;; 12) VERSION_CODENAME=bookworm ;; 13) VERSION_CODENAME=trixie ;; esac; fi && '.
             'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
