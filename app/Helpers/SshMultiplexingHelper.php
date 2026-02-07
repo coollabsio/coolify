@@ -158,7 +158,13 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
 
-        self::validateSshKey($server->privateKey);
+        $keyWasRewritten = self::validateSshKey($server->privateKey);
+
+        // If the key file was rewritten (stale content detected), invalidate the
+        // existing mux connection since it was authenticated with the old key.
+        if ($keyWasRewritten) {
+            self::removeMuxFile($server);
+        }
 
         $muxSocket = $sshConfig['muxFilename'];
 
@@ -201,20 +207,43 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
-    private static function validateSshKey(PrivateKey $privateKey): void
+    /**
+     * Validate that the SSH key file exists on disk and its content matches the
+     * current key stored in the database. If the file is missing or stale
+     * (e.g. after key regeneration), it is rewritten from the database.
+     *
+     * @return bool True if the key file was (re)written, false if it was already valid.
+     */
+    private static function validateSshKey(PrivateKey $privateKey): bool
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $needsWrite = false;
 
-        if ($keyCheckProcess->exitCode() !== 0) {
-            $privateKey->storeInFileSystem();
+        if (! file_exists($keyLocation)) {
+            $needsWrite = true;
+        } else {
+            // Verify the file content matches the current key in the database.
+            // This prevents using a stale key file after the key has been
+            // regenerated in the database but the old file still exists on disk.
+            $diskContent = file_get_contents($keyLocation);
+            if ($diskContent === false || trim($diskContent) !== trim($privateKey->private_key)) {
+                $needsWrite = true;
+            }
         }
+
+        if ($needsWrite) {
+            $privateKey->storeInFileSystem();
+
+            return true;
+        }
+
+        return false;
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
         $options = "-i {$sshKeyLocation} "
+            .'-o IdentitiesOnly=yes '
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
