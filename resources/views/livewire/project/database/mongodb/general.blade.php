@@ -153,6 +153,9 @@
                 </div>
                 <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                     id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="600" disabled="{{ $isPublic }}" id="proxyTimeout"
+                        label="Proxy Timeout (seconds)" canGate="update" :canResource="$database"
+                        helper="The timeout for the public proxy. Default is 600s (10 minutes). Set to a higher value for long running queries." />
             </div>
             <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="mongoConf"
                 canGate="update" :canResource="$database" />
