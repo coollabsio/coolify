@@ -323,6 +323,7 @@
                             </a>
                         </li>
                     @endif
+                    <livewire:sidebar.recent-deployments />
 
                     @if (isCloud() || isDev())
                         @if (isInstanceAdmin() || session('impersonating'))
