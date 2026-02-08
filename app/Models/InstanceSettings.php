@@ -32,6 +32,7 @@ class InstanceSettings extends Model
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
         'is_oauth_registration_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
     ];
 
     protected static function booted(): void
