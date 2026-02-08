@@ -177,9 +177,10 @@ class CleanupDocker
                 ->filter(fn ($image) => ! empty($image['tag']));
 
             // Separate images into categories
-            // PR images (pr-*) and build images (*-build) are excluded from retention
-            // Build images will be cleaned up by docker image prune -af
+            // PR images (pr-*) are for preview deployments
+            // Build images (*-build) are intermediate build artifacts
             $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
+            $buildImages = $images->filter(fn ($image) => str_ends_with($image['tag'], '-build'));
             $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
 
             // Always delete all PR images
@@ -189,6 +190,17 @@ class CleanupDocker
                 $cleanupLog[] = [
                     'command' => $deleteCommand,
                     'output' => $deleteOutput ?? 'PR image removed or was in use',
+                ];
+            }
+
+            // Always delete all build images (-build suffix)
+            // These are intermediate build artifacts that can accumulate over time
+            foreach ($buildImages as $image) {
+                $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
+                $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
+                $cleanupLog[] = [
+                    'command' => $deleteCommand,
+                    'output' => $deleteOutput ?? 'Build image removed or was in use',
                 ];
             }
 
