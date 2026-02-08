@@ -50,10 +50,8 @@ class OauthSettingSeeder extends Seeder
                 $provider->delete();
             });
             $allProviders->each(function ($provider) {
-                $provider = new OauthSetting;
-                $provider->provider = $provider->provider;
-                unset($provider->id);
-                $provider->save();
+                $newProvider = $provider->replicate();
+                $newProvider->save();
             });
 
             foreach ($notFoundProviders as $provider) {
