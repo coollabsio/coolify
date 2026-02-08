@@ -155,6 +155,10 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="0" id="publicPortIdleTimeout"
+                label="Idle Timeout (seconds)"
+                helper="Connection idle timeout in seconds. Set to 0 to disable timeout (recommended for long-running queries). Leave empty to use nginx default (10 minutes)."
+                canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="mysqlConf" canGate="update" :canResource="$database" />
         <h3 class="pt-4">Advanced</h3>

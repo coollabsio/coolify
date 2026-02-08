@@ -54,6 +54,20 @@ class StartDatabaseProxy
         if (isDev()) {
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
+
+        // Get idle timeout setting (0 means no timeout, null means use nginx default of 10m)
+        $idleTimeout = $database->public_port_idle_timeout ?? 0;
+
+        // Build proxy_timeout directive: 0 disables timeout, positive value sets custom timeout in seconds
+        $proxyTimeoutDirective = '';
+        if ($idleTimeout === 0) {
+            // Disable timeout completely - use a very large value (nginx doesn't support 0)
+            $proxyTimeoutDirective = 'proxy_timeout 365d;';
+        } elseif ($idleTimeout > 0) {
+            $proxyTimeoutDirective = "proxy_timeout {$idleTimeout}s;";
+        }
+        // If null/not set, we don't add the directive and nginx uses its default (10m)
+
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -67,6 +81,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            $proxyTimeoutDirective
        }
     }
     EOF;
