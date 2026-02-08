@@ -74,6 +74,8 @@ class InstallDocker
 
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([$this->getDebianDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
@@ -94,9 +96,20 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
             ]);
+
+            if ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([
+                    'rc-update add docker default >/dev/null 2>&1 || true',
+                    'service docker restart',
+                ]);
+            } else {
+                $command = $command->merge([
+                    'systemctl enable docker >/dev/null 2>&1 || true',
+                    'systemctl restart docker',
+                ]);
+            }
+
             if ($server->isSwarm()) {
                 $command = $command->merge([
                     'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
@@ -118,6 +131,7 @@ class InstallDocker
     {
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
+            'if [ "${ID}" = "debian" ] && [ "${VERSION_ID}" = "13" ]; then VERSION_CODENAME="trixie"; fi && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
@@ -157,6 +171,11 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk update && apk add docker docker-cli-compose && rc-update add docker default && service docker start';
     }
 
     private function getGenericDockerInstallCommand(): string
