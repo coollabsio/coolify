@@ -203,6 +203,12 @@ class EnvironmentVariable extends BaseModel
                 $id = $resource->environment->project->id;
             } elseif ($type->value() === 'team') {
                 $id = $resource->team()->id;
+            } elseif ($type->value() === 'server') {
+                if ($resource instanceof Service) {
+                    $id = $resource->server->id;
+                } else {
+                    $id = $resource->destination->server->id;
+                }
             }
             if (is_null($id)) {
                 continue;

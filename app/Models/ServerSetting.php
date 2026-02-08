@@ -141,6 +141,20 @@ class ServerSetting extends Model
         return $this->belongsTo(Server::class);
     }
 
+    public function isEnvSortingEnabled(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ?? true,
+        );
+    }
+
+    public function useBuildSecrets(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ?? false,
+        );
+    }
+
     public function dockerCleanupFrequency(): Attribute
     {
         return Attribute::make(

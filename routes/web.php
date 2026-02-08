@@ -256,6 +256,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/environment-variables', \App\Livewire\Server\EnvironmentVariables::class)->name('server.environment-variables');
         Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
         Route::get('/sentinel', ServerSentinel::class)->name('server.sentinel');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');

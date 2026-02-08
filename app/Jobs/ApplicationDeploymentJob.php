@@ -1181,6 +1181,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+        $server_envs = $this->server->environment_variables()->get();
+        foreach ($server_envs as $env) {
+            $envs->push($env->key.'='.$env->real_value);
+        }
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
@@ -1463,6 +1467,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         foreach ($coolify_envs as $key => $item) {
             $envs_dict[$key] = escapeBashEnvValue($item);
+        }
+
+        $server_envs = $this->server->environment_variables()->where('is_buildtime', true)->get();
+        foreach ($server_envs as $env) {
+            $envs_dict[$env->key] = escapeBashEnvValue($env->real_value);
         }
 
         // 3. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
@@ -2447,6 +2456,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($value, $key) {
             $this->env_args->put($key, $value);
         });
+
+        $server_envs = $this->server->environment_variables()->where('is_buildtime', true)->get();
+        foreach ($server_envs as $env) {
+            $this->env_args->put($env->key, $env->real_value);
+        }
 
         // For build process, include only environment variables where is_buildtime = true
         if ($this->pull_request_id === 0) {

@@ -5,6 +5,9 @@
         <a class="sub-menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
             href="{{ route('server.advanced', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Advanced</span>
         </a>
+        <a class="sub-menu-item {{ $activeMenu === 'environment-variables' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+            href="{{ route('server.environment-variables', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Environment Variables</span>
+        </a>
     @endif
     @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
         <a class="sub-menu-item {{ $activeMenu === 'sentinel' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}

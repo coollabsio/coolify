@@ -315,6 +315,11 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
     public function dockerCleanupExecutions()
     {
         return $this->hasMany(DockerCleanupExecution::class);
