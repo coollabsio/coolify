@@ -447,16 +447,41 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\Throwable $e) {
             throw $e;
         } finally {
-            if ($this->team) {
-                BackupCreated::dispatch($this->team->id);
-            }
-            if ($this->backup_log) {
-                $this->backup_log->update([
-                    'finished_at' => Carbon::now()->toImmutable(),
-                ]);
+    if ($this->team) {
+        BackupCreated::dispatch($this->team->id);
+    }
+
+    if ($this->backup_log) {
+        $updateData = [
+            'finished_at' => Carbon::now()->toImmutable(),
+        ];
+
+        // Si sigue en running, decidir estado según resultado
+        if ($this->backup_log->status === 'running') {
+            if ($this->backup_location && $this->size > 0) {
+                $updateData['status'] = 'success';
+                $updateData['size'] = $this->size;
+                $updateData['message'] = $this->backup_output ?? 'Backup completed successfully';
+            } else {
+                $updateData['status'] = 'failed';
+                $updateData['message'] = 'Backup job completed but status was not updated properly.';
             }
         }
+
+        $this->backup_log->update($updateData);
+    } elseif ($this->backup_log_uuid) {
+        // Fallback: intentar actualizar por UUID
+        $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+        if ($log && $log->status === 'running') {
+            $log->update([
+                'status' => 'failed',
+                'message' => 'Backup job completed but backup_log reference was lost.',
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+        }
     }
+}
+
 
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
@@ -513,11 +538,45 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-        } catch (\Throwable $e) {
-            $this->add_to_error_output($e->getMessage());
-            throw $e;
+       } catch (\Throwable $e) {
+    $this->add_to_error_output($e->getMessage());
+    throw $e;
+} finally {
+    if ($this->team) {
+        BackupCreated::dispatch($this->team->id);
+    }
+
+    if ($this->backup_log) {
+        $updateData = [
+            'finished_at' => Carbon::now()->toImmutable(),
+        ];
+
+        // Si sigue en running, decidir estado según resultado
+        if ($this->backup_log->status === 'running') {
+            if ($this->backup_location && $this->size > 0) {
+                $updateData['status'] = 'success';
+                $updateData['size'] = $this->size;
+                $updateData['message'] = $this->backup_output ?? 'Backup completed successfully';
+            } else {
+                $updateData['status'] = 'failed';
+                $updateData['message'] = 'Backup job completed but status was not updated properly.';
+            }
+        }
+
+        $this->backup_log->update($updateData);
+    } elseif ($this->backup_log_uuid) {
+        // Fallback: intentar actualizar por UUID
+        $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+        if ($log && $log->status === 'running') {
+            $log->update([
+                'status' => 'failed',
+                'message' => 'Backup job completed but backup_log reference was lost.',
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
         }
     }
+}
+
 
     private function backup_standalone_postgresql(string $database): void
     {
