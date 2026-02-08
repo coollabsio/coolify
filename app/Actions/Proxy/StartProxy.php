@@ -42,6 +42,7 @@ class StartProxy
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
+                "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
                 'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
@@ -57,6 +58,7 @@ class StartProxy
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
+                "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
                 "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
