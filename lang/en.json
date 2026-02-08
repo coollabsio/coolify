@@ -40,5 +40,9 @@
     "resource.delete_connected_networks": "Permanently delete all non-predefined networks associated with this resource.",
     "resource.delete_configurations": "Permanently delete all configuration files from the server.",
     "database.delete_backups_locally": "All backups will be permanently deleted from local storage.",
-    "warning.sslipdomain": "Your configuration is saved, but sslip domain with https is <span class='dark:text-red-500 text-red-500 font-bold'>NOT</span> recommended, because Let's Encrypt servers with this public domain are rate limited (SSL certificate validation will fail). <br><br>Use your own domain instead."
+    "warning.sslipdomain": "Your configuration is saved, but sslip domain with https is <span class='dark:text-red-500 text-red-500 font-bold'>NOT</span> recommended, because Let's Encrypt servers with this public domain are rate limited (SSL certificate validation will fail). <br><br>Use your own domain instead.",
+    "settings.advanced.registration_allowed": "Registration Allowed",
+    "settings.advanced.registration_allowed.helper": "Allow users to self-register. If disabled, only administrators can create accounts.",
+    "settings.advanced.oauth_registration_allowed": "OAuth Registration Allowed",
+    "settings.advanced.oauth_registration_allowed.helper": "Allow users to self-register via OAuth (if OAuth is configured). If disabled, only administrators can create accounts or existing users can log in via OAuth."
 }

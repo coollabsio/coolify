@@ -18,19 +18,16 @@
                 <div class="flex flex-col gap-1">
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
-                            label="Registration Allowed" />
+                            label="{{ __('settings.advanced.registration_allowed') }}"
+                            helper="{{ __('settings.advanced.registration_allowed.helper') }}" />
                     </div>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
-                            helper="Allow users to self-register via OAuth (if OAuth is configured). If disabled, only administrators can create accounts or existing users can log in via OAuth."
-                            label="OAuth Registration Allowed" />
-                    </div>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
-                            helper="Allow users to self-register via OAuth (if OAuth is configured). If disabled, only administrators can create accounts or existing users can log in via OAuth."
-                            label="OAuth Registration Allowed" />
-                    </div>
+                    @if (is_null(data_get(get_oauth_providers(), 'error')))
+                        <div class="md:w-96">
+                            <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                                label="{{ __('settings.advanced.oauth_registration_allowed') }}"
+                                helper="{{ __('settings.advanced.oauth_registration_allowed.helper') }}" />
+                        </div>
+                    @endif
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."
