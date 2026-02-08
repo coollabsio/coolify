@@ -68,6 +68,7 @@ const SUPPORTED_OS = [
     'sles opensuse-leap opensuse-tumbleweed',
     'arch',
     'alpine',
+    'trixie', // Debian 13
 ];
 
 const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
