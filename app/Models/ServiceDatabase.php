@@ -27,7 +27,11 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        // Include both service-based and application-based databases
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +40,11 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        // Include both service-based and application-based databases
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +57,44 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Get the parent resource (Service or Application).
+     */
+    public function getParentResource()
+    {
+        return $this->service ?? $this->application;
+    }
+
+    /**
+     * Get the server for this database.
+     */
+    public function getServer()
+    {
+        $parent = $this->getParentResource();
+        if (! $parent) {
+            return null;
+        }
+
+        if ($parent instanceof Service) {
+            return $parent->server;
+        }
+
+        // Application
+        return $parent->destination?->server;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $parent = $this->getParentResource();
+        if (! $parent) {
+            return;
+        }
+
+        $container_id = $this->name.'-'.$parent->uuid;
+        $server = $this->getServer();
+        if ($server) {
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
 
     public function isRunning()
@@ -114,8 +156,13 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        if (! $server) {
+            return null;
+        }
+
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +171,42 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        $parent = $this->getParentResource();
+        if (! $parent) {
+            return null;
+        }
+
+        return data_get($parent, 'environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $parent = $this->getParentResource();
+        if (! $parent) {
+            return null;
+        }
+
+        if ($parent instanceof Service) {
+            return service_configuration_dir()."/{$parent->uuid}";
+        }
+
+        // Application - use application configuration directory
+        return application_configuration_dir()."/{$parent->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * Get the application that owns this database (for GitHub App docker-compose deployments).
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7528
+     */
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

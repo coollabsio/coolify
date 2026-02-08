@@ -2418,6 +2418,29 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create ServiceDatabase records for detected databases in Application docker-compose deployments
+            // This enables backup functionality for databases deployed via GitHub App
+            // @see https://github.com/coollabsio/coolify/issues/7528
+            if ($isDatabase && $pull_request_id === 0) {
+                $existingDatabase = ServiceDatabase::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->first();
+
+                if (is_null($existingDatabase)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } else {
+                    // Update image if changed
+                    if ($existingDatabase->image !== $image) {
+                        $existingDatabase->image = $image;
+                        $existingDatabase->save();
+                    }
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {

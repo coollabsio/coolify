@@ -247,6 +247,11 @@ class Application extends BaseModel
             foreach ($application->deployment_queue as $deployment) {
                 $deployment->delete();
             }
+            // Delete associated ServiceDatabase records (for docker-compose database detection)
+            // @see https://github.com/coollabsio/coolify/issues/7528
+            foreach ($application->databases as $database) {
+                $database->delete();
+            }
         });
     }
 
@@ -498,6 +503,17 @@ class Application extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    /**
+     * Get the databases associated with this application (for docker-compose deployments).
+     * Enables database detection and backup support for GitHub App deployments.
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7528
+     */
+    public function databases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function type()
