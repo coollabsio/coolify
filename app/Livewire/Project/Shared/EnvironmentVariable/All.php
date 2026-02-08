@@ -285,7 +285,21 @@ class All extends Component
                 continue;
             }
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
-            $found = $this->resource->$method()->where('key', $key)->first();
+            
+            // Get ALL existing variables with this key (not just first)
+            $existingVars = $this->resource->$method()->where('key', $key)->get();
+            
+            if ($existingVars->count() > 1) {
+                // Duplicates exist! Keep the first one, delete the rest
+                $first = $existingVars->shift();
+                foreach ($existingVars as $duplicate) {
+                    $duplicate->delete();
+                }
+                $found = $first;
+                $count++; // Count this as a change since we cleaned up duplicates
+            } else {
+                $found = $existingVars->first();
+            }
 
             if ($found) {
                 if (! $found->is_shown_once && ! $found->is_multiline) {
