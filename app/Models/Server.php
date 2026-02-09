@@ -178,6 +178,24 @@ class Server extends BaseModel
             if (! isset($server->proxy->redirect_enabled)) {
                 $server->proxy->redirect_enabled = true;
             }
+
+            // Create predefined server shared variables
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_UUID',
+                'value' => $server->uuid,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
+            SharedEnvironmentVariable::create([
+                'key' => 'COOLIFY_SERVER_NAME',
+                'value' => $server->name,
+                'type' => 'server',
+                'server_id' => $server->id,
+                'team_id' => $server->team_id,
+                'is_literal' => true,
+            ]);
         });
         static::retrieved(function ($server) {
             if (! isset($server->proxy->redirect_enabled)) {
@@ -1001,6 +1019,11 @@ $schema://$host {
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function environment_variables()
+    {
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'server');
     }
 
     public function isProxyShouldRun()

@@ -6,7 +6,8 @@
         <x-forms.env-var-input placeholder="production" id="value" label="Value" required
             :availableVars="$shared ? [] : $this->availableSharedVariables"
             :projectUuid="data_get($parameters, 'project_uuid')"
-            :environmentUuid="data_get($parameters, 'environment_uuid')" />
+            :environmentUuid="data_get($parameters, 'environment_uuid')"
+            :serverUuid="data_get($parameters, 'server_uuid')" />
     @endif
 
     @if (!$shared && !$is_multiline)

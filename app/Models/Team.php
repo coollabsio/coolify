@@ -214,7 +214,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'team');
     }
 
     public function members()

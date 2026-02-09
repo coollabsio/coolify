@@ -17,8 +17,15 @@
             selectedIndex: 0,
             cursorPosition: 0,
             currentScope: null,
-            availableScopes: ['team', 'project', 'environment'],
             availableVars: @js($availableVars),
+            get availableScopes() {
+                // Only include scopes that have at least one variable
+                const allScopes = ['team', 'project', 'environment', 'server'];
+                return allScopes.filter(scope => {
+                    const vars = this.availableVars[scope];
+                    return vars && vars.length > 0;
+                });
+            },
             scopeUrls: @js($scopeUrls),
 
             handleInput() {
@@ -54,6 +61,11 @@
 
                 if (content === '') {
                     this.currentScope = null;
+                    // Only show dropdown if there are available scopes with variables
+                    if (this.availableScopes.length === 0) {
+                        this.showDropdown = false;
+                        return;
+                    }
                     this.suggestions = this.availableScopes.map(scope => ({
                         type: 'scope',
                         value: scope,

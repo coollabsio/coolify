@@ -109,9 +109,10 @@
                             disabled
                             type="password"
                             id="value"
-                            :availableVars="$this->availableSharedVariables"
+                            :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
                             :projectUuid="data_get($parameters, 'project_uuid')"
-                            :environmentUuid="data_get($parameters, 'environment_uuid')" />
+                            :environmentUuid="data_get($parameters, 'environment_uuid')"
+                            :serverUuid="data_get($parameters, 'server_uuid')" />
                         @if ($is_shared)
                             <x-forms.input disabled type="password" id="real_value" />
                         @endif
