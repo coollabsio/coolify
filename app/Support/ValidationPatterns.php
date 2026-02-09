@@ -9,7 +9,7 @@ class ValidationPatterns
 {
     /**
      * Pattern for names excluding all dangerous characters
-    */
+     */
     public const NAME_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.]+$/u';
 
     /**
@@ -64,7 +64,7 @@ class ValidationPatterns
     public static function nameMessages(): array
     {
         return [
-            'name.regex' => "The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).",
+            'name.regex' => 'The name may only contain letters (including Unicode), numbers, spaces, dashes (-), underscores (_) and dots (.).',
             'name.min' => 'The name must be at least :min characters.',
             'name.max' => 'The name may not be greater than :max characters.',
         ];
@@ -81,7 +81,7 @@ class ValidationPatterns
         ];
     }
 
-    /** 
+    /**
      * Get combined validation messages for both name and description fields
      */
     public static function combinedMessages(): array

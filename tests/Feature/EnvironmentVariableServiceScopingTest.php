@@ -11,6 +11,9 @@
 
 use App\Models\EnvironmentVariable;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 it('database has service scoping columns', function () {
     expect(Schema::hasColumn('environment_variables', 'service_names'))->toBeTrue();

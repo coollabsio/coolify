@@ -1346,6 +1346,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // Check if this variable applies to this service
             $service_names = $env->service_names ?? ['all'];
+
             return in_array('all', $service_names) || in_array($service_name, $service_names);
         });
     }
@@ -1358,11 +1359,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Step 1: Create global .env with ONLY interpolation variables
         $interpolation_vars = $this->pull_request_id === 0
-            ? $this->application->environment_variables->filter(fn($v) => $v->is_interpolation_only ?? false)
-            : $this->application->environment_variables_preview->filter(fn($v) => $v->is_interpolation_only ?? false);
+            ? $this->application->environment_variables->filter(fn ($v) => $v->is_interpolation_only ?? false)
+            : $this->application->environment_variables_preview->filter(fn ($v) => $v->is_interpolation_only ?? false);
 
         if ($interpolation_vars->isNotEmpty()) {
-            $interpolation_envs = $interpolation_vars->map(fn($env) => $env->key.'='.$env->real_value);
+            $interpolation_envs = $interpolation_vars->map(fn ($env) => $env->key.'='.$env->real_value);
             $envs_base64 = base64_encode($interpolation_envs->implode("\n"));
 
             $this->application_deployment_queue->addLogEntry('Creating .env file with interpolation variables for Docker Compose.', hidden: true);
@@ -1392,7 +1393,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $runtime_environment_variables = $this->generate_runtime_environment_variables();
 
                     // Filter to only include vars for this service
-                    $service_envs = $service_vars->map(fn($env) => $env->key.'='.$env->real_value);
+                    $service_envs = $service_vars->map(fn ($env) => $env->key.'='.$env->real_value);
                     $service_envs_base64 = base64_encode($service_envs->implode("\n"));
 
                     $this->application_deployment_queue->addLogEntry("Creating .env.$service_name file for service-specific variables.", hidden: true);

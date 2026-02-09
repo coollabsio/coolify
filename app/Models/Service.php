@@ -881,7 +881,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                        if ($SERVICE_PASSWORD_LINKDING) {
+                    if ($SERVICE_PASSWORD_LINKDING) {
                         $data = $data->merge([
                             'Superuser Password' => [
                                 'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
