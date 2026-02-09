@@ -80,6 +80,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -157,6 +159,13 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk update && apk add --no-cache docker docker-cli-compose && '.
+            'rc-update add docker && '.
+            'service docker start';
     }
 
     private function getGenericDockerInstallCommand(): string
