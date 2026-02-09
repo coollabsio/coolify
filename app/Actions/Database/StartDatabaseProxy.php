@@ -28,6 +28,7 @@ class StartDatabaseProxy
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
         $isSSLEnabled = $database->enable_ssl ?? false;
+        $proxyTimeout = $database->public_proxy_timeout ?? '600s';
 
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
@@ -67,6 +68,8 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_timeout $proxyTimeout;
+            proxy_connect_timeout 60s;
        }
     }
     EOF;

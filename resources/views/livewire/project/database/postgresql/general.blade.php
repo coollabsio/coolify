@@ -170,6 +170,10 @@
                 <div class="flex flex-col gap-2">
                     <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="postgresConf"
                         canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="600s" id="publicProxyTimeout"
+                        label="Proxy Timeout"
+                        helper="Timeout for the public proxy. Default is 600s (10 minutes). A value of 0 disables the timeout. <br><br>Examples: 600s, 10m, 1h, 0"
+                        canGate="update" :canResource="$database" />
                 </div>
             </div>
         </div>
