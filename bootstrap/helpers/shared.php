@@ -1146,23 +1146,27 @@ function checkIPAgainstAllowlist($ip, $allowlist)
 
             $mask = (int) $mask;
 
-            // Validate mask
-            if ($mask < 0 || $mask > 32) {
-                continue;
+            if ($mask >= 0 && $mask <= 32) {
+                $ip_long = ip2long($ip);
+                $subnet_long = ip2long($subnet);
+
+                if ($ip_long !== false && $subnet_long !== false) {
+                    $mask_long = ~((1 << (32 - $mask)) - 1);
+                    if (($ip_long & $mask_long) == ($subnet_long & $mask_long)) {
+                        return true;
+                    }
+                }
             }
+            elseif ($mask > 32 && $mask <= 128) {
+                $ip_bin = @inet_pton($ip);
+                $subnet_bin = @inet_pton($subnet);
 
-            // Calculate network addresses
-            $ip_long = ip2long($ip);
-            $subnet_long = ip2long($subnet);
-
-            if ($ip_long === false || $subnet_long === false) {
-                continue;
-            }
-
-            $mask_long = ~((1 << (32 - $mask)) - 1);
-
-            if (($ip_long & $mask_long) == ($subnet_long & $mask_long)) {
-                return true;
+                if ($ip_bin !== false && $subnet_bin !== false && strlen($ip_bin) === 16 && strlen($subnet_bin) === 16) {
+                    $bytes_to_compare = (int) ceil($mask / 8);
+                    if (substr_compare($ip_bin, $subnet_bin, 0, $bytes_to_compare) === 0) {
+                        return true;
+                    }
+                }
             }
         } else {
             // Special case: 0.0.0.0 means allow all

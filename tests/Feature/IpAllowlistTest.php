@@ -106,6 +106,31 @@ test('IP allowlist with various subnet sizes', function () {
     expect(checkIPAgainstAllowlist('255.255.255.255', ['0.0.0.0/0']))->toBeTrue();
 });
 
+test('IP allowlist with IPv6 CIDR notation', function () {
+    $testCases = [
+        ['ip' => '2001:db8::1', 'allowlist' => ['2001:db8::/32'], 'expected' => true],
+        ['ip' => '2001:db8:ffff:ffff:ffff:ffff:ffff:ffff', 'allowlist' => ['2001:db8::/32'], 'expected' => true],
+        ['ip' => '2001:db9::1', 'allowlist' => ['2001:db8::/32'], 'expected' => false],
+        ['ip' => 'fd00::1', 'allowlist' => ['fd00::/8'], 'expected' => true],
+        ['ip' => 'fd00:ffff:ffff:ffff:ffff:ffff:ffff:ffff', 'allowlist' => ['fd00::/8'], 'expected' => true],
+        ['ip' => 'fe80::1', 'allowlist' => ['fd00::/8'], 'expected' => false],
+    ];
+
+    foreach ($testCases as $case) {
+        $result = checkIPAgainstAllowlist($case['ip'], $case['allowlist']);
+        expect($result)->toBe($case['expected']);
+    }
+});
+
+test('IP allowlist with mixed IPv4 and IPv6', function () {
+    $allowlist = ['192.0.2.1', '2001:db8::/32'];
+
+    expect(checkIPAgainstAllowlist('192.0.2.1', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('2001:db8::1', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('198.51.100.1', $allowlist))->toBeFalse();
+    expect(checkIPAgainstAllowlist('2001:db9::1', $allowlist))->toBeFalse();
+});
+
 test('IP allowlist comma-separated string input', function () {
     // Test with comma-separated string (as it would come from the settings)
     $allowlistString = '192.168.1.100,10.0.0.0/8,172.16.0.0/16';
