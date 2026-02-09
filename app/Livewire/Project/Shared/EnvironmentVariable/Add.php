@@ -31,7 +31,33 @@ class Add extends Component
 
     public bool $is_buildtime = true;
 
+    public bool $is_interpolation_only = false;
+
+    public array $service_names = ['all'];
+
+    public string $service_names_input = 'all';
+
+    public string $injection_method = 'environment';
+
     public array $problematicVariables = [];
+
+    public function updatedServiceNamesInput($value)
+    {
+        // Convert comma-separated string to array
+        if (empty($value)) {
+            $this->service_names = ['all'];
+        } else {
+            $this->service_names = array_map('trim', explode(',', $value));
+        }
+    }
+
+    public function updatedIsInterpolationOnly($value)
+    {
+        // If interpolation only is checked, set injection method to 'none'
+        if ($value) {
+            $this->injection_method = 'none';
+        }
+    }
 
     protected $listeners = ['clearAddEnv' => 'clear'];
 
@@ -42,6 +68,9 @@ class Add extends Component
         'is_literal' => 'required|boolean',
         'is_runtime' => 'required|boolean',
         'is_buildtime' => 'required|boolean',
+        'is_interpolation_only' => 'required|boolean',
+        'service_names' => 'required|array',
+        'injection_method' => 'required|string|in:none,environment,env_file',
     ];
 
     protected $validationAttributes = [
@@ -51,6 +80,9 @@ class Add extends Component
         'is_literal' => 'literal',
         'is_runtime' => 'runtime',
         'is_buildtime' => 'buildtime',
+        'is_interpolation_only' => 'interpolation only',
+        'service_names' => 'service names',
+        'injection_method' => 'injection method',
     ];
 
     public function mount()
@@ -135,6 +167,9 @@ class Add extends Component
             'is_literal' => $this->is_literal,
             'is_runtime' => $this->is_runtime,
             'is_buildtime' => $this->is_buildtime,
+            'is_interpolation_only' => $this->is_interpolation_only,
+            'service_names' => $this->service_names,
+            'injection_method' => $this->injection_method,
             'is_preview' => $this->is_preview,
         ]);
         $this->clear();
@@ -148,5 +183,9 @@ class Add extends Component
         $this->is_literal = false;
         $this->is_runtime = true;
         $this->is_buildtime = true;
+        $this->is_interpolation_only = false;
+        $this->service_names = ['all'];
+        $this->service_names_input = 'all';
+        $this->injection_method = 'environment';
     }
 }

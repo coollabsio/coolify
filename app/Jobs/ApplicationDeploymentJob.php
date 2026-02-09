@@ -637,10 +637,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
+            // Add env_file and environment variables per service based on user configuration
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+                // Only add env_file if user explicitly configured env_file injection for this service
+                $env_file_vars = $this->get_environment_variables_for_service($name, 'env_file');
+                if ($env_file_vars->isNotEmpty()) {
+                    $service['env_file'] = array_merge($service['env_file'] ?? [], [".env.$name"]);
+                }
+
+                // Add environment variables directly if user configured environment injection
+                $environment_vars = $this->get_environment_variables_for_service($name, 'environment');
+                if ($environment_vars->isNotEmpty()) {
+                    foreach ($environment_vars as $env) {
+                        $service['environment'][$env->key] = $env->real_value;
+                    }
+                }
 
                 return $service;
             });
@@ -1311,11 +1323,87 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $envs;
     }
 
+    /**
+     * Get environment variables for a specific service based on injection method
+     * Respects Docker Compose semantics: only include vars explicitly scoped to this service
+     */
+    private function get_environment_variables_for_service(string $service_name, string $injection_method)
+    {
+        $all_vars = $this->pull_request_id === 0
+            ? $this->application->environment_variables
+            : $this->application->environment_variables_preview;
+
+        return $all_vars->filter(function ($env) use ($service_name, $injection_method) {
+            // Skip interpolation-only variables (they go in global .env)
+            if ($env->is_interpolation_only ?? false) {
+                return false;
+            }
+
+            // Check if this variable uses the specified injection method
+            if (($env->injection_method ?? 'environment') !== $injection_method) {
+                return false;
+            }
+
+            // Check if this variable applies to this service
+            $service_names = $env->service_names ?? ['all'];
+            return in_array('all', $service_names) || in_array($service_name, $service_names);
+        });
+    }
+
     private function save_runtime_environment_variables()
     {
-        // This method saves the .env file with ALL runtime variables
-        // For builds, it should be called AFTER the build to include runtime-only variables
+        // This method saves BOTH:
+        // 1. Global .env file with interpolation-only variables (for ${VAR} substitution)
+        // 2. Per-service .env files for runtime variables (if using env_file injection)
 
+        // Step 1: Create global .env with ONLY interpolation variables
+        $interpolation_vars = $this->pull_request_id === 0
+            ? $this->application->environment_variables->filter(fn($v) => $v->is_interpolation_only ?? false)
+            : $this->application->environment_variables_preview->filter(fn($v) => $v->is_interpolation_only ?? false);
+
+        if ($interpolation_vars->isNotEmpty()) {
+            $interpolation_envs = $interpolation_vars->map(fn($env) => $env->key.'='.$env->real_value);
+            $envs_base64 = base64_encode($interpolation_envs->implode("\n"));
+
+            $this->application_deployment_queue->addLogEntry('Creating .env file with interpolation variables for Docker Compose.', hidden: true);
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+            ]);
+        } else {
+            // Create empty .env file for Docker Compose compatibility
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "touch $this->workdir/.env"),
+            ]);
+        }
+
+        // Step 2: Create per-service .env files for env_file injection method
+        if ($this->build_pack === 'dockercompose') {
+            $composeFile = $this->application->settings->is_raw_compose_deployment_enabled
+                ? Yaml::parse($this->application->docker_compose_raw)
+                : Yaml::parse($this->application->docker_compose);
+
+            $services = data_get($composeFile, 'services', []);
+
+            foreach ($services as $service_name => $_) {
+                $service_vars = $this->get_environment_variables_for_service($service_name, 'env_file');
+
+                if ($service_vars->isNotEmpty()) {
+                    // Generate runtime environment variables for this service
+                    $runtime_environment_variables = $this->generate_runtime_environment_variables();
+
+                    // Filter to only include vars for this service
+                    $service_envs = $service_vars->map(fn($env) => $env->key.'='.$env->real_value);
+                    $service_envs_base64 = base64_encode($service_envs->implode("\n"));
+
+                    $this->application_deployment_queue->addLogEntry("Creating .env.$service_name file for service-specific variables.", hidden: true);
+                    $this->execute_remote_command([
+                        executeInDocker($this->deployment_uuid, "echo '$service_envs_base64' | base64 -d | tee $this->workdir/.env.$service_name > /dev/null"),
+                    ]);
+                }
+            }
+        }
+
+        // Step 3: For non-compose deployments, keep backward compatibility
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
 

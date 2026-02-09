@@ -239,6 +239,9 @@ class All extends Component
         $environment->is_literal = $data['is_literal'] ?? false;
         $environment->is_runtime = $data['is_runtime'] ?? true;
         $environment->is_buildtime = $data['is_buildtime'] ?? true;
+        $environment->is_interpolation_only = $data['is_interpolation_only'] ?? false;
+        $environment->service_names = $data['service_names'] ?? ['all'];
+        $environment->injection_method = $data['injection_method'] ?? 'environment';
         $environment->is_preview = $data['is_preview'] ?? false;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
