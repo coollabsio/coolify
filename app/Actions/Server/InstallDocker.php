@@ -133,11 +133,13 @@ class InstallDocker
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            // Dynamic fallback: Check if Docker repo has the VERSION_CODENAME, otherwise use bookworm
+            // Dynamic fallback: Handle Debian 13 (VERSION_ID=13 or VERSION_CODENAME=trixie)
             'DOCKER_CODENAME=${VERSION_CODENAME} && '.
+            'if [ "${VERSION_ID}" = "13" ] || [ "${VERSION_CODENAME}" = "trixie" ]; then '.
             'if ! curl -fsSL https://download.docker.com/linux/${ID}/dists/${VERSION_CODENAME}/Release >/dev/null 2>&1; then '.
-            'echo "Docker repository for ${VERSION_CODENAME} not available, falling back to bookworm" && '.
+            'echo "Docker repository for Debian 13 (${VERSION_CODENAME}) not available, falling back to bookworm" && '.
             'DOCKER_CODENAME=bookworm; '.
+            'fi; '.
             'fi && '.
             'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${DOCKER_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
