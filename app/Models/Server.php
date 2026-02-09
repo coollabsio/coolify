@@ -9,6 +9,7 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\RegenerateSslCertJob;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -136,6 +138,26 @@ class Server extends BaseModel
         static::saved(function ($server) {
             if ($server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            }
+
+            // When the server is switched to a different SSH key, tear down the
+            // existing multiplexed connection so it is re-established with the
+            // new key on the next SSH command.
+            // @see https://github.com/coollabsio/coolify/issues/7724
+            if ($server->wasChanged('private_key_id')) {
+                try {
+                    SshMultiplexingHelper::removeMuxFile($server);
+                    Log::info('Invalidated SSH mux connection after private_key_id change', [
+                        'server_uuid' => $server->uuid,
+                        'old_key_id' => $server->getOriginal('private_key_id'),
+                        'new_key_id' => $server->private_key_id,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to invalidate SSH mux connection after key change', [
+                        'server_uuid' => $server->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         });
         static::created(function ($server) {

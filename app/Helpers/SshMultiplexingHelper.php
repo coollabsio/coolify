@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -42,6 +43,17 @@ class SshMultiplexingHelper
 
         if ($process->exitCode() !== 0) {
             return self::establishNewMultiplexedConnection($server);
+        }
+
+        // Connection exists – verify the key hasn't changed since the mux was established.
+        // If the server was switched to a different private key the cached fingerprint
+        // will no longer match, and we must refresh the connection.
+        if (self::isKeyMismatch($server)) {
+            Log::warning('SSH key fingerprint mismatch on existing mux connection, refreshing', [
+                'server_uuid' => $server->uuid,
+            ]);
+
+            return self::refreshMultiplexedConnection($server);
         }
 
         // Connection exists, ensure we have metadata for age tracking
@@ -201,14 +213,79 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
+    /**
+     * Validate that the SSH key file exists and its content matches the database.
+     *
+     * The previous implementation only checked file existence via `ls`. This could
+     * cause sporadic "Permission denied (publickey)" errors when the key file on
+     * disk became stale (e.g., key updated in the database but not on disk, or
+     * multiple Horizon workers with separate storage volumes).
+     *
+     * When a content mismatch is detected the key file is re-written and all
+     * multiplexed connections that may have been authenticated with the old key
+     * are torn down so the next SSH command establishes a fresh connection.
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7724
+     */
     private static function validateSshKey(PrivateKey $privateKey): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        // Refresh from the database to bypass any Eloquent in-memory cache that
+        // might hold a stale version of the key loaded earlier in the request.
+        $freshKey = PrivateKey::find($privateKey->id);
+        if (! $freshKey) {
+            Log::error('SSH private key not found in database during validation', [
+                'key_id' => $privateKey->id,
+            ]);
 
-        if ($keyCheckProcess->exitCode() !== 0) {
-            $privateKey->storeInFileSystem();
+            return;
+        }
+
+        $disk = Storage::disk('ssh-keys');
+        $filename = "ssh_key@{$freshKey->uuid}";
+
+        if (! $disk->exists($filename)) {
+            Log::debug('SSH key file missing from disk, storing key', [
+                'key_uuid' => $freshKey->uuid,
+            ]);
+            $freshKey->storeInFileSystem();
+
+            return;
+        }
+
+        // Compare the file content with the database value to detect stale keys.
+        $storedContent = $disk->get($filename);
+        if ($storedContent !== $freshKey->private_key) {
+            Log::warning('SSH key file content does not match database, refreshing key and invalidating connections', [
+                'key_uuid' => $freshKey->uuid,
+            ]);
+
+            $freshKey->storeInFileSystem();
+
+            // Invalidate multiplexed connections for every server that uses this
+            // key so they do not keep authenticating with the old (stale) key.
+            self::invalidateConnectionsForKey($freshKey);
+        }
+    }
+
+    /**
+     * Close multiplexed connections for all servers that use the given key.
+     */
+    private static function invalidateConnectionsForKey(PrivateKey $privateKey): void
+    {
+        foreach ($privateKey->servers as $server) {
+            try {
+                self::removeMuxFile($server);
+                Log::debug('Invalidated mux connection due to SSH key content change', [
+                    'server_uuid' => $server->uuid,
+                    'key_uuid' => $privateKey->uuid,
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('Failed to invalidate mux connection during key validation', [
+                    'server_uuid' => $server->uuid,
+                    'key_uuid' => $privateKey->uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -265,6 +342,32 @@ class SshMultiplexingHelper
     }
 
     /**
+     * Detect whether the server's current SSH key differs from the one that was
+     * used when the multiplexed connection was established.
+     *
+     * Returns false when no cached fingerprint exists (e.g. connections created
+     * before this logic was deployed) to avoid unnecessary churn.
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7724
+     */
+    public static function isKeyMismatch(Server $server): bool
+    {
+        $fingerprintCacheKey = "ssh_mux_key_fingerprint_{$server->uuid}";
+        $cachedFingerprint = Cache::get($fingerprintCacheKey);
+
+        if ($cachedFingerprint === null) {
+            return false;
+        }
+
+        $privateKey = PrivateKey::find($server->private_key_id);
+        if (! $privateKey) {
+            return true; // Key was deleted – force refresh to surface a clear error
+        }
+
+        return $cachedFingerprint !== $privateKey->fingerprint;
+    }
+
+    /**
      * Get the age of the current connection in seconds
      */
     public static function getConnectionAge(Server $server): ?int
@@ -292,20 +395,33 @@ class SshMultiplexingHelper
     }
 
     /**
-     * Store connection metadata when a new connection is established
+     * Store connection metadata when a new connection is established.
+     *
+     * Persists both the connection timestamp and the SSH key fingerprint so that
+     * future calls to isKeyMismatch() can detect when the server was switched to
+     * a different key.
      */
     private static function storeConnectionMetadata(Server $server): void
     {
+        $cacheTtl = config('constants.ssh.mux_persist_time') + 300; // slightly longer than persist time
+
         $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
-        Cache::put($cacheKey, time(), config('constants.ssh.mux_persist_time') + 300); // Cache slightly longer than persist time
+        Cache::put($cacheKey, time(), $cacheTtl);
+
+        // Record which key was used so we can detect key changes later.
+        $privateKey = PrivateKey::find($server->private_key_id);
+        if ($privateKey && $privateKey->fingerprint) {
+            $fingerprintCacheKey = "ssh_mux_key_fingerprint_{$server->uuid}";
+            Cache::put($fingerprintCacheKey, $privateKey->fingerprint, $cacheTtl);
+        }
     }
 
     /**
-     * Clear connection metadata from cache
+     * Clear connection metadata (timestamp and key fingerprint) from cache.
      */
     private static function clearConnectionMetadata(Server $server): void
     {
-        $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
-        Cache::forget($cacheKey);
+        Cache::forget("ssh_mux_connection_time_{$server->uuid}");
+        Cache::forget("ssh_mux_key_fingerprint_{$server->uuid}");
     }
 }
