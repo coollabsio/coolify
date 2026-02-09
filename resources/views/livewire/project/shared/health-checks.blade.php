@@ -15,9 +15,13 @@
     </div>
     <div class="mt-1 pb-4">Define how your resource's health should be checked.</div>
     <div class="flex flex-col gap-4">
-        @if ($customHealthcheckFound)
-            <x-callout type="warning" title="Caution">
-                <p>A custom health check has been detected. If you enable this health check, it will disable the custom one and use this instead.</p>
+        @if ($customHealthcheckFound && $healthCheckEnabled)
+            <x-callout type="info" title="Custom Healthcheck Active">
+                <p>A custom health check was detected in the Docker image and is being used. The settings below are not applied. To use Coolify's health check instead, disable the healthcheck and re-enable it after removing the custom one from the image.</p>
+            </x-callout>
+        @elseif ($customHealthcheckFound && !$healthCheckEnabled)
+            <x-callout type="warning" title="Custom Healthcheck Disabled">
+                <p>A custom health check was detected in the Docker image, but healthcheck is disabled. The image's health check will not run. Enable healthcheck to use the image's custom health check.</p>
             </x-callout>
         @endif
 
