@@ -53,6 +53,15 @@ class InstallPrerequisites
                 "echo 'Installing Prerequisites for Arch Linux...'",
                 'pacman -Syu --noconfirm --needed curl wget git jq',
             ]);
+        } elseif ($supported_os_type->contains('alpine')) {
+            $command = $command->merge([
+                "echo 'Installing Prerequisites for Alpine Linux...'",
+                'apk update',
+                'command -v curl >/dev/null || apk add --no-cache curl',
+                'command -v wget >/dev/null || apk add --no-cache wget',
+                'command -v git >/dev/null || apk add --no-cache git',
+                'command -v jq >/dev/null || apk add --no-cache jq',
+            ]);
         } else {
             throw new \Exception('Unsupported OS type for prerequisites installation');
         }
