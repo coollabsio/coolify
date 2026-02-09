@@ -180,7 +180,7 @@ class GetContainersStatus
                         if ($database_id) {
                             $service_db = ServiceDatabase::where('id', $database_id)->first();
                             if ($service_db) {
-                                $uuid = data_get($service_db, 'service.uuid');
+                                $uuid = $service_db->getOwnerUuid();
                                 if ($uuid) {
                                     $isPublic = data_get($service_db, 'is_public');
                                     if ($isPublic) {

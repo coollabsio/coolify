@@ -48,7 +48,10 @@ class LocalFileVolume extends BaseModel
     {
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
-        if ($isService) {
+        if ($this->resource instanceof ServiceDatabase) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
+        } elseif ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
         } else {
@@ -83,7 +86,10 @@ class LocalFileVolume extends BaseModel
     {
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
-        if ($isService) {
+        if ($this->resource instanceof ServiceDatabase) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
+        } elseif ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
         } else {
@@ -120,7 +126,10 @@ class LocalFileVolume extends BaseModel
     {
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
-        if ($isService) {
+        if ($this->resource instanceof ServiceDatabase) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
+        } elseif ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
         } else {
