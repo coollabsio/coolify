@@ -1317,11 +1317,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // Auto-inject per-service .env file so Coolify environment variables are segregated
+        // This prevents sharing all environment variables across all containers in a Compose project
         $existingEnvFiles = data_get($service, 'env_file');
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push(".env.{$serviceName}")
             ->unique()
             ->values();
 
@@ -2417,10 +2417,11 @@ function serviceParser(Service $resource): Collection
             $payload['depends_on'] = $depends_on;
         }
         // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Auto-inject per-service .env file so Coolify environment variables are segregated
+        // This prevents sharing all environment variables across all containers in a Compose project
         $existingEnvFiles = data_get($service, 'env_file');
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push(".env.{$serviceName}")
             ->unique()
             ->values();
 

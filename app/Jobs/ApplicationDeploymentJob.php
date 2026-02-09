@@ -1157,7 +1157,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function generate_runtime_environment_variables()
+    private function generate_runtime_environment_variables(?string $serviceName = null)
     {
         $envs = collect([]);
         $sort = $this->application->settings->is_env_sorting_enabled;
@@ -1169,10 +1169,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('id');
         }
         if ($this->build_pack === 'dockercompose') {
-            $sorted_environment_variables = $sorted_environment_variables->filter(function ($env) {
+            $sorted_environment_variables = $sorted_environment_variables->filter(function ($env) use ($serviceName) {
+                if ($serviceName && str($env->key)->startsWith('SERVICE_')) {
+                    $key = str($env->key);
+                    // Metadata like URL/FQDN is shareable and needed by other services
+                    if ($key->startsWith('SERVICE_URL_') || $key->startsWith('SERVICE_FQDN_')) {
+                        return true;
+                    }
+                    // Segregate other SERVICE_ variables (like PASSWORDS) to their respective services
+                    return $key->contains(str($serviceName)->upper()->replace('-', '_'));
+                }
                 return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_') && ! str($env->key)->startsWith('SERVICE_NAME_');
             });
-            $sorted_environment_variables_preview = $sorted_environment_variables_preview->filter(function ($env) {
+            $sorted_environment_variables_preview = $sorted_environment_variables_preview->filter(function ($env) use ($serviceName) {
+                if ($serviceName && str($env->key)->startsWith('SERVICE_')) {
+                    $key = str($env->key);
+                    if ($key->startsWith('SERVICE_URL_') || $key->startsWith('SERVICE_FQDN_')) {
+                        return true;
+                    }
+                    return $key->contains(str($serviceName)->upper()->replace('-', '_'));
+                }
                 return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_') && ! str($env->key)->startsWith('SERVICE_NAME_');
             });
         }
@@ -1316,6 +1332,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This method saves the .env file with ALL runtime variables
         // For builds, it should be called AFTER the build to include runtime-only variables
 
+        if ($this->build_pack === 'dockercompose') {
+            $this->save_per_service_runtime_environment_variables();
+            return;
+        }
+
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
 
@@ -1417,6 +1438,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
             );
+        }
+    }
+
+    private function save_per_service_runtime_environment_variables()
+    {
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $dockerCompose = Yaml::parse($this->application->docker_compose_raw);
+        } else {
+            $dockerCompose = Yaml::parse($this->application->docker_compose);
+        }
+        $services = data_get($dockerCompose, 'services', []);
+
+        foreach ($services as $serviceName => $service) {
+            $envs = $this->generate_runtime_environment_variables(serviceName: $serviceName);
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $envFileName = ".env.{$serviceName}";
+
+            $this->application_deployment_queue->addLogEntry("Creating {$envFileName} for container: {$serviceName}", hidden: true);
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$envFileName} > /dev/null"),
+                ]
+            );
+
+            // Also create in configuration directory
+            if ($this->use_build_server) {
+                $this->server = $this->mainServer;
+                $this->execute_remote_command(
+                    [
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$envFileName} > /dev/null",
+                    ]
+                );
+                $this->server = $this->build_server;
+            } else {
+                $this->execute_remote_command(
+                    [
+                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$envFileName} > /dev/null",
+                    ]
+                );
+            }
         }
     }
 
