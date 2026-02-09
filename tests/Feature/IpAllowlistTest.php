@@ -106,6 +106,31 @@ test('IP allowlist with various subnet sizes', function () {
     expect(checkIPAgainstAllowlist('255.255.255.255', ['0.0.0.0/0']))->toBeTrue();
 });
 
+test('IP allowlist with IPv6 CIDR notation', function () {
+    $testCases = [
+        ['ip' => '2a02:a457:7181:1:2d1f:d36b:ea09:f05', 'allowlist' => ['2a02:a457:7181::/48'], 'expected' => true],
+        ['ip' => '2a02:a457:7181:ffff:ffff:ffff:ffff:ffff', 'allowlist' => ['2a02:a457:7181::/48'], 'expected' => true],
+        ['ip' => '2a02:a457:7182::1', 'allowlist' => ['2a02:a457:7181::/48'], 'expected' => false],
+        ['ip' => '2001:db8::1', 'allowlist' => ['2001:db8::/32'], 'expected' => true],
+        ['ip' => '2001:db8:ffff:ffff:ffff:ffff:ffff:ffff', 'allowlist' => ['2001:db8::/32'], 'expected' => true],
+        ['ip' => '2001:db9::1', 'allowlist' => ['2001:db8::/32'], 'expected' => false],
+    ];
+
+    foreach ($testCases as $case) {
+        $result = checkIPAgainstAllowlist($case['ip'], $case['allowlist']);
+        expect($result)->toBe($case['expected']);
+    }
+});
+
+test('IP allowlist with mixed IPv4 and IPv6', function () {
+    $allowlist = ['84.85.134.157', '2a02:a457:7181::/48'];
+
+    expect(checkIPAgainstAllowlist('84.85.134.157', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('2a02:a457:7181:1:2d1f:d36b:ea09:f05', $allowlist))->toBeTrue();
+    expect(checkIPAgainstAllowlist('8.8.8.8', $allowlist))->toBeFalse();
+    expect(checkIPAgainstAllowlist('2001:db8::1', $allowlist))->toBeFalse();
+});
+
 test('IP allowlist comma-separated string input', function () {
     // Test with comma-separated string (as it would come from the settings)
     $allowlistString = '192.168.1.100,10.0.0.0/8,172.16.0.0/16';
@@ -139,6 +164,8 @@ test('ValidIpOrCidr validation rule', function () {
     expect($validate('10.0.0.0/8'))->toBeTrue(); // Valid CIDR
     expect($validate('192.168.1.1,10.0.0.1'))->toBeTrue(); // Multiple valid IPs
     expect($validate('192.168.1.0/24,10.0.0.0/8'))->toBeTrue(); // Multiple CIDRs
+    expect($validate('2a02:a457:7181::/48'))->toBeTrue(); // IPv6 CIDR
+    expect($validate('2001:db8::1'))->toBeTrue(); // IPv6 single address
     expect($validate('0.0.0.0/0'))->toBeTrue(); // 0.0.0.0 with subnet
     expect($validate('0.0.0.0/24'))->toBeTrue(); // 0.0.0.0 with any subnet
     expect($validate(' 192.168.1.1 '))->toBeTrue(); // With spaces
@@ -147,7 +174,8 @@ test('ValidIpOrCidr validation rule', function () {
     expect($validate('1'))->toBeFalse(); // Single digit
     expect($validate('abc'))->toBeFalse(); // Invalid text
     expect($validate('192.168.1.256'))->toBeFalse(); // Invalid IP (256)
-    expect($validate('192.168.1.0/33'))->toBeFalse(); // Invalid CIDR mask (>32)
+    expect($validate('192.168.1.0/33'))->toBeFalse(); // Invalid IPv4 CIDR mask (>32)
+    expect($validate('2a02:a457:7181::/129'))->toBeFalse(); // Invalid IPv6 CIDR mask (>128)
     expect($validate('192.168.1.0/-1'))->toBeFalse(); // Invalid CIDR mask (<0)
     expect($validate('192.168.1.1,abc'))->toBeFalse(); // Mix of valid and invalid
     expect($validate('192.168.1.1,192.168.1.256'))->toBeFalse(); // Mix with invalid IP
