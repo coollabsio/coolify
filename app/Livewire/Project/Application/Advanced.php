@@ -236,12 +236,19 @@ class Advanced extends Component
 
                 return;
             }
+
+            $this->customContainerNamePrefix = null;
             $customInternalName = $this->customInternalName;
             $server = $this->application->destination->server;
             $allApplications = $server->applications();
 
             $foundSameInternalName = $allApplications->filter(function ($application) {
-                return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->customInternalName;
+                if ($application->id === $this->application->id) {
+                    return false;
+                }
+
+                return $application->settings->custom_internal_name === $this->customInternalName
+                    || $application->settings->custom_container_name_prefix === $this->customInternalName;
             });
             if ($foundSameInternalName->isNotEmpty()) {
                 $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
@@ -266,6 +273,32 @@ class Advanced extends Component
                 $this->customContainerNamePrefix = str($this->customContainerNamePrefix)->slug()->value();
             } else {
                 $this->customContainerNamePrefix = null;
+            }
+
+            if (is_null($this->customContainerNamePrefix)) {
+                $this->syncData(true);
+                $this->dispatch('success', 'Custom container name prefix saved.');
+
+                return;
+            }
+
+            $this->customInternalName = null;
+            $server = $this->application->destination->server;
+            $allApplications = $server->applications();
+
+            $foundDuplicate = $allApplications->filter(function ($application) {
+                if ($application->id === $this->application->id) {
+                    return false;
+                }
+
+                return $application->settings->custom_container_name_prefix === $this->customContainerNamePrefix
+                    || $application->settings->custom_internal_name === $this->customContainerNamePrefix;
+            });
+
+            if ($foundDuplicate->isNotEmpty()) {
+                $this->dispatch('error', 'This custom container name prefix is already in use by another application on this server.');
+
+                return;
             }
 
             $this->syncData(true);
