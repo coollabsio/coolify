@@ -55,6 +55,7 @@ class User extends Authenticatable implements SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'oauth_only' => 'boolean',
     ];
 
     /**
@@ -79,7 +80,7 @@ class User extends Authenticatable implements SendsEmail
 
         static::created(function (User $user) {
             $team = [
-                'name' => $user->name."'s Team",
+                'name' => $user->name . "'s Team",
                 'personal_team' => true,
                 'show_boarding' => true,
             ];
@@ -182,7 +183,7 @@ class User extends Authenticatable implements SendsEmail
     public function recreate_personal_team()
     {
         $team = [
-            'name' => $this->name."'s Team",
+            'name' => $this->name . "'s Team",
             'personal_team' => true,
             'show_boarding' => true,
         ];
@@ -213,7 +214,7 @@ class User extends Authenticatable implements SendsEmail
             'team_id' => session('currentTeam')->id,
         ]);
 
-        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
+        return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
     }
 
     public function teams()
@@ -321,14 +322,14 @@ class User extends Authenticatable implements SendsEmail
         }
 
         // Check if user actually belongs to this team
-        if (! $this->teams->contains('id', $sessionTeamId)) {
+        if (!$this->teams->contains('id', $sessionTeamId)) {
             session()->forget('currentTeam');
-            Cache::forget('user:'.$this->id.':team:'.$sessionTeamId);
+            Cache::forget('user:' . $this->id . ':team:' . $sessionTeamId);
 
             return null;
         }
 
-        return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
+        return Cache::remember('user:' . $this->id . ':team:' . $sessionTeamId, 3600, function () use ($sessionTeamId) {
             return Team::find($sessionTeamId);
         });
     }
@@ -366,7 +367,7 @@ class User extends Authenticatable implements SendsEmail
     {
         $team = $this->teams->where('id', $teamId)->first();
 
-        if (! $team) {
+        if (!$team) {
             return false;
         }
 
@@ -384,7 +385,7 @@ class User extends Authenticatable implements SendsEmail
         // Check if user is member of root team
         $rootTeam = $this->teams->where('id', 0)->first();
 
-        if (! $rootTeam) {
+        if (!$rootTeam) {
             return false;
         }
 
@@ -420,7 +421,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function confirmEmailChange(string $code): bool
     {
-        if (! $this->isEmailChangeCodeValid($code)) {
+        if (!$this->isEmailChangeCodeValid($code)) {
             return false;
         }
 
@@ -460,8 +461,8 @@ class User extends Authenticatable implements SendsEmail
 
     public function hasEmailChangeRequest(): bool
     {
-        return ! is_null($this->pending_email)
-            && ! is_null($this->email_change_code)
+        return !is_null($this->pending_email)
+            && !is_null($this->email_change_code)
             && $this->email_change_code_expires_at
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
@@ -472,6 +473,6 @@ class User extends Authenticatable implements SendsEmail
      */
     public function hasPassword(): bool
     {
-        return ! empty($this->password);
+        return !empty($this->password);
     }
 }

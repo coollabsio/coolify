@@ -20,15 +20,16 @@ class OauthController extends Controller
         try {
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
-            if (! $user) {
+            if (!$user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                if (!$settings->is_registration_enabled && !$settings->is_oauth_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
 
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
+                    'oauth_only' => true,
                 ]);
             }
             Auth::login($user);

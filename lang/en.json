@@ -25,6 +25,7 @@
     "auth.failed.password": "The provided password is incorrect.",
     "auth.failed.email": "If an account exists with this email address, you will receive a password reset link shortly.",
     "auth.throttle": "Too many login attempts. Please try again in :seconds seconds.",
+    "auth.oauth_only": "This account is restricted to OAuth login only. Please use an OAuth provider to sign in.",
     "input.name": "Name",
     "input.email": "Email",
     "input.password": "Password",

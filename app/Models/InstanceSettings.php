@@ -31,6 +31,7 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -54,7 +55,7 @@ class InstanceSettings extends Model
                     $url = Url::fromString($value);
                     $host = $url->getHost();
 
-                    return $url->getScheme().'://'.$host;
+                    return $url->getScheme() . '://' . $host;
                 }
             }
         );
@@ -86,7 +87,7 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return once(fn () => InstanceSettings::findOrFail(0));
+        return once(fn() => InstanceSettings::findOrFail(0));
     }
 
     // public function getRecipients($notification)
@@ -102,7 +103,7 @@ class InstanceSettings extends Model
     public function getTitleDisplayName(): string
     {
         $instanceName = $this->instance_name;
-        if (! $instanceName) {
+        if (!$instanceName) {
             return '';
         }
 

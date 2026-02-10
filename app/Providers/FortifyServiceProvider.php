@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
 
@@ -23,8 +24,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse
-        {
+        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse {
             public function toResponse($request)
             {
                 // First user (root) will be redirected to /settings instead of / on registration.
@@ -47,7 +47,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
 
@@ -78,6 +78,13 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                // Block password login for OAuth-only users
+                if ($user->oauth_only) {
+                    throw ValidationException::withMessages([
+                        'email' => [__('auth.oauth_only')],
+                    ]);
+                }
+
                 $user->updated_at = now();
                 $user->save();
 
@@ -86,7 +93,7 @@ class FortifyServiceProvider extends ServiceProvider
                 if ($invitation && $invitation->isValid()) {
                     // User is logging in for the first time after being invited
                     // Attach them to the invited team if not already attached
-                    if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
+                    if (!$user->teams()->where('team_id', $invitation->team->id)->exists()) {
                         $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
                     }
                     $user->currentTeam = $invitation->team;
@@ -94,7 +101,7 @@ class FortifyServiceProvider extends ServiceProvider
                 } else {
                     // Normal login - use personal team
                     $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                    if (! $user->currentTeam) {
+                    if (!$user->currentTeam) {
                         $user->currentTeam = $user->recreate_personal_team();
                     }
                 }
@@ -139,7 +146,7 @@ class FortifyServiceProvider extends ServiceProvider
             // server('REMOTE_ADDR') gives the actual connecting IP before proxy headers
             $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
 
-            return Limit::perMinute(5)->by($email.'|'.$realIp);
+            return Limit::perMinute(5)->by($email . '|' . $realIp);
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
