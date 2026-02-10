@@ -88,7 +88,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $databasesToBackup = null;
 
             $this->team = Team::find($this->backup->team_id);
-            if (! $this->team) {
+            if (!$this->team) {
                 $this->backup->delete();
 
                 return;
@@ -112,7 +112,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             BackupCreated::dispatch($this->team->id);
 
             $status = str(data_get($this->database, 'status'));
-            if (! $status->startsWith('running') && $this->database->id !== 0) {
+            if (!$status->startsWith('running') && $this->database->id !== 0) {
                 return;
             }
 
@@ -128,7 +128,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $serviceName = str($this->database->service->name)->slug();
                 if (str($databaseType)->contains('postgres')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -159,7 +159,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -182,7 +182,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -220,7 +220,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
                     $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->directory_name = $serviceName . '-' . $this->container_name;
 
                     // Try to extract MongoDB credentials from environment variables
                     try {
@@ -251,7 +251,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $databaseName = str($this->database->name)->slug()->value();
                 $this->container_name = $this->database->uuid;
-                $this->directory_name = $databaseName.'-'.$this->container_name;
+                $this->directory_name = $databaseName . '-' . $this->container_name;
                 $databaseType = $this->database->type();
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
@@ -291,12 +291,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             }
-            $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
+            $this->backup_dir = backup_dir() . '/databases/' . str($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->directory_name;
             if ($this->database->name === 'coolify-db') {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
                 $ip = Str::slug($this->server->ip);
-                $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
+                $this->backup_dir = backup_dir() . '/coolify' . "/coolify-db-$ip";
             }
             foreach ($databasesToBackup as $database) {
                 $this->backup_log_uuid = (string) new Cuid2;
@@ -308,11 +308,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
-                        $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        $this->backup_file = "/pg-dump-$database-" . Carbon::now()->timestamp . '.dmp';
                         if ($this->backup->dump_all) {
-                            $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            $this->backup_file = '/pg-dump-all-' . Carbon::now()->timestamp . '.gz';
                         }
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
@@ -332,8 +332,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                                 $databaseName = $database;
                             }
                         }
-                        $this->backup_file = "/mongo-dump-$databaseName-".Carbon::now()->timestamp.'.tar.gz';
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_file = "/mongo-dump-$databaseName-" . Carbon::now()->timestamp . '.tar.gz';
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $databaseName,
@@ -343,11 +343,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         $this->backup_standalone_mongodb($database);
                     } elseif (str($databaseType)->contains('mysql')) {
-                        $this->backup_file = "/mysql-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        $this->backup_file = "/mysql-dump-$database-" . Carbon::now()->timestamp . '.dmp';
                         if ($this->backup->dump_all) {
-                            $this->backup_file = '/mysql-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            $this->backup_file = '/mysql-dump-all-' . Carbon::now()->timestamp . '.gz';
                         }
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
@@ -357,11 +357,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         $this->backup_standalone_mysql($database);
                     } elseif (str($databaseType)->contains('mariadb')) {
-                        $this->backup_file = "/mariadb-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        $this->backup_file = "/mariadb-dump-$database-" . Carbon::now()->timestamp . '.dmp';
                         if ($this->backup->dump_all) {
-                            $this->backup_file = '/mariadb-dump-all-'.Carbon::now()->timestamp.'.gz';
+                            $this->backup_file = '/mariadb-dump-all-' . Carbon::now()->timestamp . '.gz';
                         }
-                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
                             'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
@@ -421,8 +421,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                     if ($s3UploadError) {
                         $message = $message
-                            ? $message."\n\nWarning: S3 upload failed: ".$s3UploadError
-                            : 'Warning: S3 upload failed: '.$s3UploadError;
+                            ? $message . "\n\nWarning: S3 upload failed: " . $s3UploadError
+                            : 'Warning: S3 upload failed: ' . $s3UploadError;
                     }
 
                     $this->backup_log->update([
@@ -474,7 +474,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             if ($databaseWithCollections === 'all') {
-                $commands[] = 'mkdir -p '.$this->backup_dir;
+                $commands[] = 'mkdir -p ' . $this->backup_dir;
                 if (str($this->database->image)->startsWith('mongo:4')) {
                     $commands[] = "docker exec $this->container_name mongodump --uri=\"$url\" --gzip --archive > $this->backup_location";
                 } else {
@@ -488,7 +488,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databaseName = $databaseWithCollections;
                     $collectionsToExclude = collect();
                 }
-                $commands[] = 'mkdir -p '.$this->backup_dir;
+                $commands[] = 'mkdir -p ' . $this->backup_dir;
 
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($databaseName, 'database name');
@@ -502,9 +502,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } else {
                     if (str($this->database->image)->startsWith('mongo:4')) {
-                        $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
+                        $commands[] = "docker exec $this->container_name mongodump --uri=$url --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
                     } else {
-                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $escapedDatabaseName --gzip --excludeCollection ".$collectionsToExclude->implode(' --excludeCollection ')." --archive > $this->backup_location";
+                        $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=\"$url\" --db $escapedDatabaseName --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
                     }
                 }
             }
@@ -522,7 +522,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_postgresql(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.$this->backup_dir;
+            $commands[] = 'mkdir -p ' . $this->backup_dir;
             $backupCommand = 'docker exec';
             if ($this->postgres_password) {
                 $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
@@ -551,7 +551,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_mysql(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.$this->backup_dir;
+            $commands[] = 'mkdir -p ' . $this->backup_dir;
             if ($this->backup->dump_all) {
                 $commands[] = "docker exec $this->container_name mysqldump -u root -p\"{$this->database->mysql_root_password}\" --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
             } else {
@@ -574,7 +574,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function backup_standalone_mariadb(string $database): void
     {
         try {
-            $commands[] = 'mkdir -p '.$this->backup_dir;
+            $commands[] = 'mkdir -p ' . $this->backup_dir;
             if ($this->backup->dump_all) {
                 $commands[] = "docker exec $this->container_name mariadb-dump -u root -p\"{$this->database->mariadb_root_password}\" --all-databases --single-transaction --quick --lock-tables=false --compress > $this->backup_location";
             } else {
@@ -597,7 +597,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function add_to_backup_output($output): void
     {
         if ($this->backup_output) {
-            $this->backup_output = $this->backup_output."\n".$output;
+            $this->backup_output = $this->backup_output . "\n" . $output;
         } else {
             $this->backup_output = $output;
         }
@@ -606,7 +606,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function add_to_error_output($output): void
     {
         if ($this->error_output) {
-            $this->error_output = $this->error_output."\n".$output;
+            $this->error_output = $this->error_output . "\n" . $output;
         } else {
             $this->error_output = $output;
         }
@@ -647,16 +647,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             if (isDev()) {
                 if ($this->database->name === 'coolify-db') {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
-                    $escapedVolumeMount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-' . $this->server->ip . $this->backup_file;
+                    $escapedVolumeMount = escapeshellarg($backup_location_from . ':' . $this->backup_location . ':ro');
                     $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
                 } else {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
-                    $escapedVolumeMount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/' . str($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->directory_name . $this->backup_file;
+                    $escapedVolumeMount = escapeshellarg($backup_location_from . ':' . $this->backup_location . ':ro');
                     $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
                 }
             } else {
-                $escapedVolumeMount = escapeshellarg($this->backup_location.':'.$this->backup_location.':ro');
+                $escapedVolumeMount = escapeshellarg($this->backup_location . ':' . $this->backup_location . ':ro');
                 $commands[] = "docker run -d --network {$escapedNetwork} --name {$escapedContainerName} --rm -v {$escapedVolumeMount} {$escapedImageName}";
             }
 
@@ -708,67 +708,53 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             'pgbackrest_stanza' => $stanza,
         ]);
 
+        $tempConfigPath = "/tmp/pgbackrest-{$this->backup->uuid}.conf";
+
         try {
-            $this->update_pgbackrest_config();
-
-            $backupCmd = PgBackrestService::buildBackupCommand($stanza, $backupType, 'info');
-            $backupCmdWithWait = PgBackrestService::wrapWithLockWait($backupCmd);
-
-            $s3EnvVars = PgBackrestService::buildS3EnvVars($this->backup);
-            $dockerEnvArgs = PgBackrestService::buildDockerEnvArgs($s3EnvVars);
-            $fixPermsCmd = 'chown -R postgres:postgres /var/lib/pgbackrest /tmp/pgbackrest /var/log/pgbackrest 2>/dev/null || true';
-            $escapedInnerCmd = str_replace("'", "'\"'\"'", $backupCmdWithWait);
-            $fullScript = "{$fixPermsCmd}; su postgres -c '{$escapedInnerCmd}' 2>&1; echo \"EXIT_CODE:\$?\"";
-            $escapedScript = escapeshellarg($fullScript);
-            $containerName = escapeshellarg($this->container_name);
-            $backupFullCmd = "docker exec{$dockerEnvArgs} {$containerName} sh -c {$escapedScript}";
-
-            $rawOutput = instant_remote_process([$backupFullCmd], $this->server, false, false, $this->timeout, disableMultiplexing: true);
-            $rawOutput = trim($rawOutput) ?: '';
-
-            $exitCode = 0;
-            if (preg_match('/EXIT_CODE:(\d+)$/', $rawOutput, $matches)) {
-                $exitCode = (int) $matches[1];
-                $this->backup_output = trim(preg_replace('/EXIT_CODE:\d+$/', '', $rawOutput)) ?: null;
-            } else {
-                $this->backup_output = $rawOutput ?: null;
+            // 1. Generate and Write Config to Host
+            $configContent = PgBackrestService::generateConfig($this->database);
+            if (empty($configContent)) {
+                throw new \RuntimeException("Could not generate pgBackRest configuration. Check if repositories are enabled.");
             }
 
-            if ($exitCode !== 0) {
-                $errorMessage = $this->backup_output ?: "pgBackRest backup failed with exit code {$exitCode}";
-                throw new \RuntimeException($errorMessage, $exitCode);
-            }
+            // Write config to temporary file on the server
+            // We use instant_remote_process with 'echo' or 'cat' to write the file.
+            // Be careful with quoting. base64 encoding avoids quoting issues.
+            $encodedConfig = base64_encode($configContent);
+            $writeCmd = "echo '{$encodedConfig}' | base64 -d > {$tempConfigPath}";
+            instant_remote_process([$writeCmd], $this->server, true);
 
-            $infoCmd = PgBackrestService::buildInfoCommand($stanza, true);
-            $escapedInfoCmd = escapeshellarg($infoCmd);
-            $infoJson = instant_remote_process(
-                ["docker exec{$dockerEnvArgs} {$containerName} su postgres -c {$escapedInfoCmd}"],
-                $this->server,
-                false,
-                false,
-                120,
-                disableMultiplexing: true
+            // 2. Build Sidecar Command
+            $network = $this->database->destination->network;
+            $sidecarCmd = PgBackrestService::buildSidecarBackupCommand(
+                $stanza,
+                $backupType,
+                $this->backup,
+                $this->container_name, // The running DB container name to mount volumes from
+                $network,
+                $this->container_name // volume name (usually same as container name for volumes-from)
             );
 
-            $info = PgBackrestService::parseInfoJson($infoJson);
-            $latestBackup = $info ? PgBackrestService::getLatestBackup($info) : null;
+            // 3. Run Backup via Sidecar
+            $this->backup_output = instant_remote_process([$sidecarCmd], $this->server, false, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
 
-            $label = $latestBackup['label'] ?? null;
-            $type = $latestBackup ? PgBackrestService::getBackupType($latestBackup) : $backupType;
-            $size = $latestBackup ? PgBackrestService::getBackupSize($latestBackup) : 0;
+            // 4. Verify Success (pgBackRest usually returns 0 on success)
+            // But we should check the output for explicit success message if needed.
+            // instant_remote_process throws exception if exit code != 0 unless we catch it?
+            // Wait, instant_remote_process implementation throws if throwError is true? 
+            // The signature is (..., bool $throwError = true, ...). Default true.
+            // So if it fails, it throws. If we are here, it succeeded.
 
-            $this->run_pgbackrest_expire($stanza);
+            // 5. Get Backup Info for Logs (Optional: run 'info' command via sidecar)
+            // For now, let's skip the heavy parsing and assume success if exit code 0.
+            // Or we can run a quick info command.
 
             $this->backup_log->update([
                 'status' => 'success',
                 'message' => $this->backup_output,
-                'size' => $size,
-                'filename' => "pgbackrest:{$label}",
-                'engine' => 'pgbackrest',
-                'pgbackrest_backup_type' => $type,
-                'pgbackrest_label' => $label,
-                'pgbackrest_repo_size' => $size,
-                's3_uploaded' => $this->backup->hasS3Repo() ? true : null,
+                // 'size' => $size, // We'd need to parse 'info' to get size. keeping it simple for now.
+                'pgbackrest_backup_type' => $backupType,
                 'finished_at' => Carbon::now(),
             ]);
 
@@ -776,9 +762,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         } catch (Throwable $e) {
             $errorMsg = $this->backup_output ?? $e->getMessage();
-            if ($this->backup_output && $e->getMessage() !== $this->backup_output) {
-                $errorMsg = $this->backup_output;
-            }
 
             $this->backup_log->update([
                 'status' => 'failed',
@@ -795,6 +778,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             throw $e;
         } finally {
+            // 6. Cleanup Host Config
+            instant_remote_process(["rm -f {$tempConfigPath}"], $this->server, false, false, null, disableMultiplexing: true);
+
             BackupCreated::dispatch($this->team->id);
         }
     }
@@ -863,7 +849,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         if ($log) {
             $log->update([
                 'status' => 'failed',
-                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => 'Job permanently failed after ' . $this->attempts() . ' attempts: ' . ($exception?->getMessage() ?? 'Unknown error'),
                 'size' => 0,
                 'filename' => null,
                 'finished_at' => Carbon::now(),

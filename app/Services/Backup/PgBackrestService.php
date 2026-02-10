@@ -42,10 +42,10 @@ class PgBackrestService
         }
 
         $config = "[global]\n";
-        $config .= 'log-level-console='.($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL)."\n";
-        $config .= 'log-level-file='.($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL)."\n";
-        $config .= 'compress-type='.($backup->pgbackrest_compress_type ?? self::DEFAULT_COMPRESS_TYPE)."\n";
-        $config .= 'compress-level='.($backup->pgbackrest_compress_level ?? self::DEFAULT_COMPRESS_LEVEL)."\n";
+        $config .= 'log-level-console=' . ($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL) . "\n";
+        $config .= 'log-level-file=' . ($backup->pgbackrest_log_level ?? self::DEFAULT_LOG_LEVEL) . "\n";
+        $config .= 'compress-type=' . ($backup->pgbackrest_compress_type ?? self::DEFAULT_COMPRESS_TYPE) . "\n";
+        $config .= 'compress-level=' . ($backup->pgbackrest_compress_level ?? self::DEFAULT_COMPRESS_LEVEL) . "\n";
         $config .= "start-fast=y\n";
         $config .= "stop-auto=y\n";
         $config .= "delta=y\n";
@@ -56,12 +56,12 @@ class PgBackrestService
         }
 
         $config .= "\n[{$stanza}]\n";
-        $config .= 'pg1-path='.self::PGDATA_PATH."\n";
+        $config .= 'pg1-path=' . self::PGDATA_PATH . "\n";
 
         $validRepoCount = 0;
         foreach ($repos as $repo) {
             $repoConfig = self::generateRepoConfig($repo, $database);
-            if (! empty($repoConfig)) {
+            if (!empty($repoConfig)) {
                 $config .= $repoConfig;
                 $validRepoCount++;
             }
@@ -81,7 +81,7 @@ class PgBackrestService
 
         if ($repo->isS3()) {
             $s3 = $repo->s3Storage;
-            if (! $s3) {
+            if (!$s3) {
                 return '';
             }
 
@@ -89,7 +89,7 @@ class PgBackrestService
                 validateShellSafePath($s3->bucket, 'S3 bucket');
                 validateShellSafePath($s3->endpoint, 'S3 endpoint');
             } catch (\Exception $e) {
-                throw new \Exception('Invalid S3 configuration: '.$e->getMessage());
+                throw new \Exception('Invalid S3 configuration: ' . $e->getMessage());
             }
 
             $settings = [
@@ -116,7 +116,12 @@ class PgBackrestService
         $settings["{$repoKey}-retention-full"] = $retentionFull;
         $settings["{$repoKey}-retention-diff"] = $retentionDiff;
 
-        return implode("\n", array_map(fn ($k, $v) => "{$k}={$v}", array_keys($settings), $settings))."\n";
+        if ($repo->encryption_key) {
+            $settings["{$repoKey}-cipher-type"] = 'aes-256-cbc';
+            $settings["{$repoKey}-cipher-pass"] = $repo->encryption_key;
+        }
+
+        return implode("\n", array_map(fn($k, $v) => "{$k}={$v}", array_keys($settings), $settings)) . "\n";
     }
 
     public static function cleanEndpoint(string $endpoint): string
@@ -127,37 +132,71 @@ class PgBackrestService
         return $endpoint;
     }
 
-    public static function getInstallCommand(): string
-    {
-        return <<<'BASH'
-if ! command -v pgbackrest &> /dev/null; then
-    if command -v apk >/dev/null 2>&1; then
-        echo "Installing pgBackRest via apk..."
-        apk add --no-cache pgbackrest
-    elif command -v apt-get >/dev/null 2>&1; then
-        echo "Installing pgBackRest via apt..."
-        apt-get update && apt-get install -y --no-install-recommends pgbackrest && rm -rf /var/lib/apt/lists/*
-    elif command -v yum >/dev/null 2>&1; then
-        echo "Installing pgBackRest via yum..."
-        yum install -y pgbackrest
-    else
-        echo "ERROR: Could not detect package manager to install pgBackRest"
-        exit 1
-    fi
-else
-    echo "pgBackRest already installed"
-fi
-BASH;
+    public static function buildSidecarBackupCommand(
+        string $stanza,
+        string $type,
+        ScheduledDatabaseBackup $backup,
+        string $containerName,
+        string $network,
+        string $volumeName
+    ): string {
+        $image = config('coolify.pgbackrest_image', 'pgbackrest/pgbackrest:latest');
+
+        $envVars = self::buildS3EnvVars($backup);
+        $dockerEnvArgs = self::buildDockerEnvArgs($envVars);
+
+        // Mount points
+        $configMount = "-v /tmp/pgbackrest-{$backup->uuid}.conf:/etc/pgbackrest/pgbackrest.conf:ro";
+        // Mount the DB volume correctly. Assuming standard Postgres layout.
+        // We use volumes-from to share the DB volume, or explicit volume mapping if we know the volume name.
+        // For Sidecar pattern, --volumes-from is easiest if target container is running.
+        // But if we want to be independent, mounting the named volume is better.
+        // Let's use --volumes-from for now as it maps the paths automatically.
+        $volumeMount = "--volumes-from {$containerName}:ro";
+
+        $cmd = "pgbackrest --stanza={$stanza} --type={$type} backup";
+
+        return "docker run --rm --network {$network} {$dockerEnvArgs} {$configMount} {$volumeMount} {$image} {$cmd}";
     }
 
-    public static function buildInstallAndSetupCommand(string $command): string
-    {
-        $installCmd = self::getInstallCommand();
-        $setupCmd = 'mkdir -p /var/lib/pgbackrest/log /tmp/pgbackrest 2>/dev/null || true';
-        $clearLocksCmd = 'rm -rf /tmp/pgbackrest/*.lock 2>/dev/null || true';
-        $permsCmd = 'chown -R postgres:postgres /var/lib/pgbackrest /etc/pgbackrest /tmp/pgbackrest 2>/dev/null || true';
+    public static function buildSidecarRestoreCommand(
+        string $stanza,
+        ScheduledDatabaseBackup $backup, // We need backup config for env vars
+        string $network,
+        string $volumeMounts,
+        string $targetTime = null
+    ): string {
+        $image = config('coolify.pgbackrest_image', 'pgbackrest/pgbackrest:latest');
+        $envVars = self::buildS3EnvVars($backup);
+        $dockerEnvArgs = self::buildDockerEnvArgs($envVars);
 
-        return "{$installCmd}; {$setupCmd}; {$clearLocksCmd}; {$permsCmd}; su postgres -c \"{$command}\"";
+        $configMount = "-v /tmp/pgbackrest-{$backup->uuid}.conf:/etc/pgbackrest/pgbackrest.conf:ro";
+
+        $cmd = "pgbackrest --stanza={$stanza} --delta restore";
+        if ($targetTime) {
+            $cmd .= " --type=time --target=\"{$targetTime}\" --target-action=promote";
+        }
+
+        return "docker run --rm --network {$network} {$dockerEnvArgs} {$configMount} {$volumeMounts} {$image} {$cmd}";
+    }
+
+    public static function buildSidecarInfoCommand(
+        string $stanza,
+        ScheduledDatabaseBackup $backup,
+        string $network,
+        string $containerName
+    ): string {
+        $image = config('coolify.pgbackrest_image', 'pgbackrest/pgbackrest:latest');
+        $envVars = self::buildS3EnvVars($backup);
+        $dockerEnvArgs = self::buildDockerEnvArgs($envVars);
+
+        $configMount = "-v /tmp/pgbackrest-{$backup->uuid}.conf:/etc/pgbackrest/pgbackrest.conf:ro";
+        // Info command might need access to local repo (volumes-from handles this)
+        $volumeMount = "--volumes-from {$containerName}:ro";
+
+        $cmd = "pgbackrest --stanza={$stanza} --output=json info";
+
+        return "docker run --rm --network {$network} {$dockerEnvArgs} {$configMount} {$volumeMount} {$image} {$cmd}";
     }
 
     public static function buildS3EnvVars(ScheduledDatabaseBackup $backup): array
@@ -179,7 +218,7 @@ BASH;
 
     public static function buildS3EnvVarsForRepo(PgbackrestRepo $repo): array
     {
-        if (! $repo->isS3() || ! $repo->s3Storage) {
+        if (!$repo->isS3() || !$repo->s3Storage) {
             return [];
         }
 
@@ -196,10 +235,10 @@ BASH;
     {
         $args = '';
         foreach ($envVars as $key => $value) {
-            if (! preg_match('/^[A-Z_][A-Z0-9_]*$/i', $key)) {
+            if (!preg_match('/^[A-Z_][A-Z0-9_]*$/i', $key)) {
                 throw new \InvalidArgumentException("Invalid environment variable name: {$key}");
             }
-            $args .= ' -e '.escapeshellarg("{$key}={$value}");
+            $args .= ' -e ' . escapeshellarg("{$key}={$value}");
         }
 
         return $args;
@@ -220,7 +259,7 @@ BASH;
         }
 
         if ($repoNumber !== null) {
-            $cmd .= ' --repo='.((int) $repoNumber);
+            $cmd .= ' --repo=' . ((int) $repoNumber);
         }
 
         $escapedType = escapeshellarg($type);
@@ -277,7 +316,7 @@ BASH;
         }
 
         if ($repoNumber !== null) {
-            $cmd .= ' --repo='.((int) $repoNumber);
+            $cmd .= ' --repo=' . ((int) $repoNumber);
         }
 
         if ($label) {
@@ -301,7 +340,7 @@ BASH;
         $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($repoNumber !== null) {
-            $cmd .= ' --repo='.((int) $repoNumber);
+            $cmd .= ' --repo=' . ((int) $repoNumber);
         }
 
         if ($json) {
@@ -328,7 +367,7 @@ BASH;
         $cmd = "pgbackrest --stanza={$escapedStanza}";
 
         if ($repoNumber !== null) {
-            $cmd .= ' --repo='.((int) $repoNumber);
+            $cmd .= ' --repo=' . ((int) $repoNumber);
         }
 
         $cmd .= ' expire';
@@ -349,7 +388,7 @@ BASH;
 
     public static function getLatestBackup(array $info): ?array
     {
-        if (empty($info) || ! isset($info[0]['backup'])) {
+        if (empty($info) || !isset($info[0]['backup'])) {
             return null;
         }
 
@@ -364,7 +403,7 @@ BASH;
 
     public static function findBackupByLabel(array $info, string $label): ?array
     {
-        if (empty($info) || ! isset($info[0]['backup'])) {
+        if (empty($info) || !isset($info[0]['backup'])) {
             return null;
         }
 
@@ -389,7 +428,7 @@ BASH;
 
     public static function stanzaExists(array $info): bool
     {
-        if (empty($info) || ! isset($info[0])) {
+        if (empty($info) || !isset($info[0])) {
             return false;
         }
 
@@ -400,7 +439,7 @@ BASH;
 
     public static function hasBackups(array $info): bool
     {
-        if (empty($info) || ! isset($info[0]['backup'])) {
+        if (empty($info) || !isset($info[0]['backup'])) {
             return false;
         }
 
