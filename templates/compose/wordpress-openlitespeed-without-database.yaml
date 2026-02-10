@@ -12,6 +12,15 @@ services:
       - lsws-conf:/usr/local/lsws/conf
     environment:
       - SERVICE_URL_WORDPRESS
+    command: >
+      /bin/sh -c "
+      if [ -z \"\$(ls -A /var/www/vhosts/localhost/html)\" ]; then
+        curl -Lo /tmp/wp.tar.gz https://wordpress.org/latest.tar.gz;
+        tar -xzf /tmp/wp.tar.gz -C /var/www/vhosts/localhost/html --strip-components=1;
+        rm /tmp/wp.tar.gz;
+        chown -R 1000:1000 /var/www/vhosts/localhost/html;
+      fi;
+      exec /entrypoint.sh"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
       interval: 5s

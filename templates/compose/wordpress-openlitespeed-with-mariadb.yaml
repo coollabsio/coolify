@@ -16,6 +16,24 @@ services:
       - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
       - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
       - WORDPRESS_DB_NAME=wordpress
+    command: >
+      /bin/sh -c "
+      if [ ! -f /var/www/vhosts/localhost/html/wp-config.php ]; then
+        echo 'Provisioning WordPress...';
+        if [ -z \"\$(ls -A /var/www/vhosts/localhost/html)\" ]; then
+          curl -Lo /tmp/wp.tar.gz https://wordpress.org/latest.tar.gz;
+          tar -xzf /tmp/wp.tar.gz -C /var/www/vhosts/localhost/html --strip-components=1;
+          rm /tmp/wp.tar.gz;
+        fi;
+        cp /var/www/vhosts/localhost/html/wp-config-sample.php /var/www/vhosts/localhost/html/wp-config.php;
+        sed -i \"s|put your unique phrase here|\$(head -c 64 /dev/urandom | base64)|g\" /var/www/vhosts/localhost/html/wp-config.php;
+        sed -i \"s/database_name_here/\$WORDPRESS_DB_NAME/\" /var/www/vhosts/localhost/html/wp-config.php;
+        sed -i \"s/username_here/\$WORDPRESS_DB_USER/\" /var/www/vhosts/localhost/html/wp-config.php;
+        sed -i \"s/password_here/\$WORDPRESS_DB_PASSWORD/\" /var/www/vhosts/localhost/html/wp-config.php;
+        sed -i \"s/localhost/\$WORDPRESS_DB_HOST/\" /var/www/vhosts/localhost/html/wp-config.php;
+        chown -R 1000:1000 /var/www/vhosts/localhost/html;
+      fi;
+      exec /entrypoint.sh"
     depends_on:
       mariadb:
         condition: service_healthy
