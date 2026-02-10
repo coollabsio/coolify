@@ -2134,12 +2134,14 @@
     },
     "jellyseerr": {
         "documentation": "https://docs.seerr.dev/getting-started/docker?docker-methods=docker-compose",
-        "slogan": "Jellyseerr is a request management and media discovery tool built to work with your existing Jellyfin ecosystem.",
+        "slogan": "Jellyseerr is a request management and media discovery tool built to work with your existing Jellyfin/Plex/Emby ecosystem.",
         "compose": "c2VydmljZXM6CiAgamVsbHlzZWVycjoKICAgIGltYWdlOiAnZ2hjci5pby9mYWxsZW5iYWdlbC9qZWxseXNlZXJyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0pFTExZU0VFUlJfNTA1NQogICAgICAtICdUWj0ke1RaOi1FdXJvcGUvWnVyaWNofScKICAgICAgIyBvcHRpb25hbDoKICAgICAgIyAtICdQT1JUPTUwNTUnCiAgICAgICMgLSAnTE9HX0xFVkVMPWluZm8nCiAgICB2b2x1bWVzOgogICAgICAtICdqZWxseXNlZXJyLWNvbmZpZzovYXBwL2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiB3Z2V0IC0tbm8tdmVyYm9zZSAtLXRyaWVzPTEgLS1zcGlkZXIgaHR0cDovL2xvY2FsaG9zdDo1MDU1L2FwaS92MS9zdGF0dXMgfHwgZXhpdCAxCiAgICAgIHN0YXJ0X3BlcmlvZDogMjBzCiAgICAgIHRpbWVvdXQ6IDNzCiAgICAgIGludGVydmFsOiAxNXMKICAgICAgcmV0cmllczogMwo=",
         "tags": [
             "media",
             "request",
-            "jellyseerr",
+            "jellyfin",
+            "plex",
+            "emby",
             "sonarr",
             "radarr"
         ],
