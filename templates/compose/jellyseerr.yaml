@@ -1,0 +1,31 @@
+# documentation: https://docs.seerr.dev/getting-started/docker?docker-methods=docker-compose
+# slogan: Jellyseerr is a request management and media discovery tool built to work with your existing Jellyfin ecosystem.
+# category: media
+# tags: media,request,jellyfin,sonarr,radarr
+# logo: svgs/jellyseerr.svg
+# port: 5055
+
+services:
+  jellyseerr:
+    image: ghcr.io/fallenbagel/jellyseerr:latest
+    environment:
+      - SERVICE_URL_JELLYSEERR_5055
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - jellyseerr-config:/app/config
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--tries",
+          "1",
+          "--no-verbose",
+          "--spider",
+          "http://localhost:5055/api/v1/status",
+        ]
+      interval: 2s
+      timeout: 10s
+      retries: 15
