@@ -43,8 +43,16 @@ class StandalonePostgresql extends BaseModel
                 : '/var/lib/postgresql/data';
 
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-'.$database->uuid,
+                'name' => 'postgres-data-' . $database->uuid,
                 'mount_path' => $mountPath,
+                'host_path' => null,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+
+            LocalPersistentVolume::create([
+                'name' => 'postgres-pgbackrest-repo-' . $database->uuid,
+                'mount_path' => '/var/lib/pgbackrest',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
@@ -84,7 +92,7 @@ class StandalonePostgresql extends BaseModel
 
     public function workdir()
     {
-        return database_configuration_dir()."/{$this->uuid}";
+        return database_configuration_dir() . "/{$this->uuid}";
     }
 
     protected function serverStatus(): Attribute
@@ -101,7 +109,7 @@ class StandalonePostgresql extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -119,7 +127,7 @@ class StandalonePostgresql extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
+        $newConfigHash = $this->image . $this->ports_mappings . $this->postgres_initdb_args . $this->postgres_host_auth_method;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -223,16 +231,16 @@ class StandalonePostgresql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            get: fn() => is_null($this->ports_mappings)
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -245,7 +253,7 @@ class StandalonePostgresql extends BaseModel
     public function databaseType(): Attribute
     {
         return new Attribute(
-            get: fn () => $this->type(),
+            get: fn() => $this->type(),
         );
     }
 
@@ -343,5 +351,84 @@ class StandalonePostgresql extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return true;
+    }
+
+    public function hasPgBackrestBackups(): bool
+    {
+        return $this->scheduledBackups()
+            ->where('engine', 'pgbackrest')
+            ->where('enabled', true)
+            ->exists();
+    }
+
+    public function pgbackrestBackups()
+    {
+        return $this->scheduledBackups()->where('engine', 'pgbackrest');
+    }
+
+    public function restores()
+    {
+        return $this->morphMany(DatabaseRestore::class, 'database');
+    }
+
+    public function pgdataVolume(): ?LocalPersistentVolume
+    {
+        return $this->persistentStorages()
+            ->where('mount_path', '/var/lib/postgresql/data')
+            ->first();
+    }
+
+    public function pgbackrestRepoVolume(): ?LocalPersistentVolume
+    {
+        return $this->persistentStorages()
+            ->where('mount_path', '/var/lib/pgbackrest')
+            ->first();
+    }
+
+    public function getCpuMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        $from = now()->subMinutes($mins)->toIso8601ZuluString();
+        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
+        if (str($metrics)->contains('error')) {
+            $error = json_decode($metrics, true);
+            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+            if ($error === 'Unauthorized') {
+                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+            }
+            throw new \Exception($error);
+        }
+        $metrics = json_decode($metrics, true);
+        $parsedCollection = collect($metrics)->map(function ($metric) {
+            return [
+                (int) $metric['time'],
+                (float) ($metric['percent'] ?? 0.0),
+            ];
+        });
+
+        return $parsedCollection->toArray();
+    }
+
+    public function getMemoryMetrics(int $mins = 5)
+    {
+        $server = $this->destination->server;
+        $container_name = $this->uuid;
+        $from = now()->subMinutes($mins)->toIso8601ZuluString();
+        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
+        if (str($metrics)->contains('error')) {
+            $error = json_decode($metrics, true);
+            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
+            if ($error === 'Unauthorized') {
+                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+            }
+            throw new \Exception($error);
+        }
+        $metrics = json_decode($metrics, true);
+        $parsedCollection = collect($metrics)->map(function ($metric) {
+            return [(int) $metric['time'], (float) $metric['used']];
+        });
+
+        return $parsedCollection->toArray();
     }
 }

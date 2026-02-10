@@ -10,7 +10,7 @@ use App\Models\EnvironmentVariable;
  *
  * Fix: JSON objects/arrays detected in realValue() skip escaping entirely.
  */
-const COMPOSER_AUTH_JSON = '{"http-basic":{"backpackforlaravel.com":{"username":"ourusername","password":"ourpassword"}}}';
+const COMPOSER_AUTH_JSON = '{"http-basic":{"example.com":{"username":"user","password":"password"}}}';
 
 // ---------------------------------------------------------------------------
 // Test 1: realValue accessor returns raw JSON for non-literal env vars

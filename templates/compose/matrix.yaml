@@ -1,0 +1,132 @@
+# documentation: https://matrix.org/docs/chat_basics/matrix-for-im/
+# slogan: Chat securely with your family, friends, community, or build great apps with Matrix!
+# category: messaging
+# tags: chat,slack,discord,voip,video,call
+# logo: svgs/matrix.svg
+# port: 8008
+
+services:
+  matrix:
+    image: matrixdotorg/synapse:latest
+    environment:
+      - SERVICE_URL_MATRIX_8008
+      - SYNAPSE_SERVER_NAME=${SERVICE_FQDN_MATRIX}
+      - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
+      - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
+      - RECAPTCHA_PUBLIC_KEY=${RECAPTCHA_PUBLIC_KEY}
+      - RECAPTCHA_PRIVATE_KEY=${RECAPTCHA_PRIVATE_KEY}
+      - _SERVER_NAME=${SERVICE_FQDN_MATRIX}
+      - _ADMIN_NAME=${SERVICE_USER_ADMIN}
+      - _ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
+    volumes:
+      - matrix-data:/data
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        ! test -f /data/homeserver.yaml && /start.py generate
+
+        # registration_shared_secret
+        grep "registration_shared_secret" /data/homeserver.yaml \
+        | awk '{print $2}' > ./registration_shared_secret
+
+        # macaroon_secret_key
+        grep "macaroon_secret_key" /data/homeserver.yaml \
+        | awk '{print $2}' > ./macaroon_secret_key
+
+        # form_secret
+        grep "form_secret" /data/homeserver.yaml \
+        | awk '{print $2}' > ./form_secret
+
+        ##########################
+        #                        #
+        # homeserver.yaml: start #
+        #                        #
+        ##########################
+        cat <<EOF > /data/homeserver.yaml
+        server_name: "${SERVICE_FQDN_MATRIX}"
+        pid_file: /data/homeserver.pid
+
+        # server
+        listeners:
+          - port: 8008
+            tls: false
+            type: http
+            x_forwarded: true
+            resources:
+              - names: [client, federation]
+                compress: false
+
+        # database
+        database:
+          name: sqlite3
+          args:
+            database: /data/homeserver.db
+
+        # general
+        log_config: "/data/${SERVICE_FQDN_MATRIX}.log.config"
+        media_store_path: /data/media_store
+        report_stats: false
+
+        # secrets
+        registration_shared_secret: $(<./registration_shared_secret)
+        macaroon_secret_key: $(<./macaroon_secret_key)
+        form_secret: $(<./form_secret)
+        signing_key_path: "/data/${SERVICE_FQDN_MATRIX}.signing.key"
+
+        #rooms
+        auto_join_rooms:
+          - "#general:${SERVICE_FQDN_MATRIX}"
+
+        # federation
+        trusted_key_servers:
+          - server_name: "matrix.org"
+        autocreate_auto_join_rooms_federated: false
+        allow_public_rooms_over_federation: false
+        EOF
+        ########################
+        #                      #
+        # homeserver.yaml: end #
+        #                      #
+        ########################
+
+        [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
+        && echo >> /data/homeserver.yaml \
+        && cat <<EOF >> /data/homeserver.yaml
+        #registration
+        enable_registration: true  # Allows users to register on your server.
+        EOF
+
+        [ -n "${RECAPTCHA_PUBLIC_KEY}" ] && ! grep "${RECAPTCHA_PUBLIC_KEY}" /data/homeserver.yaml &>/dev/null \
+        && echo >> /data/homeserver.yaml \
+        && cat <<EOF >> /data/homeserver.yaml
+        # reCAPTCHA settings
+        enable_registration_captcha: true  # Enables CAPTCHA for registrations.
+        recaptcha_public_key: "${RECAPTCHA_PUBLIC_KEY}"
+        recaptcha_private_key: "${RECAPTCHA_PRIVATE_KEY}"
+        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+        EOF
+
+        register_admin(){
+          while ! curl -I localhost:8008 &>/dev/null; do
+            sleep 1
+          done
+          register_new_matrix_user \
+            -a \
+            -u ${SERVICE_USER_ADMIN} \
+            -p ${SERVICE_PASSWORD_ADMIN} \
+            -c /data/homeserver.yaml \
+            http://localhost:8008 &>/dev/null
+        }
+        register_admin &
+
+        /start.py
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -I
+        - localhost:8008
+      interval: 5s
+      timeout: 3s
+      retries: 5

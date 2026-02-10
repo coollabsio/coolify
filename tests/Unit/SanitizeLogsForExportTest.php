@@ -15,7 +15,7 @@ it('removes JWT/Bearer tokens', function () {
     $result = sanitizeLogsForExport($input);
 
     expect($result)->not->toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
-    expect($result)->toContain('Bearer '.REDACTED);
+    expect($result)->toContain('Bearer ' . REDACTED);
 });
 
 it('removes API keys with common patterns', function () {
@@ -36,12 +36,12 @@ it('removes API keys with common patterns', function () {
 
 it('removes database URLs with passwords', function () {
     $testCases = [
-        'postgres://user:secretpassword@localhost:5432/db' => 'postgres://user:'.REDACTED.'@localhost:5432/db',
-        'mysql://admin:mysecret123@db.example.com/app' => 'mysql://admin:'.REDACTED.'@db.example.com/app',
-        'mongodb://user:pass123@mongo:27017' => 'mongodb://user:'.REDACTED.'@mongo:27017',
-        'redis://default:redispass@redis:6379' => 'redis://default:'.REDACTED.'@redis:6379',
-        'rediss://default:redispass@redis:6379' => 'rediss://default:'.REDACTED.'@redis:6379',
-        'mariadb://root:rootpass@mariadb:3306/test' => 'mariadb://root:'.REDACTED.'@mariadb:3306/test',
+        'postgres://user:password@localhost:5432/db' => 'postgres://user:' . REDACTED . '@localhost:5432/db',
+        'mysql://admin:password@db.example.com/app' => 'mysql://admin:' . REDACTED . '@db.example.com/app',
+        'mongodb://user:password@mongo:27017' => 'mongodb://user:' . REDACTED . '@mongo:27017',
+        'redis://default:password@redis:6379' => 'redis://default:' . REDACTED . '@redis:6379',
+        'rediss://default:password@redis:6379' => 'rediss://default:' . REDACTED . '@redis:6379',
+        'mariadb://root:password@mariadb:3306/test' => 'mariadb://root:' . REDACTED . '@mariadb:3306/test',
     ];
 
     foreach ($testCases as $input => $expected) {
@@ -71,7 +71,7 @@ it('removes x-access-token from git URLs', function () {
     $result = sanitizeLogsForExport($input);
 
     expect($result)->not->toContain('gho_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
-    expect($result)->toContain('x-access-token:'.REDACTED.'@github.com');
+    expect($result)->toContain('x-access-token:' . REDACTED . '@github.com');
 });
 
 it('removes ANSI color codes', function () {
@@ -150,17 +150,17 @@ it('removes AWS secret access key', function () {
     $result = sanitizeLogsForExport($input);
 
     expect($result)->not->toContain($secretKey);
-    expect($result)->toContain('aws_secret_access_key='.REDACTED);
+    expect($result)->toContain('aws_secret_access_key=' . REDACTED);
 });
 
 it('removes generic URL passwords', function () {
     $testCases = [
-        'ftp://user:ftppass@ftp.example.com/path' => 'ftp://user:'.REDACTED.'@ftp.example.com/path',
-        'sftp://deploy:secret123@sftp.example.com' => 'sftp://deploy:'.REDACTED.'@sftp.example.com',
-        'ssh://git:sshpass@git.example.com/repo' => 'ssh://git:'.REDACTED.'@git.example.com/repo',
-        'amqp://rabbit:bunny123@rabbitmq:5672' => 'amqp://rabbit:'.REDACTED.'@rabbitmq:5672',
-        'ldap://admin:ldappass@ldap.example.com' => 'ldap://admin:'.REDACTED.'@ldap.example.com',
-        's3://access:secretkey@bucket.s3.amazonaws.com' => 's3://access:'.REDACTED.'@bucket.s3.amazonaws.com',
+        'ftp://user:ftppass@ftp.example.com/path' => 'ftp://user:' . REDACTED . '@ftp.example.com/path',
+        'sftp://deploy:secret123@sftp.example.com' => 'sftp://deploy:' . REDACTED . '@sftp.example.com',
+        'ssh://git:sshpass@git.example.com/repo' => 'ssh://git:' . REDACTED . '@git.example.com/repo',
+        'amqp://rabbit:bunny123@rabbitmq:5672' => 'amqp://rabbit:' . REDACTED . '@rabbitmq:5672',
+        'ldap://admin:ldappass@ldap.example.com' => 'ldap://admin:' . REDACTED . '@ldap.example.com',
+        's3://access:secretkey@bucket.s3.amazonaws.com' => 's3://access:' . REDACTED . '@bucket.s3.amazonaws.com',
     ];
 
     foreach ($testCases as $input => $expected) {

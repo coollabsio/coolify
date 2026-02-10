@@ -1,0 +1,20 @@
+# documentation: https://postgresus.com/#guide
+# slogan: Postgresus is a free, open source and self-hosted tool to backup PostgreSQL.
+# category: devtools
+# tags: postgres,backup
+# logo: svgs/postgresus.svg
+# port: 4005
+
+services:
+  postgresus:
+    image: rostislavdugin/postgresus:7fb59bb5d02fbaf856b0bcfc7a0786575818b96f # Released on 30 Sep, 2025
+    environment:
+      - SERVICE_URL_POSTGRESUS_4005
+    volumes:
+      - postgresus-data:/postgresus-data
+    healthcheck:
+      test:
+        ["CMD", "wget", "-qO-", "http://localhost:4005/api/v1/system/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
