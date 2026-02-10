@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
 
     protected $guarded = [];
 
@@ -19,21 +20,38 @@ class StandalonePostgresql extends BaseModel
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
     ];
 
     protected static function booted()
     {
         static::created(function ($database) {
+            // This is really stupid and it took me 1h to figure out why the image was not loading properly. This is exactly the reason why we need to use the action pattern because Model events and Accessors are a fragile mess!
+            $image = (string) ($database->getAttributes()['image'] ?? '');
+            $majorVersion = 0;
+
+            if (preg_match('/:(?:pg)?(\d+)/i', $image, $matches)) {
+                $majorVersion = (int) $matches[1];
+            }
+
+            // PostgreSQL 18+ uses /var/lib/postgresql as mount path
+            // Older versions use /var/lib/postgresql/data
+            $mountPath = $majorVersion >= 18
+                ? '/var/lib/postgresql'
+                : '/var/lib/postgresql/data';
+
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-'.$database->uuid,
-                'mount_path' => '/var/lib/postgresql/data',
+                'name' => 'postgres-data-' . $database->uuid,
+                'mount_path' => $mountPath,
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
             ]);
 
             LocalPersistentVolume::create([
-                'name' => 'postgres-pgbackrest-repo-'.$database->uuid,
+                'name' => 'postgres-pgbackrest-repo-' . $database->uuid,
                 'mount_path' => '/var/lib/pgbackrest',
                 'host_path' => null,
                 'resource_id' => $database->id,
@@ -74,7 +92,7 @@ class StandalonePostgresql extends BaseModel
 
     public function workdir()
     {
-        return database_configuration_dir()."/{$this->uuid}";
+        return database_configuration_dir() . "/{$this->uuid}";
     }
 
     protected function serverStatus(): Attribute
@@ -91,7 +109,7 @@ class StandalonePostgresql extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -109,7 +127,7 @@ class StandalonePostgresql extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
+        $newConfigHash = $this->image . $this->ports_mappings . $this->postgres_initdb_args . $this->postgres_host_auth_method;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -213,16 +231,16 @@ class StandalonePostgresql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            get: fn() => is_null($this->ports_mappings)
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -235,7 +253,7 @@ class StandalonePostgresql extends BaseModel
     public function databaseType(): Attribute
     {
         return new Attribute(
-            get: fn () => $this->type(),
+            get: fn() => $this->type(),
         );
     }
 
@@ -327,15 +345,7 @@ class StandalonePostgresql extends BaseModel
 
     public function environment_variables()
     {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function isBackupSolutionAvailable()

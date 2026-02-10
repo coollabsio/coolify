@@ -7,7 +7,7 @@
         <h2>API Tokens</h2>
         @if (!$isApiEnabled)
             <div>API is disabled. If you want to use the API, please enable it in the <a
-                    href="{{ route('settings.advanced') }}" class="underline dark:text-white">Settings</a> menu.</div>
+                    href="{{ route('settings.advanced') }}" class="underline dark:text-white" {{ wireNavigate() }}>Settings</a> menu.</div>
         @else
             <div>Tokens are created with the current team as scope.</div>
     </div>

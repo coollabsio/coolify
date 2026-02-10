@@ -237,8 +237,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     $this->foundProxy = true;
                 } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
                 } else {
-                    if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                    if ($this->allDatabaseUuids->contains($uuid) && $this->isActiveOrTransient($containerStatus)) {
                         $this->foundDatabaseUuids->push($uuid);
+                        // TCP proxy should only be started/managed when database is actually running
                         if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
                             $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
                         } else {
@@ -495,7 +496,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
-            } else {
+            }
+        } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
+            // Clean up orphaned proxy containers when is_public=false
+            $orphanedProxy = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
+                return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
+            })->first();
+            if ($orphanedProxy) {
+                StopDatabaseProxy::dispatch($database);
             }
         }
     }
@@ -503,20 +511,28 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function updateNotFoundDatabaseStatus()
     {
         $notFoundDatabaseUuids = $this->allDatabaseUuids->diff($this->foundDatabaseUuids);
-        if ($notFoundDatabaseUuids->isNotEmpty()) {
-            $notFoundDatabaseUuids->each(function ($databaseUuid) {
-                $database = $this->databases->where('uuid', $databaseUuid)->first();
-                if ($database) {
-                    if ($database->status !== 'exited') {
-                        $database->status = 'exited';
-                        $database->save();
-                    }
-                    if ($database->is_public) {
-                        StopDatabaseProxy::dispatch($database);
-                    }
-                }
-            });
+        if ($notFoundDatabaseUuids->isEmpty()) {
+            return;
         }
+
+        // Only protection: Verify we received any container data at all
+        // If containers collection is completely empty, Sentinel might have failed
+        if ($this->containers->isEmpty()) {
+            return;
+        }
+
+        $notFoundDatabaseUuids->each(function ($databaseUuid) {
+            $database = $this->databases->where('uuid', $databaseUuid)->first();
+            if ($database) {
+                if (! str($database->status)->startsWith('exited')) {
+                    $database->status = 'exited';
+                    $database->save();
+                }
+                if ($database->is_public) {
+                    StopDatabaseProxy::dispatch($database);
+                }
+            }
+        });
     }
 
     private function updateServiceSubStatus(string $serviceId, string $subType, string $subId, string $containerStatus)
@@ -574,6 +590,23 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function isRunning(string $containerStatus)
     {
         return str($containerStatus)->contains('running');
+    }
+
+    /**
+     * Check if container is in an active or transient state.
+     * Active states: running
+     * Transient states: restarting, starting, created, paused
+     *
+     * These states indicate the container exists and should be tracked.
+     * Terminal states (exited, dead, removing) should NOT be tracked.
+     */
+    private function isActiveOrTransient(string $containerStatus): bool
+    {
+        return str($containerStatus)->contains('running') ||
+               str($containerStatus)->contains('restarting') ||
+               str($containerStatus)->contains('starting') ||
+               str($containerStatus)->contains('created') ||
+               str($containerStatus)->contains('paused');
     }
 
     private function checkLogDrainContainer()

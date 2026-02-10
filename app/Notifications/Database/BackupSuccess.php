@@ -15,18 +15,12 @@ class BackupSuccess extends CustomEmailNotification
 
     public string $frequency;
 
-    public string $engine;
-
-    public ?string $backupType;
-
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
     {
         $this->onQueue('high');
 
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
-        $this->engine = $backup->engine ?? 'native';
-        $this->backupType = $backup->isPgBackrest() ? ($backup->pgbackrest_backup_type ?? 'full') : null;
     }
 
     public function via(object $notifiable): array
@@ -96,7 +90,7 @@ class BackupSuccess extends CustomEmailNotification
     {
         $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
 
-        $payload = [
+        return [
             'success' => true,
             'message' => 'Database backup successful',
             'event' => 'backup_success',
@@ -104,14 +98,7 @@ class BackupSuccess extends CustomEmailNotification
             'database_uuid' => $this->database->uuid,
             'database_type' => $this->database_name,
             'frequency' => $this->frequency,
-            'engine' => $this->engine,
             'url' => $url,
         ];
-
-        if ($this->backupType) {
-            $payload['backup_type'] = $this->backupType;
-        }
-
-        return $payload;
     }
 }

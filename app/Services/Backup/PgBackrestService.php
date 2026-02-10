@@ -147,11 +147,7 @@ class PgBackrestService
 
         // Mount points
         $configMount = "-v /tmp/pgbackrest-{$backup->uuid}.conf:/etc/pgbackrest/pgbackrest.conf:ro";
-        // Mount the DB volume correctly. Assuming standard Postgres layout.
-        // We use volumes-from to share the DB volume, or explicit volume mapping if we know the volume name.
-        // For Sidecar pattern, --volumes-from is easiest if target container is running.
-        // But if we want to be independent, mounting the named volume is better.
-        // Let's use --volumes-from for now as it maps the paths automatically.
+        // Use --volumes-from to inherit mount paths from the target container.
         $volumeMount = "--volumes-from {$containerName}:ro";
 
         $cmd = "pgbackrest --stanza={$stanza} --type={$type} backup";
@@ -161,7 +157,7 @@ class PgBackrestService
 
     public static function buildSidecarRestoreCommand(
         string $stanza,
-        ScheduledDatabaseBackup $backup, // We need backup config for env vars
+        ScheduledDatabaseBackup $backup,
         string $network,
         string $volumeMounts,
         string $targetTime = null
@@ -191,7 +187,7 @@ class PgBackrestService
         $dockerEnvArgs = self::buildDockerEnvArgs($envVars);
 
         $configMount = "-v /tmp/pgbackrest-{$backup->uuid}.conf:/etc/pgbackrest/pgbackrest.conf:ro";
-        // Info command might need access to local repo (volumes-from handles this)
+        // Access local repo via volumes-from.
         $volumeMount = "--volumes-from {$containerName}:ro";
 
         $cmd = "pgbackrest --stanza={$stanza} --output=json info";

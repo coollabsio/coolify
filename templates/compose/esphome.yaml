@@ -1,0 +1,19 @@
+# documentation: https://esphome.io/guides/getting_started_command_line/
+# slogan: Smart Home Made Simple.
+# category: automation
+# tags: home, smart, assistant, microcontroller
+# logo: svgs/esphome.svg
+# port: 6052
+
+services:
+  esphome:
+    image: ghcr.io/esphome/esphome:2025.12.4
+    volumes:
+      - esp_config:/config
+      - /etc/localtime:/etc/localtime:ro
+    privileged: true
+    network_mode: host
+    environment:
+      - SERVICE_URL_ESPHOME_6052
+      - USERNAME=${SERVICE_USER_ADMIN}
+      - PASSWORD=${SERVICE_PASSWORD_ADMIN}

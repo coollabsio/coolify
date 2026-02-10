@@ -81,6 +81,8 @@ class Show extends Component
 
     public ?int $selectedHetznerTokenId = null;
 
+    public ?string $manualHetznerServerId = null;
+
     public ?array $matchedHetznerServer = null;
 
     public ?string $hetznerSearchError = null;
@@ -447,6 +449,10 @@ class Show extends Component
 
         // Update validation state
         $this->isValidating = $this->server->is_validating ?? false;
+
+        // Reload Hetzner tokens in case the linking section should now be shown
+        $this->loadHetznerTokens();
+
         $this->dispatch('refreshServerShow');
         $this->dispatch('refreshServer');
     }
@@ -524,6 +530,47 @@ class Show extends Component
         }
     }
 
+    public function searchHetznerServerById(): void
+    {
+        $this->hetznerSearchError = null;
+        $this->hetznerNoMatchFound = false;
+        $this->matchedHetznerServer = null;
+
+        if (! $this->selectedHetznerTokenId) {
+            $this->hetznerSearchError = 'Please select a Hetzner token first.';
+
+            return;
+        }
+
+        if (! $this->manualHetznerServerId) {
+            $this->hetznerSearchError = 'Please enter a Hetzner Server ID.';
+
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->server);
+
+            $token = $this->availableHetznerTokens->firstWhere('id', $this->selectedHetznerTokenId);
+            if (! $token) {
+                $this->hetznerSearchError = 'Invalid token selected.';
+
+                return;
+            }
+
+            $hetznerService = new HetznerService($token->token);
+            $serverData = $hetznerService->getServer((int) $this->manualHetznerServerId);
+
+            if (! empty($serverData)) {
+                $this->matchedHetznerServer = $serverData;
+            } else {
+                $this->hetznerNoMatchFound = true;
+            }
+        } catch (\Throwable $e) {
+            $this->hetznerSearchError = 'Failed to fetch Hetzner server: '.$e->getMessage();
+        }
+    }
+
     public function linkToHetzner()
     {
         if (! $this->matchedHetznerServer) {
@@ -564,6 +611,7 @@ class Show extends Component
             // Clear the linking state
             $this->matchedHetznerServer = null;
             $this->selectedHetznerTokenId = null;
+            $this->manualHetznerServerId = null;
             $this->hetznerNoMatchFound = false;
             $this->hetznerSearchError = null;
 

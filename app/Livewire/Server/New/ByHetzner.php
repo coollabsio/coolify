@@ -567,10 +567,10 @@ class ByHetzner extends Component
                 ]);
                 refreshSession();
 
-                return $this->redirect(route('server.show', $server->uuid));
+                return redirectRoute($this, 'server.show', [$server->uuid]);
             }
 
-            return redirect()->route('server.show', $server->uuid);
+            return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

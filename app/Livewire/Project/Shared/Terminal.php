@@ -57,7 +57,14 @@ class Terminal extends Component
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'");
+
+            // Add sudo for non-root users to access Docker socket
+            $dockerCommand = "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'";
+            if ($server->isNonRoot()) {
+                $dockerCommand = "sudo {$dockerCommand}";
+            }
+
+            $command = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand);
         } else {
             $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.

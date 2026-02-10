@@ -23,7 +23,7 @@
         @forelse ($project->environments->sortBy('created_at') as $environment)
             <div class="gap-2 coolbox group">
                 <div class="flex flex-1 mx-6">
-                    <a class="flex flex-col justify-center flex-1"
+                    <a class="flex flex-col justify-center flex-1" {{ wireNavigate() }}
                         href="{{ route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                         <div class="font-bold dark:text-white"> {{ $environment->name }}</div>
                         <div class="description">
@@ -31,7 +31,7 @@
                     </a>
                     @can('update', $project)
                         <div class="flex items-center justify-center gap-2 text-xs">
-                            <a class="font-bold hover:underline"
+                            <a class="font-bold hover:underline" {{ wireNavigate() }}
                                 href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                                 Settings
                             </a>

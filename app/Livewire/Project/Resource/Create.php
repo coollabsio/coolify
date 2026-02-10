@@ -35,6 +35,13 @@ class Create extends Component
 
             if (in_array($type, DATABASE_TYPES)) {
                 if ($type->value() === 'postgresql') {
+                    // PostgreSQL requires database_image to be explicitly set
+                    // If not provided, fall through to Select component for version selection
+                    if (! $database_image) {
+                        $this->type = $type->value();
+
+                        return;
+                    }
                     $database = create_standalone_postgresql(
                         environmentId: $environment->id,
                         destinationUuid: $destination_uuid,

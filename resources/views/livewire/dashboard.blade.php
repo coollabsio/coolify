@@ -36,7 +36,7 @@
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
                     <div class="relative gap-2 cursor-pointer coolbox group">
-                        <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
+                        <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }} class="absolute inset-0"></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
                                 <div class="box-title">{{ $project->name }}</div>
@@ -47,7 +47,7 @@
                             <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
                                 @if ($project->environments->first())
                                     @can('createAnyResource')
-                                        <a class="hover:underline"
+                                        <a class="hover:underline" {{ wireNavigate() }}
                                             href="{{ route('project.resource.create', [
                                                 'project_uuid' => $project->uuid,
                                                 'environment_uuid' => $project->environments->first()->uuid,
@@ -57,7 +57,7 @@
                                     @endcan
                                 @endif
                                 @can('update', $project)
-                                    <a class="hover:underline"
+                                    <a class="hover:underline" {{ wireNavigate() }}
                                         href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                         Settings
                                     </a>
@@ -74,7 +74,7 @@
                     <x-modal-input buttonTitle="Add" title="New Project">
                         <livewire:project.add-empty />
                     </x-modal-input> your first project or
-                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a> page.
+                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a> page.
                 </div>
             </div>
         @endif
@@ -101,7 +101,7 @@
         @if ($servers->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($servers as $server)
-                    <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+                    <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}" {{ wireNavigate() }}
                         @class([
                             'gap-2 border cursor-pointer coolbox group',
                             'border-red-500' =>
@@ -138,7 +138,7 @@
                             <livewire:security.private-key.create from="server" />
                         </x-modal-input> a private key
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a>
                         page.
                     </div>
                 </div>
@@ -150,7 +150,7 @@
                             <livewire:server.create />
                         </x-modal-input> your first server
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a>
                         page.
                     </div>
                 </div>

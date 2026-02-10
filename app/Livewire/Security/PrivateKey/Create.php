@@ -114,7 +114,7 @@ class Create extends Component
     private function redirectAfterCreation(PrivateKey $privateKey)
     {
         return $this->from === 'server'
-            ? redirect()->route('dashboard')
-            : redirect()->route('security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            ? redirectRoute($this, 'dashboard')
+            : redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
     }
 }

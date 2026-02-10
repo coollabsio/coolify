@@ -81,7 +81,7 @@
                                     <div class="p-4 rounded-lg bg-neutral-200 dark:bg-coolgray-200">
                                         <div class="flex items-center gap-3">
                                             <template x-if="!upgradeComplete && !upgradeError">
-                                                <svg class="w-5 h-5 text-warning animate-spin"
+                                                <svg class="w-5 h-5 text-black dark:text-warning animate-spin"
                                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                                         stroke-width="4"></circle>

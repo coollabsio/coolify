@@ -33,7 +33,6 @@ class StartDatabaseProxy
             $databaseType = $database->databaseType();
             $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
-            $proxyContainerName = "{$database->service->uuid}-proxy";
             $containerName = "{$database->name}-{$database->service->uuid}";
         }
         $internalPort = match ($databaseType) {

@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
-use App\Services\Backup\PgBackrestService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -23,13 +22,14 @@ class StartPostgresql
 
     private ?SslCertificate $ssl_certificate = null;
 
-    private bool $hasPgBackrest = false;
-
     public function handle(StandalonePostgresql $database)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        if (isDev()) {
+            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -97,7 +97,6 @@ class StartPostgresql
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
-        $this->setup_pgbackrest_config();
         $this->add_custom_conf();
 
         $docker_compose = [
@@ -174,12 +173,11 @@ class StartPostgresql
 
         if (count($this->init_scripts) > 0) {
             foreach ($this->init_scripts as $init_script) {
-                $hostInitScript = $this->getHostPath($init_script);
                 $docker_compose['services'][$container_name]['volumes'] = array_merge(
                     $docker_compose['services'][$container_name]['volumes'],
                     [[
                         'type' => 'bind',
-                        'source' => $hostInitScript,
+                        'source' => $init_script,
                         'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
                         'read_only' => true,
                     ]]
@@ -190,12 +188,11 @@ class StartPostgresql
         $command = ['postgres'];
 
         if (filled($this->database->postgres_conf)) {
-            $hostConfigPath = $this->getHostPath($this->configuration_dir.'/custom-postgres.conf');
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
                 [[
                     'type' => 'bind',
-                    'source' => $hostConfigPath,
+                    'source' => $this->configuration_dir.'/custom-postgres.conf',
                     'target' => '/etc/postgresql/postgresql.conf',
                     'read_only' => true,
                 ]]
@@ -209,22 +206,6 @@ class StartPostgresql
                 '-c', 'ssl_cert_file=/var/lib/postgresql/certs/server.crt',
                 '-c', 'ssl_key_file=/var/lib/postgresql/certs/server.key',
             ]);
-        }
-
-        if ($this->hasPgBackrest) {
-            $hostPgbackrestDir = $this->getHostPath($this->configuration_dir.'/pgbackrest');
-            $docker_compose['services'][$container_name]['volumes'] = array_merge(
-                $docker_compose['services'][$container_name]['volumes'],
-                [
-                    $hostPgbackrestDir.':/etc/pgbackrest',
-                ]
-            );
-            $docker_compose['services'][$container_name]['entrypoint'] = [
-                '/bin/sh',
-                '-c',
-                '/etc/pgbackrest/install-pgbackrest.sh && exec docker-entrypoint.sh "$@"',
-                '--',
-            ];
         }
 
         // Add custom docker run options
@@ -248,7 +229,6 @@ class StartPostgresql
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
-
         $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
@@ -335,134 +315,19 @@ class StartPostgresql
         $filename = 'custom-postgres.conf';
         $config_file_path = "$this->configuration_dir/$filename";
 
-        $content = $this->database->postgres_conf ?? '';
-
-        if (! str($content)->contains('listen_addresses')) {
-            if ($this->database->is_public) {
-                $content .= "\nlisten_addresses = '*'";
-            } else {
-                $content .= "\nlisten_addresses = 'localhost'";
-            }
-        }
-
-        if ($this->hasPgBackrest) {
-            $stanza = PgBackrestService::getStanzaName($this->database);
-            $configPath = PgBackrestService::CONFIG_PATH;
-            $archiveCommand = "test ! -f {$configPath}/pgbackrest.conf || (command -v pgbackrest >/dev/null 2>&1 && pgbackrest --stanza={$stanza} archive-push %p)";
-
-            if (! str($content)->contains('archive_mode')) {
-                $content .= "\narchive_mode = on";
-            }
-
-            $content = preg_replace('/^\s*archive_command\s*=.*$/m', '', $content);
-            $content = preg_replace('/\n{3,}/', "\n\n", $content);
-            $content .= "\narchive_command = '{$archiveCommand}'";
-
-            if (! str($content)->contains('wal_level')) {
-                $content .= "\nwal_level = replica";
-            }
-            if (! str($content)->contains('max_wal_senders')) {
-                $content .= "\nmax_wal_senders = 3";
-            }
-        }
-
-        $content = trim($content);
-
-        if (blank($content)) {
+        if (blank($this->database->postgres_conf)) {
             $this->commands[] = "rm -f $config_file_path";
 
             return;
         }
 
-        if ($content !== ($this->database->postgres_conf ?? '')) {
+        $content = $this->database->postgres_conf;
+        if (! str($content)->contains('listen_addresses')) {
+            $content .= "\nlisten_addresses = '*'";
             $this->database->postgres_conf = $content;
             $this->database->save();
         }
-
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
-    }
-
-    private function setup_pgbackrest_config(): void
-    {
-        $pgbackrestConfig = PgBackrestService::generateConfig($this->database);
-
-        if ($pgbackrestConfig === null) {
-            $this->commands[] = "rm -rf $this->configuration_dir/pgbackrest";
-            $this->hasPgBackrest = false;
-
-            return;
-        }
-
-        $this->hasPgBackrest = true;
-        $configBase64 = base64_encode($pgbackrestConfig);
-
-        $this->commands[] = "echo 'Setting up pgBackRest configuration.'";
-        $this->commands[] = "rm -rf $this->configuration_dir/pgbackrest";
-        $this->commands[] = "mkdir -p $this->configuration_dir/pgbackrest";
-        $this->commands[] = "echo '{$configBase64}' | base64 -d | tee $this->configuration_dir/pgbackrest/pgbackrest.conf > /dev/null";
-
-        $this->create_pgbackrest_entrypoint();
-    }
-
-    private function create_pgbackrest_entrypoint(): void
-    {
-        $stanza = PgBackrestService::getStanzaName($this->database);
-        $installCmd = PgBackrestService::getInstallCommand();
-
-        $backup = $this->database->pgbackrestBackups()->where('enabled', true)->first();
-        $s3EnvSetup = '';
-        if ($backup) {
-            $s3EnvVars = PgBackrestService::buildS3EnvVars($backup);
-            foreach ($s3EnvVars as $key => $value) {
-                $escapedValue = addslashes($value);
-                $s3EnvSetup .= "export {$key}=\"{$escapedValue}\"\n";
-            }
-        }
-
-        $installScript = <<<BASH
-#!/bin/bash
-set -e
-
-mkdir -p /tmp/pgbackrest
-mkdir -p /var/lib/pgbackrest/log
-
-NEED_INSTALL=0
-if ! command -v pgbackrest &> /dev/null; then
-    NEED_INSTALL=1
-fi
-
-if [ "\$NEED_INSTALL" = "1" ]; then
-    {$installCmd}
-fi
-
-# Fix permissions for postgres user
-chown -R postgres:postgres /tmp/pgbackrest /var/lib/pgbackrest /etc/pgbackrest 2>/dev/null || true
-chmod -R 770 /tmp/pgbackrest /var/lib/pgbackrest 2>/dev/null || true
-
-# Set up S3 environment variables if configured
-{$s3EnvSetup}
-
-# Create stanza if it doesn't exist (before PostgreSQL starts archiving)
-if [ -d /var/lib/postgresql/data ] && [ -f /var/lib/postgresql/data/PG_VERSION ]; then
-    STANZA_CHECK=\$(su postgres -c "pgbackrest --stanza={$stanza} info" 2>&1 || true)
-    if echo "\$STANZA_CHECK" | grep -q 'missing stanza'; then
-        echo "Creating pgbackrest stanza..."
-        su postgres -c "pgbackrest --stanza={$stanza} stanza-create"
-    fi
-fi
-BASH;
-
-        $installScriptBase64 = base64_encode($installScript);
-        $this->commands[] = "echo '{$installScriptBase64}' | base64 -d | tee $this->configuration_dir/pgbackrest/install-pgbackrest.sh > /dev/null";
-        $this->commands[] = "chmod +x $this->configuration_dir/pgbackrest/install-pgbackrest.sh";
-    }
-
-    /**
-     * Convert a path from the SSH target perspective to the Docker host perspective.
-     */
-    private function getHostPath(string $path): string
-    {
-        return convertPathToDockerHost($path);
     }
 }

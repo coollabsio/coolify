@@ -1,58 +1,82 @@
-# documentation: https://trigger.dev
-# slogan: The open source Background Jobs framework for TypeScript
+# documentation: https://trigger.dev/docs/self-hosting/overview
+# slogan: The open source background jobs platform for developers
 # category: automation
-# tags: trigger.dev, background jobs, typescript, trigger, jobs, cron, scheduler
+# tags: background-jobs, typescript, javascript, scheduling, workflows, automation, tasks, queues
 # logo: svgs/trigger.png
 # port: 3000
 
-x-common-env: &common-env
-  REMIX_APP_PORT: 3000
-  NODE_ENV: production
-  RUNTIME_PLATFORM: docker-compose
-  V3_ENABLED: true
-  INTERNAL_OTEL_TRACE_DISABLED: 1
-  INTERNAL_OTEL_TRACE_LOGGING_ENABLED: 0
-  POSTGRES_USER: $SERVICE_USER_POSTGRES
-  POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
-  POSTGRES_DB: ${POSTGRES_DB:-trigger}
-  MAGIC_LINK_SECRET: $SERVICE_PASSWORD_32_MAGIC
-  SESSION_SECRET: $SERVICE_PASSWORD_32_SESSION
-  ENCRYPTION_KEY: $SERVICE_PASSWORD_32_ENCRYPTION
-  PROVIDER_SECRET: $SERVICE_PASSWORD_64_PROVIDER
-  COORDINATOR_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
-  DATABASE_HOST: postgresql:5432
-  DATABASE_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB?sslmode=disable
-  DIRECT_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB?sslmode=disable
-  REDIS_HOST: redis
-  REDIS_PORT: 6379
-  REDIS_TLS_DISABLED: true
-  COORDINATOR_HOST: 127.0.0.1
-  COORDINATOR_PORT: 9020
-  WHITELISTED_EMAILS: ""
-  ADMIN_EMAILS: ""
-  DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT: 300
-  DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT: 100
-  DEPLOY_REGISTRY_HOST: docker.io
-  DEPLOY_REGISTRY_NAMESPACE: trigger
-  REGISTRY_HOST: ${DEPLOY_REGISTRY_HOST}
-  REGISTRY_NAMESPACE: ${DEPLOY_REGISTRY_NAMESPACE}
-  AUTH_GITHUB_CLIENT_ID: ${AUTH_GITHUB_CLIENT_ID}
-  AUTH_GITHUB_CLIENT_SECRET: ${AUTH_GITHUB_CLIENT_SECRET}
-  RESEND_API_KEY: ${RESEND_API_KEY}
-  FROM_EMAIL: ${FROM_EMAIL}
-  REPLY_TO_EMAIL: ${REPLY_TO_EMAIL}
-  LOGIN_ORIGIN: $SERVICE_URL_TRIGGER_3000
-  APP_ORIGIN: $SERVICE_URL_TRIGGER_3000
-  DEV_OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_URL_TRIGGER_3000/otel
-  OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_URL_TRIGGER_3000/otel
-  ELECTRIC_ORIGIN: http://electric:3000
-
 services:
   trigger:
-    image: ghcr.io/triggerdotdev/trigger.dev:v3
+    image: ghcr.io/triggerdotdev/trigger.dev:v4.3.0
+    # Root user is required for bootstrap and shared volume permissions
+    # See: https://github.com/triggerdotdev/trigger.dev/blob/main/hosting/docker/webapp/docker-compose.yml
+    user: root
+    command: |
+      sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
     environment:
-      SERVICE_URL_TRIGGER_3000: ""
-      <<: *common-env
+      - SERVICE_URL_TRIGGER_3000
+      - APP_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - API_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
+      - MAGIC_LINK_SECRET=${SERVICE_PASSWORD_64_MAGICLINK}
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_WORKERSECRET}
+      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN}
+      - NODE_ENV=production
+      - APP_LOG_LEVEL=info
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?schema=public&sslmode=disable
+      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?schema=public&sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_TLS_DISABLED=true
+      - ELECTRIC_ORIGIN=http://electric:3000
+      - DEV_OTEL_EXPORTER_OTLP_ENDPOINT=${DEV_OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - DEPLOY_REGISTRY_HOST=${DEPLOY_REGISTRY_HOST:-ghcr.io}
+      - DEPLOY_REGISTRY_PROTOCOL=${DEPLOY_REGISTRY_PROTOCOL:-https}
+      - DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
+      - V4_DEPLOY_REGISTRY_NAMESPACE=${DEPLOY_REGISTRY_NAMESPACE:-trigger}
+      - OBJECT_STORE_BASE_URL=${OBJECT_STORE_BASE_URL}
+      - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
+      - OBJECT_STORE_SECRET_ACCESS_KEY=${OBJECT_STORE_SECRET_ACCESS_KEY}
+      - CLICKHOUSE_URL=http://${SERVICE_USER_CLICKHOUSE}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123?secure=false
+      - CLICKHOUSE_LOG_LEVEL=info
+      - RUN_REPLICATION_ENABLED=1
+      - RUN_REPLICATION_CLICKHOUSE_URL=http://${SERVICE_USER_CLICKHOUSE}:${SERVICE_PASSWORD_64_CLICKHOUSE}@clickhouse:8123
+      - RUN_REPLICATION_LOG_LEVEL=info
+      - TRIGGER_BOOTSTRAP_ENABLED=1
+      - TRIGGER_BOOTSTRAP_WORKER_GROUP_NAME=bootstrap
+      - TRIGGER_BOOTSTRAP_WORKER_TOKEN_PATH=/home/node/shared/worker_token
+      - DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ORG_EXECUTION_CONCURRENCY_LIMIT:-300}
+      - DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT=${DEFAULT_ENV_EXECUTION_CONCURRENCY_LIMIT:-100}
+      - AUTH_GITHUB_CLIENT_ID=${AUTH_GITHUB_CLIENT_ID:-}
+      - AUTH_GITHUB_CLIENT_SECRET=${AUTH_GITHUB_CLIENT_SECRET:-}
+      - EMAIL_TRANSPORT=${EMAIL_TRANSPORT:-smtp}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - REPLY_TO_EMAIL=${REPLY_TO_EMAIL}
+      - WHITELISTED_EMAILS=${WHITELISTED_EMAILS}
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
+      - GRACEFUL_SHUTDOWN_TIMEOUT=1000
+      - INTERNAL_OTEL_TRACE_LOGGING_ENABLED=${INTERNAL_OTEL_TRACE_LOGGING_ENABLED:-0}
+      - TRIGGER_TELEMETRY_DISABLED=${TRIGGER_TELEMETRY_DISABLED:-true}
+    volumes:
+      - shared-data:/home/node/shared
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - "-e"
+        - "require('http').get('http://127.0.0.1:3000/healthcheck',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       postgresql:
         condition: service_healthy
@@ -60,87 +84,130 @@ services:
         condition: service_healthy
       electric:
         condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  supervisor:
+    image: ghcr.io/triggerdotdev/supervisor:v4.3.0
+    user: root
+    command: |
+      sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
+    environment:
+      - TRIGGER_API_URL=http://trigger:3000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://trigger:3000/otel
+      - TRIGGER_WORKER_TOKEN=${TRIGGER_WORKER_TOKEN:-file:///home/node/shared/worker_token}
+      - MANAGED_WORKER_SECRET=${SERVICE_PASSWORD_64_WORKERSECRET}
+      - TRIGGER_WORKLOAD_API_DOMAIN=${TRIGGER_WORKLOAD_API_DOMAIN}
+      - TRIGGER_WORKLOAD_API_PORT_EXTERNAL=8020
+      - DOCKER_HOST=tcp://docker-proxy:2375
+      - DOCKER_RUNNER_NETWORKS=${DOCKER_RUNNER_NETWORKS}
+      - DOCKER_AUTOREMOVE_EXITED_CONTAINERS=${DOCKER_AUTOREMOVE_EXITED_CONTAINERS:-1}
+      - DOCKER_REGISTRY_URL=https://${DEPLOY_REGISTRY_HOST:-ghcr.io}
+      - DOCKER_REGISTRY_USERNAME=${DEPLOY_REGISTRY_USERNAME}
+      - DOCKER_REGISTRY_PASSWORD=${DEPLOY_REGISTRY_PASSWORD}
+      - ENFORCE_MACHINE_PRESETS=1
+      - TRIGGER_DEQUEUE_INTERVAL_MS=1000
+      - DEBUG=${SUPERVISOR_DEBUG:-0}
+    volumes:
+      - shared-data:/home/node/shared
     healthcheck:
-      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"
+      test:
+        - CMD
+        - node
+        - "-e"
+        - "require('http').get('http://127.0.0.1:8020/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 5
-
-  electric:
-    image: electricsql/electric
-    environment:
-      <<: *common-env
     depends_on:
-      postgresql:
+      trigger:
         condition: service_healthy
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pwd
+      docker-proxy:
+        condition: service_healthy
 
-  redis:
-    image: "redis:7"
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+      - LOG_LEVEL=info
+      - POST=${POST:-1}
+      - CONTAINERS=${CONTAINERS:-1}
+      - IMAGES=${IMAGES:-1}
+      - INFO=${INFO:-1}
+      - NETWORKS=${NETWORKS:-1}
+      - AUTH=${AUTH:-1}
+      - DISTRIBUTION=${DISTRIBUTION:-1}
     healthcheck:
       test:
         - CMD-SHELL
-        - "redis-cli -h localhost -p 6379 ping"
-      interval: 5s
+        - nc -z 127.0.0.1 2375 || exit 1
+      interval: 30s
       timeout: 5s
-      retries: 3
-    volumes:
-      - redis-data:/data
+      retries: 5
+
   postgresql:
     image: postgres:16-alpine
+    command:
+      - "-c"
+      - wal_level=logical
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-trigger-db}
     volumes:
       - postgresql-data:/var/lib/postgresql/data
-    environment:
-      <<: *common-env
-    command:
-      - -c
-      - wal_level=logical
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
 
-  docker-provider:
-    image: ghcr.io/triggerdotdev/provider/docker:v3
-    platform: linux/amd64
+  redis:
+    image: redis:7-alpine
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    user: root
-    depends_on:
-      trigger:
-        condition: service_healthy
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  electric:
+    image: electricsql/electric:1.2.9
     environment:
-      <<: *common-env
-      PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3000
-      SECURE_CONNECTION: "false"
-      PLATFORM_SECRET: $SERVICE_PASSWORD_64_PROVIDER
-      HTTP_SERVER_PORT: 9020
-  coordinator:
-    image: ghcr.io/triggerdotdev/coordinator:v3
-    platform: linux/amd64
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?sslmode=disable
+      - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
+      - ELECTRIC_USAGE_REPORTING=false
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost:3000/v1/health"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    user: root
-    ports:
-      - '127.0.0.1:9020:9020'
-    depends_on:
-      trigger:
-        condition: service_healthy
-    environment:
-      <<: *common-env
-      PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3000
-      SECURE_CONNECTION: "false"
-      PLATFORM_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
-      HTTP_SERVER_PORT: 9020
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
     healthcheck:
       test:
         - CMD-SHELL
-        - pwd
+        - wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5

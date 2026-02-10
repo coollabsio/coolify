@@ -32,7 +32,7 @@ class CleanupNames extends Command
                             {--backup : Create database backup before changes}
                             {--force : Skip confirmation prompt}';
 
-    protected $description = 'Sanitize name fields by removing invalid characters (keeping only letters, numbers, spaces, dashes, underscores, dots, slashes, colons, parentheses)';
+    protected $description = 'Sanitize name fields by removing dangerous characters';
 
     protected array $modelsToClean = [
         'Project' => Project::class,

@@ -32,6 +32,7 @@
                 <div>You can't delete your last / personal team.</div>
             @elseif(currentTeam()->subscription)
                 <div>Please cancel your subscription <a class="underline dark:text-white"
+                        {{ wireNavigate() }}
                         href="{{ route('subscription.show') }}">here</a> before deleting this team.</div>
             @else
                 @if (currentTeam()->isEmpty())

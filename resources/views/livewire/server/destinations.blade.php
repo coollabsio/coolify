@@ -20,12 +20,12 @@
                 <h4 class="pt-4 pb-2">Available Destinations</h4>
                 <div class="flex gap-2">
                     @foreach ($server->standaloneDockers as $docker)
-                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
+                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}" {{ wireNavigate() }}>
                             <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
                         </a>
                     @endforeach
                     @foreach ($server->swarmDockers as $docker)
-                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
+                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}" {{ wireNavigate() }}>
                             <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
                         </a>
                     @endforeach

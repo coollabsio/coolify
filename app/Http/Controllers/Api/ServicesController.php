@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 
@@ -35,6 +36,100 @@ class ServicesController extends Controller
         }
 
         return serializeApiResponse($service);
+    }
+
+    private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
+    {
+        $errors = [];
+        $conflicts = [];
+
+        $urls = collect($urlsArray)->flatMap(function ($item) {
+            $urlValue = data_get($item, 'url');
+            if (blank($urlValue)) {
+                return [];
+            }
+
+            return str($urlValue)->replaceStart(',', '')->replaceEnd(',', '')->trim()->explode(',')->map(fn ($url) => trim($url))->filter();
+        });
+
+        $urls = $urls->map(function ($url) use (&$errors) {
+            if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                $errors[] = "Invalid URL: {$url}";
+
+                return $url;
+            }
+            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+            if (! in_array(strtolower($scheme), ['http', 'https'])) {
+                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+            }
+
+            return $url;
+        });
+
+        $duplicates = $urls->duplicates()->unique()->values();
+        if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
+            $errors[] = 'The current request contains conflicting URLs across containers: '.implode(', ', $duplicates->toArray()).'. Use force_domain_override=true to proceed.';
+        }
+
+        if (count($errors) > 0) {
+            return ['errors' => $errors];
+        }
+
+        collect($urlsArray)->each(function ($item) use ($service, $teamId, $forceDomainOverride, &$errors, &$conflicts) {
+            $name = data_get($item, 'name');
+            $containerUrls = data_get($item, 'url');
+
+            if (blank($name)) {
+                $errors[] = 'Service container name is required to apply URLs.';
+
+                return;
+            }
+
+            $application = $service->applications()->where('name', $name)->first();
+            if (! $application) {
+                $errors[] = "Service container with '{$name}' not found.";
+
+                return;
+            }
+
+            if (filled($containerUrls)) {
+                $containerUrls = str($containerUrls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
+                $containerUrls = str($containerUrls)->explode(',')->map(fn ($url) => str(trim($url))->lower());
+
+                $result = checkIfDomainIsAlreadyUsedViaAPI($containerUrls, $teamId, $application->uuid);
+                if (isset($result['error'])) {
+                    $errors[] = $result['error'];
+
+                    return;
+                }
+
+                if ($result['hasConflicts'] && ! $forceDomainOverride) {
+                    $conflicts = array_merge($conflicts, $result['conflicts']);
+
+                    return;
+                }
+
+                $containerUrls = $containerUrls->filter(fn ($u) => filled($u))->unique()->implode(',');
+            } else {
+                $containerUrls = null;
+            }
+
+            $application->fqdn = $containerUrls;
+            $application->save();
+        });
+
+        if (! empty($errors)) {
+            return ['errors' => $errors];
+        }
+
+        if (! empty($conflicts)) {
+            return [
+                'conflicts' => $conflicts,
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ];
+        }
+
+        return null;
     }
 
     #[OA\Get(
@@ -105,98 +200,7 @@ class ServicesController extends Controller
                     type: 'object',
                     required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
                     properties: [
-                        'type' => [
-                            'description' => 'The one-click service type',
-                            'type' => 'string',
-                            'enum' => [
-                                'activepieces',
-                                'appsmith',
-                                'appwrite',
-                                'authentik',
-                                'babybuddy',
-                                'budge',
-                                'changedetection',
-                                'chatwoot',
-                                'classicpress-with-mariadb',
-                                'classicpress-with-mysql',
-                                'classicpress-without-database',
-                                'cloudflared',
-                                'code-server',
-                                'dashboard',
-                                'directus',
-                                'directus-with-postgresql',
-                                'docker-registry',
-                                'docuseal',
-                                'docuseal-with-postgres',
-                                'dokuwiki',
-                                'duplicati',
-                                'emby',
-                                'embystat',
-                                'fider',
-                                'filebrowser',
-                                'firefly',
-                                'formbricks',
-                                'ghost',
-                                'gitea',
-                                'gitea-with-mariadb',
-                                'gitea-with-mysql',
-                                'gitea-with-postgresql',
-                                'glance',
-                                'glances',
-                                'glitchtip',
-                                'grafana',
-                                'grafana-with-postgresql',
-                                'grocy',
-                                'heimdall',
-                                'homepage',
-                                'jellyfin',
-                                'kuzzle',
-                                'listmonk',
-                                'logto',
-                                'mediawiki',
-                                'meilisearch',
-                                'metabase',
-                                'metube',
-                                'minio',
-                                'moodle',
-                                'n8n',
-                                'n8n-with-postgresql',
-                                'next-image-transformation',
-                                'nextcloud',
-                                'nocodb',
-                                'odoo',
-                                'openblocks',
-                                'pairdrop',
-                                'penpot',
-                                'phpmyadmin',
-                                'pocketbase',
-                                'posthog',
-                                'reactive-resume',
-                                'rocketchat',
-                                'shlink',
-                                'slash',
-                                'snapdrop',
-                                'statusnook',
-                                'stirling-pdf',
-                                'supabase',
-                                'syncthing',
-                                'tolgee',
-                                'trigger',
-                                'trigger-with-external-database',
-                                'twenty',
-                                'umami',
-                                'unleash-with-postgresql',
-                                'unleash-without-database',
-                                'uptime-kuma',
-                                'vaultwarden',
-                                'vikunja',
-                                'weblate',
-                                'whoogle',
-                                'wordpress-with-mariadb',
-                                'wordpress-with-mysql',
-                                'wordpress-without-database',
-                            ],
-                        ],
+                        'type' => ['description' => 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)', 'type' => 'string'],
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
                         'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
@@ -205,7 +209,19 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
-                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
+                        'urls' => [
+                            'type' => 'array',
+                            'description' => 'Array of URLs to be applied to containers of a service.',
+                            'items' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                    'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                ],
+                            ),
+                        ],
+                        'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                     ],
                 ),
             ),
@@ -236,6 +252,35 @@ class ServicesController extends Controller
                 ref: '#/components/responses/400',
             ),
             new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
                 response: 422,
                 ref: '#/components/responses/422',
             ),
@@ -243,7 +288,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -256,7 +301,7 @@ class ServicesController extends Controller
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $validator = customApiValidator($request->all(), [
+        $validationRules = [
             'type' => 'string|required_without:docker_compose_raw',
             'docker_compose_raw' => 'string|required_without:type',
             'project_uuid' => 'string|required',
@@ -267,7 +312,16 @@ class ServicesController extends Controller
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
-        ]);
+            'urls' => 'array|nullable',
+            'urls.*' => 'array:name,url',
+            'urls.*.name' => 'string|required',
+            'urls.*.url' => 'string|nullable',
+            'force_domain_override' => 'boolean',
+        ];
+        $validationMessages = [
+            'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+        ];
+        $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -283,6 +337,13 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+
+        if (filled($request->type) && filled($request->docker_compose_raw)) {
+            return response()->json([
+                'message' => 'You cannot provide both service type and docker_compose_raw. Use one or the other.',
+            ], 422);
+        }
+
         $environmentUuid = $request->environment_uuid;
         $environmentName = $request->environment_name;
         if (blank($environmentUuid) && blank($environmentName)) {
@@ -355,7 +416,8 @@ class ServicesController extends Controller
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
                 $service = Service::create($servicePayload);
-                $service->name = "$oneClickServiceName-".$service->uuid;
+                $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
+                $service->description = $request->description;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
@@ -380,29 +442,41 @@ class ServicesController extends Controller
                 // Apply service-specific application prerequisites
                 applyServiceApplicationPrerequisites($service);
 
+                if ($request->has('urls') && is_array($request->urls)) {
+                    $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+                    if ($urlResult !== null) {
+                        $service->delete();
+                        if (isset($urlResult['errors'])) {
+                            return response()->json([
+                                'message' => 'Validation failed.',
+                                'errors' => $urlResult['errors'],
+                            ], 422);
+                        }
+                        if (isset($urlResult['conflicts'])) {
+                            return response()->json([
+                                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                                'conflicts' => $urlResult['conflicts'],
+                                'warning' => $urlResult['warning'],
+                            ], 409);
+                        }
+                    }
+                }
+
                 if ($instantDeploy) {
                     StartService::dispatch($service);
                 }
-                $domains = $service->applications()->get()->pluck('fqdn')->sort();
-                $domains = $domains->map(function ($domain) {
-                    if (count(explode(':', $domain)) > 2) {
-                        return str($domain)->beforeLast(':')->value();
-                    }
-
-                    return $domain;
-                });
 
                 return response()->json([
                     'uuid' => $service->uuid,
-                    'domains' => $domains,
-                ]);
+                    'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
+                ])->setStatusCode(201);
             }
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
 
-            $validator = customApiValidator($request->all(), [
+            $validationRules = [
                 'project_uuid' => 'string|required',
                 'environment_name' => 'string|nullable',
                 'environment_uuid' => 'string|nullable',
@@ -413,7 +487,16 @@ class ServicesController extends Controller
                 'instant_deploy' => 'boolean',
                 'connect_to_docker_network' => 'boolean',
                 'docker_compose_raw' => 'string|required',
-            ]);
+                'urls' => 'array|nullable',
+                'urls.*' => 'array:name,url',
+                'urls.*.name' => 'string|required',
+                'urls.*.url' => 'string|nullable',
+                'force_domain_override' => 'boolean',
+            ];
+            $validationMessages = [
+                'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+            ];
+            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -469,7 +552,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -507,25 +590,40 @@ class ServicesController extends Controller
             $service->save();
 
             $service->parse(isNew: true);
+
+            if ($request->has('urls') && is_array($request->urls)) {
+                $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+                if ($urlResult !== null) {
+                    $service->delete();
+                    if (isset($urlResult['errors'])) {
+                        return response()->json([
+                            'message' => 'Validation failed.',
+                            'errors' => $urlResult['errors'],
+                        ], 422);
+                    }
+                    if (isset($urlResult['conflicts'])) {
+                        return response()->json([
+                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                            'conflicts' => $urlResult['conflicts'],
+                            'warning' => $urlResult['warning'],
+                        ], 409);
+                    }
+                }
+            }
+
             if ($instantDeploy) {
                 StartService::dispatch($service);
             }
 
-            $domains = $service->applications()->get()->pluck('fqdn')->sort();
-            $domains = $domains->map(function ($domain) {
-                if (count(explode(':', $domain)) > 2) {
-                    return str($domain)->beforeLast(':')->value();
-                }
-
-                return $domain;
-            })->values();
-
             return response()->json([
                 'uuid' => $service->uuid,
-                'domains' => $domains,
+                'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
             ])->setStatusCode(201);
-        } else {
-            return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
+        } elseif (filled($request->type)) {
+            return response()->json([
+                'message' => 'Invalid service type.',
+                'valid_service_types' => $serviceKeys,
+            ], 404);
         }
     }
 
@@ -681,7 +779,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -703,7 +800,19 @@ class ServicesController extends Controller
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The base64 encoded Docker Compose content.'],
+                            'urls' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a service.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'url' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io").'],
+                                    ],
+                                ),
+                            ],
+                            'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
                         ],
                     )
                 ),
@@ -739,6 +848,35 @@ class ServicesController extends Controller
                 ref: '#/components/responses/404',
             ),
             new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
                 response: 422,
                 ref: '#/components/responses/422',
             ),
@@ -763,15 +901,24 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
 
-        $validator = customApiValidator($request->all(), [
+        $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|nullable',
-        ]);
+            'urls' => 'array|nullable',
+            'urls.*' => 'array:name,url',
+            'urls.*.name' => 'string|required',
+            'urls.*.url' => 'string|nullable',
+            'force_domain_override' => 'boolean',
+        ];
+        $validationMessages = [
+            'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
+        ];
+        $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -797,7 +944,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -835,22 +982,33 @@ class ServicesController extends Controller
         $service->save();
 
         $service->parse();
+
+        if ($request->has('urls') && is_array($request->urls)) {
+            $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+            if ($urlResult !== null) {
+                if (isset($urlResult['errors'])) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => $urlResult['errors'],
+                    ], 422);
+                }
+                if (isset($urlResult['conflicts'])) {
+                    return response()->json([
+                        'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                        'conflicts' => $urlResult['conflicts'],
+                        'warning' => $urlResult['warning'],
+                    ], 409);
+                }
+            }
+        }
+
         if ($request->instant_deploy) {
             StartService::dispatch($service);
         }
 
-        $domains = $service->applications()->get()->pluck('fqdn')->sort();
-        $domains = $domains->map(function ($domain) {
-            if (count(explode(':', $domain)) > 2) {
-                return str($domain)->beforeLast(':')->value();
-            }
-
-            return $domain;
-        })->values();
-
         return response()->json([
             'uuid' => $service->uuid,
-            'domains' => $domains,
+            'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
         ])->setStatusCode(200);
     }
 
@@ -871,7 +1029,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -952,7 +1109,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1069,7 +1225,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1200,7 +1355,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1315,7 +1469,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(
@@ -1325,7 +1478,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1404,7 +1556,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1485,7 +1636,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
         ],
@@ -1566,7 +1716,6 @@ class ServicesController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
-                    format: 'uuid',
                 )
             ),
             new OA\Parameter(

@@ -2,22 +2,13 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Actions\Database\PgBackrestRestore;
-use App\Models\DatabaseRestore;
-use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ScheduledDatabaseBackupExecution;
-use App\Models\StandalonePostgresql;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
-    use AuthorizesRequests;
-
     public ?ScheduledDatabaseBackup $backup = null;
 
     public $database;
@@ -41,14 +32,6 @@ class BackupExecutions extends Component
     public $delete_backup_s3 = false;
 
     public $delete_backup_sftp = false;
-
-    public ?int $restoreExecutionId = null;
-
-    public ?DatabaseRestore $currentRestore = null;
-
-    public bool $showRestoreModal = false;
-
-    public bool $showRestoreProgressModal = false;
 
     public function getListeners()
     {
@@ -84,12 +67,8 @@ class BackupExecutions extends Component
 
     public function deleteBackup($executionId, $password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return;
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -123,73 +102,6 @@ class BackupExecutions extends Component
     public function download_file($exeuctionId)
     {
         return redirect()->route('download.backup', $exeuctionId);
-    }
-
-    public function confirmRestore(int $executionId)
-    {
-        $execution = $this->backup->executions()->where('id', $executionId)->first();
-        if (! $execution || ! $execution->canRestore()) {
-            $this->dispatch('error', 'This backup cannot be restored.');
-
-            return;
-        }
-
-        $this->restoreExecutionId = $executionId;
-        $this->showRestoreModal = true;
-    }
-
-    public function cancelRestore()
-    {
-        $this->restoreExecutionId = null;
-        $this->showRestoreModal = false;
-    }
-
-    public function startRestore(int $executionId)
-    {
-        $execution = $this->backup->executions()->where('id', $executionId)->first();
-        if (! $execution || ! $execution->canRestore()) {
-            $this->dispatch('error', 'This backup cannot be restored.');
-
-            return;
-        }
-
-        $database = $this->backup->database;
-        if (! $database instanceof StandalonePostgresql) {
-            $this->dispatch('error', 'PgBackRest restore is only available for PostgreSQL databases.');
-
-            return;
-        }
-
-        $this->authorize('manage', $database);
-
-        try {
-            $this->currentRestore = PgBackrestRestore::run($database, $execution);
-            $this->showRestoreModal = false;
-            $this->showRestoreProgressModal = true;
-            $this->dispatch('success', 'Restore initiated. The database will be temporarily unavailable.');
-        } catch (\Exception $e) {
-            $this->dispatch('error', 'Failed to start restore: '.$e->getMessage());
-        }
-    }
-
-    public function pollRestoreStatus()
-    {
-        if (! $this->currentRestore) {
-            return;
-        }
-
-        $this->currentRestore->refresh();
-
-        if ($this->currentRestore->isFinished()) {
-            $this->refreshBackupExecutions();
-        }
-    }
-
-    public function closeRestoreProgress()
-    {
-        $this->currentRestore = null;
-        $this->showRestoreProgressModal = false;
-        $this->refreshBackupExecutions();
     }
 
     public function refreshBackupExecutions(): void
@@ -260,7 +172,6 @@ class BackupExecutions extends Component
     {
         $this->backup = $backup;
         $this->database = $backup->database;
-        $this->authorize('view', $this->database);
         $this->updateCurrentPage();
         $this->loadExecutions();
     }

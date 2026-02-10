@@ -20,9 +20,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command:
-      - node
-      - index.js
     healthcheck:
       test: "wget --no-verbose --tries=1 --spider http://127.0.0.1:4242/health || exit 1"
       interval: 1s

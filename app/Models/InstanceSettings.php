@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Once;
 use Spatie\Url\Url;
 
 class InstanceSettings extends Model
@@ -29,11 +30,15 @@ class InstanceSettings extends Model
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
+        'is_wire_navigate_enabled' => 'boolean',
     ];
 
     protected static function booted(): void
     {
         static::updated(function ($settings) {
+            // Clear once() cache so subsequent calls get fresh data
+            Once::flush();
+
             // Clear trusted hosts cache when FQDN changes
             if ($settings->wasChanged('fqdn')) {
                 \Cache::forget('instance_settings_fqdn_host');
@@ -81,7 +86,7 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return InstanceSettings::findOrFail(0);
+        return once(fn () => InstanceSettings::findOrFail(0));
     }
 
     // public function getRecipients($notification)

@@ -11,7 +11,7 @@
     <div class="navbar-main">
         <nav
             class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.database.configuration', $parameters) }}">
                 Configuration
             </a>
@@ -31,7 +31,7 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
+                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     Backups
                 </a>

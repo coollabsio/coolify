@@ -195,8 +195,8 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
         $network = $this->database->destination->network;
         $containerName = $this->database->uuid;
 
-        // Ensure we handle the case where config might not exist on host (though unlikely in restore flow)
-        // Ideally we should regenerate it here, but for now we follow the pattern.
+        // Helper to get info from sidecar.
+        // Note: Config is generated on fly or mounted.
 
         $cmd = PgBackrestService::buildSidecarInfoCommand(
             $stanza,
@@ -397,7 +397,7 @@ class PgBackrestRestoreJob implements ShouldBeEncrypted, ShouldQueue
             throw new RuntimeException('No enabled PgBackRest backup configuration found.');
         }
 
-        // Resolve Mounts Explicitly (since StopDatabase removes the container)
+        // StopDatabase removes container; resolve mounts explicitly.
         $pgdataVolume = $this->database->pgdataVolume();
         $pgdataMount = $pgdataVolume->host_path ?: $pgdataVolume->name;
         $mounts = "-v " . escapeshellarg($pgdataMount . ':/var/lib/postgresql/data');
