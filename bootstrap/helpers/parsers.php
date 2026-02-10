@@ -822,10 +822,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
+                        if (data_get($temp, 'driver_opts.type') === 'cifs' || data_get($temp, 'driver_opts.type') === 'nfs') {
+                            dispatch(new ServerFilesFromServerJob($originalResource));
+                            $volumesParsed->put($index, $volume);
+
                             continue;
                         }
                     }
@@ -868,6 +868,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $volumesParsed->put($index, $volume);
             }
         }
+        $volumesParsed = $volumesParsed->values();
 
         if ($depends_on?->count() > 0) {
             if ($isPullRequest) {
@@ -2045,10 +2046,10 @@ function serviceParser(Service $resource): Collection
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
+                        if (data_get($temp, 'driver_opts.type') === 'cifs' || data_get($temp, 'driver_opts.type') === 'nfs') {
+                            dispatch(new ServerFilesFromServerJob($originalResource));
+                            $volumesParsed->put($index, $volume);
+
                             continue;
                         }
                     }
@@ -2088,6 +2089,7 @@ function serviceParser(Service $resource): Collection
                 $volumesParsed->put($index, $volume);
             }
         }
+        $volumesParsed = $volumesParsed->values();
 
         if (! $use_network_mode) {
             if ($topLevel->get('networks')?->count() > 0) {
