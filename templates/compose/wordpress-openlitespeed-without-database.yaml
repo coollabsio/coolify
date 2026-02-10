@@ -1,0 +1,19 @@
+# documentation: https://openlitespeed.org/kb/
+# slogan: High-performance WordPress on OpenLiteSpeed, bring your own database.
+# category: cms
+# tags: cms, wordpress, openlitespeed, litespeed, blog, content, management, performance
+# logo: svgs/openlitespeed.svg
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost
+      - lsws-conf:/usr/local/lsws/conf
+    environment:
+      - SERVICE_URL_WORDPRESS
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
