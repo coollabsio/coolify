@@ -1,0 +1,51 @@
+# documentation: https://wordpress.org
+# slogan: WordPress is open source software you can use to create a beautiful website, blog, or app.
+# category: cms
+# tags: cms, blog, content, management, mariadb, openlitespeed
+# logo: svgs/wordpress.svg
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+    depends_on:
+      - mariadb
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      set -e
+      DOCROOT="/var/www/vhosts/localhost/html"
+      if [ ! -f "$${DOCROOT}/wp-config.php" ]; then
+        mkdir -p "$${DOCROOT}"
+        curl -sL https://wordpress.org/latest.tar.gz | tar -xz -C /tmp
+        cp -R /tmp/wordpress/. "$${DOCROOT}"
+        rm -rf /tmp/wordpress
+        wp config create --path="$${DOCROOT}" --dbname="$${WORDPRESS_DB_NAME}" --dbuser="$${WORDPRESS_DB_USER}" --dbpass="$${WORDPRESS_DB_PASSWORD}" --dbhost="$${WORDPRESS_DB_HOST}" --skip-check --allow-root
+        chown -R 1000:1000 "$${DOCROOT}"
+      fi
+      exec /entrypoint.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
