@@ -204,11 +204,27 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        // Check if file exists
+        if (! file_exists($keyLocation)) {
             $privateKey->storeInFileSystem();
+
+            return;
+        }
+
+        // Check if file content matches the database value
+        // This catches the case where the key was rotated in the DB
+        // but the old file still exists on disk
+        $fileContent = file_get_contents($keyLocation);
+        if ($fileContent !== $privateKey->private_key) {
+            ray('SSH key content mismatch detected, re-storing key for: '.$privateKey->uuid);
+            $privateKey->storeInFileSystem();
+
+            // Invalidate any multiplexed connections using the old key
+            // since they'd be caching the stale credentials
+            foreach ($privateKey->servers as $server) {
+                self::removeMuxFile($server);
+            }
         }
     }
 
