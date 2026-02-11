@@ -1,0 +1,59 @@
+# documentation: https://surrealdb.com/docs
+# slogan: SurrealDB is a scalable, distributed, collaborative, document-graph database for the realtime web.
+# category: database
+# tags: database, nosql, graph, document, realtime, surrealdb, tikv, distributed
+# logo: svgs/surrealdb.png
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREAL_USER=${SERVICE_USER_SURREALDB}
+      - SURREAL_PASS=${SERVICE_PASSWORD_SURREALDB}
+    command: start --user $${SURREAL_USER} --pass $${SURREAL_PASS} tikv://pd:2379
+    depends_on:
+      tikv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  pd:
+    image: pingcap/pd:latest
+    command:
+      - --name=pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --data-dir=/data/pd
+    volumes:
+      - pd-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:2379/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  tikv:
+    image: pingcap/tikv:latest
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --status-addr=0.0.0.0:20180
+      - --pd=pd:2379
+      - --data-dir=/data/tikv
+    volumes:
+      - tikv-data:/data
+    depends_on:
+      pd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:20180/status"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
