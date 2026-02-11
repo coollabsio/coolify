@@ -74,6 +74,8 @@ class InstallDocker
 
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([$this->getDebianDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
@@ -126,6 +128,13 @@ class InstallDocker
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk add docker docker-cli-compose && '.
+            'rc-update add docker default && '.
+            'service docker start';
     }
 
     private function getRhelDockerInstallCommand(): string

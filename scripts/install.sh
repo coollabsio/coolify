@@ -375,7 +375,7 @@ else
         apk update >/dev/null
         apk add curl wget git jq openssl >/dev/null
         ;;
-    ubuntu | debian | raspbian)
+    ubuntu | debian | raspbian | pop)
         apt-get update -y >/dev/null
         APT_UPDATED=true
         apt-get install -y curl wget git jq openssl >/dev/null
@@ -442,7 +442,7 @@ if [ "$SSH_DETECTED" = "false" ]; then
         rc-update add sshd default >/dev/null 2>&1
         service sshd start >/dev/null 2>&1
         ;;
-    ubuntu | debian | raspbian)
+    ubuntu | debian | raspbian | pop)
         if [ "$APT_UPDATED" = false ]; then
             apt-get update -y >/dev/null
             APT_UPDATED=true
