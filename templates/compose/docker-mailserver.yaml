@@ -1,0 +1,91 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack, production-ready, self-hosted mail server (SMTP, IMAP, DKIM, antispam, antivirus, etc.)
+# category: email
+# tags: email,mail,smtp,imap,postfix,dovecot,dkim,spf,dmarc,antispam
+# logo: svgs/docker-mailserver.svg
+# port: 25
+
+services:
+  docker-mailserver:
+    image: docker.io/mailserver/docker-mailserver:14.0.0
+    hostname: ${MAIL_HOSTNAME:?mail}
+    domainname: ${MAIL_DOMAIN:?}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    environment:
+      # Postmaster account — the initial admin mailbox created on first boot
+      - POSTMASTER_ADDRESS=postmaster@${MAIL_DOMAIN:?}
+      - POSTMASTER_PASSWORD=${SERVICE_PASSWORD_POSTMASTER}
+
+      # General configuration
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:?mail}.${MAIL_DOMAIN:?}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - SUPERVISOR_LOGLEVEL=${SUPERVISOR_LOGLEVEL:-warn}
+      - TZ=${TZ:-UTC}
+      - ONE_DIR=1
+      - PERMIT_DOCKER=none
+
+      # TLS — use letsencrypt when paired with Coolify's proxy, or manual certs
+      - SSL_TYPE=${SSL_TYPE:-}
+      - SSL_CERT_PATH=${SSL_CERT_PATH:-}
+      - SSL_KEY_PATH=${SSL_KEY_PATH:-}
+
+      # DKIM / SPF / DMARC
+      - ENABLE_OPENDKIM=${ENABLE_OPENDKIM:-1}
+      - ENABLE_OPENDMARC=${ENABLE_OPENDMARC:-1}
+      - ENABLE_POLICYD_SPF=${ENABLE_POLICYD_SPF:-1}
+
+      # Optional features — disabled by default to save resources
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-0}
+      - SPAMASSASSIN_SPAM_TO_INBOX=${SPAMASSASSIN_SPAM_TO_INBOX:-1}
+      - MOVE_SPAM_TO_JUNK=${MOVE_SPAM_TO_JUNK:-1}
+
+      # Fail2Ban — requires NET_ADMIN capability
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+
+      # Relay host — useful when ISP blocks port 25 outbound
+      - DEFAULT_RELAY_HOST=${DEFAULT_RELAY_HOST:-}
+
+      # Rate limiting
+      - POSTFIX_MESSAGE_SIZE_LIMIT=${POSTFIX_MESSAGE_SIZE_LIMIT:-25600000}
+      - ENABLE_QUOTAS=${ENABLE_QUOTAS:-1}
+      - POSTFIX_MAILBOX_SIZE_LIMIT=${POSTFIX_MAILBOX_SIZE_LIMIT:-0}
+
+      # Fetchmail — pull mail from external accounts
+      - ENABLE_FETCHMAIL=${ENABLE_FETCHMAIL:-0}
+      - FETCHMAIL_POLL=${FETCHMAIL_POLL:-300}
+
+      # ManageSieve — client-side mail filtering rules (Thunderbird, etc.)
+      - ENABLE_MANAGESIEVE=${ENABLE_MANAGESIEVE:-0}
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        # Create the postmaster account on first boot if it does not exist
+        if [ ! -f /tmp/docker-mailserver/postfix-accounts.cf ] || \
+           ! grep -q "^postmaster@" /tmp/docker-mailserver/postfix-accounts.cf 2>/dev/null; then
+          setup email add "postmaster@${MAIL_DOMAIN}" "${POSTMASTER_PASSWORD}"
+        fi
+
+        # Start the mail server
+        exec /usr/bin/dumb-init -- supervisord -c /etc/supervisor/supervisord.conf
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss -tlnp | grep -q ':25 '"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
