@@ -1,0 +1,48 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/tikv
+# slogan: SurrealDB with TiKV backend for distributed storage.
+# category: database
+# tags: database, surrealdb, tikv, distributed
+# logo: svgs/default.webp
+# port: 8000
+
+services:
+  pd:
+    image: pingcap/pd:latest
+    command: --name=pd --data-dir=/data --client-urls=http://0.0.0.0:2379 --peer-urls=http://0.0.0.0:2380 --advertise-client-urls=http://pd:2379 --advertise-peer-urls=http://pd:2380 --initial-cluster=pd=http://pd:2380
+    volumes:
+      - pd-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2379/pd/api/v1/health"]
+      interval: 10s
+      timeout: 20s
+      retries: 20
+
+  tikv:
+    image: pingcap/tikv:latest
+    command: --addr=0.0.0.0:20160 --advertise-addr=tikv:20160 --data-dir=/data --pd=pd:2379
+    depends_on:
+      pd:
+        condition: service_healthy
+    volumes:
+      - tikv-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:20180/status"]
+      interval: 10s
+      timeout: 20s
+      retries: 20
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user ${SERVICE_USER_SURREALDB} --pass ${SERVICE_PASSWORD_SURREALDB} --log ${SURREALDB_LOG_LEVEL:-info} tikv://pd:2379
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+    depends_on:
+      pd:
+        condition: service_healthy
+      tikv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 20

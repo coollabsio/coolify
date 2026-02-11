@@ -5284,5 +5284,36 @@
         "logo": "svgs/marimo.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "surrealdb": {
+        "documentation": "https://surrealdb.com/docs/surrealdb/installation/running/docker?utm_source=coolify.io",
+        "slogan": "Multi-model database for the cloud, edge, and everything in between.",
+        "compose": "IyBkb2N1bWVudGF0aW9uOiBodHRwczovL3N1cnJlYWxkYi5jb20vZG9jcy9zdXJyZWFsZGIvaW5zdGFsbGF0aW9uL3J1bm5pbmcvZG9ja2VyCiMgc2xvZ2FuOiBNdWx0aS1tb2RlbCBkYXRhYmFzZSBmb3IgdGhlIGNsb3VkLCBlZGdlLCBhbmQgZXZlcnl0aGluZyBpbiBiZXR3ZWVuLgojIGNhdGVnb3J5OiBkYXRhYmFzZQojIHRhZ3M6IGRhdGFiYXNlLCBzdXJyZWFsZGIsIGt2LCBub3NxbCwgc3FsCiMgbG9nbzogc3Zncy9kZWZhdWx0LndlYnAKIyBwb3J0OiA4MDAwCgpzZXJ2aWNlczoKICBzdXJyZWFsZGI6CiAgICBpbWFnZTogc3VycmVhbGRiL3N1cnJlYWxkYjpsYXRlc3QKICAgIGNvbW1hbmQ6IHN0YXJ0IC0tdXNlciAke1NFUlZJQ0VfVVNFUl9TVVJSRUFMREJ9IC0tcGFzcyAke1NFUlZJQ0VfUEFTU1dPUkRfU1VSUkVBTERCfSAtLWxvZyAke1NVUlJFQUxEQl9MT0dfTEVWRUw6LWluZm99IHJvY2tzZGI6L215ZGF0YS9zdXJyZWFsLmRiCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9TVVJSRUFMREJfODAwMAogICAgdm9sdW1lczoKICAgICAgLSBzdXJyZWFsZGItZGF0YTovbXlkYXRhCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAiY3VybCIsICItZiIsICJodHRwOi8vMTI3LjAuMC4xOjgwMDAvaGVhbHRoIl0KICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAyMAo=",
+        "tags": [
+            "database",
+            "surrealdb",
+            "kv",
+            "nosql",
+            "sql"
+        ],
+        "category": "database",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "8000"
+    },
+    "surrealdb-with-tikv": {
+        "documentation": "https://surrealdb.com/docs/surrealdb/installation/running/tikv?utm_source=coolify.io",
+        "slogan": "SurrealDB with TiKV backend for distributed storage.",
+        "compose": "IyBkb2N1bWVudGF0aW9uOiBodHRwczovL3N1cnJlYWxkYi5jb20vZG9jcy9zdXJyZWFsZGIvaW5zdGFsbGF0aW9uL3J1bm5pbmcvdGlrdgojIHNsb2dhbjogU3VycmVhbERCIHdpdGggVGlLViBiYWNrZW5kIGZvciBkaXN0cmlidXRlZCBzdG9yYWdlLgojIGNhdGVnb3J5OiBkYXRhYmFzZQojIHRhZ3M6IGRhdGFiYXNlLCBzdXJyZWFsZGIsIHRpa3YsIGRpc3RyaWJ1dGVkCiMgbG9nbzogc3Zncy9kZWZhdWx0LndlYnAKIyBwb3J0OiA4MDAwCgpzZXJ2aWNlczoKICBwZDoKICAgIGltYWdlOiBwaW5nY2FwL3BkOmxhdGVzdAogICAgY29tbWFuZDogLS1uYW1lPXBkIC0tZGF0YS1kaXI9L2RhdGEgLS1jbGllbnQtdXJscz1odHRwOi8vMC4wLjAuMDoyMzc5IC0tcGVlci11cmxzPWh0dHA6Ly8wLjAuMC4wOjIzODAgLS1hZHZlcnRpc2UtY2xpZW50LXVybHM9aHR0cDovL3BkOjIzNzkgLS1hZHZlcnRpc2UtcGVlci11cmxzPWh0dHA6Ly9wZDoyMzgwIC0taW5pdGlhbC1jbHVzdGVyPXBkPWh0dHA6Ly9wZDoyMzgwCiAgICB2b2x1bWVzOgogICAgICAtIHBkLWRhdGE6L2RhdGEKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJ3Z2V0IiwgIi0tc3BpZGVyIiwgIi1xIiwgImh0dHA6Ly8xMjcuMC4wLjE6MjM3OS9wZC9hcGkvdjEvaGVhbHRoIl0KICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMjAKCiAgdGlrdjoKICAgIGltYWdlOiBwaW5nY2FwL3Rpa3Y6bGF0ZXN0CiAgICBjb21tYW5kOiAtLWFkZHI9MC4wLjAuMDoyMDE2MCAtLWFkdmVydGlzZS1hZGRyPXRpa3Y6MjAxNjAgLS1kYXRhLWRpcj0vZGF0YSAtLXBkPXBkOjIzNzkKICAgIGRlcGVuZHNfb246CiAgICAgIHBkOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICB2b2x1bWVzOgogICAgICAtIHRpa3YtZGF0YTovZGF0YQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01EIiwgIndnZXQiLCAiLS1zcGlkZXIiLCAiLXEiLCAiaHR0cDovLzEyNy4wLjAuMToyMDE4MC9zdGF0dXMiXQogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAyMAoKICBzdXJyZWFsZGI6CiAgICBpbWFnZTogc3VycmVhbGRiL3N1cnJlYWxkYjpsYXRlc3QKICAgIGNvbW1hbmQ6IHN0YXJ0IC0tdXNlciAke1NFUlZJQ0VfVVNFUl9TVVJSRUFMREJ9IC0tcGFzcyAke1NFUlZJQ0VfUEFTU1dPUkRfU1VSUkVBTERCfSAtLWxvZyAke1NVUlJFQUxEQl9MT0dfTEVWRUw6LWluZm99IHRpa3Y6Ly9wZDoyMzc5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9TVVJSRUFMREJfODAwMAogICAgZGVwZW5kc19vbjoKICAgICAgcGQ6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgdGlrdjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01EIiwgImN1cmwiLCAiLWYiLCAiaHR0cDovLzEyNy4wLjAuMTo4MDAwL2hlYWx0aCJdCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMjAK",
+        "tags": [
+            "database",
+            "surrealdb",
+            "tikv",
+            "distributed"
+        ],
+        "category": "database",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "port": "8000"
     }
 }

@@ -1,0 +1,20 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: Multi-model database for the cloud, edge, and everything in between.
+# category: database
+# tags: database, surrealdb, kv, nosql, sql
+# logo: svgs/default.webp
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user ${SERVICE_USER_SURREALDB} --pass ${SERVICE_PASSWORD_SURREALDB} --log ${SURREALDB_LOG_LEVEL:-info} rocksdb:/mydata/surreal.db
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+    volumes:
+      - surrealdb-data:/mydata
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 20
