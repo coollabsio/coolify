@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\ProxyTimeout;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, ProxyTimeout, SoftDeletes;
 
     protected $guarded = [];
+
+    protected $casts = [
+        'proxy_timeout' => 'integer',
+    ];
 
     protected static function booted()
     {

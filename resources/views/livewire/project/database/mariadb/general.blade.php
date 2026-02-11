@@ -139,6 +139,9 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="0" id="proxyTimeout"
+                label="Proxy Timeout (seconds)"
+                helper="Set to 0 to use 168h timeout." canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea label="Custom MariaDB Configuration" rows="10" id="mariadbConf"
             canGate="update" :canResource="$database" />

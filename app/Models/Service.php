@@ -881,7 +881,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                        if ($SERVICE_PASSWORD_LINKDING) {
+                    if ($SERVICE_PASSWORD_LINKDING) {
                         $data = $data->merge([
                             'Superuser Password' => [
                                 'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
@@ -1117,6 +1117,40 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Sessy', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/openclaw'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
+                    $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'readonly' => true,
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($gateway_token) {
+                        $data = $data->merge([
+                            'Gateway Token' => [
+                                'key' => data_get($gateway_token, 'key'),
+                                'value' => data_get($gateway_token, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Openclaw', $data->toArray());
                     break;
                 default:
                     $data = collect([]);

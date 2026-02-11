@@ -5,19 +5,21 @@ namespace App\Models;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ProxyTimeout;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMysql extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, ProxyTimeout, SoftDeletes;
 
     protected $guarded = [];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     protected $casts = [
+        'proxy_timeout' => 'integer',
         'mysql_password' => 'encrypted',
         'mysql_root_password' => 'encrypted',
         'restart_count' => 'integer',

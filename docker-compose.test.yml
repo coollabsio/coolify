@@ -1,0 +1,54 @@
+services:
+  test-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: coolify
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test-redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test-app:
+    image: thecodingmachine/php:8.2-v4-cli
+    user: root
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    environment:
+      - PHP_EXTENSIONS=pgsql pdo_pgsql redis bcmath
+      - APP_NAME=Coolify-Test
+      - APP_ENV=local
+      - APP_KEY=base64:Xv9L6qS9mXv9L6qS9mXv9L6qS9mXv9L6qS9mXv9L6qS=
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8000
+      - DB_CONNECTION=pgsql
+      - DB_HOST=test-db
+      - DB_PORT=5432
+      - DB_DATABASE=coolify
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=test-redis
+    ports:
+      - "8000:8000"
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        php artisan migrate --force &&
+        php -S 0.0.0.0:8000 -t public
+      "

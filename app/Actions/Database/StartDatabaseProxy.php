@@ -43,6 +43,9 @@ class StartDatabaseProxy
             'standalone-mongodb' => 27017,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };
+        $proxyTimeoutSeconds = (int) ($database->proxy_timeout ?? 0);
+        $resolvedProxyTimeout = $proxyTimeoutSeconds === 0 ? '168h' : "{$proxyTimeoutSeconds}s";
+
         if ($isSSLEnabled) {
             $internalPort = match ($databaseType) {
                 'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6380,
@@ -67,6 +70,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_timeout $resolvedProxyTimeout;
        }
     }
     EOF;

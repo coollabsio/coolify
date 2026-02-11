@@ -62,6 +62,7 @@
         "barryvdh/laravel-debugbar": "^3.16.5",
         "driftingly/rector-laravel": "^2.1.9",
         "fakerphp/faker": "^1.24.1",
+        "laravel/boost": "^2.1",
         "laravel/dusk": "^8.3.4",
         "laravel/pint": "^1.27",
         "laravel/telescope": "^5.16.1",

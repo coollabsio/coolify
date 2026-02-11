@@ -36,6 +36,8 @@ class General extends Component
 
     public ?int $publicPort = null;
 
+    public ?int $proxyTimeout = null;
+
     public ?string $customDockerRunOptions = null;
 
     public ?string $dbUrl = null;
@@ -91,6 +93,7 @@ class General extends Component
             'portsMappings' => 'nullable|string',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
+        'proxyTimeout' => 'nullable|integer|min:0',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',
@@ -109,6 +112,8 @@ class General extends Component
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
+                'proxyTimeout.integer' => 'The Proxy Timeout must be an integer.',
+                'proxyTimeout.min' => 'The Proxy Timeout must be at least 0.',
             ]
         );
     }
@@ -124,6 +129,7 @@ class General extends Component
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort;
+            $this->database->proxy_timeout = $this->proxyTimeout;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->enable_ssl = $this->enable_ssl;
@@ -139,6 +145,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->proxyTimeout = $this->database->proxy_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->enable_ssl = $this->database->enable_ssl;
@@ -212,6 +219,9 @@ class General extends Component
 
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
+            }
+            if (str($this->proxyTimeout)->isEmpty()) {
+                $this->proxyTimeout = null;
             }
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
