@@ -259,6 +259,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -322,7 +323,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -339,6 +340,7 @@ class DatabasesController extends Controller
             'image' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable',
+            'proxy_timeout' => 'integer|min:0|nullable',
             'limits_memory' => 'string',
             'limits_memory_swap' => 'string',
             'limits_memory_swappiness' => 'numeric',
@@ -370,7 +372,7 @@ class DatabasesController extends Controller
         }
         switch ($database->type()) {
             case 'standalone-postgresql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
                 $validator = customApiValidator($request->all(), [
                     'postgres_user' => 'string',
                     'postgres_password' => 'string',
@@ -401,20 +403,20 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-clickhouse':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'clickhouse_admin_user', 'clickhouse_admin_password'];
                 $validator = customApiValidator($request->all(), [
                     'clickhouse_admin_user' => 'string',
                     'clickhouse_admin_password' => 'string',
                 ]);
                 break;
             case 'standalone-dragonfly':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
                 $validator = customApiValidator($request->all(), [
                     'dragonfly_password' => 'string',
                 ]);
                 break;
             case 'standalone-redis':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
                 $validator = customApiValidator($request->all(), [
                     'redis_password' => 'string',
                     'redis_conf' => 'string',
@@ -441,7 +443,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-keydb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
                 $validator = customApiValidator($request->all(), [
                     'keydb_password' => 'string',
                     'keydb_conf' => 'string',
@@ -468,7 +470,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-mariadb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mariadb_conf' => 'string',
                     'mariadb_root_password' => 'string',
@@ -498,7 +500,7 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-mongodb':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
                 $validator = customApiValidator($request->all(), [
                     'mongo_conf' => 'string',
                     'mongo_initdb_root_username' => 'string',
@@ -528,7 +530,7 @@ class DatabasesController extends Controller
 
                 break;
             case 'standalone-mysql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'proxy_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
                 $validator = customApiValidator($request->all(), [
                     'mysql_root_password' => 'string',
                     'mysql_password' => 'string',
@@ -580,6 +582,8 @@ class DatabasesController extends Controller
             $whatToDoWithDatabaseProxy = 'start';
         }
 
+        $oldProxyTimeout = $database->proxy_timeout;
+
         // Only update database fields, not backup configuration
         $database->update($request->only($allowedFields));
 
@@ -587,6 +591,8 @@ class DatabasesController extends Controller
             StartDatabaseProxy::dispatch($database);
         } elseif ($whatToDoWithDatabaseProxy === 'stop') {
             StopDatabaseProxy::dispatch($database);
+        } elseif ($database->is_public && $request->has('proxy_timeout') && $oldProxyTimeout !== $database->proxy_timeout) {
+            StartDatabaseProxy::dispatch($database);
         }
 
         return response()->json([
@@ -1039,6 +1045,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1106,6 +1113,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1172,6 +1180,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1239,6 +1248,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1306,6 +1316,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1376,6 +1387,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1446,6 +1458,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1513,6 +1526,7 @@ class DatabasesController extends Controller
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'proxy_timeout' => ['type' => 'integer', 'description' => 'Proxy timeout in seconds. Set to 0 for no timeout (default).'],
                         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
                         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
                         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
@@ -1641,6 +1655,7 @@ class DatabasesController extends Controller
             'destination_uuid' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable',
+            'proxy_timeout' => 'integer|min:0|nullable',
             'limits_memory' => 'string',
             'limits_memory_swap' => 'string',
             'limits_memory_swappiness' => 'numeric',
