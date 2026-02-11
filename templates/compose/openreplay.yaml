@@ -1,0 +1,494 @@
+# documentation: https://docs.openreplay.com/
+# slogan: OpenReplay is an open-source session replay suite that lets you see what users do on your web app, helping you troubleshoot issues faster.
+# tags: analytics, session-replay, monitoring, debugging, user-experience
+# category: analytics
+# logo: svgs/openreplay.png
+# port: 80
+
+services:
+  postgresql:
+    image: ghcr.io/openreplay/postgres:16
+    volumes:
+      - openreplay-pgdata:/bitnami/postgresql
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    volumes:
+      - openreplay-clickhouse:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+
+  redis:
+    image: ghcr.io/openreplay/valkey:8
+    volumes:
+      - openreplay-redisdata:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+
+  minio:
+    image: ghcr.io/openreplay/minio:2024.12.13
+    volumes:
+      - openreplay-miniodata:/bitnami/minio/data
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+
+  alerts:
+    image: public.ecr.aws/p1t3u8a3/alerts:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  api:
+    image: public.ecr.aws/p1t3u8a3/api:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  http:
+    image: public.ecr.aws/p1t3u8a3/http:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  images:
+    image: public.ecr.aws/p1t3u8a3/images:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  integrations:
+    image: public.ecr.aws/p1t3u8a3/integrations:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  sink:
+    image: public.ecr.aws/p1t3u8a3/sink:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+      - clickhouse
+    restart: unless-stopped
+
+  sourcemapreader:
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  spot:
+    image: public.ecr.aws/p1t3u8a3/spot:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  storage:
+    image: public.ecr.aws/p1t3u8a3/storage:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  assets:
+    image: public.ecr.aws/p1t3u8a3/assets:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  assist:
+    image: public.ecr.aws/p1t3u8a3/assist:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  canvases:
+    image: public.ecr.aws/p1t3u8a3/canvases:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  chalice:
+    image: public.ecr.aws/p1t3u8a3/chalice:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  db:
+    image: public.ecr.aws/p1t3u8a3/db:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  ender:
+    image: public.ecr.aws/p1t3u8a3/ender:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+      - clickhouse
+    restart: unless-stopped
+
+  frontend:
+    image: public.ecr.aws/p1t3u8a3/frontend:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - SERVICE_URL_FRONTEND
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+      - api
+    restart: unless-stopped
+
+  heuristics:
+    image: public.ecr.aws/p1t3u8a3/heuristics:v1.22.3
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      - postgresql
+      - redis
+      - minio
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        content: |
+          upstream frontend {
+              server frontend:8080;
+          }
+          upstream api {
+              server api:8080;
+          }
+          upstream assets {
+              server assets:8080;
+          }
+          upstream http {
+              server http:8888;
+          }
+          upstream assist {
+              server assist:9001;
+          }
+          server {
+              listen 80;
+              server_name _;
+              client_max_body_size 500M;
+              location / {
+                  proxy_pass http://frontend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+              location /api/ {
+                  proxy_pass http://api/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+              location /assets/ {
+                  proxy_pass http://assets/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+              location /ingest/ {
+                  proxy_pass http://http/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+              location /ws-assist/ {
+                  proxy_pass http://assist/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+    depends_on:
+      - frontend
+      - api
+      - assets
+      - http
+      - assist
+    restart: unless-stopped
