@@ -1048,17 +1048,29 @@ $schema://$host {
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
+            if ($item->contains('=')) {
+                $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
+            }
         }
         $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
+        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID, $ID_LIKE) {
+            if ($ID && str($supportedOs)->contains($ID)) {
+                return true;
             }
+            if ($ID_LIKE) {
+                $likes = str($ID_LIKE)->explode(' ');
+                foreach ($likes as $like) {
+                    if (str($supportedOs)->contains(trim($like))) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         });
-        if ($supported->count() === 1) {
+
+        if ($supported->count() >= 1) {
             return str($supported->first());
         } else {
             return false;
