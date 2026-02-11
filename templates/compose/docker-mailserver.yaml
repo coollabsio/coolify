@@ -20,6 +20,9 @@ services:
       - mail-state:/var/mail-state
       - mail-logs:/var/log/mail
       - mail-config:/tmp/docker-mailserver
+      # Mount Traefik's ACME certificate store (read-only)
+      # DMS natively reads acme.json and auto-reloads on cert renewal
+      - /data/coolify/proxy/acme.json:/etc/letsencrypt/acme.json:ro
     environment:
       # Postmaster account — the initial admin mailbox created on first boot
       - POSTMASTER_ADDRESS=postmaster@${MAIL_DOMAIN:?}
@@ -33,10 +36,10 @@ services:
       - ONE_DIR=1
       - PERMIT_DOCKER=none
 
-      # TLS — use letsencrypt when paired with Coolify's proxy, or manual certs
-      - SSL_TYPE=${SSL_TYPE:-}
-      - SSL_CERT_PATH=${SSL_CERT_PATH:-}
-      - SSL_KEY_PATH=${SSL_KEY_PATH:-}
+      # TLS — pre-configured for Coolify's Traefik proxy
+      # DMS reads Traefik's acme.json and extracts the matching certificate
+      - SSL_TYPE=letsencrypt
+      - SSL_DOMAIN=${MAIL_HOSTNAME:?mail}.${MAIL_DOMAIN:?}
 
       # DKIM / SPF / DMARC
       - ENABLE_OPENDKIM=${ENABLE_OPENDKIM:-1}
@@ -69,7 +72,6 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
-    restart: unless-stopped
     entrypoint:
       - /bin/bash
       - -c
