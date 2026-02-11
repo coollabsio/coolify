@@ -522,10 +522,17 @@ install_docker_manually() {
         curl -fsSL https://download.docker.com/linux/$OS_TYPE/gpg -o /etc/apt/keyrings/docker.asc
         chmod a+r /etc/apt/keyrings/docker.asc
 
+# Check if the OS is Debian 13 (Trixie), if so, use bookworm for Docker repo until Trixie is officially supported by Docker
+if [ "$OS_TYPE" = "debian" ] && [ "$OS_VERSION" = "13" ]; then
+    DOCKER_CODENAME="bookworm"
+else
+    DOCKER_CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+fi
+
         # Add the repository to Apt sources
         echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
-                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+                  $DOCKER_CODENAME stable" |
             tee /etc/apt/sources.list.d/docker.list
         apt-get update
         apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
