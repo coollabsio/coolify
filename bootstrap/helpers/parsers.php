@@ -1317,15 +1317,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // Do NOT auto-inject .env as env_file. Per Docker Compose semantics, .env is for
+        // variable interpolation only (${VAR} substitution). Injecting it via env_file
+        // leaks all variables into every container as runtime env vars (#7655).
+        // Preserve any env_file entries the user explicitly defined in their compose file.
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->reject(fn ($f) => $f === '.env')
+                ->unique()
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -2416,15 +2421,20 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Do NOT auto-inject .env as env_file. Per Docker Compose semantics, .env is for
+        // variable interpolation only (${VAR} substitution). Injecting it via env_file
+        // leaks all variables into every container as runtime env vars (#7655).
+        // Preserve any env_file entries the user explicitly defined in their compose file.
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->reject(fn ($f) => $f === '.env')
+                ->unique()
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         $parsedServices->put($serviceName, $payload);
     }

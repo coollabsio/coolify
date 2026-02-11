@@ -637,14 +637,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
-            $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
-
-                return $service;
-            });
-            $composeFile['services'] = $services->toArray();
+            // Do NOT auto-inject env_file: ['.env'] into services.
+            // Per Docker Compose semantics, .env is used for variable interpolation only
+            // (i.e. ${VAR} substitution in the compose file). Runtime environment variables
+            // should be explicitly declared by the user via environment: or env_file: in
+            // their compose file. Auto-injecting .env as env_file causes all variables to
+            // leak into every container, which is a security issue (#7655).
             if (empty($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
