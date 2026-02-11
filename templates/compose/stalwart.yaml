@@ -1,0 +1,19 @@
+# documentation: https://stalw.art
+# slogan: A modern all-in-one mail server (SMTP, IMAP, JMAP) written in Rust.
+# category: Mail
+# tags: mail, email, smtp, imap, jmap, rust
+# port: 8080
+
+services:
+  stalwart:
+    image: stalwartlabs/stalwart:latest
+    container_name: stalwart-mail
+    environment:
+      - SERVICE_URL_STALWART_8080
+    volumes:
+      - stalwart-data:/opt/stalwart
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
