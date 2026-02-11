@@ -1043,26 +1043,41 @@ $schema://$host {
 
     public function validateOS(): bool|Stringable
     {
-        $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
-        $collectedData = collect([]);
+        $osRelease = instant_remote_process(['cat /etc/os-release'], $this);
+        $supportedOsType = $this->resolveSupportedOsType($osRelease);
+
+        return $supportedOsType ?? false;
+    }
+
+    private function resolveSupportedOsType(string $osRelease): ?Stringable
+    {
+        $releaseLines = collect(explode("\n", $osRelease));
+        $collectedData = collect();
+
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
+            if ($item->isEmpty() || ! $item->contains('=')) {
+                continue;
+            }
+
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
-            }
+
+        $id = data_get($collectedData, 'ID');
+        $idLike = data_get($collectedData, 'ID_LIKE');
+
+        $candidates = collect([$id])
+            ->merge(str($idLike ?? '')->explode(' '))
+            ->filter()
+            ->map(fn (string $value) => str($value)->lower()->value())
+            ->unique()
+            ->values();
+
+        $supported = collect(SUPPORTED_OS)->first(function (string $supportedOs) use ($candidates) {
+            return $candidates->contains(fn (string $candidate) => str($supportedOs)->contains($candidate));
         });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
-            return false;
-        }
+
+        return $supported ? str($supported) : null;
     }
 
     public function isTerminalEnabled()
