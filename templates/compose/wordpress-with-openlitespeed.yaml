@@ -1,0 +1,60 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: High-performance WordPress powered by OpenLiteSpeed, LSCache, and Redis.
+# category: cms
+# tags: cms, wordpress, litespeed, openlitespeed, php, mariadb, redis, performance, lscache
+# logo: svgs/wordpress.svg
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - wordpress-conf:/usr/local/lsws/conf
+      - wordpress-admin-conf:/usr/local/lsws/admin/conf
+    environment:
+      - TZ=${TIMEZONE:-UTC}
+      - SERVICE_URL_WORDPRESS
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - MYSQL_HOST=mariadb
+      - DOMAIN=$SERVICE_FQDN_WORDPRESS
+      - USERNAME=$SERVICE_USER_ADMIN
+      - PASSWORD=$SERVICE_PASSWORD_ADMIN
+      - EMAIL=$SERVICE_EMAIL_ADMIN
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3

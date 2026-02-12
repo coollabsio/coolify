@@ -5284,5 +5284,25 @@
         "logo": "svgs/marimo.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "wordpress-with-openlitespeed": {
+        "documentation": "https://docs.litespeedtech.com/cloud/docker/ols-wordpress/",
+        "slogan": "High-performance WordPress powered by OpenLiteSpeed, LSCache, and Redis.",
+        "compose": "IyBkb2N1bWVudGF0aW9uOiBodHRwczovL2RvY3MubGl0ZXNwZWVkdGVjaC5jb20vY2xvdWQvZG9ja2VyL29scy13b3JkcHJlc3MvCiMgc2xvZ2FuOiBIaWdoLXBlcmZvcm1hbmNlIFdvcmRQcmVzcyBwb3dlcmVkIGJ5IE9wZW5MaXRlU3BlZWQsIExTQ2FjaGUsIGFuZCBSZWRpcy4KIyBjYXRlZ29yeTogY21zCiMgdGFnczogY21zLCB3b3JkcHJlc3MsIGxpdGVzcGVlZCwgb3BlbmxpdGVzcGVlZCwgcGhwLCBtYXJpYWRiLCByZWRpcywgcGVyZm9ybWFuY2UsIGxzY2FjaGUKIyBsb2dvOiBzdmdzL3dvcmRwcmVzcy5zdmcKCnNlcnZpY2VzOgogIHdvcmRwcmVzczoKICAgIGltYWdlOiBsaXRlc3BlZWR0ZWNoL29wZW5saXRlc3BlZWQ6bGF0ZXN0CiAgICB2b2x1bWVzOgogICAgICAtIHdvcmRwcmVzcy1kYXRhOi92YXIvd3d3L3Zob3N0cy9sb2NhbGhvc3QvaHRtbAogICAgICAtIHdvcmRwcmVzcy1jb25mOi91c3IvbG9jYWwvbHN3cy9jb25mCiAgICAgIC0gd29yZHByZXNzLWFkbWluLWNvbmY6L3Vzci9sb2NhbC9sc3dzL2FkbWluL2NvbmYKICAgIGVudmlyb25tZW50OgogICAgICAtIFRaPSR7VElNRVpPTkU6LVVUQ30KICAgICAgLSBTRVJWSUNFX1VSTF9XT1JEUFJFU1MKICAgICAgLSBNWVNRTF9EQVRBQkFTRT13b3JkcHJlc3MKICAgICAgLSBNWVNRTF9VU0VSPSRTRVJWSUNFX1VTRVJfV09SRFBSRVNTCiAgICAgIC0gTVlTUUxfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTCiAgICAgIC0gTVlTUUxfSE9TVD1tYXJpYWRiCiAgICAgIC0gRE9NQUlOPSRTRVJWSUNFX0ZRRE5fV09SRFBSRVNTCiAgICAgIC0gVVNFUk5BTUU9JFNFUlZJQ0VfVVNFUl9BRE1JTgogICAgICAtIFBBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX0FETUlOCiAgICAgIC0gRU1BSUw9JFNFUlZJQ0VfRU1BSUxfQURNSU4KICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgcmVkaXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX3N0YXJ0ZWQKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3QiXQogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDMKCiAgbWFyaWFkYjoKICAgIGltYWdlOiBtYXJpYWRiOjExCiAgICB2b2x1bWVzOgogICAgICAtIG1hcmlhZGItZGF0YTovdmFyL2xpYi9teXNxbAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAgIC0gTVlTUUxfREFUQUJBU0U9d29yZHByZXNzCiAgICAgIC0gTVlTUUxfVVNFUj0kU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01EIiwgImhlYWx0aGNoZWNrLnNoIiwgIi0tY29ubmVjdCIsICItLWlubm9kYl9pbml0aWFsaXplZCJdCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKCiAgcmVkaXM6CiAgICBpbWFnZTogcmVkaXM6YWxwaW5lCiAgICBjb21tYW5kOiByZWRpcy1zZXJ2ZXIgLS1hcHBlbmRvbmx5IHllcwogICAgdm9sdW1lczoKICAgICAgLSByZWRpcy1kYXRhOi9kYXRhCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAicmVkaXMtY2xpIiwgInBpbmciXQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "cms",
+            "wordpress",
+            "litespeed",
+            "openlitespeed",
+            "php",
+            "mariadb",
+            "redis",
+            "performance",
+            "lscache"
+        ],
+        "category": "cms",
+        "logo": "svgs/wordpress.svg",
+        "minversion": "0.0.0",
+        "port": "80"
     }
 }
