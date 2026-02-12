@@ -9,6 +9,7 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\RegenerateSslCertJob;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -136,6 +138,20 @@ class Server extends BaseModel
         static::saved(function ($server) {
             if ($server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            }
+
+            // When the server is switched to a different SSH key, tear down the
+            // multiplexed connection so it re-authenticates with the new key.
+            // @see https://github.com/coollabsio/coolify/issues/7724
+            if ($server->wasChanged('private_key_id')) {
+                try {
+                    SshMultiplexingHelper::removeMuxFile($server);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to invalidate mux after SSH key change', [
+                        'server_uuid' => $server->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         });
         static::created(function ($server) {
