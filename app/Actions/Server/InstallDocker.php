@@ -80,6 +80,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -118,10 +120,13 @@ class InstallDocker
     {
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
+            'CODENAME="${VERSION_CODENAME:-}" && '.
+            'if [ -z "$CODENAME" ] || [ "$CODENAME" = "${VERSION_ID:-}" ]; then CODENAME=bookworm; fi && '.
+            'if [ "$ID" = "debian" ] && [ "$CODENAME" = "trixie" ]; then CODENAME=bookworm; fi && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
@@ -157,6 +162,14 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk update && '.
+            'apk add --no-cache docker docker-cli docker-cli-compose && '.
+            '(rc-update add docker boot >/dev/null 2>&1 || true) && '.
+            '(service docker start >/dev/null 2>&1 || rc-service docker start >/dev/null 2>&1 || true)';
     }
 
     private function getGenericDockerInstallCommand(): string

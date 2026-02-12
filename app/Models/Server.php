@@ -1044,25 +1044,63 @@ $schema://$host {
     public function validateOS(): bool|Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
+        $collectedData = self::parseOsRelease($os_release);
+
+        return self::detectSupportedOsType($collectedData);
+    }
+
+    public static function parseOsRelease(string $osRelease): \Illuminate\Support\Collection
+    {
+        $releaseLines = collect(explode("\n", $osRelease));
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
-        }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
+            if ($item->isEmpty() || ! $item->contains('=')) {
+                continue;
             }
+
+            $key = $item->before('=');
+            $value = $item->after('=');
+            $collectedData->put($key->value(), $value->lower()->replace('"', '')->value());
+        }
+
+        return $collectedData;
+    }
+
+    public static function detectSupportedOsType(\Illuminate\Support\Collection $osRelease): bool|Stringable
+    {
+        $id = str((string) data_get($osRelease, 'ID', ''))->trim()->value();
+        $idLike = str((string) data_get($osRelease, 'ID_LIKE', ''))->trim()->value();
+
+        $supported = collect(SUPPORTED_OS)->first(function ($supportedOs) use ($id, $idLike) {
+            $supportedIds = collect(explode(' ', $supportedOs))
+                ->filter()
+                ->map(fn ($value) => str($value)->lower()->value())
+                ->values();
+
+            if ($id !== '' && $supportedIds->contains($id)) {
+                return true;
+            }
+
+            if ($idLike !== '') {
+                $idLikeValues = collect(explode(' ', $idLike))
+                    ->filter()
+                    ->map(fn ($value) => str($value)->lower()->value())
+                    ->values();
+
+                if ($idLikeValues->intersect($supportedIds)->isNotEmpty()) {
+                    return true;
+                }
+            }
+
+            return false;
         });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
+
+        if (! $supported) {
             return false;
         }
+
+        return str($supported);
     }
 
     public function isTerminalEnabled()
