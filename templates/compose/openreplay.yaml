@@ -1,0 +1,204 @@
+# documentation: https://docs.openreplay.com
+# slogan: Open-source session replay suite, built for developers.
+# category: monitoring
+# tags: monitoring, session-replay, analytics
+# logo: svgs/openreplay.svg
+
+x-openreplay-env: &openreplay-env
+  JWT_SECRET: ${SERVICE_PASSWORD_JWT:-secret_jwt_string}
+  ASSIST_JWT_SECRET: ${SERVICE_PASSWORD_ASSIST_JWT:-secret_assist_jwt_string}
+  COMMON_PG_PASSWORD: $SERVICE_PASSWORD_POSTGRES
+  COMMON_S3_KEY: $SERVICE_USER_MINIO
+  COMMON_S3_SECRET: $SERVICE_PASSWORD_MINIO
+  COMMON_DOMAIN_NAME: $SERVICE_FQDN_OPENREPLAY
+  COMMON_PROTOCOL: http
+  POSTGRES_STRING: postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/postgres?sslmode=disable
+  CLICKHOUSE_STRING: clickhouse://default:$SERVICE_PASSWORD_CLICKHOUSE@clickhouse:9000/default
+  CLICKHOUSE_HTTP_STRING: http://clickhouse:8123/default
+  REDIS_STRING: redis://redis:6379
+  AWS_ACCESS_KEY_ID: $SERVICE_USER_MINIO
+  AWS_SECRET_ACCESS_KEY: $SERVICE_PASSWORD_MINIO
+  AWS_ENDPOINT: http://minio:9000
+  AWS_REGION: us-east-1
+  BUCKET_NAME: mobs
+  KAFKA_SERVERS: kafka:9092
+  KAFKA_USE_SSL: "false"
+
+services:
+  postgresql:
+    image: ghcr.io/openreplay/postgres:14
+    environment:
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - openreplay-pg-data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.3
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - openreplay-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: ghcr.io/openreplay/valkey:7.2
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - openreplay-redis-data:/bitnami/redis/data
+
+  minio:
+    image: ghcr.io/openreplay/minio:latest
+    environment:
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - openreplay-minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-openreplay:
+    image: public.ecr.aws/p1t3u8a3/api:latest
+    depends_on:
+      - postgresql
+      - clickhouse
+      - redis
+      - minio
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  http-openreplay:
+    image: public.ecr.aws/p1t3u8a3/http:latest
+    depends_on:
+      - redis
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  frontend-openreplay:
+    image: public.ecr.aws/p1t3u8a3/frontend:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  assets-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assets:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  assist-openreplay:
+    image: public.ecr.aws/p1t3u8a3/assist:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  chalice-openreplay:
+    image: public.ecr.aws/p1t3u8a3/chalice:latest
+    depends_on:
+      - postgresql
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  integrations-openreplay:
+    image: public.ecr.aws/p1t3u8a3/integrations:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  storage-openreplay:
+    image: public.ecr.aws/p1t3u8a3/storage:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  sink-openreplay:
+    image: public.ecr.aws/p1t3u8a3/sink:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  db-openreplay:
+    image: public.ecr.aws/p1t3u8a3/db:latest
+    environment:
+      <<: *openreplay-env
+    volumes:
+      - openreplay-shared-volume:/mnt/efs
+
+  nginx:
+    image: nginx:latest
+    depends_on:
+      - frontend-openreplay
+      - api-openreplay
+      - http-openreplay
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        content: |
+          # Extract sessionid from peerId
+          map $arg_peerId $sessionid {
+            default "";
+            "~.*-(\d+)(?:-.*|$)" $1;
+          }
+          map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+          }
+          server {
+              listen 80;
+              client_max_body_size 10m;
+              location ~ ^/(mobs|sessions-assets|frontend|static|sourcemaps|ios-images|uxtesting-records|records|spots)/ {
+                proxy_set_header Host $http_host;
+                proxy_pass http://minio:9000;
+              }
+              location /ingest/ {
+                rewrite ^/ingest/(.*) /$1 break;
+                proxy_pass http://http-openreplay:8080;
+              }
+              location /v2/api/ {
+                rewrite ^/v2/api/(.*) /$1 break;
+                proxy_pass http://api-openreplay:8080;
+              }
+              location /api/ {
+                rewrite ^/api/(.*) /$1 break;
+                proxy_pass http://chalice-openreplay:8000;
+              }
+              location /assist/ {
+                rewrite ^/assist/(.*) /$1 break;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_pass http://assist-openreplay:9001;
+              }
+              location / {
+                proxy_pass http://frontend-openreplay:8080;
+              }
+          }
+    environment:
+      - SERVICE_FQDN_OPENREPLAY
