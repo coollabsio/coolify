@@ -1,12 +1,16 @@
 <div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit" canGate="update" :canResource="$database">
-                Save
-            </x-forms.button>
-        </div>
-        <div class="flex gap-2">
+    <div class="form-page">
+    <form wire:submit="submit" class="flex flex-col gap-10">
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>General</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="submit" canGate="update" :canResource="$database">
+                        Save
+                    </x-forms.button>
+                </div>
+            </div>
+        <div class="flex gap-2 mt-4">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
             <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
@@ -34,8 +38,9 @@
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
             id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
+        </div>
+        <div class="form-subsection">
+            <h3>Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
@@ -54,11 +59,11 @@
                     readonly value="Starting the database will generate this." canGate="update" :canResource="$database" />
             @endif
         </div>
-        <div>
-            <div class="flex flex-col py-2 w-64">
+        <div class="form-subsection">
+            <h3>Proxy</h3>
+            <div class="flex flex-col w-64">
                 <div class="flex items-center gap-2 pb-2">
                     <div class="flex items-center">
-                        <h3>Proxy</h3>
                         <x-loading wire:loading wire:target="instantSave" />
                     </div>
                     @if ($isPublic)
@@ -80,10 +85,13 @@
                 canGate="update" :canResource="$database" />
         </div>
     </form>
-    <h3 class="pt-4">Advanced</h3>
-    <div class="w-64">
-        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-            instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update"
-            :canResource="$database" />
+    <div class="form-subsection">
+        <h3>Advanced</h3>
+        <div class="w-64">
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update"
+                :canResource="$database" />
+        </div>
+    </div>
     </div>
 </div>

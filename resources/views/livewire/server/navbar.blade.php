@@ -63,14 +63,14 @@
     <div class="navbar-main">
         <nav
             class="flex items-center gap-4 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
-            <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
+            <a class="nav-tab {{ request()->routeIs('server.show') ? 'nav-tab-active' : '' }}" href="{{ route('server.show', [
     'server_uuid' => data_get($server, 'uuid'),
 ]) }}" {{ wireNavigate() }}>
                 Configuration
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
-                        <a class="{{ request()->routeIs('server.proxy') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
+                        <a class="nav-tab {{ request()->routeIs('server.proxy') ? 'nav-tab-active' : '' }} flex items-center gap-1" href="{{ route('server.proxy', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
                             Proxy
@@ -82,20 +82,20 @@
                             @endif
                         </a>
             @endif
-            <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}" href="{{ route('server.resources', [
+            <a class="nav-tab {{ request()->routeIs('server.resources') ? 'nav-tab-active' : '' }}" href="{{ route('server.resources', [
     'server_uuid' => data_get($server, 'uuid'),
 ]) }}" {{ wireNavigate() }}>
                 Resources
             </a>
             @can('canAccessTerminal')
-                        <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}" href="{{ route('server.command', [
+                        <a class="nav-tab {{ request()->routeIs('server.command') ? 'nav-tab-active' : '' }}" href="{{ route('server.command', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
                             Terminal
                         </a>
             @endcan
             @can('update', $server)
-                        <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
+                        <a class="nav-tab {{ request()->routeIs('server.security.patches') ? 'nav-tab-active' : '' }}" href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
                             Security

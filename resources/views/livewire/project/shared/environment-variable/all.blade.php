@@ -1,20 +1,22 @@
-<div class="flex flex-col gap-4">
-    <div>
-        <div class="flex items-center gap-2">
+<div class="flex flex-col gap-10">
+    <div class="form-card max-w-none">
+        <div class="form-section-title">
             <h2>Environment Variables</h2>
-            @can('manageEnvironment', $resource)
-                <div class="flex flex-col items-center">
-                    <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
-                        <livewire:project.shared.environment-variable.add />
-                    </x-modal-input>
-                </div>
-                <x-forms.button
-                    wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
-            @endcan
+            <div class="flex items-center gap-2">
+                @can('manageEnvironment', $resource)
+                    <div class="flex flex-col items-center">
+                        <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
+                            <livewire:project.shared.environment-variable.add />
+                        </x-modal-input>
+                    </div>
+                    <x-forms.button
+                        wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+                @endcan
+            </div>
         </div>
-        <div>Environment variables (secrets) for this resource. </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Environment variables (secrets) for this resource.</p>
         @if ($resourceClass === 'App\Models\Application')
-            <div class="flex flex-col gap-2 pt-2">
+            <div class="flex flex-col gap-10 pt-2">
                 @if (data_get($resource, 'build_pack') !== 'dockercompose')
                     <div class="w-64">
                         @can('manageEnvironment', $resource)
@@ -56,28 +58,32 @@
         @endif
     </div>
     @if ($view === 'normal')
-        <div>
-            <h3>Production Environment Variables</h3>
-            <div>Environment (secrets) variables for Production.</div>
-        </div>
-        @forelse ($this->environmentVariables as $env)
-            <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
-                :env="$env" :type="$resource->type()" />
-        @empty
-            <div>No environment variables found.</div>
-        @endforelse
-        @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
+        <div class="form-subsection">
             <div>
-                <h3>Preview Deployments Environment Variables</h3>
-                <div>Environment (secrets) variables for Preview Deployments.</div>
+                <h3>Production Environment Variables</h3>
+                <div>Environment (secrets) variables for Production.</div>
             </div>
-            @foreach ($this->environmentVariablesPreview as $env)
+            @forelse ($this->environmentVariables as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
-            @endforeach
+            @empty
+                <div class="empty-state">No environment variables found.</div>
+            @endforelse
+        </div>
+        @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
+            <div class="form-subsection">
+                <div>
+                    <h3>Preview Deployments Environment Variables</h3>
+                    <div>Environment (secrets) variables for Preview Deployments.</div>
+                </div>
+                @foreach ($this->environmentVariablesPreview as $env)
+                    <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
+                        :env="$env" :type="$resource->type()" />
+                @endforeach
+            </div>
         @endif
     @else
-        <form wire:submit.prevent='submit' class="flex flex-col gap-2">
+        <form wire:submit.prevent='submit' class="flex flex-col gap-10">
             @can('manageEnvironment', $resource)
                 <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
                     label="Production Environment Variables"></x-forms.textarea>

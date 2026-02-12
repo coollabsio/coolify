@@ -1,20 +1,23 @@
 <form wire:submit='submit' class="flex flex-col">
-    <div class="flex items-center gap-2">
-        <h2>Healthchecks</h2>
-        <x-forms.button canGate="update" :canResource="$resource" type="submit">Save</x-forms.button>
-        @if (!$healthCheckEnabled)
-            <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
-                submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this resource.']"
-                warningMessage="If the health check fails, your application will become inaccessible. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
-                step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
-                isHighlightedButton>
-            </x-modal-confirmation>
-        @else
-            <x-forms.button canGate="update" :canResource="$resource" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
-        @endif
-    </div>
-    <div class="mt-1 pb-4">Define how your resource's health should be checked.</div>
-    <div class="flex flex-col gap-4">
+    <div class="form-card">
+        <div class="form-section-title">
+            <h2>Healthchecks</h2>
+            <div class="flex items-center gap-2">
+                <x-forms.button canGate="update" :canResource="$resource" type="submit">Save</x-forms.button>
+                @if (!$healthCheckEnabled)
+                    <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
+                        submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this resource.']"
+                        warningMessage="If the health check fails, your application will become inaccessible. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
+                        step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
+                        isHighlightedButton>
+                    </x-modal-confirmation>
+                @else
+                    <x-forms.button canGate="update" :canResource="$resource" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
+                @endif
+            </div>
+        </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Define how your resource's health should be checked.</p>
+        <div class="mt-4 flex flex-col gap-10">
         @if ($customHealthcheckFound)
             <x-callout type="warning" title="Caution">
                 <p>A custom health check has been detected. If you enable this health check, it will disable the custom one and use this instead.</p>
@@ -48,5 +51,6 @@
             <x-forms.input canGate="update" :canResource="$resource" min=1 type="number" id="healthCheckStartPeriod" placeholder="30"
                 label="Start Period (s)" required />
         </div>
+    </div>
     </div>
 </form>

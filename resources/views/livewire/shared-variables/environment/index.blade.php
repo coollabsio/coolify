@@ -2,11 +2,9 @@
     <x-slot:title>
         Environment Variables | Coolify
     </x-slot>
-    <div class="flex gap-2">
-        <h1>Environments</h1>
-    </div>
-    <div class="subtitle">List of your environments by projects.</div>
-    <div class="flex flex-col gap-2">
+    <h1>Environments</h1>
+    <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-4">List of your environments by projects.</p>
+    <div class="flex flex-col gap-10">
         @forelse ($projects as $project)
             <h2>Project: {{ data_get($project, 'name') }}</h2>
             <div class="pt-0 pb-3">{{ data_get($project, 'description') }}</div>
@@ -23,12 +21,10 @@
                     </div>
                 </a>
             @empty
-                <p class="pb-4">No environments found.</p>
+                <p class="empty-state">No environments found.</p>
             @endforelse
         @empty
-            <div>
-                <div>No project found.</div>
-            </div>
+            <div class="empty-state">No project found.</div>
         @endforelse
     </div>
 </div>

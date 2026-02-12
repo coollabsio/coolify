@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-10">
     @if (
         $resource->getMorphClass() == 'App\Models\Application' ||
             $resource->getMorphClass() == 'App\Models\StandalonePostgresql' ||
@@ -10,12 +10,14 @@
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMysql')
         <div>
-            <div class="flex items-center gap-2">
-                <h2>Storages</h2>
-                <x-helper
-                    helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
-                        volume
-                        name, example: <span class='text-helper'>-pr-1</span>" />
+            <div class="form-card max-w-none">
+                <div class="form-section-title">
+                    <h2>Storages</h2>
+                    <div class="flex items-center gap-2">
+                        <x-helper
+                            helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
+                                volume
+                                name, example: <span class='text-helper'>-pr-1</span>" />
                 @if ($resource?->build_pack !== 'dockercompose')
                     @can('update', $resource)
                         <div x-data="{
@@ -113,7 +115,7 @@
                                                     })
                                                 }
                                             })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                            <form class="flex flex-col w-full gap-8 rounded-sm"
                                                 wire:submit='submitPersistentVolume'>
                                                 <div class="flex flex-col">
                                                     <div>Docker Volumes mounted to the container.</div>
@@ -125,7 +127,7 @@
                                                         persistent
                                                         volumes.</div>
                                                 @endif
-                                                <div class="flex flex-col gap-2">
+                                                <div class="flex flex-col gap-8">
                                                     <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
                                                         id="name" label="Name" required helper="Volume name." />
                                                     @if ($isSwarm)
@@ -187,12 +189,12 @@
                                                     })
                                                 }
                                             })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                            <form class="flex flex-col w-full gap-8 rounded-sm"
                                                 wire:submit='submitFileStorage'>
                                                 <div class="flex flex-col">
                                                     <div>Actual file mounted from the host system to the container.</div>
                                                 </div>
-                                                <div class="flex flex-col gap-2">
+                                                <div class="flex flex-col gap-8">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx/nginx.conf" id="file_storage_path"
                                                         label="Destination Path" required
@@ -246,12 +248,12 @@
                                                     })
                                                 }
                                             })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                            <form class="flex flex-col w-full gap-8 rounded-sm"
                                                 wire:submit='submitFileStorageDirectory'>
                                                 <div class="flex flex-col">
                                                     <div>Directory mounted from the host system to the container.</div>
                                                 </div>
-                                                <div class="flex flex-col gap-2">
+                                                <div class="flex flex-col gap-8">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
                                                         id="file_storage_directory_source" label="Source Directory"
@@ -272,11 +274,13 @@
                         </div>
                     @endcan
                 @endif
+                    </div>
+                </div>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Persistent storage to preserve data between deployments.</p>
             </div>
-            <div>Persistent storage to preserve data between deployments.</div>
         </div>
         @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-            <div>No storage found.</div>
+            <div class="empty-state">No storage found.</div>
         @endif
         @php
             $hasVolumes = $this->volumeCount > 0;
@@ -317,7 +321,7 @@
                 {{-- Tab Content --}}
                 <div class="pt-4">
                     {{-- Volumes Tab --}}
-                    <div x-show="activeTab === 'volumes'" class="flex flex-col gap-4">
+                    <div x-show="activeTab === 'volumes'" class="flex flex-col gap-10">
                         @if ($hasVolumes)
                             <livewire:project.shared.storages.all :resource="$resource" />
                         @else
@@ -328,7 +332,7 @@
                     </div>
 
                     {{-- Files Tab --}}
-                    <div x-show="activeTab === 'files'" class="flex flex-col gap-4">
+                    <div x-show="activeTab === 'files'" class="flex flex-col gap-10">
                         @if ($hasFiles)
                             @foreach ($this->files as $fs)
                                 <livewire:project.service.file-storage :fileStorage="$fs"
@@ -342,7 +346,7 @@
                     </div>
 
                     {{-- Directories Tab --}}
-                    <div x-show="activeTab === 'directories'" class="flex flex-col gap-4">
+                    <div x-show="activeTab === 'directories'" class="flex flex-col gap-10">
                         @if ($hasDirectories)
                             @foreach ($this->directories as $fs)
                                 <livewire:project.service.file-storage :fileStorage="$fs"
@@ -358,14 +362,14 @@
             </div>
         @endif
     @else
-        <div class="flex flex-col gap-4 py-2">
+        <div class="flex flex-col gap-10 py-2">
             <div>
                 <div class="flex items-center gap-2">
                     <h2>{{ Str::headline($resource->name) }}</h2>
                 </div>
             </div>
             @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-                <div>No storage found.</div>
+                <div class="empty-state">No storage found.</div>
             @endif
 
             @php
@@ -407,7 +411,7 @@
                     {{-- Tab Content --}}
                     <div class="pt-4">
                         {{-- Volumes Tab --}}
-                        <div x-show="activeTab === 'volumes'" class="flex flex-col gap-4">
+                        <div x-show="activeTab === 'volumes'" class="flex flex-col gap-10">
                             @if ($hasVolumes)
                                 <livewire:project.shared.storages.all :resource="$resource" />
                             @else
@@ -418,7 +422,7 @@
                         </div>
 
                         {{-- Files Tab --}}
-                        <div x-show="activeTab === 'files'" class="flex flex-col gap-4">
+                        <div x-show="activeTab === 'files'" class="flex flex-col gap-10">
                             @if ($hasFiles)
                                 @foreach ($this->files as $fs)
                                     <livewire:project.service.file-storage :fileStorage="$fs"
@@ -432,7 +436,7 @@
                         </div>
 
                         {{-- Directories Tab --}}
-                        <div x-show="activeTab === 'directories'" class="flex flex-col gap-4">
+                        <div x-show="activeTab === 'directories'" class="flex flex-col gap-10">
                             @if ($hasDirectories)
                                 @foreach ($this->directories as $fs)
                                     <livewire:project.service.file-storage :fileStorage="$fs"

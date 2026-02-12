@@ -7,13 +7,15 @@
         <x-server.sidebar :server="$server" activeMenu="log-drains" />
         <div class="w-full">
             @if ($server->isFunctional())
-                <div class="flex gap-2 items-center">
-                    <h2>Log Drains</h2>
-                    <x-loading wire:target="instantSave" wire:loading.delay />
-                </div>
-                <div>Sends service logs to 3rd party tools.</div>
-                <div class="flex flex-col gap-4 pt-4">
-                    <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
+                <div class="flex flex-col gap-10">
+                    <div class="form-card">
+                        <div class="form-section-title">
+                            <h2>Log Drains</h2>
+                            <x-loading wire:target="instantSave" wire:loading.delay />
+                        </div>
+                        <div>Sends service logs to 3rd party tools.</div>
+                    </div>
+                    <div class="form-subsection">
                         <form wire:submit='submit("newrelic")' class="flex flex-col">
                             <h3>New Relic</h3>
                             <div class="w-32">
@@ -24,8 +26,8 @@
                                         id="isLogDrainNewRelicEnabled" label="Enabled" />
                                 @endif
                             </div>
-                            <div class="flex flex-col gap-4">
-                                <div class="flex flex-col w-full gap-2 xl:flex-row">
+                            <div class="flex flex-col gap-10">
+                                <div class="flex flex-col w-full gap-8 xl:flex-row">
                                     @if ($server->isLogDrainEnabled())
                                         <x-forms.input disabled type="password" required id="logDrainNewRelicLicenseKey"
                                             label="License Key" />
@@ -50,7 +52,9 @@
                                 </x-forms.button>
                             </div>
                         </form>
+                    </div>
 
+                    <div class="form-subsection">
                         <h3>Axiom</h3>
                         <div class="w-32">
                             @if ($isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled)
@@ -61,8 +65,8 @@
                             @endif
                         </div>
                         <form wire:submit='submit("axiom")' class="flex flex-col">
-                            <div class="flex flex-col gap-4">
-                                <div class="flex flex-col w-full gap-2 xl:flex-row">
+                            <div class="flex flex-col gap-10">
+                                <div class="flex flex-col w-full gap-8 xl:flex-row">
                                     @if ($server->isLogDrainEnabled())
                                         <x-forms.input disabled type="password" required id="logDrainAxiomApiKey"
                                             label="API Key" />
@@ -82,6 +86,9 @@
                                 </x-forms.button>
                             </div>
                         </form>
+                    </div>
+
+                    <div class="form-subsection">
                         <h3>Custom FluentBit</h3>
                         <div class="w-32">
                             @if ($isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled)
@@ -92,7 +99,7 @@
                             @endif
                         </div>
                         <form wire:submit='submit("custom")' class="flex flex-col">
-                            <div class="flex flex-col gap-4">
+                            <div class="flex flex-col gap-10">
                                 @if ($server->isLogDrainEnabled())
                                     <x-forms.textarea disabled rows="6" required id="logDrainCustomConfig"
                                         label="Custom FluentBit Configuration" />
@@ -112,11 +119,10 @@
                                 </x-forms.button>
                             </div>
                         </form>
-
                     </div>
                 </div>
             @else
-                <div>Server is not validated. Validate first.</div>
+                <div class="warning-zone">Server is not validated. Validate first.</div>
             @endif
         </div>
     </div>

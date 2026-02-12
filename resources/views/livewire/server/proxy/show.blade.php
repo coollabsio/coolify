@@ -11,6 +11,6 @@
             </div>
         </div>
     @else
-        <div>Server is not validated. Validate first.</div>
+        <div class="warning-zone">Server is not validated. Validate first.</div>
     @endif
 </div>

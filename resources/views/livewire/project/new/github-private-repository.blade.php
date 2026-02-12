@@ -1,21 +1,23 @@
 <div>
-    <div class="flex items-end gap-2">
+    <div class="form-section-title">
         <h1>Create a new Application</h1>
-        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
-            <livewire:source.github.create />
-        </x-modal-input>
-        @if ($repositories->count() > 0)
-            <a target="_blank" class="flex hover:no-underline" href="{{ getInstallationPath($github_app) }}">
-                <x-forms.button>
-                    Change Repositories on GitHub
-                    <x-external-link />
-                </x-forms.button>
-            </a>
-        @endif
+        <div class="flex items-center gap-2">
+            <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
+                <livewire:source.github.create />
+            </x-modal-input>
+            @if ($repositories->count() > 0)
+                <a target="_blank" class="flex hover:no-underline" href="{{ getInstallationPath($github_app) }}">
+                    <x-forms.button>
+                        Change Repositories on GitHub
+                        <x-external-link />
+                    </x-forms.button>
+                </a>
+            @endif
+        </div>
     </div>
     <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
     @if ($github_apps->count() !== 0)
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-10">
             @if ($current_step === 'github_apps')
                 <h2 class="pt-4 pb-4">Select a Github App</h2>
                 <div class="flex flex-col justify-center gap-2 text-left">
@@ -43,7 +45,7 @@
             @endif
             @if ($current_step === 'repository')
                 @if ($repositories->count() > 0)
-                    <div class="flex flex-col gap-2 pb-6">
+                    <div class="flex flex-col gap-10 pb-6">
                         <div class="flex gap-2">
                             <x-forms.datalist class="w-full" label="Repository" placeholder="Search repositories..." wire:model.live="selected_repository_id">
                                 @foreach ($repositories as $repo)
@@ -54,13 +56,13 @@
                         <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
                     </div>
                 @else
-                    <div>No repositories found. Check your GitHub App configuration.</div>
+                    <div class="empty-state">No repositories found. Check your GitHub App configuration.</div>
                 @endif
                 @if ($branches->count() > 0)
                     <h2 class="text-lg font-bold">Configuration</h2>
-                    <div class="flex flex-col gap-2 pb-6">
+                    <div class="flex flex-col gap-10 pb-6">
                         <form class="flex flex-col" wire:submit='submit'>
-                            <div class="flex flex-col gap-2 pb-6">
+                            <div class="flex flex-col gap-10 pb-6">
                                 <div class="flex gap-2">
                                     <x-forms.select id="selected_branch_name" label="Branch">
                                         <option value="default" disabled selected>Select a branch</option>

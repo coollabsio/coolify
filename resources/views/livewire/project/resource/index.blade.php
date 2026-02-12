@@ -3,31 +3,33 @@
         {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
     <div class="flex flex-col">
-        <div class="flex min-w-0 flex-nowrap items-center gap-1">
+        <div class="form-section-title">
             <h1>Resources</h1>
-            @if ($environment->isEmpty())
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
+            <div class="flex items-center gap-2">
+                @if ($environment->isEmpty())
+                    @can('createAnyResource')
+                        <a class="button" {{ wireNavigate() }}
+                            href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                            Clone
+                        </a>
+                    @endcan
+                @else
+                    @can('createAnyResource')
+                        <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
+                            {{ wireNavigate() }} class="button">+
+                            New</a>
+                    @endcan
+                    @can('createAnyResource')
+                        <a class="button" {{ wireNavigate() }}
+                            href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                            Clone
+                        </a>
+                    @endcan
+                @endif
+                @can('delete', $environment)
+                    <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
                 @endcan
-            @else
-                @can('createAnyResource')
-                    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                        {{ wireNavigate() }} class="button">+
-                        New</a>
-                @endcan
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
-                @endcan
-            @endif
-            @can('delete', $environment)
-                <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
-            @endcan
+            </div>
         </div>
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
@@ -470,18 +472,15 @@
             <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
             <template
                 x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
-                <div class="flex flex-col items-center justify-center p-8 text-center">
-                    <div x-show="search.length > 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resource found with the search term "<span
-                                class="font-semibold" x-text="search"></span>".</p>
-                        <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Try adjusting your search
-                            criteria.</p>
+                <div>
+                    <div class="empty-state" x-show="search.length > 0">
+                        No resource found with the search term "<span
+                            class="font-semibold" x-text="search"></span>". Try adjusting your search criteria.
                     </div>
-                    <div x-show="search.length === 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resources found in this environment.</p>
+                    <div class="empty-state" x-show="search.length === 0">
+                        No resources found in this environment.
                         @cannot('createAnyResource')
-                            <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Contact your team administrator
-                                to add resources.</p>
+                            Contact your team administrator to add resources.
                         @endcannot
                     </div>
                 </div>
@@ -494,7 +493,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
+                        <a class="min-h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -520,8 +519,8 @@
                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
                                         x-text="item.destination?.server?.name || 'Unknown'"></span></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 pt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-error/10 text-error border border-error/20">Server is unreachable or misconfigured</span>
                                     </div>
                                 </template>
                             </div>
@@ -546,7 +545,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
+                        <a class="min-h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -572,8 +571,8 @@
                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
                                         x-text="item.destination?.server?.name || 'Unknown'"></span></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 pt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-error/10 text-error border border-error/20">Server is unreachable or misconfigured</span>
                                     </div>
                                 </template>
                             </div>
@@ -598,7 +597,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
+                        <a class="min-h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -624,8 +623,8 @@
                                 <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
                                         x-text="item.destination?.server?.name || 'Unknown'"></span></div>
                                 <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
+                                    <div class="px-4 pt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-error/10 text-error border border-error/20">Server is unreachable or misconfigured</span>
                                     </div>
                                 </template>
                             </div>

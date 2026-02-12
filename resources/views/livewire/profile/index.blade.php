@@ -4,78 +4,90 @@
     </x-slot>
     <h1>Profile</h1>
     <div class="subtitle -mt-2">Your user profile settings.</div>
+    <div class="flex flex-col gap-6">
     <form wire:submit='submit' class="flex flex-col">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit" label="Save">Save</x-forms.button>
-        </div>
-        <div class="flex flex-col gap-2 lg:flex-row items-end">
-            <x-forms.input id="name" label="Name" required />
-            <x-forms.input id="email" label="Email" readonly />
-            @if (!$show_email_change && !$show_verification)
-                <x-forms.button wire:click="showEmailChangeForm" type="button">Change Email</x-forms.button>
-            @else
-                <x-forms.button wire:click="showEmailChangeForm" type="button" disabled>Change Email</x-forms.button>
-            @endif
-        </div>
-    </form>
-
-    <div class="flex flex-col pt-4">
-        @if ($show_email_change)
-            <form wire:submit='requestEmailChange'>
-                <div class="flex gap-2 items-end">
-                    <x-forms.input id="new_email" label="New Email Address" required type="email" />
-                    <x-forms.button type="submit">Send Verification Code</x-forms.button>
-                    <x-forms.button wire:click="$set('show_email_change', false)" type="button"
-                        isError>Cancel</x-forms.button>
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>General</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="submit" label="Save">Save</x-forms.button>
                 </div>
-                <div class="text-xs font-bold dark:text-warning pt-2">A verification code will be sent to your
-                    new email
-                    address.</div>
-            </form>
-        @endif
+            </div>
+            <div class="mt-4 flex flex-col gap-10 lg:flex-row items-end">
+                <x-forms.input id="name" label="Name" required />
+                <x-forms.input id="email" label="Email" readonly />
+                @if (!$show_email_change && !$show_verification)
+                    <x-forms.button wire:click="showEmailChangeForm" type="button">Change Email</x-forms.button>
+                @else
+                    <x-forms.button wire:click="showEmailChangeForm" type="button" disabled>Change Email</x-forms.button>
+                @endif
+            </div>
 
-        @if ($show_verification)
-            <form wire:submit='verifyEmailChange'>
-                <div class="flex gap-2 items-end">
-                    <x-forms.input id="email_verification_code" label="Verification Code (6 digits)" required
-                        maxlength="6" />
-                    <x-forms.button type="submit">Verify & Update Email</x-forms.button>
-                    <x-forms.button wire:click="resendVerificationCode" type="button" isWarning>Resend
-                        Code</x-forms.button>
-                    <x-forms.button wire:click="cancelEmailChange" type="button" isError>Cancel</x-forms.button>
-                </div>
-                <div class="text-xs font-bold dark:text-warning pt-2">
-                    Verification code sent to {{ $new_email ?? auth()->user()->pending_email }}.
-                    The code is valid for {{ config('constants.email_change.verification_code_expiry_minutes', 10) }}
-                    minutes.
-                </div>
+            <div class="flex flex-col pt-4">
+                @if ($show_email_change)
+                    <form wire:submit='requestEmailChange'>
+                        <div class="flex gap-2 items-end">
+                            <x-forms.input id="new_email" label="New Email Address" required type="email" />
+                            <x-forms.button type="submit">Send Verification Code</x-forms.button>
+                            <x-forms.button wire:click="$set('show_email_change', false)" type="button"
+                                isError>Cancel</x-forms.button>
+                        </div>
+                        <div class="text-xs font-bold dark:text-warning pt-2">A verification code will be sent to your
+                            new email
+                            address.</div>
+                    </form>
+                @endif
+
+                @if ($show_verification)
+                    <form wire:submit='verifyEmailChange'>
+                        <div class="flex gap-2 items-end">
+                            <x-forms.input id="email_verification_code" label="Verification Code (6 digits)" required
+                                maxlength="6" />
+                            <x-forms.button type="submit">Verify & Update Email</x-forms.button>
+                            <x-forms.button wire:click="resendVerificationCode" type="button" isWarning>Resend
+                                Code</x-forms.button>
+                            <x-forms.button wire:click="cancelEmailChange" type="button" isError>Cancel</x-forms.button>
+                        </div>
+                        <div class="text-xs font-bold dark:text-warning pt-2">
+                            Verification code sent to {{ $new_email ?? auth()->user()->pending_email }}.
+                            The code is valid for {{ config('constants.email_change.verification_code_expiry_minutes', 10) }}
+                            minutes.
+                        </div>
 
 
-            </form>
-        @endif
-    </div>
-    <form wire:submit='resetPassword' class="flex flex-col pt-4">
-        <div class="flex items-center gap-2 pb-2">
-            <h2>Change Password</h2>
-            <x-forms.button type="submit" label="Save">Save</x-forms.button>
-        </div>
-        <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
-        <div class="flex flex-col gap-2">
-            <x-forms.input id="current_password" label="Current Password" required type="password" />
-            <div class="flex gap-2">
-                <x-forms.input id="new_password" label="New Password" required type="password" />
-                <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+                    </form>
+                @endif
             </div>
         </div>
     </form>
-    <h2 class="py-4">Two-factor Authentication</h2>
+    <form wire:submit='resetPassword' class="flex flex-col">
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>Change Password</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="submit" label="Save">Save</x-forms.button>
+                </div>
+            </div>
+            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Resetting the password will logout all sessions.</p>
+            <div class="mt-4 flex flex-col gap-10">
+                <x-forms.input id="current_password" label="Current Password" required type="password" />
+                <div class="flex gap-2">
+                    <x-forms.input id="new_password" label="New Password" required type="password" />
+                    <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+                </div>
+            </div>
+        </div>
+    </form>
+    <div class="form-card">
+        <div class="form-section-title">
+            <h2>Two-factor Authentication</h2>
+        </div>
     @if (session('status') == 'two-factor-authentication-enabled')
-        <div class="mb-4 font-medium">
+        <div class="mt-4 mb-4 font-medium">
             Please finish configuring two factor authentication below. Read the QR code or enter the secret key
             manually.
         </div>
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-10">
             <form action="/user/confirmed-two-factor-authentication" method="POST" class="flex items-end gap-2">
                 @csrf
                 <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
@@ -90,7 +102,7 @@
                 <div x-data="{
                     showCode: false,
                 }" class="py-4 w-full">
-                    <div class="flex flex-col gap-2 pb-2" x-show="showCode">
+                    <div class="flex flex-col gap-10 pb-2" x-show="showCode">
                         <x-forms.copy-button text="{{ decrypt(request()->user()->two_factor_secret) }}" />
                         <x-forms.copy-button text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
                     </div>
@@ -101,7 +113,7 @@
             </div>
         </div>
     @elseif(session('status') == 'two-factor-authentication-confirmed')
-        <div class="mb-4 ">
+        <div class="mt-4 mb-4 ">
             Two factor authentication confirmed and enabled successfully.
         </div>
         <div>
@@ -116,7 +128,7 @@
         </div>
     @else
         @if (request()->user()->two_factor_confirmed_at)
-            <div class="pb-4 "> Two factor authentication is <span class="text-helper">enabled</span>.</div>
+            <div class="mt-4 pb-4 "> Two factor authentication is <span class="text-helper">enabled</span>.</div>
             <div class="flex gap-2">
                 <form action="/user/two-factor-authentication" method="POST">
                     @csrf
@@ -142,7 +154,7 @@
                 </div>
             @endif
         @else
-            <form action="/user/two-factor-authentication" method="POST">
+            <form class="mt-4" action="/user/two-factor-authentication" method="POST">
                 @csrf
                 <x-forms.button type="submit">Configure</x-forms.button>
             </form>
@@ -153,4 +165,6 @@
             Something went wrong. Please try again.
         </div>
     @endif
+    </div>
+    </div>
 </div>

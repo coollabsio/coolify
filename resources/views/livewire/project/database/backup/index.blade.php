@@ -6,13 +6,15 @@
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
     <div>
-        <div class="flex gap-2">
-            <h2 class="pb-4">Scheduled Backups</h2>
-            @can('update', $database)
-                <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                    <livewire:project.database.create-scheduled-backup :database="$database" />
-                </x-modal-input>
-            @endcan
+        <div class="form-section-title mb-6">
+            <h2>Scheduled Backups</h2>
+            <div class="flex items-center gap-2">
+                @can('update', $database)
+                    <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                        <livewire:project.database.create-scheduled-backup :database="$database" />
+                    </x-modal-input>
+                @endcan
+            </div>
         </div>
         <livewire:project.database.scheduled-backups :database="$database" />
     </div>

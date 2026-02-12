@@ -3,19 +3,19 @@
     <div class="subtitle">Instance wide settings for Coolify.</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-6 min-h-10 whitespace-nowrap">
-            <a class="{{ request()->routeIs('settings.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('settings.index') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.index') }}">
                 Configuration
             </a>
-            <a class="{{ request()->routeIs('settings.backup') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('settings.backup') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.backup') }}">
                 Backup
             </a>
-            <a class="{{ request()->routeIs('settings.email') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('settings.email') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.email') }}">
                 Transactional Email
             </a>
-            <a class="{{ request()->routeIs('settings.oauth') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('settings.oauth') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('settings.oauth') }}">
                 OAuth
             </a>

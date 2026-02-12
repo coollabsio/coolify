@@ -7,19 +7,21 @@
         <x-server.sidebar :server="$server" activeMenu="cloud-provider-token" />
         <div class="w-full">
             @if ($server->hetzner_server_id)
-                <div class="flex items-end gap-2">
+                <div class="form-section-title">
                     <h2>Hetzner Token</h2>
-                    @can('create', App\Models\CloudProviderToken::class)
-                        <x-modal-input buttonTitle="+ Add" title="Add Hetzner Token">
-                            <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
-                        </x-modal-input>
-                    @endcan
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted
-                        wire:click.prevent='validateToken'>
-                        Validate token
-                    </x-forms.button>
+                    <div class="flex items-center gap-2">
+                        @can('create', App\Models\CloudProviderToken::class)
+                            <x-modal-input buttonTitle="+ Add" title="Add Hetzner Token">
+                                <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
+                            </x-modal-input>
+                        @endcan
+                        <x-forms.button canGate="update" :canResource="$server" isHighlighted
+                            wire:click.prevent='validateToken'>
+                            Validate token
+                        </x-forms.button>
+                    </div>
                 </div>
-                <div class="pb-4">Change your server's Hetzner token.</div>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400 pb-4">Change your server's Hetzner token.</p>
                 <div class="grid xl:grid-cols-2 grid-cols-1 gap-2">
                     @forelse ($cloudProviderTokens as $token)
                         <div
@@ -42,7 +44,7 @@
                             @endif
                         </div>
                     @empty
-                        <div>No Hetzner tokens found. </div>
+                        <div class="empty-state">No Hetzner tokens found.</div>
                     @endforelse
                 </div>
             @else

@@ -3,31 +3,33 @@
         Notifications | Coolify
     </x-slot>
     <x-notification.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-4 pb-4">
-        <div class="flex items-center gap-2">
+    <form wire:submit='submit' class="flex flex-col gap-10 pb-4">
+        <div class="form-section-title">
             <h2>Email</h2>
-            <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                Save
-            </x-forms.button>
-            @if (auth()->user()->isAdminFromSession())
-                @can('sendTest', $settings)
-                    @if ($team->isNotificationEnabled('email'))
-                        <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
-                            <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                                <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com"
-                                    id="testEmailAddress" label="Recipient" required />
-                                <x-forms.button type="submit" @click="modalOpen=false">
-                                    Send Email
-                                </x-forms.button>
-                            </form>
-                        </x-modal-input>
-                    @else
-                        <x-forms.button disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                            Send Test Email
-                        </x-forms.button>
-                    @endif
-                @endcan
-            @endif
+            <div class="flex items-center gap-2">
+                <x-forms.button canGate="update" :canResource="$settings" type="submit">
+                    Save
+                </x-forms.button>
+                @if (auth()->user()->isAdminFromSession())
+                    @can('sendTest', $settings)
+                        @if ($team->isNotificationEnabled('email'))
+                            <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
+                                <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-8">
+                                    <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com"
+                                        id="testEmailAddress" label="Recipient" required />
+                                    <x-forms.button type="submit" @click="modalOpen=false">
+                                        Send Email
+                                    </x-forms.button>
+                                </form>
+                            </x-modal-input>
+                        @else
+                            <x-forms.button disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
+                                Send Test Email
+                            </x-forms.button>
+                        @endif
+                    @endcan
+                @endif
+            </div>
         </div>
         @if (!isCloud())
             <div class="w-96">
@@ -55,9 +57,9 @@
         </div>
     @endif
     @if (!$useInstanceEmailSettings)
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-10">
             <form wire:submit='submitSmtp'
-                class="p-4 border dark:border-coolgray-300 border-neutral-200 rounded-lg flex flex-col gap-2">
+                class="form-subsection">
                 <div class="flex items-center gap-2">
                     <h3>SMTP Server</h3>
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
@@ -69,8 +71,8 @@
                         label="Enabled" />
                 </div>
                 <div class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
+                    <div class="flex flex-col gap-10">
+                        <div class="flex flex-col w-full gap-8 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
                             <x-forms.input canGate="update" :canResource="$settings" required id="smtpPort" placeholder="587" label="Port" />
                             <x-forms.select canGate="update" :canResource="$settings" required id="smtpEncryption" label="Encryption">
@@ -79,7 +81,7 @@
                                 <option value="none">None</option>
                             </x-forms.select>
                         </div>
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
+                        <div class="flex flex-col w-full gap-8 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpUsername" label="SMTP Username" />
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpPassword" type="password" label="SMTP Password" />
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" helper="Timeout value for sending emails."
@@ -89,7 +91,7 @@
                 </div>
             </form>
             <form wire:submit='submitResend'
-                class="p-4 border dark:border-coolgray-300 border-neutral-200 rounded-lg flex flex-col gap-2">
+                class="form-subsection">
                 <div class="flex items-center gap-2">
                     <h3>Resend</h3>
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
@@ -101,8 +103,8 @@
                         label="Enabled" />
                 </div>
                 <div class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
+                    <div class="flex flex-col gap-10">
+                        <div class="flex flex-col w-full gap-8 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" required type="password" id="resendApiKey" placeholder="API key"
                                 label="API Key" />
                         </div>
@@ -115,8 +117,8 @@
     <p class="mb-4">
         Select events for which you would like to receive email notifications.
     </p>
-    <div class="flex flex-col gap-4 max-w-2xl">
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
+    <div class="flex flex-col gap-10 max-w-2xl">
+        <div class="form-subsection">
             <h3 class="font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessEmailNotifications"
@@ -128,7 +130,7 @@
                     id="statusChangeEmailNotifications" label="Container Status Changes" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
+        <div class="form-subsection">
             <h3 class="font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupSuccessEmailNotifications"
@@ -137,7 +139,7 @@
                     label="Backup Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
+        <div class="form-subsection">
             <h3 class="font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskSuccessEmailNotifications"
@@ -146,7 +148,7 @@
                     label="Scheduled Task Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
+        <div class="form-subsection">
             <h3 class="font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupSuccessEmailNotifications"

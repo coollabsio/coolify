@@ -18,7 +18,7 @@
     @if ($type === 'application' || $type === 'database' || $type === 'service')
         <h2 class="pb-4">Terminal</h2>
         @if (count($containers) === 0)
-            <div>No containers are running or terminal access is disabled on this server.</div>
+            <div class="empty-state">No containers are running or terminal access is disabled on this server.</div>
         @else
             <form class="w-96 min-w-fit flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')"
                 x-data="{ autoConnected: false }" x-init="if ({{ count($containers) }} === 1 && !autoConnected) {
@@ -59,7 +59,7 @@
                 <livewire:project.shared.terminal />
             </div>
         @else
-            <div>Server is not functional or terminal access is disabled.</div>
+            <div class="empty-state">Server is not functional or terminal access is disabled.</div>
         @endif
     @endif
 </div>

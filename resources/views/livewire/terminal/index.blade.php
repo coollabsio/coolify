@@ -2,12 +2,14 @@
     <x-slot:title>
         Terminal | Coolify
         </x-slot>
-        <h1>Terminal</h1>
-        <div class="flex gap-2 items-end subtitle">
-            <div>Execute commands on your servers and containers without leaving the browser.</div>
-            <x-helper
-                helper="If you're having trouble connecting to your server, make sure that the port is open.<br><br><a class='underline' href='https://coolify.io/docs/knowledge-base/server/firewall/#terminal' target='_blank'>Documentation</a>"></x-helper>
+        <div class="form-section-title mb-6">
+            <div class="flex items-center gap-2">
+                <h1>Terminal</h1>
+                <x-helper
+                    helper="If you're having trouble connecting to your server, make sure that the port is open.<br><br><a class='underline' href='https://coolify.io/docs/knowledge-base/server/firewall/#terminal' target='_blank'>Documentation</a>"></x-helper>
+            </div>
         </div>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 -mt-4 mb-4">Execute commands on your servers and containers without leaving the browser.</p>
         <div x-init="$wire.loadContainers()">
             @if ($isLoadingContainers)
                 <div class="pt-1">
@@ -15,7 +17,7 @@
                 </div>
             @else
                 @if ($servers->count() > 0)
-                    <form class="flex flex-col gap-2 justify-center xl:items-end xl:flex-row"
+                    <form class="flex flex-col gap-10 justify-center xl:items-end xl:flex-row"
                         wire:submit="$dispatchSelf('connectToContainer')">
                         <x-forms.select id="selected_uuid" required wire:model.live="selected_uuid">
                             <option value="default">Select a server or container</option>
@@ -33,7 +35,7 @@
                         <x-forms.button type="submit">Connect</x-forms.button>
                     </form>
                 @else
-                    <div>No servers with terminal access found.</div>
+                    <div class="empty-state">No servers with terminal access found.</div>
                 @endif
             @endif
             <livewire:project.shared.terminal />

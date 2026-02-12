@@ -2,15 +2,15 @@
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-4 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('project.application.configuration') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
-            <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('project.application.deployment.index') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('project.application.deployment.index', $parameters) }}">
                 Deployments
             </a>
-            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
+            <a class="nav-tab {{ request()->routeIs('project.application.logs') ? 'nav-tab-active' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
                 <div class="flex items-center gap-1">
                     Logs
@@ -23,7 +23,7 @@
             </a>
             @if (!$application->destination->server->isSwarm())
                 @can('canAccessTerminal')
-                    <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
+                    <a class="nav-tab {{ request()->routeIs('project.application.command') ? 'nav-tab-active' : '' }}"
                         href="{{ route('project.application.command', $parameters) }}">
                         Terminal
                     </a>

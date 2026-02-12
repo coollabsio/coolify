@@ -1,4 +1,4 @@
-<form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
+<form class="flex flex-col w-full gap-8 rounded-sm" wire:submit='submit'>
     <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
     @if ($is_multiline)
         <x-forms.textarea id="value" label="Value" required />

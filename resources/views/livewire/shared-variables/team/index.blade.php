@@ -2,14 +2,16 @@
     <x-slot:title>
         Team Variables | Coolify
     </x-slot>
-    <div class="flex gap-2 items-center">
+    <div class="form-section-title mb-6">
         <h1>Team Shared Variables</h1>
-        @can('create', App\Models\SharedEnvironmentVariable::class)
-            <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
-                <livewire:project.shared.environment-variable.add :shared="true" />
-            </x-modal-input>
-        @endcan
-        <x-forms.button canGate="update" :canResource="$team" wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+        <div class="flex items-center gap-2">
+            @can('create', App\Models\SharedEnvironmentVariable::class)
+                <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
+                    <livewire:project.shared.environment-variable.add :shared="true" />
+                </x-modal-input>
+            @endcan
+            <x-forms.button canGate="update" :canResource="$team" wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
+        </div>
     </div>
     <div class="flex items-center gap-1 subtitle">You can use these variables anywhere with <span
             class="dark:text-warning text-coollabs">@{{ team.VARIABLENAME }}</span> <x-helper
@@ -17,16 +19,16 @@
     </div>
 
     @if ($view === 'normal')
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-10">
             @forelse ($team->environment_variables->sort()->sortBy('key') as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" type="team" />
             @empty
-                <div>No environment variables found.</div>
+                <div class="empty-state">No environment variables found.</div>
             @endforelse
         </div>
     @else
-        <form wire:submit='submit' class="flex flex-col gap-2">
+        <form wire:submit='submit' class="flex flex-col gap-10">
             <x-forms.textarea canGate="update" :canResource="$team" rows="20" class="whitespace-pre-wrap" id="variables" wire:model="variables"
                 label="Team Shared Variables"></x-forms.textarea>
             <x-forms.button canGate="update" :canResource="$team" type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>

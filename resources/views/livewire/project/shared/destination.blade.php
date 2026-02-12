@@ -103,7 +103,7 @@
                     @endforeach
                 </div>
             @else
-                <div>No additional servers available to attach.</div>
+                <div class="empty-state">No additional servers available to attach.</div>
             @endif
         </div>
     @endif

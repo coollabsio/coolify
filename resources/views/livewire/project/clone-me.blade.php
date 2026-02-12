@@ -7,14 +7,13 @@
         <div class="subtitle ">Quickly clone all resources to a new project or environment.</div>
     </div>
     <x-forms.input required id="newName" label="New Name" />
-    <h3 class="pt-8 ">Destination Server</h3>
-    <div class="pb-2">Choose the server and network to clone the resources to.</div>
-    <div class="flex flex-col">
-        <div class="flex flex-col">
-            <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="overflow-hidden">
-                        <table class="min-w-full">
+    <div class="form-card max-w-none">
+    <h3>Destination Server</h3>
+    <div>Choose the server and network to clone the resources to.</div>
+        <div class="overflow-x-auto">
+            <div class="inline-block min-w-full">
+                <div class="overflow-hidden">
+                    <table class="min-w-full">
                             <thead>
                                 <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Server</th>
@@ -39,21 +38,19 @@
                                     @endforeach
                                 @endforeach
                             </tbody>
-                        </table>
-                    </div>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <h3 class="pt-8">Resources</h3>
-    <div class="pb-2">These will be cloned to the new project</div>
-    <div class="flex flex-col pt-4">
-        <div class="flex flex-col">
-            <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="overflow-hidden">
-                        <table class="min-w-full">
+    <div class="form-card max-w-none">
+    <h3>Resources</h3>
+    <div>These will be cloned to the new project</div>
+        <div class="overflow-x-auto">
+            <div class="inline-block min-w-full">
+                <div class="overflow-hidden">
+                    <table class="min-w-full">
                             <thead>
                                 <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
@@ -92,8 +89,7 @@
                                     </tr>
                                 @endforeach
                             </tbody>
-                        </table>
-                    </div>
+                    </table>
                 </div>
             </div>
         </div>

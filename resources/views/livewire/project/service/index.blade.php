@@ -46,7 +46,7 @@
                                 shortConfirmationLabel="Service Application Name" />
                         @endcan
                     </div>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-10">
                         @if ($requiredPort && !$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
                             <x-callout type="warning" title="Required Port: {{ $requiredPort }}" class="mb-2">
                                 This service requires port <strong>{{ $requiredPort }}</strong> to function correctly. All domains must include this port number (or any other port if you know what you're doing).
@@ -204,7 +204,7 @@
                                     shortConfirmationLabel="Service Database Name" />
                             @endcan
                         </div>
-                        <div class="flex flex-col gap-2">
+                        <div class="flex flex-col gap-10">
                             <div class="flex gap-2">
                                 <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Name" id="humanName"
                                     placeholder="Name"></x-forms.input>
@@ -214,7 +214,7 @@
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                     label="Image" id="image"></x-forms.input>
                             </div>
-                            <div class="flex flex-col gap-2">
+                            <div class="flex flex-col gap-10">
                                 <div class="flex items-center gap-2 py-2">
                                     <h3>Proxy</h3>
                                     <x-loading wire:loading wire:target="instantSave" />
@@ -229,7 +229,7 @@
                                         </x-slide-over>
                                     @endif
                                 </div>
-                                <div class="flex flex-col gap-2 w-64">
+                                <div class="flex flex-col gap-10 w-64">
                                     <x-forms.checkbox canGate="update" :canResource="$serviceDatabase" instantSave id="isPublic"
                                         label="Make it publicly available" />
                                 </div>

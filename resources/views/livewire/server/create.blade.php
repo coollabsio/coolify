@@ -1,5 +1,5 @@
 <div class="w-full">
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-10">
         @can('viewAny', App\Models\CloudProviderToken::class)
             <div>
                 <x-modal-input title="Connect a Hetzner Server">
@@ -26,8 +26,8 @@
             <div class="border-t dark:border-coolgray-300 my-4"></div>
         @endcan
 
-        <div>
-            <h3 class="pb-2">Add Server by IP Address</h3>
+        <div class="form-subsection">
+            <h3>Add Server by IP Address</h3>
             <livewire:server.new.by-ip :private_keys="$private_keys" :limit_reached="$limit_reached" />
         </div>
     </div>

@@ -2,7 +2,7 @@
     <h1>Create a new Service</h1>
     <div class="pb-4">You can deploy complex services easily with Docker Compose.</div>
     <form wire:submit="submit">
-        <div class="flex gap-2 pb-1">
+        <div class="form-section-title">
             <h2>Docker Compose</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>

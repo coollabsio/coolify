@@ -9,7 +9,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4 empty-state">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...
@@ -30,14 +30,14 @@
                                             :expandByDefault="$totalContainers === 1" />
                                     @endforeach
                                 @else
-                                    <div class="pt-2">No containers are running on server: {{ $server->name }}</div>
+                                    <div class="pt-2 empty-state">No containers are running on server: {{ $server->name }}</div>
                                 @endif
                             @else
-                                <div class="pt-2">Server {{ $server->name }} is not functional.</div>
+                                <div class="pt-2 empty-state">Server {{ $server->name }} is not functional.</div>
                             @endif
                         </div>
                     @empty
-                        <div>No functional server found for the application.</div>
+                        <div class="empty-state">No functional server found for the application.</div>
                     @endforelse
                 </div>
             @endif
@@ -48,7 +48,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4 empty-state">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...
@@ -60,10 +60,10 @@
                                 :resource="$resource" :container="$container"
                                 :expandByDefault="count($containers) === 1" />
                         @else
-                            <div>No functional server found for the database.</div>
+                            <div class="empty-state">No functional server found for the database.</div>
                         @endif
                     @empty
-                        <div class="pt-2">No containers are running.</div>
+                        <div class="pt-2 empty-state">No containers are running.</div>
                     @endforelse
                 </div>
             @endif
@@ -73,7 +73,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-4">The resource is not running.</div>
+                <div class="pt-4 empty-state">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...
@@ -85,10 +85,10 @@
                                 :resource="$resource" :container="$container"
                                 :expandByDefault="count($containers) === 1" />
                         @else
-                            <div>No functional server found for the service.</div>
+                            <div class="empty-state">No functional server found for the service.</div>
                         @endif
                     @empty
-                        <div class="pt-2">No containers are running.</div>
+                        <div class="pt-2 empty-state">No containers are running.</div>
                     @endforelse
                 </div>
             @endif

@@ -7,16 +7,18 @@
         <x-server.sidebar :server="$server" activeMenu="destinations" />
         <div class="w-full">
             @if ($server->isFunctional())
-                <div class="flex items-end gap-2">
+                <div class="form-section-title mb-6">
                     <h2>Destinations</h2>
-                    @can('update', $server)
-                        <x-modal-input buttonTitle="+ Add" title="New Destination">
-                            <livewire:destination.new.docker :server_id="$server->id" />
-                        </x-modal-input>
-                    @endcan
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>
+                    <div class="flex items-center gap-2">
+                        @can('update', $server)
+                            <x-modal-input buttonTitle="+ Add" title="New Destination">
+                                <livewire:destination.new.docker :server_id="$server->id" />
+                            </x-modal-input>
+                        @endcan
+                        <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>
+                    </div>
                 </div>
-                <div>Destinations are used to segregate resources by network.</div>
+                <p class="text-sm text-neutral-500 dark:text-neutral-400 -mt-4 mb-4">Destinations are used to segregate resources by network.</p>
                 <h4 class="pt-4 pb-2">Available Destinations</h4>
                 <div class="flex gap-2">
                     @foreach ($server->standaloneDockers as $docker)
@@ -44,7 +46,7 @@
                     </div>
                 @endif
             @else
-                <div>Server is not validated. Validate first.</div>
+                <div class="warning-zone">Server is not validated. Validate first.</div>
             @endif
         </div>
     </div>

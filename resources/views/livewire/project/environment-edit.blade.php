@@ -3,12 +3,14 @@
         {{ data_get_str($project, 'name')->limit(10) }} > Edit | Coolify
     </x-slot>
     <form wire:submit='submit' class="flex flex-col">
-        <div class="flex items-end gap-2">
+        <div class="form-section-title">
             <h1>Environment: {{ data_get_str($environment, 'name')->limit(15) }}</h1>
-            <x-forms.button canGate="update" :canResource="$environment" type="submit">Save</x-forms.button>
-            @can('delete', $environment)
-                <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
-            @endcan
+            <div class="flex items-center gap-2">
+                <x-forms.button canGate="update" :canResource="$environment" type="submit">Save</x-forms.button>
+                @can('delete', $environment)
+                    <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
+                @endcan
+            </div>
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex flex-wrap items-center gap-y-1">

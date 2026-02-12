@@ -5,8 +5,8 @@
     <livewire:server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="cloudflare-tunnel" />
-        <div class="w-full">
-            <div class="flex flex-col">
+        <div class="w-full flex flex-col gap-10">
+            <div class="form-card">
                 <div class="flex gap-2 items-center">
                     <h2>Cloudflare Tunnel</h2>
                     <x-helper class="inline-flex"
@@ -20,9 +20,9 @@
                 </div>
                 <div>Secure your servers with Cloudflare Tunnel.</div>
             </div>
-            <div class="flex flex-col gap-2 pt-6">
+            <div class="flex flex-col gap-10">
                 @if ($isCloudflareTunnelsEnabled)
-                    <div class="flex flex-col gap-4">
+                    <div class="form-subsection">
                         <x-callout type="warning" title="Warning!">
                             If you disable Cloudflare Tunnel, you will need to update the server's IP address back
                             to its real IP address in the server "General" settings. The server may become inaccessible
@@ -56,78 +56,84 @@
                         </div>
                     </div>
                 @elseif (!$server->isFunctional())
-                    <x-callout type="info" title="Configuration Options" class="mb-4">
-                        To <span class="font-semibold">automatically</span> configure Cloudflare Tunnel, please
-                        validate your server first. Then you will need a Cloudflare token and an SSH
-                        domain configured.
-                        <br />
-                        To <span class="font-semibold">manually</span> configure Cloudflare Tunnel, please
-                        click <span wire:click="manualCloudflareConfig" class="underline cursor-pointer">here</span>,
-                        then you should validate the server.
-                        <br /><br />
-                        For more information, please read our <a
-                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="underline">documentation</a>.
-                    </x-callout>
+                    <div class="form-subsection">
+                        <x-callout type="info" title="Configuration Options" class="mb-4">
+                            To <span class="font-semibold">automatically</span> configure Cloudflare Tunnel, please
+                            validate your server first. Then you will need a Cloudflare token and an SSH
+                            domain configured.
+                            <br />
+                            To <span class="font-semibold">manually</span> configure Cloudflare Tunnel, please
+                            click <span wire:click="manualCloudflareConfig" class="underline cursor-pointer">here</span>,
+                            then you should validate the server.
+                            <br /><br />
+                            For more information, please read our <a
+                                href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
+                                class="underline">documentation</a>.
+                        </x-callout>
+                    </div>
                 @endif
                 @if (!$isCloudflareTunnelsEnabled && $server->isFunctional())
-                    <div class="flex  flex-col pb-2">
-                        <h3>Automated </h3>
-                        <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="text-xs underline hover:text-warning-600 dark:hover:text-warning-200">Docs<x-external-link /></a>
+                    <div class="form-subsection">
+                        <div class="flex flex-col pb-2">
+                            <h3>Automated</h3>
+                            <a href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
+                                class="text-xs underline hover:text-warning-600 dark:hover:text-warning-200">Docs<x-external-link /></a>
+                        </div>
+                        <div class="flex gap-2">
+                            <x-slide-over @automated.window="slideOverOpen = true" fullScreen>
+                                <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:activity-monitor header="Logs" fullHeight />
+                                </x-slot:content>
+                            </x-slide-over>
+                            @can('update', $server)
+                                <form @submit.prevent="$wire.dispatch('automatedCloudflareConfig')"
+                                    class="flex flex-col gap-10 w-full">
+                                    <x-forms.input id="cloudflare_token" required label="Cloudflare Token" type="password" />
+                                    <x-forms.input id="ssh_domain" label="Configured SSH Domain" required
+                                        helper="The SSH domain you configured in Cloudflare. Make sure there is no protocol like http(s):// so you provide a FQDN not a URL. <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh' target='_blank'>Documentation</a>" />
+                                    <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
+                                </form>
+                            @else
+                                <x-callout type="warning" title="Permission Required" class="mb-4">
+                                    You don't have permission to configure Cloudflare Tunnel for this server.
+                                </x-callout>
+                            @endcan
+                        </div>
+                        @script
+                            <script>
+                                $wire.$on('automatedCloudflareConfig', () => {
+                                    try {
+                                        window.dispatchEvent(new CustomEvent('automated'));
+                                        $wire.$call('automatedCloudflareConfig');
+                                    } catch (error) {
+                                        console.error(error);
+                                    }
+                                });
+                            </script>
+                        @endscript
                     </div>
-                    <div class="flex gap-2">
-                        <x-slide-over @automated.window="slideOverOpen = true" fullScreen>
-                            <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
-                            <x-slot:content>
-                                <livewire:activity-monitor header="Logs" fullHeight />
-                            </x-slot:content>
-                        </x-slide-over>
-                        @can('update', $server)
-                            <form @submit.prevent="$wire.dispatch('automatedCloudflareConfig')"
-                                class="flex flex-col gap-2 w-full">
-                                <x-forms.input id="cloudflare_token" required label="Cloudflare Token" type="password" />
-                                <x-forms.input id="ssh_domain" label="Configured SSH Domain" required
-                                    helper="The SSH domain you configured in Cloudflare. Make sure there is no protocol like http(s):// so you provide a FQDN not a URL. <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh' target='_blank'>Documentation</a>" />
-                                <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
-                            </form>
-                        @else
-                            <x-callout type="warning" title="Permission Required" class="mb-4">
-                                You don't have permission to configure Cloudflare Tunnel for this server.
-                            </x-callout>
-                        @endcan
+                    <div class="form-subsection">
+                        <h3>Manual</h3>
+                        <div class="pl-2">
+                            @can('update', $server)
+                                <x-modal-confirmation buttonFullWidth title="I manually configured Cloudflare Tunnel?"
+                                    buttonTitle="I manually configured Cloudflare Tunnel" submitAction="manualCloudflareConfig"
+                                    :actions="[
+                                        'You set everything up manually, including in Cloudflare and on the server (cloudflared is running).',
+                                        'If you missed something, the connection will not work.',
+                                    ]" confirmationText="I manually configured Cloudflare Tunnel"
+                                    confirmationLabel="Please type the confirmation text to confirm that you manually configured Cloudflare Tunnel."
+                                    shortConfirmationLabel="Confirmation text" />
+                            @else
+                                <x-callout type="warning" title="Permission Required" class="mb-4">
+                                    You don't have permission to configure Cloudflare Tunnel for this server.
+                                </x-callout>
+                            @endcan
+                        </div>
                     </div>
-                    @script
-                        <script>
-                            $wire.$on('automatedCloudflareConfig', () => {
-                                try {
-                                    window.dispatchEvent(new CustomEvent('automated'));
-                                    $wire.$call('automatedCloudflareConfig');
-                                } catch (error) {
-                                    console.error(error);
-                                }
-                            });
-                        </script>
-                    @endscript
+                @endif
             </div>
-            <h3 class="pt-6 pb-2">Manual</h3>
-            <div class="pl-2">
-                @can('update', $server)
-                    <x-modal-confirmation buttonFullWidth title="I manually configured Cloudflare Tunnel?"
-                        buttonTitle="I manually configured Cloudflare Tunnel" submitAction="manualCloudflareConfig"
-                        :actions="[
-                            'You set everything up manually, including in Cloudflare and on the server (cloudflared is running).',
-                            'If you missed something, the connection will not work.',
-                        ]" confirmationText="I manually configured Cloudflare Tunnel"
-                        confirmationLabel="Please type the confirmation text to confirm that you manually configured Cloudflare Tunnel."
-                        shortConfirmationLabel="Confirmation text" />
-                @else
-                    <x-callout type="warning" title="Permission Required" class="mb-4">
-                        You don't have permission to configure Cloudflare Tunnel for this server.
-                    </x-callout>
-                @endcan
-            </div>
-            @endif
         </div>
     </div>
 </div>

@@ -22,6 +22,6 @@
              @endforeach
          </div>
      @empty
-         <div>No deployments running.</div>
+         <div class="empty-state">No deployments running.</div>
      @endforelse
  </div>

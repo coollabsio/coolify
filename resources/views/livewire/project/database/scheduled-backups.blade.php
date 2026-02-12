@@ -1,5 +1,5 @@
 <div>
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-10">
         @if ($database->is_migrated && blank($database->custom_type))
             <div>
                 <div>Select the type of
@@ -209,7 +209,7 @@
                     </div>
                 @endif
             @empty
-                <div>No scheduled backups configured.</div>
+                <div class="empty-state">No scheduled backups configured.</div>
             @endforelse
         @endif
     </div>

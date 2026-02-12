@@ -1,5 +1,5 @@
 <div class="w-full">
-    <form class="flex flex-col gap-2 {{ $modal_mode ? 'w-full' : '' }}" wire:submit='addToken'>
+    <form class="flex flex-col gap-10 {{ $modal_mode ? 'w-full' : '' }}" wire:submit='addToken'>
         @if ($modal_mode)
             {{-- Modal layout: vertical, compact --}}
             @if (!isset($provider) || empty($provider) || $provider === '')

@@ -1,15 +1,17 @@
 <div>
-    <div class="flex gap-2">
+    <div class="form-section-title mb-6">
         <h2>Scheduled Tasks</h2>
-        @can('update', $resource)
-            <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
-                @if ($resource->type() == 'application')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
-                @elseif ($resource->type() == 'service')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
-                @endif
-            </x-modal-input>
-        @endcan
+        <div class="flex items-center gap-2">
+            @can('update', $resource)
+                <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
+                    @if ($resource->type() == 'application')
+                        <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
+                    @elseif ($resource->type() == 'service')
+                        <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
+                    @endif
+                </x-modal-input>
+            @endcan
+        </div>
     </div>
     <div class="flex flex-col flex-wrap gap-2 pt-4">
         @forelse($resource->scheduled_tasks as $task)
@@ -44,7 +46,7 @@
                 </a>
             @endif
         @empty
-            <div>No scheduled tasks configured.</div>
+            <div class="empty-state">No scheduled tasks configured.</div>
         @endforelse
     </div>
 </div>

@@ -4,15 +4,17 @@
     </x-slot>
     <x-settings.navbar />
     <div class="flex flex-col">
-        <div class="flex items-center gap-2 pb-2">
+        <div class="form-section-title">
             <h2>Backup</h2>
-            @if (isset($database) && $server->isFunctional())
-                <x-forms.button type="submit" wire:click="submit">
-                    Save
-                </x-forms.button>
-            @endif
+            <div class="flex items-center gap-2">
+                @if (isset($database) && $server->isFunctional())
+                    <x-forms.button type="submit" wire:click="submit">
+                        Save
+                    </x-forms.button>
+                @endif
+            </div>
         </div>
-        <div class="pb-4">Backup configuration for Coolify instance.</div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Backup configuration for Coolify instance.</p>
         <div>
             @if ($server->isFunctional())
                 @if (isset($database) && isset($backup))

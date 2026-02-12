@@ -1,13 +1,15 @@
 <div>
     <h1>Admin Dashboard</h1>
-    <div class="flex gap-2 pt-4">
+    <div class="form-section-title pt-4">
         <h3>Who am I now?</h3>
-        @if (session('impersonating'))
-            <x-forms.button wire:click="back">Go back to root</x-forms.button>
-        @endif
+        <div class="flex items-center gap-2">
+            @if (session('impersonating'))
+                <x-forms.button wire:click="back">Go back to root</x-forms.button>
+            @endif
+        </div>
     </div>
     <div class="pb-4">{{ auth()->user()->name }} ({{ auth()->user()->email }})</div>
-    <form wire:submit="submitSearch" class="flex flex-col gap-2 lg:flex-row">
+    <form wire:submit="submitSearch" class="flex flex-col gap-10 lg:flex-row">
         <x-forms.input wire:model="search" placeholder="Search for a user" />
         <x-forms.button type="submit">Search</x-forms.button>
     </form>
@@ -18,7 +20,7 @@
             <div class="flex flex-wrap gap-2 pt-4">
                 @foreach ($foundUsers as $user)
                     <div class="coolbox w-64 group" wire:click="switchUser({{ $user->id }})">
-                        <div class="flex flex-col gap-2">
+                        <div class="flex flex-col gap-10">
                             <div class="box-title">{{ $user->name }}</div>
                             <div class="box-description">{{ $user->email }}</div>
                             <div class="box-description">Active:
@@ -29,7 +31,7 @@
                 @endforeach
             </div>
         @else
-            <div>No users found with {{ $search }}</div>
+            <div class="empty-state">No users found with {{ $search }}</div>
         @endif
     @endif
 </div>

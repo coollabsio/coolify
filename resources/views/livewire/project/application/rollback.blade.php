@@ -1,12 +1,15 @@
 <div x-init="$wire.loadImages">
-    <div class="flex items-center gap-2">
-        <h2>Rollback</h2>
-        @can('view', $application)
-            <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
-        @endcan
-    </div>
-    <div class="pb-4">You can easily rollback to a previously built (local) images quickly.</div>
-
+    <div class="form-card max-w-none">
+        <div class="form-section-title">
+            <h2>Rollback</h2>
+            <div class="flex items-center gap-2">
+                @can('view', $application)
+                    <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
+                @endcan
+            </div>
+        </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">You can easily rollback to a previously built (local) images quickly.</p>
+    <div class="mt-4">
     @if($serverRetentionDisabled)
         <x-callout type="warning" class="mb-4">
             Image retention is disabled at the server level. This setting has no effect until the server administrator enables it.
@@ -74,9 +77,11 @@
                     </div>
                 </div>
             @empty
-                <div>No images found locally.</div>
+                <div class="empty-state">No images found locally.</div>
             @endforelse
         </div>
     </div>
     <div wire:target='loadImages' wire:loading>Loading available docker images...</div>
+    </div>
+    </div>
 </div>

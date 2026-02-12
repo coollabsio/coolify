@@ -7,27 +7,25 @@
         <x-server.sidebar-proxy :server="$server" :parameters="$parameters" />
         @if ($server->isFunctional())
             <div class="w-full">
-                <div class="flex gap-2">
-                    <div>
-                        <div class="flex gap-2">
-                            <h2>Dynamic Configurations</h2>
-                            <x-forms.button wire:click="loadDynamicConfigurations">Reload</x-forms.button>
-                            @can('update', $server)
-                                <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
-                                    <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />
-                                </x-modal-input>
-                            @endcan
-                        </div>
-                        <div class='pb-4'>You can add dynamic proxy configurations here.</div>
+                <div class="form-section-title mb-6">
+                    <h2>Dynamic Configurations</h2>
+                    <div class="flex items-center gap-2">
+                        <x-forms.button wire:click="loadDynamicConfigurations">Reload</x-forms.button>
+                        @can('update', $server)
+                            <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
+                                <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />
+                            </x-modal-input>
+                        @endcan
                     </div>
                 </div>
+                <div class='pb-4'>You can add dynamic proxy configurations here.</div>
                 <div wire:loading wire:target="initLoadDynamicConfigurations">
                     <x-loading text="Loading dynamic configurations..." />
                 </div>
-                <div x-init="$wire.initLoadDynamicConfigurations" class="flex flex-col gap-4">
+                <div x-init="$wire.initLoadDynamicConfigurations" class="flex flex-col gap-10">
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)
-                            <div class="flex flex-col gap-2 py-2">
+                            <div class="flex flex-col gap-10 py-2">
                                 @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||
                                         str_replace('|', '.', $fileName) === 'Caddyfile' ||
                                         str_replace('|', '.', $fileName) === 'coolify.caddy' ||
@@ -48,7 +46,7 @@
                             </div>
                         @endforeach
                     @else
-                        <div wire:loading.remove> No dynamic configurations found.</div>
+                        <div class="empty-state" wire:loading.remove>No dynamic configurations found.</div>
                     @endif
                 </div>
             </div>

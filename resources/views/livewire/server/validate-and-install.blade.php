@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-10">
     @if ($ask)
         This will revalidate the server, install / update Docker Engine, Docker Compose and all related
         configuration. It will also restart Docker Engine, so your running containers will be unreachable

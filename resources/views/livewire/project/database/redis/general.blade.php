@@ -1,18 +1,22 @@
 <div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit" canGate="update" :canResource="$database">
-                Save
-            </x-forms.button>
-        </div>
-        <div class="flex gap-2">
+    <div class="form-page">
+    <form wire:submit="submit" class="flex flex-col gap-10">
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>General</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="submit" canGate="update" :canResource="$database">
+                        Save
+                    </x-forms.button>
+                </div>
+            </div>
+        <div class="flex gap-2 mt-4">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
             <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
         </div>
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-10">
             @if ($database->started_at)
                 <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here,
                     otherwise
@@ -53,8 +57,9 @@
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' {{ wireNavigate() }} href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
             id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
+        </div>
+        <div class="form-subsection">
+            <h3>Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
@@ -69,8 +74,8 @@
                     type="password" readonly wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
             @endif
         </div>
-        <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between py-2">
+        <div class="form-subsection">
+            <div class="flex items-center justify-between">
                 <div class="flex items-center justify-between w-full">
                     <h3>SSL Configuration</h3>
                     @if ($enableSsl && $certificateValidUntil)
@@ -95,7 +100,7 @@
                     @endif
                 </span>
             @endif
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-10">
                 <div class="w-64" wire:key='enable_ssl'>
                     @if (str($database->status)->contains('exited'))
                         <x-forms.checkbox id="enableSsl" label="Enable SSL"
@@ -110,48 +115,43 @@
                 </div>
             </div>
         </div>
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                    </div>
-                    @if ($isPublic)
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !$isPublic }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
-                </div>
+        <div class="form-subsection max-w-none">
+            <h3>Proxy</h3>
+            <x-loading wire:loading wire:target="instantSave" />
+            @if ($isPublic)
+                <x-slide-over fullScreen>
+                    <x-slot:title>Proxy Logs</x-slot:title>
+                    <x-slot:content>
+                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                            container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                    </x-slot:content>
+                    <x-forms.button disabled="{{ !$isPublic }}"
+                        @click="slideOverOpen=true">Logs</x-forms.button>
+                </x-slide-over>
+            @endif
+            <div class="flex flex-col gap-10 w-64">
                 <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
                     canGate="update" :canResource="$database" />
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
-        </div>
-        <x-forms.textarea placeholder="# maxmemory 256mb
+            <x-forms.textarea placeholder="# maxmemory 256mb
 # maxmemory-policy allkeys-lru
 # timeout 300"
-            helper="You only need to provide the Redis directives you want to override — Redis will use default values for everything else. <br/><br/>
+                helper="You only need to provide the Redis directives you want to override — Redis will use default values for everything else. <br/><br/>
 ⚠️ <strong>Important:</strong> Coolify automatically applies the requirepass directive using the password shown in the Password field above. If you override requirepass in your custom configuration, make sure it matches the password field to avoid authentication issues. <br/><br/>
 🔗 <strong>Tip:</strong> <a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>View the full Redis default configuration</a> to see what options are available."
-            label="Custom Redis Configuration" rows="10" id="redisConf" canGate="update"
-            :canResource="$database" />
-
-
-
-        <h3 class="pt-4">Advanced</h3>
-        <div class="flex flex-col">
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs"
-                canGate="update" :canResource="$database" />
+                label="Custom Redis Configuration" rows="10" id="redisConf" canGate="update"
+                :canResource="$database" />
         </div>
-
+        <div class="form-subsection">
+            <h3>Advanced</h3>
+            <div class="flex flex-col">
+                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                    instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs"
+                    canGate="update" :canResource="$database" />
+            </div>
+        </div>
     </form>
+    </div>
 </div>

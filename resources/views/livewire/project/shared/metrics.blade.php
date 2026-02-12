@@ -1,9 +1,10 @@
 <div>
-    <div class="flex items-center gap-2">
-        <h2>Metrics</h2>
-    </div>
-    <div class="pb-4">Basic metrics for your application container.</div>
-    <div>
+    <div class="form-card max-w-none">
+        <div class="form-section-title">
+            <h2>Metrics</h2>
+        </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Basic metrics for your application container.</p>
+    <div class="mt-4">
         @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
             <div class="alert alert-warning">Metrics are not available for Docker Compose applications yet!</div>
         @elseif(!$resource->destination->server->isMetricsEnabled())
@@ -292,5 +293,6 @@
             </div>
         @endif
     @endif
+    </div>
     </div>
 </div>

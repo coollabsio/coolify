@@ -6,8 +6,8 @@
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="metrics" />
         <div class="w-full">
-            <h2>Metrics</h2>
-            <div class="pb-4">Basic metrics for your server.</div>
+            <h2 class="mb-1">Metrics</h2>
+            <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-4">Basic metrics for your server.</p>
             @if ($server->isMetricsEnabled())
                 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
                     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
@@ -288,7 +288,7 @@
                     </div>
                 </div>
             @else
-                <div>Metrics are disabled for this server. Enable them in <a class="underline dark:text-white"
+                <div class="empty-state">Metrics are disabled for this server. Enable them in <a class="underline dark:text-white"
                         href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}/sentinel" {{ wireNavigate() }}>Sentinel</a> settings.</div>
             @endif
         </div>

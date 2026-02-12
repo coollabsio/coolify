@@ -1,12 +1,16 @@
 <div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-        </div>
-        <div class="flex gap-2">
+    <div class="form-page">
+    <form wire:submit="submit" class="flex flex-col gap-10">
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>General</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+            </div>
+        <div class="flex gap-2 mt-4">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
             <x-forms.input label="Image" id="image" required
@@ -16,7 +20,7 @@
             automations (like backups) won't work.
         </div>
         @if ($database->started_at)
-            <div class="flex xl:flex-row flex-col gap-2">
+            <div class="flex xl:flex-row flex-col gap-10">
                 <x-forms.input label="Root Password" id="mysqlRootPassword" type="password" required
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User" id="mysqlUser" required
@@ -24,13 +28,13 @@
                 <x-forms.input label="Normal User Password" id="mysqlPassword" type="password" required
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
             </div>
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-10">
                 <x-forms.input label="Initial Database" id="mysqlDatabase"
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
-            <div class="flex xl:flex-row flex-col gap-4 pb-2">
+            <div class="flex xl:flex-row flex-col gap-10 pb-2">
                 <x-forms.input label="Root Password" id="mysqlRootPassword" type="password"
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User" id="mysqlUser" required
@@ -38,7 +42,7 @@
                 <x-forms.input label="Normal User Password" id="mysqlPassword" type="password" required
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-10">
                 <x-forms.input label="Initial Database" id="mysqlDatabase"
                     placeholder="If empty, it will be the same as Username."
                     helper="You can only change this in the database." canGate="update" :canResource="$database" />
@@ -50,8 +54,9 @@
                 placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                 id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
         </div>
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
+        </div>
+        <div class="form-subsection">
+            <h3>Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" canGate="update" :canResource="$database" />
@@ -65,11 +70,10 @@
                     type="password" readonly wire:model="db_url_public" />
             @endif
         </div>
-
-        <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between py-2">
+        <div class="form-subsection">
+            <h3>SSL Configuration</h3>
+            <div class="flex items-center justify-between">
                 <div class="flex items-center justify-between w-full">
-                    <h3>SSL Configuration</h3>
                     @if ($enableSsl && $certificateValidUntil)
                         <x-modal-confirmation title="Regenerate SSL Certificates"
                             buttonTitle="Regenerate SSL Certificates" :actions="[
@@ -92,9 +96,7 @@
                     @endif
                 </span>
             @endif
-        </div>
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-10">
                 <div class="w-64">
                     @if (str($database->status)->contains('exited'))
                         <x-forms.checkbox id="enableSsl" label="Enable SSL"
@@ -131,14 +133,11 @@
                 @endif
             </div>
         </div>
-
-        <div>
+        <div class="form-subsection max-w-none">
+            <h3>Proxy</h3>
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                    </div>
+                    <x-loading wire:loading wire:target="instantSave" />
                     @if (data_get($database, 'is_public'))
                         <x-slide-over fullScreen>
                             <x-slot:title>Proxy Logs</x-slot:title>
@@ -155,12 +154,15 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}"
                 id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+            <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="mysqlConf" canGate="update" :canResource="$database" />
         </div>
-        <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="mysqlConf" canGate="update" :canResource="$database" />
-        <h3 class="pt-4">Advanced</h3>
-        <div class="flex flex-col">
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update" :canResource="$database" />
+        <div class="form-subsection">
+            <h3>Advanced</h3>
+            <div class="flex flex-col">
+                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                    instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update" :canResource="$database" />
+            </div>
         </div>
     </form>
+    </div>
 </div>

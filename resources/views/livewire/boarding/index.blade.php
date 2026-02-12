@@ -117,7 +117,7 @@
                             <button
                                 class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6"
                                 wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
-                                <div class="flex flex-col gap-4 text-left">
+                                <div class="flex flex-col gap-8 text-left">
                                     <div class="flex items-center justify-between">
                                         <svg class="size-10" xmlns="http://www.w3.org/2000/svg" fill="none"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -143,7 +143,7 @@
                             <button
                                 class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6"
                                 wire:target="setServerType('remote')" wire:click="setServerType('remote')">
-                                <div class="flex flex-col gap-4 text-left">
+                                <div class="flex flex-col gap-8 text-left">
                                     <div class="flex items-center justify-between">
                                         <svg class="size-10 " xmlns="http://www.w3.org/2000/svg" fill="none"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -169,7 +169,7 @@
                                         <x-slot:content>
                                             <div
                                                 class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
-                                                <div class="flex flex-col gap-4 text-left">
+                                                <div class="flex flex-col gap-8 text-left">
                                                     <div class="flex items-center justify-between">
                                                         <svg class="size-10" viewBox="0 0 200 200"
                                                             xmlns="http://www.w3.org/2000/svg">
@@ -267,7 +267,7 @@
                         @if ($privateKeys && $privateKeys->count() > 0)
                             <div class="w-full space-y-4">
                                 <div class="p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                    <form wire:submit='selectExistingPrivateKey' class="flex flex-col gap-4">
+                                    <form wire:submit='selectExistingPrivateKey' class="flex flex-col gap-8">
                                         <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
                                             @foreach ($privateKeys as $privateKey)
                                                 <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
@@ -348,7 +348,7 @@
                         Configure your SSH key for server authentication.
                     </x-slot:question>
                     <x-slot:actions>
-                        <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-4">
+                        <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-8">
                             <x-forms.input required placeholder="e.g., production-server-key" label="Key Name"
                                 id="privateKeyName" />
                             <x-forms.input placeholder="Optional: Note what this key is used for" label="Description"
@@ -407,7 +407,7 @@
                         Provide connection details for your remote server.
                     </x-slot:question>
                     <x-slot:actions>
-                        <form wire:submit='saveServer' class="flex flex-col w-full gap-4">
+                        <form wire:submit='saveServer' class="flex flex-col w-full gap-8">
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 <x-forms.input required placeholder="e.g., production-app-server" label="Server Name"
                                     id="remoteServerName" wire:model="remoteServerName" />
@@ -417,7 +417,7 @@
                             <x-forms.input placeholder="Optional: Note what this server hosts" label="Description"
                                 id="remoteServerDescription" wire:model="remoteServerDescription" />
 
-                            <div x-data="{ showAdvanced: false }" class="flex flex-col gap-4">
+                            <div x-data="{ showAdvanced: false }" class="flex flex-col gap-8">
                                 <button @click="showAdvanced = !showAdvanced" type="button"
                                     class="flex items-center gap-2 text-left text-sm font-medium  hover:underline">
                                     <svg x-show="!showAdvanced" class="size-4" xmlns="http://www.w3.org/2000/svg"
@@ -608,7 +608,7 @@
                                         <span class="px-2 text-neutral-500 dark:text-neutral-400">Or use existing</span>
                                     </div>
                                 </div>
-                                <form wire:submit='selectExistingProject' class="flex flex-col gap-4">
+                                <form wire:submit='selectExistingProject' class="flex flex-col gap-8">
                                     <x-forms.select label="Existing Projects" id='selectedProject'>
                                         @foreach ($projects as $project)
                                             <option wire:key="{{ $loop->index }}" value="{{ $project->id }}">

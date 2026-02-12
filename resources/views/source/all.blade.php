@@ -2,15 +2,17 @@
     <x-slot:title>
         Sources | Coolify
     </x-slot>
-    <div class="flex items-center gap-2">
+    <div class="form-section-title mb-6">
         <h1>Sources</h1>
-        @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
-                <livewire:source.github.create />
-            </x-modal-input>
-        @endcan
+        <div class="flex items-center gap-2">
+            @can('createAnyResource')
+                <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
+                    <livewire:source.github.create />
+                </x-modal-input>
+            @endcan
+        </div>
     </div>
-    <div class="subtitle">Git sources for your applications.</div>
+    <p class="text-sm text-neutral-500 dark:text-neutral-400 -mt-4 mb-4">Git sources for your applications.</p>
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
@@ -31,9 +33,7 @@
                 </a>
             @endif
         @empty
-            <div>
-                <div>No sources found.</div>
-            </div>
+            <div class="empty-state">No sources found.</div>
         @endforelse
     </div>
 </x-layout>

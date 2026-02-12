@@ -8,7 +8,7 @@
             Key</x-forms.button>
         <x-forms.button wire:click="generateNewRSAKey">Generate new RSA SSH Key</x-forms.button>
     </div>
-    <form class="flex flex-col gap-2" wire:submit='createPrivateKey'>
+    <form class="flex flex-col gap-10" wire:submit='createPrivateKey'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="description" label="Description" />

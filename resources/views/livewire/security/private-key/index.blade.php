@@ -1,17 +1,20 @@
 <div>
     <x-security.navbar />
-    <div class="flex gap-2">
-        <h2 class="pb-4">Private Keys</h2>
-        @can('create', App\Models\PrivateKey::class)
-            <x-modal-input buttonTitle="+ Add" title="New Private Key">
-                <livewire:security.private-key.create />
-            </x-modal-input>
-        @endcan
-        @can('create', App\Models\PrivateKey::class)
-            <x-modal-confirmation title="Confirm unused SSH Key Deletion?" buttonTitle="Delete unused SSH Keys" isErrorButton
-                submitAction="cleanupUnusedKeys" :actions="['All unused SSH keys (marked with unused) are permanently deleted.']" :confirmWithText="false" :confirmWithPassword="false" />
-        @endcan
+    <div class="form-section-title mb-6">
+        <h2>Private Keys</h2>
+        <div class="flex items-center gap-2">
+            @can('create', App\Models\PrivateKey::class)
+                <x-modal-input buttonTitle="+ Add" title="New Private Key">
+                    <livewire:security.private-key.create />
+                </x-modal-input>
+            @endcan
+            @can('create', App\Models\PrivateKey::class)
+                <x-modal-confirmation title="Confirm unused SSH Key Deletion?" buttonTitle="Delete unused SSH Keys" isErrorButton
+                    submitAction="cleanupUnusedKeys" :actions="['All unused SSH keys (marked with unused) are permanently deleted.']" :confirmWithText="false" :confirmWithPassword="false" />
+            @endcan
+        </div>
     </div>
+    <div class="form-card max-w-none">
     <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($privateKeys as $key)
             @can('view', $key)
@@ -50,7 +53,8 @@
                 </div>
             @endcan
         @empty
-            <div>No private keys found.</div>
+            <div class="empty-state">No private keys found.</div>
         @endforelse
+    </div>
     </div>
 </div>

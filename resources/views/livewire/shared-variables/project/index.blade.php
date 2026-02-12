@@ -6,7 +6,7 @@
         <h1>Projects</h1>
     </div>
     <div class="subtitle">List of your projects.</div>
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-10">
         @forelse ($projects as $project)
             <a class="coolbox group"
                 href="{{ route('shared-variables.project.show', ['project_uuid' => data_get($project, 'uuid')]) }}" {{ wireNavigate() }}>
@@ -17,9 +17,7 @@
                 </div>
             </a>
         @empty
-            <div>
-                <div>No project found.</div>
-            </div>
+            <div class="empty-state">No project found.</div>
         @endforelse
     </div>
 </div>

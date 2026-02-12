@@ -6,7 +6,7 @@
     @endif
     <div>
         @if ($application->is_github_based())
-            <div class="flex items-center gap-2">
+            <div class="form-section-title">
                 @can('update', $application)
                     <h3>Pull Requests on Git</h3>
                     <x-forms.button wire:click="load_prs">Load Pull Requests
@@ -19,6 +19,7 @@
         @endisset
         <div wire:loading.remove wire:target='load_prs'>
             @if ($pull_requests->count() > 0)
+                <div class="form-card max-w-none">
                 <div class="overflow-x-auto table-md">
                     <table>
                         <thead>
@@ -65,11 +66,13 @@
                         </tbody>
                     </table>
                 </div>
+                </div>
             @endif
         </div>
     </div>
     @if ($application->previews->count() > 0)
-        <h3 class="py-4">Deployments</h3>
+        <div class="form-subsection">
+        <h3>Deployments</h3>
         <div class="flex flex-wrap w-full gap-4">
             @foreach (data_get($application, 'previews') as $previewName => $preview)
                 <div class="flex flex-col w-full p-4 border dark:border-coolgray-200"
@@ -107,7 +110,7 @@
                     </div>
 
                     @if ($application->build_pack === 'dockercompose')
-                        <div class="flex flex-col gap-4 pt-4">
+                        <div class="flex flex-col gap-10 pt-4">
                             @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
                                 <form wire:submit="save_preview('{{ $preview->id }}')"
                                     class="flex items-end gap-2 pt-4">
@@ -138,7 +141,7 @@
                             @endcan
                         </form>
                     @endif
-                    <div class="flex flex-col xl:flex-row xl:items-center gap-2 pt-6">
+                    <div class="flex flex-col xl:flex-row xl:items-center gap-8 pt-6">
                         <div class="flex-1"></div>
                         @can('deploy', $application)
                             <x-forms.button
@@ -218,8 +221,9 @@
                 </div>
             @endforeach
         </div>
+        </div>
     @endif
-    
+
     <x-domain-conflict-modal 
         :conflicts="$domainConflicts" 
         :showModal="$showDomainConflictModal" 

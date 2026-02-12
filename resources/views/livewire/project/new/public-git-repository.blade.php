@@ -3,8 +3,8 @@
     <div class="pb-8">Deploy any public Git repositories.</div>
 
     <!-- Repository URL Form -->
-    <form class="flex flex-col gap-2" wire:submit='loadBranch'>
-        <div class="flex flex-col gap-2">
+    <form class="flex flex-col gap-10" wire:submit='loadBranch'>
+        <div class="flex flex-col gap-10">
             <div class="flex gap-2 items-end">
                 <x-forms.input required id="repository_url" label="Repository URL (https://)"
                     helper="{!! __('repository.url') !!}" autofocus />
@@ -30,8 +30,8 @@
         @endif
 
         <!-- Application Configuration Form -->
-        <form class="flex flex-col gap-2 pt-4" wire:submit='submit'>
-            <div class="flex flex-col gap-2 pb-6">
+        <form class="flex flex-col gap-10 pt-4" wire:submit='submit'>
+            <div class="flex flex-col gap-10 pb-6">
                 <div class="flex gap-2">
                     @if ($git_source === 'other')
                         <x-forms.input id="git_branch" label="Branch"

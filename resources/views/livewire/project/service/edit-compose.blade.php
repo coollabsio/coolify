@@ -37,7 +37,7 @@
         </div>
     </div>
     <div class="pt-2 flex gap-2">
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-10">
             <x-forms.checkbox label="Escape special characters in labels?"
                 helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                 id="isContainerLabelEscapeEnabled" instantSave></x-forms.checkbox>

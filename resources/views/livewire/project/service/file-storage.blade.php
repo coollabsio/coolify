@@ -1,7 +1,7 @@
 <div>
-    <div class="flex flex-col gap-4 p-4 bg-white border dark:bg-base dark:border-coolgray-300 border-neutral-200">
+    <div class="flex flex-col gap-10 p-4 bg-white border rounded-lg dark:bg-base dark:border-coolgray-300 border-neutral-200">
         @if ($isReadOnly)
-            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+            <div class="warning-zone">
                 @if ($fileStorage->is_directory)
                     This directory is mounted as read-only and cannot be modified from the UI.
                 @else
@@ -15,7 +15,7 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
-        <form wire:submit='submit' class="flex flex-col gap-2">
+        <form wire:submit='submit' class="flex flex-col gap-10">
             @if (!$isReadOnly)
                 @can('update', $resource)
                     <div class="flex gap-2">

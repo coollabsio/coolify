@@ -5,24 +5,28 @@
     <x-team.navbar />
 
     <form class="flex flex-col" wire:submit='submit'>
-        <h2>General</h2>
-        <div class="subtitle">
-            Manage the general settings of this team.
-        </div>
+        <div class="form-card">
+            <div class="form-section-title">
+                <h2>General</h2>
+                <div class="flex items-center gap-2">
+                    @can('update', $team)
+                        <x-forms.button type="submit">
+                            Save
+                        </x-forms.button>
+                    @endcan
+                </div>
+            </div>
+            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Manage the general settings of this team.</p>
 
-        <div class="flex items-end gap-2 pb-6">
-            <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
-            <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
-            @can('update', $team)
-                <x-forms.button type="submit">
-                    Save
-                </x-forms.button>
-            @endcan
+            <div class="mt-4 flex items-end gap-2 pb-6">
+                <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
+                <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
+            </div>
         </div>
     </form>
 
     @can('delete', $team)
-        <div>
+        <div class="danger-zone">
             <h2>Danger Zone</h2>
             <div class="pb-4">Woah. I hope you know what are you doing.</div>
             <h4 class="pb-4">Delete Team</h4>

@@ -1,5 +1,5 @@
 @can('createAnyResource')
-    <form wire:submit='createGitHubApp' class="flex flex-col w-full gap-2">
+    <form wire:submit='createGitHubApp' class="flex flex-col w-full gap-8">
         <div class="pb-2">This is required, if you would like to get full integration (commit / pull request
             deployments, etc)
             with GitHub.</div>
@@ -43,7 +43,7 @@
                     </svg>
                 </button>
                 <div x-show="activeAccordion==id" x-collapse x-cloak class="px-2">
-                    <div class="flex flex-col gap-2 pt-0 opacity-70">
+                    <div class="flex flex-col gap-10 pt-0 opacity-70">
                         <div class="flex gap-2">
                             <x-forms.input id="html_url" label="HTML Url" required />
                             <x-forms.input id="api_url" label="API Url" required />

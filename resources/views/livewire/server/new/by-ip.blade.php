@@ -2,7 +2,7 @@
     @if ($limit_reached)
         <x-limit-reached name="servers" />
     @else
-        <form class="flex flex-col w-full gap-2" wire:submit='submit'>
+        <form class="flex flex-col w-full gap-8" wire:submit='submit'>
             <div class="flex w-full gap-2 flex-wrap sm:flex-nowrap">
                 <x-forms.input id="name" label="Name" required />
                 <x-forms.input id="description" label="Description" />

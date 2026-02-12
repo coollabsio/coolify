@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-2" wire:poll.5000ms="refreshExecutions" x-data="{
+<div class="flex flex-col gap-10" wire:poll.5000ms="refreshExecutions" x-data="{
     init() {
         let interval;
         $wire.$watch('isPollingActive', value => {
@@ -123,6 +123,6 @@
     </div>
     @endif
     @empty
-    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
+    <div class="empty-state">No executions found.</div>
     @endforelse
 </div>

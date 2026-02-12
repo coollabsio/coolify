@@ -3,7 +3,7 @@
         @if ($current_step === 'type')
             <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)"
                 class="sticky z-10 top-0  backdrop-blur-sm border-b border-neutral-200 dark:border-coolgray-400">
-                <div class="flex flex-col gap-4 lg:flex-row">
+                <div class="form-section-title">
                     <h1>New Resource</h1>
                     <div class="w-full lg:w-96">
                         <x-forms.select wire:model.live="selectedEnvironment">
@@ -76,7 +76,7 @@
                 </div>
             </div>
             <div x-show="loading">Loading...</div>
-            <div x-show="!loading" class="flex flex-col gap-4 py-4">
+            <div x-show="!loading" class="flex flex-col gap-10 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
                 <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0"
                     class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -192,7 +192,7 @@
                 </div>
                 <div
                     x-show="filteredGitBasedApplications.length === 0 && filteredDockerBasedApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0 && loading === false">
-                    <div>No resources found.</div>
+                    <div class="empty-state">No resources found.</div>
                 </div>
             </div>
             <script>
@@ -401,13 +401,10 @@
                         </div>
                     </div>
                 @empty
-                    <div>
-
-                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
+                    <div class="empty-state">No validated & reachable servers found. <a class="underline dark:text-white"
                                 href="/servers" {{ wireNavigate() }}>
                                 Go to servers page
                             </a></div>
-                    </div>
                 @endforelse
             @endif
         </div>

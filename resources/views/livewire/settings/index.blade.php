@@ -7,17 +7,20 @@
             class="flex flex-col h-full gap-8 sm:flex-row">
             <x-settings.sidebar activeMenu="general" />
             <form wire:submit='submit' class="flex flex-col">
-                <div class="flex items-center gap-2">
-                    <h2>General</h2>
-                    <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                        Save
-                    </x-forms.button>
-                </div>
-                <div class="pb-4">General configuration for your Coolify instance.</div>
+                <div class="form-card">
+                    <div class="form-section-title">
+                        <h2>General</h2>
+                        <div class="flex items-center gap-2">
+                            <x-forms.button canGate="update" :canResource="$settings" type="submit">
+                                Save
+                            </x-forms.button>
+                        </div>
+                    </div>
+                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">General configuration for your Coolify instance.</p>
 
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-wrap items-end gap-2">
-                        <div class="flex gap-2 md:flex-row flex-col w-full">
+                <div class="flex flex-col gap-10">
+                    <div class="flex flex-wrap items-end gap-10">
+                        <div class="flex gap-10 md:flex-row flex-col w-full">
                             <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
                                 helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br>
                                 <span class='dark:text-warning text-coollabs'>Important: </span>
@@ -72,7 +75,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="flex gap-2 md:flex-row flex-col w-full">
+                        <div class="flex gap-10 md:flex-row flex-col w-full">
                             <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password" label="Instance's Public IPv4"
                                 helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
                                 placeholder="1.2.3.4" autocomplete="new-password" />
@@ -92,6 +95,7 @@
                                 helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
                                 placeholder="{{ config('constants.coolify.helper_version') }}" />
                         @endif
+                </div>
                 </div>
             </form>
 

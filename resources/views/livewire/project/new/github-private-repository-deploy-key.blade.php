@@ -46,7 +46,7 @@
             </div>
         @endif
         @if ($current_step === 'repository')
-            <form class="flex flex-col gap-2" wire:submit='submit'>
+            <form class="flex flex-col gap-10" wire:submit='submit'>
                 <x-forms.input id="repository_url" required label="Repository URL (https:// or git@)" />
                 <div class="flex gap-2">
                     <x-forms.input id="branch" required label="Branch" />

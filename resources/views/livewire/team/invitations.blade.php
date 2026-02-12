@@ -1,13 +1,12 @@
 @can('manageInvitations', currentTeam())
     <div>
         @if ($invitations->count() > 0)
-            <h2 class="pb-2">Pending Invitations</h2>
-            <div class="flex flex-col">
-                <div class="flex flex-col">
-                    <div class="overflow-x-auto">
-                        <div class="inline-block min-w-full">
-                            <div class="overflow-hidden">
-                                <table class="min-w-full">
+            <div class="form-card max-w-none">
+            <h2>Pending Invitations</h2>
+                <div class="overflow-x-auto">
+                    <div class="inline-block min-w-full">
+                        <div class="overflow-hidden">
+                            <table class="min-w-full">
                                     <thead>
                                         <tr>
                                             <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email
@@ -52,8 +51,7 @@
                                             </tr>
                                         @endforeach
                                     </tbody>
-                                </table>
-                            </div>
+                            </table>
                         </div>
                     </div>
                 </div>

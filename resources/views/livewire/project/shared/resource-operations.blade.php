@@ -1,8 +1,11 @@
 <div>
-    <h2>Resource Operations</h2>
-    <div>You can easily make different kind of operations on this resource.</div>
+    <div class="form-card">
+        <div class="form-section-title">
+            <h2>Resource Operations</h2>
+        </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">You can easily make different kind of operations on this resource.</p>
 
-    <div x-data="{
+    <div class="mt-4" x-data="{
         selectedCloneServer: null,
         selectedCloneDestination: null,
         selectedMoveProject: null,
@@ -162,5 +165,6 @@
                 administrator to request access.
             </x-callout>
         @endcan
+    </div>
     </div>
 </div>

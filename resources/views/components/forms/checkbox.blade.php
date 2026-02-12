@@ -16,18 +16,6 @@
     'dark:hover:bg-coolgray-100 cursor-pointer' => !$disabled,
 ])>
     <label @class(['flex gap-4 items-center px-0 min-w-fit label w-full'])>
-        <span class="flex grow gap-2">
-            @if ($label)
-                @if ($disabled)
-                    <span class="opacity-60">{!! $label !!}</span>
-                @else
-                    {!! $label !!}
-                @endif
-                @if ($helper)
-                    <x-helper :helper="$helper" />
-                @endif
-            @endif
-        </span>
         @if ($instantSave)
             <input type="checkbox" @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
                 wire:loading.attr="disabled"
@@ -42,5 +30,17 @@
                     wire:model={{ $value ?? $modelBinding }} id="{{ $htmlId }}" @if ($checked) checked @endif />
             @endif
         @endif
+        <span class="flex grow gap-2">
+            @if ($label)
+                @if ($disabled)
+                    <span class="opacity-60">{!! $label !!}</span>
+                @else
+                    {!! $label !!}
+                @endif
+                @if ($helper)
+                    <x-helper :helper="$helper" />
+                @endif
+            @endif
+        </span>
     </label>
 </div>

@@ -2,15 +2,17 @@
     <x-slot:title>
         Servers | Coolify
     </x-slot>
-    <div class="flex items-center gap-2">
+    <div class="form-section-title mb-6">
         <h1>Servers</h1>
-        @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
-                <livewire:server.create />
-            </x-modal-input>
-        @endcan
+        <div class="flex items-center gap-2">
+            @can('createAnyResource')
+                <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
+                    <livewire:server.create />
+                </x-modal-input>
+            @endcan
+        </div>
     </div>
-    <div class="subtitle">All your servers are here.</div>
+    <p class="text-sm text-neutral-500 dark:text-neutral-400 -mt-4 mb-4">All your servers are here.</p>
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($servers as $server)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}" {{ wireNavigate() }}
@@ -43,9 +45,7 @@
                 <div class="flex-1"></div>
             </a>
         @empty
-            <div>
-                <div>No servers found. Without a server, you won't be able to do much.</div>
-            </div>
+            <div class="empty-state">No servers found. Without a server, you won't be able to do much.</div>
         @endforelse
         @isset($error)
             <div class="text-center text-error">

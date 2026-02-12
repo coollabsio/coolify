@@ -1,9 +1,9 @@
 <div>
-    <div class="flex items-start gap-2 pb-10">
-        <div>
-            <h1 class="pb-2">Tags</h1>
-            <div>Tags help you to perform actions on multiple resources.</div>
+    <div class="form-card pb-10">
+        <div class="form-section-title">
+            <h1>Tags</h1>
         </div>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Tags help you to perform actions on multiple resources.</p>
     </div>
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
@@ -12,7 +12,7 @@
                 {{ wireNavigate() }}
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ data_get_str($oneTag, 'name')->limit(30) }}</a>
         @empty
-            <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
+            <div class="empty-state">No tags yet defined yet. Go to a resource and add a tag there.</div>
         @endforelse
     </div>
     @if (isset($tag))
@@ -89,7 +89,7 @@
                         @endforeach
                     </div>
                 @empty
-                    <div>No deployments running.</div>
+                    <div class="empty-state">No deployments running.</div>
                 @endforelse
             </div>
         </div>

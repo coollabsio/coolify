@@ -3,29 +3,29 @@
     <div class="subtitle">Get notified about your infrastructure.</div>
     <div class="navbar-main">
         <nav class="flex items-center gap-3.5 min-h-10">
-            <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.email') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.email') }}">
-                <button>Email</button>
+                Email
             </a>
-            <a class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.discord') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.discord') }}">
-                <button>Discord</button>
+                Discord
             </a>
-            <a class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.telegram') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.telegram') }}">
-                <button>Telegram</button>
+                Telegram
             </a>
-            <a class="{{ request()->routeIs('notifications.slack') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.slack') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.slack') }}">
-                <button>Slack</button>
+                Slack
             </a>
-            <a class="{{ request()->routeIs('notifications.pushover') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.pushover') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.pushover') }}">
-                <button>Pushover</button>
+                Pushover
             </a>
-            <a class="{{ request()->routeIs('notifications.webhook') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+            <a class="nav-tab {{ request()->routeIs('notifications.webhook') ? 'nav-tab-active' : '' }}" {{ wireNavigate() }}
                 href="{{ route('notifications.webhook') }}">
-                <button>Webhook</button>
+                Webhook
             </a>
         </nav>
     </div>

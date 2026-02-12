@@ -3,25 +3,28 @@
     @if ($server->proxyType())
         <div x-init="$wire.loadProxyConfiguration">
             @if ($selectedProxy !== 'NONE')
-                <form wire:submit='submit'>
-                    <div class="flex items-center gap-2">
+                <form wire:submit='submit' class="flex flex-col gap-10">
+                    <div class="form-card">
+                    <div class="form-section-title">
                         <h2>Configuration</h2>
-                        @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                            @can('update', $server)
-                                <x-modal-confirmation title="Confirm Proxy Switching?" buttonTitle="Switch Proxy"
-                                    submitAction="changeProxy" :actions="['Custom proxy configurations may be reset to their default settings.']"
-                                    warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!"
-                                    step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
-                                </x-modal-confirmation>
-                            @endcan
-                        @else
-                            <x-forms.button canGate="update" :canResource="$server"
-                                wire:click="$dispatch('error', 'Currently running proxy must be stopped before switching proxy')">Switch
-                                Proxy</x-forms.button>
-                        @endif
-                        <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
+                        <div class="flex items-center gap-2">
+                            @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
+                                @can('update', $server)
+                                    <x-modal-confirmation title="Confirm Proxy Switching?" buttonTitle="Switch Proxy"
+                                        submitAction="changeProxy" :actions="['Custom proxy configurations may be reset to their default settings.']"
+                                        warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!"
+                                        step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
+                                    </x-modal-confirmation>
+                                @endcan
+                            @else
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    wire:click="$dispatch('error', 'Currently running proxy must be stopped before switching proxy')">Switch
+                                    Proxy</x-forms.button>
+                            @endif
+                            <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
+                        </div>
                     </div>
-                    <div class="pb-4">Configure your proxy settings and advanced options.</div>
+                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Configure your proxy settings and advanced options.</p>
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
@@ -30,6 +33,8 @@
                             proxy to apply your changes.
                         </x-callout>
                     @endif
+                    </div>
+                    <div class="form-subsection">
                     <h3>Advanced</h3>
                     <div class="pb-6 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
@@ -44,6 +49,7 @@
                                 id="redirectUrl" label="Redirect to (optional)" />
                         @endif
                     </div>
+                    </div>
                     @php
                         $proxyTitle =
                             $server->proxyType() === ProxyTypes::TRAEFIK->value
@@ -51,7 +57,7 @@
                                 : 'Caddy (Coolify Proxy)';
                     @endphp
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
-                        <div @if($server->proxyType() === ProxyTypes::TRAEFIK->value) x-data="{ traefikWarningsDismissed: localStorage.getItem('callout-dismissed-traefik-warnings-{{ $server->id }}') === 'true' }" @endif>
+                        <div class="form-subsection max-w-none" @if($server->proxyType() === ProxyTypes::TRAEFIK->value) x-data="{ traefikWarningsDismissed: localStorage.getItem('callout-dismissed-traefik-warnings-{{ $server->id }}') === 'true' }" @endif>
                             <div class="flex items-center gap-2">
                                 <h3>{{ $proxyTitle }}</h3>
                                 @can('update', $server)
@@ -132,44 +138,54 @@
                                     @endif
                                 </div>
                             @endif
+                        <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
+                            <x-loading text="Loading proxy configuration..." />
+                        </div>
+                        <div wire:loading.remove wire:target="loadProxyConfiguration">
+                            @if ($proxySettings)
+                                <div class="flex flex-col gap-10 pt-2">
+                                    <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
+                                        monacoEditorLanguage="yaml"
+                                        label="Configuration file ( {{ $this->configurationFilePath }} )"
+                                        name="proxySettings" id="proxySettings" rows="30" />
+                                </div>
+                            @endif
+                        </div>
                         </div>
                     @endif
-                    <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
-                        <x-loading text="Loading proxy configuration..." />
-                    </div>
-                    <div wire:loading.remove wire:target="loadProxyConfiguration">
-                        @if ($proxySettings)
-                            <div class="flex flex-col gap-2 pt-2">
-                                <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
-                                    monacoEditorLanguage="yaml"
-                                    label="Configuration file ( {{ $this->configurationFilePath }} )"
-                                    name="proxySettings" id="proxySettings" rows="30" />
-                            </div>
-                        @endif
-                    </div>
                 </form>
             @elseif($selectedProxy === 'NONE')
-                <div class="flex items-center gap-2">
-                    <h2>Configuration</h2>
-                    @can('update', $server)
-                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
-                    @endcan
+                <div class="form-card">
+                    <div class="form-section-title">
+                        <h2>Configuration</h2>
+                        <div class="flex items-center gap-2">
+                            @can('update', $server)
+                                <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            @endcan
+                        </div>
+                    </div>
+                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Custom (None) Proxy Selected</p>
                 </div>
-                <div class="pt-2 pb-4">Custom (None) Proxy Selected</div>
             @else
-                <div class="flex items-center gap-2">
-                    <h2>Configuration</h2>
-                    @can('update', $server)
-                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
-                    @endcan
+                <div class="form-card">
+                    <div class="form-section-title">
+                        <h2>Configuration</h2>
+                        <div class="flex items-center gap-2">
+                            @can('update', $server)
+                                <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            @endcan
+                        </div>
+                    </div>
                 </div>
             @endif
         @else
-            <div>
-                <h2>Configuration</h2>
-                <div class="subtitle">Select a proxy you would like to use on this server.</div>
+            <div class="form-card">
+                <div class="form-section-title">
+                    <h2>Configuration</h2>
+                </div>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Select a proxy you would like to use on this server.</p>
                 @can('update', $server)
-                    <div class="grid gap-4">
+                    <div class="mt-4 grid gap-4">
                         <x-forms.button class="coolbox" wire:click="selectProxy('NONE')">
                             Custom (None)
                         </x-forms.button>

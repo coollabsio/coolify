@@ -5,29 +5,31 @@
     <livewire:server.navbar :server="$server" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="docker-cleanup" />
-        <div class="w-full">
-            <form wire:submit='submit'>
-                <div>
-                    <div class="flex items-center gap-2">
+        <div class="w-full flex flex-col gap-10">
+            <form wire:submit='submit' class="flex flex-col gap-10">
+                <div class="form-card">
+                    <div class="form-section-title">
                         <h2>Docker Cleanup</h2>
-                        <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
-                        @can('update', $server)
-                            <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
-                                isHighlightedButton submitAction="manualCleanup" :actions="[
-                                    'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
-                                    'Permanently deletes all unused images',
-                                    'Clears build cache',
-                                    'Removes old versions of the Coolify helper image',
-                                    'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
-                                    'Optionally permanently deletes all unused networks (if enabled in advanced options).',
-                                ]" :confirmWithText="false"
-                                :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
-                        @endcan
+                        <div class="flex items-center gap-2">
+                            <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
+                            @can('update', $server)
+                                <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
+                                    isHighlightedButton submitAction="manualCleanup" :actions="[
+                                        'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
+                                        'Permanently deletes all unused images',
+                                        'Clears build cache',
+                                        'Removes old versions of the Coolify helper image',
+                                        'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
+                                        'Optionally permanently deletes all unused networks (if enabled in advanced options).',
+                                    ]" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
+                            @endcan
+                        </div>
                     </div>
-                    <div class="mt-1 mb-6">Configure Docker cleanup settings for your server.</div>
+                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Configure Docker cleanup settings for your server.</p>
                 </div>
 
-                <div class="flex flex-col gap-2">
+                <div class="form-subsection">
                     <div class="flex gap-4">
                         <h3>Cleanup Configuration</h3>
                     </div>
@@ -54,10 +56,9 @@
                             </ul>"
                             instantSave id="forceDockerCleanup" label="Force Docker Cleanup" />
                     </div>
-
                 </div>
 
-                <div class="flex flex-col gap-2 mt-6">
+                <div class="form-subsection">
                     <h3>Advanced</h3>
                     <x-callout type="warning" title="Caution">
                         <p>These options can cause permanent data loss and functional issues. Only enable if you fully
@@ -86,8 +87,8 @@
                 </div>
             </form>
 
-            <div class="mt-8">
-                <h3 class="mb-4">Recent executions <span class="text-xs text-neutral-500">(click to check
+            <div class="form-subsection">
+                <h3>Recent executions <span class="text-xs text-neutral-500">(click to check
                         output)</span></h3>
                 <livewire:server.docker-cleanup-executions :server="$server" />
             </div>

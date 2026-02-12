@@ -6,16 +6,18 @@
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
         <x-settings.sidebar activeMenu="updates" />
         <form wire:submit='submit' class="flex flex-col w-full">
-            <div class="flex items-center gap-2">
-                <h2>Updates</h2>
-                <x-forms.button type="submit">
-                    Save
-                </x-forms.button>
-            </div>
-            <div class="pb-4">Your instance's update settings.</div>
+            <div class="form-card">
+                <div class="form-section-title">
+                    <h2>Updates</h2>
+                    <div class="flex items-center gap-2">
+                        <x-forms.button type="submit">
+                            Save
+                        </x-forms.button>
+                    </div>
+                </div>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Your instance's update settings.</p>
 
-
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-10">
                 <div class="flex items-end gap-2">
                     <x-forms.input required id="update_check_frequency" label="Update Check Frequency"
                         placeholder="0 * * * *"
@@ -44,6 +46,7 @@
                     <x-forms.input required label="Frequency (cron expression)" disabled placeholder="disabled"
                         helper="Frequency (cron expression) (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
                 @endif
+            </div>
             </div>
 
         </form>

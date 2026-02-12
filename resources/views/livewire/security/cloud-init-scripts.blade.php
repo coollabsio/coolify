@@ -1,19 +1,22 @@
 <div>
     <x-security.navbar />
-    <div class="flex gap-2">
-        <h2 class="pb-4">Cloud-Init Scripts</h2>
-        @can('create', App\Models\CloudInitScript::class)
-            <x-modal-input buttonTitle="+ Add" title="New Cloud-Init Script">
-                <livewire:security.cloud-init-script-form />
-            </x-modal-input>
-        @endcan
+    <div class="form-section-title mb-6">
+        <h2>Cloud-Init Scripts</h2>
+        <div class="flex items-center gap-2">
+            @can('create', App\Models\CloudInitScript::class)
+                <x-modal-input buttonTitle="+ Add" title="New Cloud-Init Script">
+                    <livewire:security.cloud-init-script-form />
+                </x-modal-input>
+            @endcan
+        </div>
     </div>
+    <div class="form-card max-w-none">
     <div class="pb-4 text-sm">Manage reusable cloud-init scripts for server initialization. Currently working only with <span class="text-red-500 font-bold">Hetzner's</span> integration.</div>
 
     <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($scripts as $script)
             <div wire:key="script-{{ $script->id }}"
-                class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
+                class="flex flex-col gap-2 p-4 border border-neutral-200 dark:border-coolgray-300 rounded-lg bg-white dark:bg-coolgray-100 hover:no-underline">
                 <div class="flex justify-between items-center">
                     <div class="flex-1">
                         <div class="font-bold dark:text-white">{{ $script->name }}</div>
@@ -44,7 +47,8 @@
                 </div>
             </div>
         @empty
-            <div class="text-neutral-500">No cloud-init scripts found. Create one to get started.</div>
+            <div class="empty-state">No cloud-init scripts found. Create one to get started.</div>
         @endforelse
+    </div>
     </div>
 </div>

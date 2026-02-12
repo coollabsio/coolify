@@ -2,15 +2,17 @@
     <x-slot:title>
         Projects | Coolify
     </x-slot>
-    <div class="flex gap-2">
+    <div class="form-section-title mb-6">
         <h1>Projects</h1>
-        @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New Project">
-                <livewire:project.add-empty />
-            </x-modal-input>
-        @endcan
+        <div class="flex items-center gap-2">
+            @can('createAnyResource')
+                <x-modal-input buttonTitle="+ Add" title="New Project">
+                    <livewire:project.add-empty />
+                </x-modal-input>
+            @endcan
+        </div>
     </div>
-    <div class="subtitle">All your projects are here.</div>
+    <p class="text-sm text-neutral-500 dark:text-neutral-400 -mt-4 mb-4">All your projects are here.</p>
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 -mt-1">
         @foreach ($projects as $project)
             <div class="relative gap-2 cursor-pointer coolbox group">

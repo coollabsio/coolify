@@ -7,11 +7,12 @@
         <x-server.sidebar :server="$server" activeMenu="sentinel" />
         <div class="w-full">
             <form wire:submit.prevent='submit'>
-                <div class="flex gap-2 items-center pb-2">
+                <div class="form-card">
+                <div class="form-section-title">
                     <h2>Sentinel</h2>
-                    <x-helper helper="Sentinel reports your server's & container's health and collects metrics." />
-                    @if ($server->isSentinelEnabled())
-                        <div class="flex gap-2 items-center">
+                    <div class="flex items-center gap-2">
+                        <x-helper helper="Sentinel reports your server's & container's health and collects metrics." />
+                        @if ($server->isSentinelEnabled())
                             @if ($server->isSentinelLive())
                                 <x-status.running status="In sync" noLoading title="{{ $sentinelUpdatedAt }}" />
                                 <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
@@ -40,10 +41,10 @@
                                     <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
                                 </x-slide-over>
                             @endif
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </div>
-                <div class="flex flex-col gap-2">
+                <div class="mt-4 flex flex-col gap-10">
                     <div class="w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server" wire:model.live="isSentinelEnabled"
                             label="Enable Sentinel" />
@@ -78,7 +79,7 @@
                         </div>
                     @endif
                     @if ($server->isSentinelEnabled())
-                        <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
+                        <div class="flex flex-wrap gap-10 sm:flex-nowrap items-end">
                             <x-forms.input canGate="update" :canResource="$server" type="password" id="sentinelToken"
                                 label="Sentinel token" required helper="Token for Sentinel." />
                             <x-forms.button canGate="update" :canResource="$server"
@@ -89,8 +90,8 @@
                             label="Coolify URL"
                             helper="URL to your Coolify instance. If it is empty that means you do not have a FQDN set for your Coolify instance." />
 
-                        <div class="flex flex-col gap-2">
-                            <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                        <div class="flex flex-col gap-10">
+                            <div class="flex flex-wrap gap-10 sm:flex-nowrap">
                                 <x-forms.input canGate="update" :canResource="$server"
                                     id="sentinelMetricsRefreshRateSeconds" label="Metrics rate (seconds)" required
                                     helper="Interval used for gathering metrics. Lower values result in more disk space usage." />
@@ -103,6 +104,7 @@
                             </div>
                         </div>
                     @endif
+                </div>
                 </div>
             </form>
         </div>

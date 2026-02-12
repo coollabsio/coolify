@@ -7,15 +7,17 @@
                 {{ data_get_str($service, 'name')->limit(10) }} >
                 {{ data_get_str($serviceDatabase, 'name')->limit(10) }} > Backups | Coolify
             </x-slot>
-            <div class="flex gap-2">
-                <h2 class="pb-4">Scheduled Backups</h2>
-                @if (filled($serviceDatabase->custom_type) || !$serviceDatabase->is_migrated)
-                    @can('update', $serviceDatabase)
-                        <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                            <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
-                        </x-modal-input>
-                    @endcan
-                @endif
+            <div class="form-section-title mb-6">
+                <h2>Scheduled Backups</h2>
+                <div class="flex items-center gap-2">
+                    @if (filled($serviceDatabase->custom_type) || !$serviceDatabase->is_migrated)
+                        @can('update', $serviceDatabase)
+                            <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                                <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
+                            </x-modal-input>
+                        @endcan
+                    @endif
+                </div>
             </div>
             <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
         </div>

@@ -1,19 +1,23 @@
-<div class="flex flex-col gap-2">
-    <div class="flex items-center gap-2">
-        <h2>Webhooks</h2>
-        <x-helper
-            helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid' target='_blank'>docs</a>." />
-    </div>
-    <div>
-        <x-forms.input readonly
+<div class="flex flex-col gap-10">
+    <div class="form-card">
+        <div class="form-section-title">
+            <h2>Webhooks</h2>
+            <div class="flex items-center gap-2">
+                <x-helper
+                    helper="For more details goto our <a class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid' target='_blank'>docs</a>." />
+            </div>
+        </div>
+        <div>
+            <x-forms.input readonly
             helper="See details in our <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid'>documentation</a>."
             label="Deploy Webhook (auth required)" id="deploywebhook"></x-forms.input>
+        </div>
     </div>
     @if ($resource->type() === 'application')
-        <div>
+        <div class="form-subsection">
             <h3>Manual Git Webhooks</h3>
             @if ($githubManualWebhook && $gitlabManualWebhook)
-                <form wire:submit='submit' class="flex flex-col gap-2">
+                <form wire:submit='submit' class="flex flex-col gap-10">
                     <div class="flex items-end gap-2">
                         <x-forms.input helper="Content Type in GitHub configuration could be json or form-urlencoded."
                             readonly label="GitHub" id="githubManualWebhook"></x-forms.input>
@@ -79,5 +83,4 @@
             @endif
         </div>
     @endif
-
 </div>

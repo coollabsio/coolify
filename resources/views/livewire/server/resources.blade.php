@@ -6,9 +6,11 @@
     <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
         <div class="w-full">
             <div class="flex flex-col">
-                <div class="flex gap-2">
+                <div class="form-section-title mb-6">
                     <h2>Resources</h2>
-                    <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
+                    <div class="flex items-center gap-2">
+                        <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
+                    </div>
                 </div>
                 <div>Here you can find all resources that are managed by Coolify.</div>
                 <div class="flex flex-row gap-4 py-10">
@@ -37,12 +39,11 @@
                     $managedResources = $server->definedResources()->sortBy('name', SORT_NATURAL);
                 @endphp
                 @if ($managedResources->count() > 0)
-                    <div class="flex flex-col">
-                        <div class="flex flex-col">
-                            <div class="overflow-x-auto">
-                                <div class="inline-block min-w-full">
-                                    <div class="overflow-hidden">
-                                        <table class="min-w-full">
+                    <div class="form-card max-w-none">
+                        <div class="overflow-x-auto">
+                            <div class="inline-block min-w-full">
+                                <div class="overflow-hidden">
+                                    <table class="min-w-full">
                                             <thead>
                                                 <tr>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
@@ -88,23 +89,21 @@
                                                     </tr>
                                                 @endforeach
                                             </tbody>
-                                        </table>
-                                    </div>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                 @else
-                    <div>No managed resources found.</div>
+                    <div class="empty-state">No managed resources found.</div>
                 @endif
             @elseif ($activeTab === 'unmanaged')
                 @if (count($unmanagedContainers) > 0)
-                    <div class="flex flex-col">
-                        <div class="flex flex-col">
-                            <div class="overflow-x-auto">
-                                <div class="inline-block min-w-full">
-                                    <div class="overflow-hidden">
-                                        <table class="min-w-full">
+                    <div class="form-card max-w-none">
+                        <div class="overflow-x-auto">
+                            <div class="inline-block min-w-full">
+                                <div class="overflow-hidden">
+                                    <table class="min-w-full">
                                             <thead>
                                                 <tr>
                                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">
@@ -154,14 +153,13 @@
                                                     </tr>
                                                 @endforeach
                                             </tbody>
-                                        </table>
-                                    </div>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                 @else
-                    <div>No unmanaged resources found.</div>
+                    <div class="empty-state">No unmanaged resources found.</div>
                 @endif
             @endif
         </div>

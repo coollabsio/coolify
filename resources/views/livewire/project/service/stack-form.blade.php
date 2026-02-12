@@ -1,21 +1,22 @@
-<form wire:submit.prevent='submit' class="flex flex-col gap-4 pb-2">
-    <div>
-        <div class="flex gap-2">
+<form wire:submit.prevent='submit' class="flex flex-col gap-10 pb-2">
+    <div class="form-card">
+        <div class="form-section-title">
             <h2>Service Stack</h2>
-            @if (isDev())
-                <div>{{ $service->compose_parsing_version }}</div>
-            @endif
-            <x-forms.button canGate="update" :canResource="$service" wire:target='submit'
-                type="submit">Save</x-forms.button>
-            @can('update', $service)
-                <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
-                    <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
-                </x-modal-input>
-            @endcan
+            <div class="flex items-center gap-2">
+                @if (isDev())
+                    <div>{{ $service->compose_parsing_version }}</div>
+                @endif
+                <x-forms.button canGate="update" :canResource="$service" wire:target='submit'
+                    type="submit">Save</x-forms.button>
+                @can('update', $service)
+                    <x-modal-input buttonTitle="Edit Compose File" title="Edit Docker Compose" :closeOutside="false">
+                        <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
+                    </x-modal-input>
+                @endcan
+            </div>
         </div>
-        <div>Configuration</div>
-    </div>
-    <div class="flex gap-2">
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Configuration</p>
+    <div class="mt-4 flex gap-2">
         <x-forms.input canGate="update" :canResource="$service" id="name" required label="Service Name"
             placeholder="My super WordPress site" />
         <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
@@ -46,4 +47,5 @@
             @endforeach
         </div>
     @endif
+    </div>
 </form>

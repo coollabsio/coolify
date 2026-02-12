@@ -14,18 +14,20 @@
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>
-                <div class="flex items-center gap-2 flex-row">
+                <div class="form-section-title">
                     <h2>Server Patching</h2>
-                    <span class="text-xs text-neutral-500">(experimental)</span>
-                    <x-helper
-                        helper="Only available for apt, dnf and zypper package managers atm, more coming
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-neutral-500">(experimental)</span>
+                        <x-helper
+                            helper="Only available for apt, dnf and zypper package managers atm, more coming
             soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}' {{ wireNavigate() }}>notification settings</a>." />
-                    @if (isDev())
-                        <x-forms.button type="button" wire:click="sendTestEmail">
-                            Send Test Email (dev only)</x-forms.button>
-                    @endif
+                        @if (isDev())
+                            <x-forms.button type="button" wire:click="sendTestEmail">
+                                Send Test Email (dev only)</x-forms.button>
+                        @endif
+                    </div>
                 </div>
-                <div>Update your servers semi-automatically.</div>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Update your servers semi-automatically.</p>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
                         <x-forms.button type="button" wire:click="$dispatch('checkForUpdates')">
@@ -56,6 +58,7 @@
                                                 step2ButtonText="Update All
                                             Packages" />
                                         </div>
+                                        <div class="form-card max-w-none">
                                         <div class="overflow-x-auto">
                                             <table class="min-w-full">
                                                 <thead>
@@ -102,6 +105,7 @@
                                                     @endforeach
                                                 </tbody>
                                             </table>
+                                        </div>
                                         </div>
                                     @endif
                                 @endif

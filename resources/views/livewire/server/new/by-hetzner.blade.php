@@ -3,7 +3,7 @@
         <x-limit-reached name="servers" />
     @else
         @if ($current_step === 1)
-            <div class="flex flex-col w-full gap-4">
+            <div class="flex flex-col w-full gap-8">
                 @if ($available_tokens->count() > 0)
                     <div class="flex gap-2">
                         <div class="flex-1">
@@ -43,7 +43,7 @@
                     </div>
                 </div>
             @else
-                <form class="flex flex-col w-full gap-2" wire:submit='submit'>
+                <form class="flex flex-col w-full gap-8" wire:submit='submit'>
                     <div>
                         <x-forms.input id="server_name" label="Server Name" helper="A friendly name for your server." />
                     </div>
@@ -105,7 +105,7 @@
 
                     <div>
                         @if ($private_keys->count() === 0)
-                            <div class="flex flex-col gap-2">
+                            <div class="flex flex-col gap-8">
                                 <label class="flex gap-1 items-center mb-1 text-sm font-medium">
                                     Private Key
                                     <x-highlighted text="*" />
@@ -149,7 +149,7 @@
                         </x-forms.datalist>
                     </div>
 
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-8">
                         <label class="text-sm font-medium">Network Configuration</label>
                         <div class="flex gap-4">
                             <x-forms.checkbox id="enable_ipv4" label="Enable IPv4"
@@ -159,7 +159,7 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-8">
                         <div class="flex justify-between items-center gap-2">
                             <label class="text-sm font-medium w-32">Cloud-Init Script</label>
                             @if ($saved_cloud_init_scripts->count() > 0)
