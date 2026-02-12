@@ -1,0 +1,115 @@
+# documentation: https://github.com/frappe/frappe_docker
+# slogan: Open Source ERP built on Frappe Framework.
+# category: erp
+# tags: erp, frappe, erpnext, accounting, crm, inventory
+# logo: https://erpnext.com/assets/erpnext/images/erpnext-logo.svg
+# port: 80
+
+services:
+  erpnext-frontend:
+    image: frappe/erpnext:v15.2.0
+    command: nginx-entrypoint.sh
+    environment:
+      - SERVICE_URL_ERPNEXT_FRONTEND=/
+      - BACKEND=erpnext-backend:8000
+      - SOCKETIO=erpnext-websocket:9000
+      - FRAPPE_SITE_NAME_HEADER=${FRAPPE_SITE_NAME_HEADER:-$SERVICE_FQDN_ERPNEXT_FRONTEND}
+      - UPSTREAM_REAL_IP_ADDRESS=${UPSTREAM_REAL_IP_ADDRESS:-127.0.0.1}
+      - UPSTREAM_REAL_IP_HEADER=${UPSTREAM_REAL_IP_HEADER:-X-Forwarded-For}
+      - UPSTREAM_REAL_IP_RECURSIVE=${UPSTREAM_REAL_IP_RECURSIVE:-off}
+      - PROXY_READ_TIMEOUT=${PROXY_READ_TIMEOUT:-120}
+      - CLIENT_MAX_BODY_SIZE=${CLIENT_MAX_BODY_SIZE:-50m}
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      - erpnext-backend
+      - erpnext-websocket
+    restart: always
+
+  erpnext-backend:
+    image: frappe/erpnext:v15.2.0
+    environment:
+      - SERVICE_URL_ERPNEXT_BACKEND
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      erpnext-db:
+        condition: service_started
+      erpnext-redis-cache:
+        condition: service_started
+      erpnext-redis-queue:
+        condition: service_started
+    restart: always
+
+  erpnext-websocket:
+    image: frappe/erpnext:v15.2.0
+    command: node /home/frappe/frappe-bench/apps/frappe/socketio.js
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    restart: always
+
+  erpnext-worker-short:
+    image: frappe/erpnext:v15.2.0
+    command: bench worker --queue short,default
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    restart: always
+
+  erpnext-worker-long:
+    image: frappe/erpnext:v15.2.0
+    command: bench worker --queue long,default,short
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    restart: always
+
+  erpnext-scheduler:
+    image: frappe/erpnext:v15.2.0
+    command: bench schedule
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    restart: always
+
+  erpnext-db:
+    image: mariadb:10.6
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-file-format=barracuda
+      - --innodb-large-prefix=1
+      - --innodb-file-per-table=1
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=erpnext
+      - MYSQL_USER=${SERVICE_USER_ERPNEXT:-erpnext}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_ERPNEXT}
+    volumes:
+      - erpnext-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  erpnext-redis-cache:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  erpnext-redis-queue:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+volumes:
+  erpnext-sites:
+  erpnext-db-data:
