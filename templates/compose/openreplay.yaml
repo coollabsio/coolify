@@ -1,0 +1,17 @@
+# documentation: https://docs.openreplay.com/
+# slogan: OpenReplay is the open-source alternative to FullStory and LogRocket.
+# category: analytics
+# tags: session-replay, analytics, debugging, open-source
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  openreplay:
+    image: public.ecr.aws/i3u1l1i5/openreplay:v1.10.0
+    environment:
+      - SERVICE_URL_OPENREPLAY_80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
