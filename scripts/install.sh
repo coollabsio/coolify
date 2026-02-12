@@ -525,7 +525,7 @@ install_docker_manually() {
         # Add the repository to Apt sources
         echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
-                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-${VERSION_CODENAME:-$DEBIAN_CODENAME}}") stable" |
             tee /etc/apt/sources.list.d/docker.list
         apt-get update
         apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
