@@ -1,0 +1,85 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready fullstack mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.)
+# category: email
+# tags: docker-mailserver,email,smtp,imap,postfix,dovecot,mail
+# logo: svgs/docker-mailserver.svg
+# port: 80
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAILSERVER_HOSTNAME:-mail.example.com}
+    environment:
+      - SERVICE_URL_MAILSERVER_80
+      - OVERRIDE_HOSTNAME=${MAILSERVER_HOSTNAME:-mail.example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ACCOUNT_PROVISIONER=${ACCOUNT_PROVISIONER:-FILE}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS}
+      - PERMIT_DOCKER=${PERMIT_DOCKER:-none}
+      - TZ=${TZ:-UTC}
+      - TLS_LEVEL=${TLS_LEVEL:-modern}
+      - ENABLE_OPENDKIM=${ENABLE_OPENDKIM:-1}
+      - ENABLE_OPENDMARC=${ENABLE_OPENDMARC:-1}
+      - ENABLE_POLICYD_SPF=${ENABLE_POLICYD_SPF:-1}
+      - ENABLE_IMAP=${ENABLE_IMAP:-1}
+      - ENABLE_POP3=${ENABLE_POP3:-0}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_RSPAMD=${ENABLE_RSPAMD:-0}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-0}
+      - ENABLE_AMAVIS=${ENABLE_AMAVIS:-1}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-0}
+      - ENABLE_MANAGESIEVE=${ENABLE_MANAGESIEVE:-1}
+      - ENABLE_QUOTAS=${ENABLE_QUOTAS:-1}
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+      - POSTFIX_MESSAGE_SIZE_LIMIT=${POSTFIX_MESSAGE_SIZE_LIMIT:-10240000}
+      - POSTFIX_MAILBOX_SIZE_LIMIT=${POSTFIX_MAILBOX_SIZE_LIMIT:-0}
+      - PFLOGSUMM_TRIGGER=${PFLOGSUMM_TRIGGER:-daily_cron}
+      - PFLOGSUMM_RECIPIENT=${PFLOGSUMM_RECIPIENT}
+      - LOGROTATE_INTERVAL=${LOGROTATE_INTERVAL:-weekly}
+      - ENABLE_UPDATE_CHECK=${ENABLE_UPDATE_CHECK:-1}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "4190:4190"
+    volumes:
+      - mailserver-mail-data:/var/mail/
+      - mailserver-mail-state:/var/mail-state/
+      - mailserver-mail-logs:/var/log/mail/
+      - mailserver-config:/tmp/docker-mailserver/
+      - /etc/localtime:/etc/localtime:ro
+      - type: bind
+        source: ./postfix-main.cf
+        target: /tmp/docker-mailserver/postfix-main.cf
+        isDirectory: false
+        content: ""
+      - type: bind
+        source: ./postfix-master.cf
+        target: /tmp/docker-mailserver/postfix-master.cf
+        isDirectory: false
+        content: ""
+      - type: bind
+        source: ./postfix-accounts.cf
+        target: /tmp/docker-mailserver/postfix-accounts.cf
+        isDirectory: false
+        content: ""
+      - type: bind
+        source: ./postfix-virtual.cf
+        target: /tmp/docker-mailserver/postfix-virtual.cf
+        isDirectory: false
+        content: ""
+      - type: bind
+        source: ./dovecot.cf
+        target: /tmp/docker-mailserver/dovecot.cf
+        isDirectory: false
+        content: ""
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      timeout: 3s
+      retries: 10
+      interval: 30s
+      start_period: 120s
