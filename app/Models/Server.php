@@ -1043,26 +1043,62 @@ $schema://$host {
 
     public function validateOS(): bool|Stringable
     {
-        $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
-        $collectedData = collect([]);
-        foreach ($releaseLines as $line) {
-            $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
-        }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
+        $osRelease = instant_remote_process(['cat /etc/os-release'], $this);
+        $releaseData = self::parseOsReleaseContent($osRelease);
+
+        return self::resolveSupportedOsTypeFromReleaseData($releaseData);
+    }
+
+    public static function parseOsReleaseContent(string $osRelease): Collection
+    {
+        return collect(explode("\n", $osRelease))
+            ->map(fn ($line) => str($line)->trim())
+            ->filter(fn (Stringable $line) => $line->isNotEmpty() && $line->contains('='))
+            ->reduce(function (Collection $releaseData, Stringable $line) {
+                $key = $line->before('=');
+                if ($key->isEmpty()) {
+                    return $releaseData;
+                }
+
+                $value = $line->after('=')
+                    ->lower()
+                    ->replace('"', '')
+                    ->trim()
+                    ->value();
+                $releaseData->put($key->value(), $value);
+
+                return $releaseData;
+            }, collect([]));
+    }
+
+    public static function resolveSupportedOsTypeFromReleaseData(Collection $releaseData): bool|Stringable
+    {
+        $identifiers = collect([
+            data_get($releaseData, 'ID'),
+            data_get($releaseData, 'ID_LIKE'),
+        ])->filter();
+
+        $candidateIds = $identifiers
+            ->flatMap(function ($identifier) {
+                return preg_split('/\s+/', (string) $identifier) ?: [];
+            })
+            ->map(fn ($identifier) => str($identifier)->trim()->lower()->value())
+            ->filter();
+
+        foreach ($candidateIds as $candidateId) {
+            $supportedGroup = collect(SUPPORTED_OS)->first(function ($supportedOs) use ($candidateId) {
+                $supportedIds = collect(explode(' ', $supportedOs))
+                    ->map(fn ($id) => str($id)->trim()->lower()->value())
+                    ->filter();
+
+                return $supportedIds->contains($candidateId);
+            });
+            if ($supportedGroup) {
+                return str($supportedGroup);
             }
-        });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function isTerminalEnabled()
