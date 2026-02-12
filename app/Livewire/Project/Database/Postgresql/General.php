@@ -66,6 +66,8 @@ class General extends Component
 
     public ?Carbon $certificateValidUntil = null;
 
+    public ?int $proxyTimeout = null;
+
     public function getListeners()
     {
         $userId = Auth::id();
@@ -97,6 +99,7 @@ class General extends Component
             'customDockerRunOptions' => 'nullable',
             'enableSsl' => 'boolean',
             'sslMode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
+            'proxyTimeout' => 'nullable|integer|min:0',
         ];
     }
 
@@ -133,6 +136,7 @@ class General extends Component
         'customDockerRunOptions' => 'Custom Docker Run Options',
         'enableSsl' => 'Enable SSL',
         'sslMode' => 'SSL Mode',
+        'proxyTimeout' => 'Proxy Timeout',
     ];
 
     public function mount()
@@ -178,6 +182,7 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->enable_ssl = $this->enableSsl;
             $this->database->ssl_mode = $this->sslMode;
+            $this->database->proxy_timeout = $this->proxyTimeout;
             $this->database->save();
 
             $this->db_url = $this->database->internal_db_url;
@@ -200,6 +205,7 @@ class General extends Component
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->enableSsl = $this->database->enable_ssl;
             $this->sslMode = $this->database->ssl_mode;
+            $this->proxyTimeout = $this->database->proxy_timeout;
             $this->db_url = $this->database->internal_db_url;
             $this->db_url_public = $this->database->external_db_url;
         }

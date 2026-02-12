@@ -46,6 +46,8 @@ class General extends Component
 
     public bool $isLogDrainEnabled = false;
 
+    public ?int $proxyTimeout = null;
+
     public ?string $customDockerRunOptions = null;
 
     public bool $enableSsl = false;
@@ -82,6 +84,7 @@ class General extends Component
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
             'isLogDrainEnabled' => 'nullable|boolean',
+            'proxyTimeout' => 'nullable|integer|min:0',
             'customDockerRunOptions' => 'nullable',
             'enableSsl' => 'boolean',
             'sslMode' => 'nullable|string|in:PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
@@ -160,6 +163,7 @@ class General extends Component
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->proxy_timeout = $this->proxyTimeout;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->enable_ssl = $this->enableSsl;
             $this->database->ssl_mode = $this->sslMode;
@@ -180,6 +184,7 @@ class General extends Component
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->proxyTimeout = $this->database->proxy_timeout;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->enableSsl = $this->database->enable_ssl;
             $this->sslMode = $this->database->ssl_mode;
