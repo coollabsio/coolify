@@ -1,0 +1,73 @@
+# documentation: https://docs.litespeedtech.com/cloud/docker/ols-wordpress/
+# slogan: High-performance WordPress powered by OpenLiteSpeed, LSCache, and Redis.
+# tags: cms, wordpress, litespeed, openlitespeed, php, mariadb, redis, performance, lscache
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - TZ=${TIMEZONE:-UTC}
+      - MYSQL_DATABASE=${SERVICE_DATABASE_NAME:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS:-wordpress}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+      - MYSQL_HOST=mariadb
+      # OpenLiteSpeed specific env vars for auto-setup
+      - DOMAIN=${SERVICE_FQDN_WORDPRESS:-localhost}
+      - USERNAME=${SERVICE_USER_ADMIN:-admin}
+      - PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - EMAIL=${SERVICE_EMAIL_ADMIN:-admin@example.com}
+      # LSCache & Redis configuration (usually requires the plugin, but we can set env for future automation)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - wordpress-conf:/usr/local/lsws/conf
+      - wordpress-admin-conf:/usr/local/lsws/admin/conf
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${SERVICE_DATABASE_NAME:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_WORDPRESS:-wordpress}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_WORDPRESS}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+volumes:
+  wordpress-data:
+  wordpress-conf:
+  wordpress-admin-conf:
+  mariadb-data:
+  redis-data:

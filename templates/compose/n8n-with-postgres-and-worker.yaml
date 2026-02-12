@@ -8,6 +8,9 @@
 services:
   n8n:
     image: n8nio/n8n:2.1.5
+    networks:
+      - coolify
+      - internal
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -56,6 +59,8 @@ services:
   n8n-worker:
     image: n8nio/n8n:2.1.5
     command: worker
+    networks:
+      - internal
     environment:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
       - TZ=${TZ:-UTC}
@@ -99,6 +104,8 @@ services:
 
   postgresql:
     image: postgres:16-alpine
+    networks:
+      - internal
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:
@@ -113,6 +120,8 @@ services:
 
   redis:
     image: redis:6-alpine
+    networks:
+      - internal
     volumes:
       - redis-data:/data
     healthcheck:
@@ -123,6 +132,8 @@ services:
 
   task-runners:
     image: n8nio/runners:2.1.5
+    networks:
+      - internal
     environment:
       - N8N_RUNNERS_TASK_BROKER_URI=${N8N_RUNNERS_TASK_BROKER_URI:-http://n8n-worker:5679}
       - N8N_RUNNERS_AUTH_TOKEN=$SERVICE_PASSWORD_N8N
@@ -137,3 +148,9 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
+networks:
+  coolify:
+    external: true
+  internal:
+    driver: bridge
