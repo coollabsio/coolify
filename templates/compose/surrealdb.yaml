@@ -1,0 +1,27 @@
+# documentation: https://surrealdb.com/docs/surrealdb/deployment/docker
+# slogan: SurrealDB is a multi-model database for future-ready applications.
+# category: database
+# tags: database,nosql,sql,graph,surrealdb
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user ${SURREALDB_USER:-root} --pass ${SURREALDB_PASSWORD} ${SURREALDB_EXTRA_FLAGS:-memory}
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+      - SURREALDB_USER=${SURREALDB_USER:-root}
+      - SURREALDB_PASSWORD=${SERVICE_PASSWORD_SURREALDB}
+    volumes:
+      - surrealdb-data:/mydata
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: TiKV Backend (if TiKV is chosen in SURREALDB_EXTRA_FLAGS, e.g. tikv://pd:2379)
+  # Note: A full TiKV cluster in Docker Compose is complex; usually TiKV is used in K8s.
+  # For Docker, RocksDB is the standard persistent backend.
+  # To use RocksDB: SURREALDB_EXTRA_FLAGS=rocksdb:/mydata/surreal.db

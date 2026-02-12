@@ -5284,5 +5284,21 @@
         "logo": "svgs/marimo.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "surrealdb": {
+        "documentation": "https://surrealdb.com/docs/surrealdb/deployment/docker",
+        "slogan": "A multi-model database for future-ready applications.",
+        "compose": "IyBkb2N1bWVudGF0aW9uOiBodHRwczovL3N1cnJlYWxkYi5jb20vZG9jcy9zdXJyZWFsZGIvZGVwbG95bWVudC9kb2NrZXIKIyBzbG9nYW46IFN1cnJlYWxEQiBpcyBhIG11bHRpLW1vZGVsIGRhdGFiYXNlIGZvciBmdXR1cmUtcmVhZHkgYXBwbGljYXRpb25zLgojIGNhdGVnb3J5OiBkYXRhYmFzZQojIHRhZ3M6IGRhdGFiYXNlLG5vc3FsLHNxbCxncmFwaCxzdXJyZWFsZGIKIyBsb2dvOiBzdmdzL3N1cnJlYWxkYi5zdmcKIyBwb3J0OiA4MDAwCgpzZXJ2aWNlczoKICBzdXJyZWFsZGI6CiAgICBpbWFnZTogc3VycmVhbGRiL3N1cnJlYWxkYjpsYXRlc3QKICAgIGNvbW1hbmQ6IHN0YXJ0IC0tdXNlciAke1NVUlJFQUxEQl9VU0VSOi1yb290fSAtLXBhc3MgJHtTVVJSRUFMREJfUEFTU1dPUkR9ICR7U1VSUkVBTERCX0VYVFJBX0ZMQUdTOi1tZW1vcnl9CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9TVVJSRUFMREJfODAwMAogICAgICAtIFNVUlJFQUxEQl9VU0VSPSR7U1VSUkVBTERCX1VTRVI6LXJvb3R9CiAgICAgIC0gU1VSUkVBTERCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9TVVJSRUFMREJ9CiAgICB2b2x1bWVzOgogICAgICAtIHN1cnJlYWxkYi1kYXRhOi9teWRhdGEKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9oZWFsdGgiXQogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKCiAgIyBPcHRpb25hbDogVGlLViBCYWNrZW5kIChpZiBUaUtWIGlzIGNob3NlbiBpbiBTVVJSRUFMREJfRVhUUkFfRkxBR1MsIGUuZy4gdGlrdjovL3BkOjIzNzkpCiAgIyBOb3RlOiBBIGZ1bGwgVGlLViBjbHVzdGVyIGluIERvY2tlciBDb21wb3NlIGlzIGNvbXBsZXg7IHVzdWFsbHkgVGlLViBpcyB1c2VkIGluIEs4cy4KICAjIEZvciBEb2NrZXIsIFJvY2tzREIgaXMgdGhlIHN0YW5kYXJkIHBlcnNpc3RlbnQgYmFja2VuZC4KICAjIFRvIHVzZSBSb2Nrc0RCOiBTVVJSRUFMREJfRVhUUkFfRkxBR1M9cm9ja3NkYjovbXlkYXRhL3N1cnJlYWwuZGIK",
+        "tags": [
+            "database",
+            "nosql",
+            "sql",
+            "graph",
+            "surrealdb"
+        ],
+        "category": "database",
+        "logo": "svgs/surrealdb.svg",
+        "minversion": "0.0.0",
+        "port": "8000"
     }
 }
