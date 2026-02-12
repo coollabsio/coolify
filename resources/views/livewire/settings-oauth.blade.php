@@ -17,9 +17,12 @@
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
                     <h3>{{ ucfirst($oauth_setting['provider']) }}</h3>
-                    <div class="w-32">
+                    <div class="flex gap-4">
                         <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
                             id="oauth_settings_map.{{ $oauth_setting['provider'] }}.enabled" label="Enabled" />
+                        <x-forms.checkbox instantSave="instantSave('{{ $oauth_setting['provider'] }}')"
+                            id="oauth_settings_map.{{ $oauth_setting['provider'] }}.is_registration_enabled"
+                            label="Allow Registration" />
                     </div>
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.client_id"

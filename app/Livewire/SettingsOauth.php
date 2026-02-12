@@ -13,6 +13,7 @@ class SettingsOauth extends Component
     {
         return OauthSetting::all()->reduce(function ($carry, $setting) {
             $carry["oauth_settings_map.$setting->provider.enabled"] = 'required';
+            $carry["oauth_settings_map.$setting->provider.is_registration_enabled"] = 'required';
             $carry["oauth_settings_map.$setting->provider.client_id"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
@@ -33,6 +34,7 @@ class SettingsOauth extends Component
                 'id' => $setting->id,
                 'provider' => $setting->provider,
                 'enabled' => $setting->enabled,
+                'is_registration_enabled' => $setting->is_registration_enabled,
                 'client_id' => $setting->client_id,
                 'client_secret' => $setting->client_secret,
                 'redirect_uri' => $setting->redirect_uri,
@@ -56,6 +58,7 @@ class SettingsOauth extends Component
 
             $oauth->fill([
                 'enabled' => $oauthData['enabled'],
+                'is_registration_enabled' => $oauthData['is_registration_enabled'],
                 'client_id' => $oauthData['client_id'],
                 'client_secret' => $oauthData['client_secret'],
                 'redirect_uri' => $oauthData['redirect_uri'],
@@ -74,6 +77,7 @@ class SettingsOauth extends Component
                 'id' => $oauth->id,
                 'provider' => $oauth->provider,
                 'enabled' => $oauth->enabled,
+                'is_registration_enabled' => $oauth->is_registration_enabled,
                 'client_id' => $oauth->client_id,
                 'client_secret' => $oauth->client_secret,
                 'redirect_uri' => $oauth->redirect_uri,
@@ -95,6 +99,7 @@ class SettingsOauth extends Component
 
                 $oauth->fill([
                     'enabled' => $settingData['enabled'],
+                    'is_registration_enabled' => $settingData['is_registration_enabled'],
                     'client_id' => $settingData['client_id'],
                     'client_secret' => $settingData['client_secret'],
                     'redirect_uri' => $settingData['redirect_uri'],
@@ -114,6 +119,7 @@ class SettingsOauth extends Component
                     'id' => $oauth->id,
                     'provider' => $oauth->provider,
                     'enabled' => $oauth->enabled,
+                    'is_registration_enabled' => $oauth->is_registration_enabled,
                     'client_id' => $oauth->client_id,
                     'client_secret' => $oauth->client_secret,
                     'redirect_uri' => $oauth->redirect_uri,
