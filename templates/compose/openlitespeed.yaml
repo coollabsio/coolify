@@ -1,0 +1,23 @@
+# documentation: https://openlitespeed.org
+# slogan: OpenLiteSpeed is a high-performance, lightweight, open-source HTTP server with a built-in WebAdmin GUI.
+# category: hosting
+# tags: web-server, openlitespeed, litespeed, http, hosting, php
+# logo: svgs/openlitespeed.svg
+# port: 8088
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:latest
+    volumes:
+      - ols-conf:/usr/local/lsws/conf
+      - ols-logs:/usr/local/lsws/logs
+      - webroot:/var/www/vhosts/localhost/html
+    environment:
+      - SERVICE_URL_OPENLITESPEED_8088
+    ports:
+      - "7080:7080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8088/"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
