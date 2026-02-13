@@ -53,7 +53,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
