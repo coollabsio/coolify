@@ -80,6 +80,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -94,9 +96,20 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
             ]);
+
+            // Use OpenRC for Alpine, systemd for everything else
+            if ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([
+                    'rc-update add docker default >/dev/null 2>&1 || true',
+                    'service docker restart || rc-service docker restart',
+                ]);
+            } else {
+                $command = $command->merge([
+                    'systemctl enable docker >/dev/null 2>&1 || true',
+                    'systemctl restart docker',
+                ]);
+            }
             if ($server->isSwarm()) {
                 $command = $command->merge([
                     'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
@@ -116,12 +129,20 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
+        // Dynamic codename fallback: Check if Docker repo has the distribution, fallback to bookworm if not.
+        // This handles Debian 13 (trixie) and future releases where Docker may not have packages yet.
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            // Dynamic fallback: check if the codename exists in Docker repo, otherwise use bookworm
+            'DOCKER_CODENAME=${VERSION_CODENAME} && '.
+            'if ! curl -fsSL --head "https://download.docker.com/linux/${ID}/dists/${VERSION_CODENAME}/Release" >/dev/null 2>&1; then '.
+            'DOCKER_CODENAME="bookworm"; '.
+            'echo "Docker repo not available for ${VERSION_CODENAME}, falling back to ${DOCKER_CODENAME}"; '.
+            'fi && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${DOCKER_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
@@ -157,6 +178,16 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        // Alpine Linux uses apk package manager and OpenRC instead of systemd
+        // docker-cli-compose provides docker compose v2 functionality
+        return 'apk update && '.
+            'apk add --no-cache docker docker-cli-compose && '.
+            'rc-update add docker default && '.
+            'service docker start';
     }
 
     private function getGenericDockerInstallCommand(): string

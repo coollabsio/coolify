@@ -1051,18 +1051,35 @@ $schema://$host {
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+
+        // First try to match by ID
         $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
             if (str($supportedOs)->contains($ID)) {
                 return str($ID);
             }
         });
+
         if ($supported->count() === 1) {
             return str($supported->first());
-        } else {
-            return false;
         }
+
+        // Fallback: try to match by ID_LIKE (e.g., for Debian derivatives)
+        if ($ID_LIKE) {
+            $idLikeValues = collect(explode(' ', $ID_LIKE));
+            foreach ($idLikeValues as $idLike) {
+                $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($idLike) {
+                    if (str($supportedOs)->contains($idLike)) {
+                        return str($idLike);
+                    }
+                });
+                if ($supported->count() === 1) {
+                    return str($supported->first());
+                }
+            }
+        }
+
+        return false;
     }
 
     public function isTerminalEnabled()

@@ -53,8 +53,15 @@ class InstallPrerequisites
                 "echo 'Installing Prerequisites for Arch Linux...'",
                 'pacman -Syu --noconfirm --needed curl wget git jq',
             ]);
+        } elseif ($supported_os_type->contains('alpine')) {
+            // Alpine Linux uses apk package manager and OpenRC instead of systemd
+            $command = $command->merge([
+                "echo 'Installing Prerequisites for Alpine Linux...'",
+                'apk update',
+                'apk add --no-cache curl wget git jq openssl',
+            ]);
         } else {
-            throw new \Exception('Unsupported OS type for prerequisites installation');
+            throw new \Exception("Unsupported OS type for prerequisites installation. Detected OS: {$supported_os_type}");
         }
 
         $command->push("echo 'Prerequisites installed successfully.'");
