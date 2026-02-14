@@ -54,6 +54,14 @@
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Healthcheck</span></a>
             @endif
+            @if ($application->build_pack === 'dockercompose')
+                @foreach ($application->composeDatabases as $composeDb)
+                    @if ($composeDb->isBackupSolutionAvailable())
+                        <a class="sub-menu-item" {{ wireNavigate() }}
+                            href="{{ route('project.application.database.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid, 'stack_service_uuid' => $composeDb->uuid]) }}"><span class="menu-item-label">Backups: {{ $composeDb->name }}</span></a>
+                    @endif
+                @endforeach
+            @endif
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Rollback</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"

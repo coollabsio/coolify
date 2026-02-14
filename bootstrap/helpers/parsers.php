@@ -641,6 +641,39 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
     }
 
+    // Detect and register database services for backup support (skip for preview deployments)
+    if ($pull_request_id === 0) {
+        $detectedDatabaseNames = collect([]);
+        foreach ($services as $serviceName => $service) {
+            $serviceImage = data_get_str($service, 'image');
+            if (isDatabaseImage($serviceImage, $service)) {
+                $detectedDatabaseNames->push($serviceName);
+                $savedDb = ServiceDatabase::firstOrCreate([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ]);
+                if ($savedDb->image !== $serviceImage) {
+                    $savedDb->image = $serviceImage;
+                    $savedDb->save();
+                }
+            }
+        }
+        // Clean up stale ServiceDatabase records for services no longer in the compose file
+        if ($detectedDatabaseNames->isNotEmpty()) {
+            ServiceDatabase::where('application_id', $resource->id)
+                ->whereNotIn('name', $detectedDatabaseNames->toArray())
+                ->each(function ($db) {
+                    $db->delete();
+                });
+        } else {
+            // No databases detected, remove all application-owned service databases
+            ServiceDatabase::where('application_id', $resource->id)
+                ->each(function ($db) {
+                    $db->delete();
+                });
+        }
+    }
+
     // generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = collect([]);
     if ($resource->build_pack === 'dockercompose') {

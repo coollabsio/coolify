@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +55,54 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Get the owner of this database (either a Service or an Application).
+     */
+    public function getOwner()
+    {
+        return $this->service ?? $this->application;
+    }
+
+    /**
+     * Get the UUID of the owner (Service or Application).
+     */
+    public function getOwnerUuid(): ?string
+    {
+        $owner = $this->getOwner();
+
+        return $owner?->uuid;
+    }
+
+    /**
+     * Get the server this database runs on.
+     */
+    public function getServer()
+    {
+        if ($this->service_id) {
+            return $this->service?->server;
+        }
+
+        return $this->application?->destination?->server;
+    }
+
+    /**
+     * Get the network for this database.
+     */
+    public function getNetwork(): ?string
+    {
+        if ($this->service_id) {
+            return $this->service?->uuid;
+        }
+
+        return $this->application?->destination?->network;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $ownerUuid = $this->getOwnerUuid();
+        $server = $this->getServer();
+        $container_id = $this->name.'-'.$ownerUuid;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -114,8 +164,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +175,32 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->service_id) {
+            return data_get($this, 'service.environment.project.team');
+        }
+
+        return data_get($this, 'application.environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $ownerUuid = $this->getOwnerUuid();
+
+        if ($this->application_id) {
+            return application_configuration_dir()."/{$ownerUuid}";
+        }
+
+        return service_configuration_dir()."/{$ownerUuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

@@ -200,6 +200,11 @@ class Application extends BaseModel
                                 ->orWhere('key', 'LIKE', 'SERVICE_URL_%');
                         })
                         ->delete();
+
+                    // Remove detected compose databases
+                    $application->composeDatabases()->each(function ($db) {
+                        $db->delete();
+                    });
                 }
 
                 // Clear Dockerfile specific data when switching away from dockerfile
@@ -247,6 +252,9 @@ class Application extends BaseModel
             foreach ($application->deployment_queue as $deployment) {
                 $deployment->delete();
             }
+            $application->composeDatabases()->each(function ($db) {
+                $db->delete();
+            });
         });
     }
 
@@ -913,6 +921,11 @@ class Application extends BaseModel
     public function deployment_queue()
     {
         return $this->hasMany(ApplicationDeploymentQueue::class);
+    }
+
+    public function composeDatabases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function destination()
