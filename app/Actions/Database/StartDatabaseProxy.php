@@ -20,6 +20,11 @@ class StartDatabaseProxy
 
     public string $jobQueue = 'high';
 
+    /**
+     * The default proxy timeout used when no custom value is set (1 year in seconds).
+     */
+    public const DEFAULT_PROXY_TIMEOUT = 31536000;
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
@@ -54,6 +59,7 @@ class StartDatabaseProxy
         if (isDev()) {
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
+        $proxyTimeout = $this->resolveProxyTimeout($database);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -67,6 +73,8 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_timeout {$proxyTimeout}s;
+            proxy_connect_timeout {$proxyTimeout}s;
        }
     }
     EOF;
@@ -119,5 +127,17 @@ class StartDatabaseProxy
             "docker compose --project-directory {$configuration_dir} pull",
             "docker compose --project-directory {$configuration_dir} up -d",
         ], $server);
+    }
+
+    /**
+     * Resolve the proxy timeout in seconds for the given database.
+     *
+     * A value of 0 means "no timeout", which maps to 1 year (the practical maximum).
+     */
+    private function resolveProxyTimeout(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database): int
+    {
+        $timeout = (int) ($database->public_port_timeout ?? 0);
+
+        return $timeout > 0 ? $timeout : self::DEFAULT_PROXY_TIMEOUT;
     }
 }
