@@ -1,0 +1,22 @@
+# documentation: https://surrealdb.com
+# slogan: SurrealDB is an end-to-end cloud-native database for tomorrow's applications.
+# category: database
+# tags: database, nosql, sql, graph, serverless
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --log trace --user $SERVICE_USER_SURREALDB --pass $SERVICE_PASSWORD_SURREALDB file:/data/surreal.db
+    environment:
+      - SERVICE_FQDN_SURREALDB
+      - SURREAL_USER=$SERVICE_USER_SURREALDB
+      - SURREAL_PASS=$SERVICE_PASSWORD_SURREALDB
+    volumes:
+      - surreal-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
