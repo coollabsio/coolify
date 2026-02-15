@@ -1,3 +1,29 @@
+
+
+    public function toggleOauthOnly($id)
+
+    {
+
+        if (! isInstanceAdmin()) {
+
+            return redirect()->route(\'dashboard\');
+
+        }
+
+        $user = User::find($id);
+
+        if ($user) {
+
+            $user->is_oauth_only = !$user->is_oauth_only;
+
+            $user->save();
+
+            $this->getUsers();
+
+        }
+
+    }
+
 <?php
 
 namespace App\Livewire\Team;
