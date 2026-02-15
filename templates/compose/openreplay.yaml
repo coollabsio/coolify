@@ -7,6 +7,7 @@
 services:
   postgresql:
     image: postgres:16
+    pull_policy: missing
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_USER=postgres
@@ -16,6 +17,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3-alpine
+    pull_policy: missing
     volumes:
       - openreplay-clickhouse:/var/lib/clickhouse
     environment:
@@ -25,6 +27,7 @@ services:
 
   redis:
     image: ghcr.io/openreplay/valkey:8
+    pull_policy: missing
     volumes:
       - openreplay-redisdata:/bitnami/redis/data
     environment:
@@ -32,6 +35,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    pull_policy: missing
     volumes:
       - openreplay-miniodata:/data
     environment:
@@ -41,6 +45,7 @@ services:
 
   alerts:
     image: public.ecr.aws/p1t3u8a3/alerts:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -63,6 +68,7 @@ services:
 
   api:
     image: public.ecr.aws/p1t3u8a3/api:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -85,6 +91,7 @@ services:
 
   http:
     image: public.ecr.aws/p1t3u8a3/http:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -107,6 +114,7 @@ services:
 
   images:
     image: public.ecr.aws/p1t3u8a3/images:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -129,6 +137,7 @@ services:
 
   integrations:
     image: public.ecr.aws/p1t3u8a3/integrations:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -151,6 +160,7 @@ services:
 
   sink:
     image: public.ecr.aws/p1t3u8a3/sink:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -176,6 +186,7 @@ services:
 
   sourcemapreader:
     image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -198,6 +209,7 @@ services:
 
   spot:
     image: public.ecr.aws/p1t3u8a3/spot:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -220,6 +232,7 @@ services:
 
   storage:
     image: public.ecr.aws/p1t3u8a3/storage:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -242,6 +255,7 @@ services:
 
   assets:
     image: public.ecr.aws/p1t3u8a3/assets:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -264,6 +278,7 @@ services:
 
   assist:
     image: public.ecr.aws/p1t3u8a3/assist:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -286,6 +301,7 @@ services:
 
   canvases:
     image: public.ecr.aws/p1t3u8a3/canvases:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -308,6 +324,7 @@ services:
 
   chalice:
     image: public.ecr.aws/p1t3u8a3/chalice:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -330,6 +347,7 @@ services:
 
   db:
     image: public.ecr.aws/p1t3u8a3/db:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -352,6 +370,7 @@ services:
 
   ender:
     image: public.ecr.aws/p1t3u8a3/ender:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -377,6 +396,7 @@ services:
 
   frontend:
     image: public.ecr.aws/p1t3u8a3/frontend:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -401,6 +421,7 @@ services:
 
   heuristics:
     image: public.ecr.aws/p1t3u8a3/heuristics:v1.25.0
+    pull_policy: missing
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -423,6 +444,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    pull_policy: missing
     # Embed nginx config at container start so external file is not required
     command: >
       /bin/sh -lc "cat > /etc/nginx/conf.d/default.conf <<'NGINX_CONF'
