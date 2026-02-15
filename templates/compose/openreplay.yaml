@@ -4,14 +4,15 @@
 # category: analytics
 # logo: svgs/openreplay.png
 # port: 80
-
 services:
   postgresql:
-    image: bitnami/postgresql:16
-    volumes:
-      - openreplay-pgdata:/bitnami/postgresql
+    image: postgres:16
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - openreplay-pgdata:/var/lib/postgresql/data
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3-alpine
