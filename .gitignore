@@ -38,3 +38,4 @@ docker/coolify-realtime/node_modules
 .DS_Store
 CHANGELOG.md
 /.workspaces
+/.claude/settings.local.json
