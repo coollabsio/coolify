@@ -31,15 +31,16 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
 
   minio:
-    image: ghcr.io/openreplay/minio:2024.12.13
+    image: minio/minio:latest
     volumes:
-      - openreplay-miniodata:/bitnami/minio/data
+      - openreplay-miniodata:/data
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    command: server /data
 
   alerts:
-    image: public.ecr.aws/p1t3u8a3/alerts:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/alerts:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -61,7 +62,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: public.ecr.aws/p1t3u8a3/api:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/api:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -83,7 +84,7 @@ services:
     restart: unless-stopped
 
   http:
-    image: public.ecr.aws/p1t3u8a3/http:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/http:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -105,7 +106,7 @@ services:
     restart: unless-stopped
 
   images:
-    image: public.ecr.aws/p1t3u8a3/images:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/images:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -127,7 +128,7 @@ services:
     restart: unless-stopped
 
   integrations:
-    image: public.ecr.aws/p1t3u8a3/integrations:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/integrations:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -149,7 +150,7 @@ services:
     restart: unless-stopped
 
   sink:
-    image: public.ecr.aws/p1t3u8a3/sink:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/sink:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -174,7 +175,7 @@ services:
     restart: unless-stopped
 
   sourcemapreader:
-    image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/sourcemapreader:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -196,7 +197,7 @@ services:
     restart: unless-stopped
 
   spot:
-    image: public.ecr.aws/p1t3u8a3/spot:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/spot:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -218,7 +219,7 @@ services:
     restart: unless-stopped
 
   storage:
-    image: public.ecr.aws/p1t3u8a3/storage:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/storage:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -240,7 +241,7 @@ services:
     restart: unless-stopped
 
   assets:
-    image: public.ecr.aws/p1t3u8a3/assets:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/assets:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -262,7 +263,7 @@ services:
     restart: unless-stopped
 
   assist:
-    image: public.ecr.aws/p1t3u8a3/assist:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/assist:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -284,7 +285,7 @@ services:
     restart: unless-stopped
 
   canvases:
-    image: public.ecr.aws/p1t3u8a3/canvases:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/canvases:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -306,7 +307,7 @@ services:
     restart: unless-stopped
 
   chalice:
-    image: public.ecr.aws/p1t3u8a3/chalice:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/chalice:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -328,7 +329,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: public.ecr.aws/p1t3u8a3/db:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/db:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -350,7 +351,7 @@ services:
     restart: unless-stopped
 
   ender:
-    image: public.ecr.aws/p1t3u8a3/ender:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/ender:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -375,7 +376,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: public.ecr.aws/p1t3u8a3/frontend:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/frontend:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -399,7 +400,7 @@ services:
     restart: unless-stopped
 
   heuristics:
-    image: public.ecr.aws/p1t3u8a3/heuristics:v1.22.3
+    image: public.ecr.aws/p1t3u8a3/heuristics:v1.25.0
     volumes:
       - openreplay-shared:/mnt/efs
     environment:
@@ -423,69 +424,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     volumes:
-      - type: bind
-        source: ./nginx.conf
-        target: /etc/nginx/conf.d/default.conf
-        read_only: true
-        content: |
-          upstream frontend {
-              server frontend:8080;
-          }
-          upstream api {
-              server api:8080;
-          }
-          upstream assets {
-              server assets:8080;
-          }
-          upstream http {
-              server http:8888;
-          }
-          upstream assist {
-              server assist:9001;
-          }
-          server {
-              listen 80;
-              server_name _;
-              client_max_body_size 500M;
-              location / {
-                  proxy_pass http://frontend;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-              location /api/ {
-                  proxy_pass http://api/;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-              location /assets/ {
-                  proxy_pass http://assets/;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-              location /ingest/ {
-                  proxy_pass http://http/;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-              location /ws-assist/ {
-                  proxy_pass http://assist/;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection "upgrade";
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-          }
+      - ./templates/compose/openreplay.nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - frontend
       - api
@@ -493,3 +432,10 @@ services:
       - http
       - assist
     restart: unless-stopped
+
+volumes:
+  openreplay-pgdata:
+  openreplay-clickhouse:
+  openreplay-redisdata:
+  openreplay-miniodata:
+  openreplay-shared:
