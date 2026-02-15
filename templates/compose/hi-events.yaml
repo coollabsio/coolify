@@ -7,7 +7,8 @@
 
 services:
   hi-events:
-    image: vianmora/hi-events-all-in-one:latest
+    # only available for amd
+    image: daveearley/hi.events-all-in-one:v1.6.0-beta.1
     environment:
       - SERVICE_URL_HIEVENTS
       # Frontend URLs (Vite)
