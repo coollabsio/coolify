@@ -7,7 +7,7 @@
 
 services:
   postgresql:
-    image: ghcr.io/openreplay/postgres:16
+    image: bitnami/postgresql:16
     volumes:
       - openreplay-pgdata:/bitnami/postgresql
     environment:
