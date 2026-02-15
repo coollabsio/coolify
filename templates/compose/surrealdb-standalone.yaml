@@ -1,0 +1,43 @@
+services:
+
+  surrealdb:
+  
+    image: surrealdb/surrealdb:latest
+    
+    command: start --log debug --user root --pass root rocksdb://data/surreal.db
+    
+    environment:
+    
+      - SURREAL_USER=root
+      
+      - SURREAL_PASS=root
+      
+    healthcheck:
+    
+      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"]
+      
+      interval: 10s
+      
+      timeout: 5s
+      
+      retries: 5
+      
+    volumes:
+    
+      - surreal-data:/data
+      
+volumes:
+
+  surreal-data:
+
+
+
+
+
+
+
+
+
+
+
+
