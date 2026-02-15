@@ -31,7 +31,7 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     volumes:
       - openreplay-miniodata:/data
     environment:
@@ -423,8 +423,69 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    volumes:
-      - ./templates/compose/openreplay.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # Embed nginx config at container start so external file is not required
+    command: >
+      /bin/sh -lc "cat > /etc/nginx/conf.d/default.conf <<'NGINX_CONF'
+      upstream frontend {
+        server frontend:8080;
+      }
+      upstream api {
+        server api:8080;
+      }
+      upstream assets {
+        server assets:8080;
+      }
+      upstream http {
+        server http:8888;
+      }
+      upstream assist {
+        server assist:9001;
+      }
+      server {
+        listen 80;
+        server_name _;
+        client_max_body_size 500M;
+        location / {
+          proxy_pass http://frontend;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/ {
+          proxy_pass http://api/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /assets/ {
+          proxy_pass http://assets/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /ingest/ {
+          proxy_pass http://http/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /ws-assist/ {
+          proxy_pass http://assist/;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+      }
+      NGINX_CONF
+      nginx -g 'daemon off;'"
     depends_on:
       - frontend
       - api
