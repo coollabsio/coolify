@@ -18,6 +18,7 @@
                 class="flex items-center justify-center gap-2 bg-white box-without-bg dark:bg-coolgray-100">
                 <div>{{ $user->name }}</div>
                 <div>{{ $user->email }}</div>
+                    <x-forms.checkbox instantSave id="is_oauth_only" label="OAuth Only" wire:click="toggleOauthOnly({{ $user->id }})" />
                 <div class="flex-1"></div>
                 <div class="flex items-center justify-center gap-2 mx-4 text-xs font-bold ">
                     <x-modal-confirmation title="Confirm User Deletion?" buttonTitle="Delete" isErrorButton
@@ -34,7 +35,3 @@
             <div>No users found other than the root.</div>
         @endforelse
         @if ($lots_of_users)
-            <div>There are more users than shown. Please use the search bar to find the user you are looking for.</div>
-        @endif
-    </div>
-</div>
