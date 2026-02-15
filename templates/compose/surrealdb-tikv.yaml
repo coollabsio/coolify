@@ -1,0 +1,83 @@
+services:
+
+  pd:
+  
+    image: pingcap/pd:latest
+    
+    command:
+    
+      - --name=pd
+      
+      - --data-dir=/data
+      
+      - --client-urls=http://0.0.0.0:2379
+      
+      - --advertise-client-urls=http://pd:2379
+      
+    healthcheck:
+    
+      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:2379/pd/api/v1/health\"]
+      
+      interval: 10s
+      
+      timeout: 5s
+      
+      retries: 5
+      
+  tikv:
+  
+    image: pingcap/tikv:latest
+    
+    command:
+    
+      - --pd-endpoints=http://pd:2379
+      
+      - --addr=0.0.0.0:20160
+      
+      - --advertise-addr=tikv:20160
+      
+      - --data-dir=/data
+      
+    depends_on:
+    
+      - pd
+      
+  surrealdb:
+  
+    image: surrealdb/surrealdb:latest
+    
+    command: start --log debug --user root --pass root tikv://pd:2379
+    
+    ports:
+    
+      - \"8000:8000\"
+      
+    depends_on:
+    
+      - tikv
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
