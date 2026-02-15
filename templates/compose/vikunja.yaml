@@ -3,68 +3,9 @@
 # category: productivity
 # tags: productivity,todo
 # logo: svgs/vikunja.svg
-# port: 80
+# port: 3456
 
 services:
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - nginx-config:/etc/nginx/conf.d:ro
-    depends_on:
-      - vikunja
-      - nginx-init
-
-  nginx-init:
-    image: busybox
-    restart: "no"
-    volumes:
-      - nginx-config:/etc/nginx/conf.d
-    command:
-      - sh
-      - -c
-      - |
-        cat > /etc/nginx/conf.d/default.conf << 'NGINX'
-        server {
-            listen 80;
-            server_name _;
-            client_max_body_size 20M;
-
-            location ~ ^/(api|dav|\.well-known)/ {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-            }
-
-            location ~ \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|json|webmanifest)$ {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-            }
-
-            location / {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_intercept_errors on;
-                error_page 404 = /index.html;
-            }
-
-            location = /index.html {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                internal;
-            }
-        }
-        NGINX
-        echo "Nginx config created"
-
   vikunja:
     image: vikunja/vikunja
     environment:
@@ -75,15 +16,22 @@ services:
       - VIKUNJA_DATABASE_PATH=/db/vikunja.db
       - VIKUNJA_DATABASE_TYPE=sqlite
     volumes:
-      - vikunja-data:/app/vikunja/
+      - vikunja-files:/app/vikunja/files
       - vikunja-sqlite-data:/db
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   init:
     image: busybox
     restart: "no"
     volumes:
       - vikunja-sqlite-data:/db
-      - vikunja-data:/app/vikunja
-    command: ["sh", "-c", "mkdir -p /app/vikunja/files && touch /db/vikunja.db && chown -R 1000:1000 /db /app/vikunja"]
+      - vikunja-files:/app/vikunja/files
+    command: ["sh", "-c", "mkdir -p /app/vikunja/files && touch /db/vikunja.db && chown -R 1000:1000 /db /app/vikunja/files"]

@@ -3,68 +3,9 @@
 # category: productivity
 # tags: productivity,todo
 # logo: svgs/vikunja.svg
-# port: 80
+# port: 3456
 
 services:
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - nginx-config:/etc/nginx/conf.d:ro
-    depends_on:
-      - vikunja
-      - nginx-init
-
-  nginx-init:
-    image: busybox
-    restart: "no"
-    volumes:
-      - nginx-config:/etc/nginx/conf.d
-    command:
-      - sh
-      - -c
-      - |
-        cat > /etc/nginx/conf.d/default.conf << 'NGINX'
-        server {
-            listen 80;
-            server_name _;
-            client_max_body_size 20M;
-
-            location ~ ^/(api|dav|\.well-known)/ {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-            }
-
-            location ~ \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|json|webmanifest)$ {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-            }
-
-            location / {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_intercept_errors on;
-                error_page 404 = /index.html;
-            }
-
-            location = /index.html {
-                proxy_pass http://vikunja:3456;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                internal;
-            }
-        }
-        NGINX
-        echo "Nginx config created"
-
   vikunja:
     image: vikunja/vikunja
     environment:
@@ -76,12 +17,18 @@ services:
       - VIKUNJA_DATABASE_HOST=postgresql
       - VIKUNJA_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - VIKUNJA_DATABASE_USER=${SERVICE_USER_POSTGRESQL}
-      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}
+      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE:-vikunja}
     volumes:
-      - vikunja-data:/app/vikunja/
+      - vikunja-files:/app/vikunja/files
     depends_on:
       postgresql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   postgresql:
     image: postgres:16-alpine
@@ -90,7 +37,7 @@ services:
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRESQL_DATABASE}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-vikunja}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
