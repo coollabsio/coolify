@@ -1,0 +1,61 @@
+# documentation: https://corsfix.com/docs
+# slogan: Corsfix is a production-ready and secure CORS proxy platform.
+# tags: proxy, cors, api, development, utility
+# logo: svgs/corsfix.svg
+# port: 3000
+
+services:
+  mongodb:
+    image: mongo:8.0.17
+    restart: always
+    volumes:
+      - ${COOLIFY_VOLUME_MONGODB_DATA}:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_USER:-${COOLIFY_SECRET_PASSWORD}}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD:-${COOLIFY_SECRET_PASSWORD}}
+      - MONGO_INITDB_DATABASE=db
+
+  redis:
+    image: redis:7.4-alpine
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-${COOLIFY_SECRET_PASSWORD}}
+
+  app:
+    image: ghcr.io/corsfix/corsfix-app:latest
+    pull_policy: always
+    restart: always
+    environment:
+      - MONGODB_URI=mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@mongodb/db?authSource=admin
+      - REDIS_URI=redis://default:${REDIS_PASSWORD}@redis
+      - KEK_VERSION=KEK_VERSION_1
+      - KEK_VERSION_1=${KEK_VERSION_1:-${COOLIFY_SECRET_PASSWORD}}
+      - AUTH_SECRET=${AUTH_SECRET:-${COOLIFY_SECRET_PASSWORD}}
+      - AUTH_TRUST_HOST=true
+      - AUTH_URL=https://${APP_DOMAIN:?}
+      - APP_DOMAIN=${APP_DOMAIN:?}
+      - PROXY_DOMAIN=${PROXY_DOMAIN:?}
+    labels:
+      - "coolify.managed=true"
+      - "traefik.http.routers.${COOLIFY_CONTAINER_NAME}-app.rule=Host(`${APP_DOMAIN:?}`)"
+      - "traefik.http.services.${COOLIFY_CONTAINER_NAME}-app.loadbalancer.server.port=3000"
+    depends_on:
+      - mongodb
+      - redis
+
+  proxy:
+    image: ghcr.io/corsfix/corsfix-proxy:latest
+    pull_policy: always
+    restart: always
+    environment:
+      - MONGODB_URI=mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@mongodb/db?authSource=admin
+      - REDIS_URI=redis://default:${REDIS_PASSWORD}@redis
+      - KEK_VERSION_1=${KEK_VERSION_1:-${COOLIFY_SECRET_PASSWORD}}
+      - APP_DOMAIN=${APP_DOMAIN:?}
+      - PROXY_DOMAIN=${PROXY_DOMAIN:?}
+    labels:
+      - "coolify.managed=true"
+      - "traefik.http.routers.${COOLIFY_CONTAINER_NAME}-proxy.rule=Host(`${PROXY_DOMAIN:?}`)"
+      - "traefik.http.services.${COOLIFY_CONTAINER_NAME}-proxy.loadbalancer.server.port=80"
+    depends_on:
+      - mongodb
+      - redis
