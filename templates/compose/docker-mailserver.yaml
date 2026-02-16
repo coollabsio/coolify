@@ -1,0 +1,85 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Production-ready full-stack mail server (SMTP, IMAP, spam/virus protection)
+# category: email
+# tags: email, smtp, imap, mailserver, postfix, dovecot, spamassassin, clamav
+# logo: svgs/email.svg
+# port: 443
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    ports:
+      - "25:25"    # SMTP (explicit TLS => STARTTLS)
+      - "143:143"  # IMAP4 (explicit TLS => STARTTLS)
+      - "465:465"  # ESMTP (implicit TLS)
+      - "587:587"  # ESMTP (explicit TLS => STARTTLS)
+      - "993:993"  # IMAP4 (implicit TLS)
+    volumes:
+      - mail-data:/var/mail/
+      - mail-state:/var/mail-state/
+      - mail-logs:/var/log/mail/
+      - mail-config:/tmp/docker-mailserver/
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # Basic Configuration
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - POSTMASTER_ADDRESS=${POSTMASTER_EMAIL:-postmaster@example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ONE_DIR=1
+      - ENABLE_UPDATE_CHECK=1
+      - UPDATE_CHECK_INTERVAL=1d
+      # Security
+      - TLS_LEVEL=${TLS_LEVEL:-modern}
+      - SPOOF_PROTECTION=1
+      # Services - Enable/Disable as needed
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - ENABLE_QUOTAS=${ENABLE_QUOTAS:-1}
+      # Spam settings
+      - SPAMASSASSIN_SPAM_TO_INBOX=${SPAM_TO_INBOX:-1}
+      - MOVE_SPAM_TO_JUNK=${MOVE_SPAM_TO_JUNK:-1}
+      - SA_TAG=${SA_TAG:-2.0}
+      - SA_TAG2=${SA_TAG2:-6.31}
+      - SA_KILL=${SA_KILL:-10.0}
+      # Relay settings (optional - for sending via external SMTP)
+      - RELAY_HOST=${RELAY_HOST:-}
+      - RELAY_PORT=${RELAY_PORT:-25}
+      - RELAY_USER=${RELAY_USER:-}
+      - RELAY_PASSWORD=${RELAY_PASSWORD:-}
+    cap_add:
+      - NET_ADMIN  # Required for fail2ban
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --tcp | grep -q ':smtp' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Webmail (Roundcube) - Optional
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    environment:
+      - SERVICE_URL_ROUNDCUBE_80
+      - ROUNDCUBEMAIL_DEFAULT_HOST=tls://mailserver
+      - ROUNDCUBEMAIL_DEFAULT_PORT=993
+      - ROUNDCUBEMAIL_SMTP_SERVER=tls://mailserver
+      - ROUNDCUBEMAIL_SMTP_PORT=465
+      - ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE=25M
+      - ROUNDCUBEMAIL_DB_TYPE=sqlite
+    volumes:
+      - roundcube-data:/var/roundcube/db
+      - roundcube-config:/var/roundcube/config
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
