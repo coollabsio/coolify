@@ -9,6 +9,8 @@
             @if ($application->git_based())
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                     id="isAutoDeployEnabled" label="Auto Deploy" canGate="update" :canResource="$application" />
+                <x-forms.checkbox helper="Automatically deploy when a new GitHub release is published. Requires the 'release' webhook event to be enabled in your repository settings." instantSave
+                    id="isDeployOnReleaseEnabled" label="Deploy on Release" canGate="update" :canResource="$application" />
                 <x-forms.checkbox
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" canGate="update"
