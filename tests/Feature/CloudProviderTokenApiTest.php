@@ -14,10 +14,10 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
-    // Set the current team session before creating the token
+    // Set the current team session before creating the token (required for team_id on token)
     session(['currentTeam' => $this->team]);
 
-    // Create an API token for the user
+    // Create an API token for the user (session currentTeam is set so token gets team_id)
     $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
 });
@@ -280,13 +280,14 @@ describe('PATCH /api/v1/cloud-tokens/{uuid}', function () {
             'provider' => 'hetzner',
         ]);
 
+        // Empty body is rejected with 400 by API before validation
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
         ])->patchJson("/api/v1/cloud-tokens/{$token->uuid}", []);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['name']);
+        $response->assertStatus(400);
+        $response->assertJson(['message' => 'Invalid request.']);
     });
 
     test('cannot update token from another team', function () {

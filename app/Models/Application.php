@@ -205,7 +205,8 @@ class Application extends BaseModel
                 // Clear Dockerfile specific data when switching away from dockerfile
                 if ($originalBuildPack === 'dockerfile') {
                     $application->dockerfile = null;
-                    $application->dockerfile_location = null;
+                    // Bypass dockerfileLocation mutator which converts null to '/Dockerfile'
+                    $application->attributes['dockerfile_location'] = null;
                     $application->dockerfile_target_build = null;
                     $application->custom_healthcheck_found = false;
                 }

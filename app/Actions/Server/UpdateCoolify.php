@@ -26,7 +26,9 @@ class UpdateCoolify
             return;
         }
         $settings = instanceSettings();
-        $this->server = Server::find(0);
+        $this->server = app()->bound('update_coolify.server')
+            ? app('update_coolify.server')
+            : Server::find(0);
         if (! $this->server) {
             return;
         }
@@ -109,7 +111,11 @@ class UpdateCoolify
             );
         }
 
-        $this->update();
+        if (app()->bound('update_coolify.update_runner')) {
+            app('update_coolify.update_runner')($this);
+        } else {
+            $this->update();
+        }
         $settings->new_version_available = false;
         $settings->save();
     }

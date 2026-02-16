@@ -64,6 +64,10 @@ class ServerManagerJob implements ShouldQueue
 
     private function getServers(): Collection
     {
+        if (app()->bound('server_manager_job.servers')) {
+            return app('server_manager_job.servers')();
+        }
+
         $allServers = Server::where('ip', '!=', '1.2.3.4');
 
         if (isCloud()) {

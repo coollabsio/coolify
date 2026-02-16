@@ -27,9 +27,12 @@ services:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
+    image: postgres:15-alpine
     pull_policy: always
+    networks:
+      - coolify
     ports:
-      - "${FORWARD_DB_PORT:-5432}:5432"
+      - "${FORWARD_DB_PORT:-5433}:5432"
     env_file:
       - .env
     environment:
@@ -45,7 +48,10 @@ services:
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
   redis:
+    image: redis:7-alpine
     pull_policy: always
+    networks:
+      - coolify
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"
     env_file:
@@ -138,6 +144,26 @@ services:
       - dev_minio_data:/data
     networks:
       - coolify
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.49.0-noble
+    container_name: coolify-e2e
+    working_dir: /var/www/html
+    ipc: host
+    cap_add:
+      - SYS_ADMIN
+    networks:
+      - coolify
+    depends_on:
+      coolify:
+        condition: service_started
+    environment:
+      APP_URL: http://coolify:8080
+      CI: "1"
+    volumes:
+      - .:/var/www/html
+    command: sh -c "sleep 20 && npm ci && npx playwright test --project=chromium --reporter=list --timeout=60000"
+    profiles:
+      - e2e
   minio-init:
     image: minio/mc:latest
     pull_policy: always

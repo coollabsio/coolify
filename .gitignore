@@ -1,5 +1,18 @@
 /.phpunit.cache
+.phpunit.result.cache
 /node_modules
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.playwright/
+
+# PEST
+.pest/
+tests/.pest/
+coverage/
 /public/build
 /public/hot
 /public/storage
@@ -8,7 +21,6 @@
 .env
 .env.backup
 .env.secrets
-.phpunit.result.cache
 Homestead.json
 Homestead.yaml
 auth.json

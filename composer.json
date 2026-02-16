@@ -122,6 +122,20 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
+        ],
+        "test": [
+            "@vendor/bin/pest",
+            "--compact"
+        ],
+        "test:unit": [
+            "@vendor/bin/pest",
+            "--compact",
+            "tests/Unit"
+        ],
+        "test:feature": [
+            "@vendor/bin/pest",
+            "--compact",
+            "tests/Feature"
         ]
     }
 }

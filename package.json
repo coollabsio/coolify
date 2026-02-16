@@ -4,9 +4,15 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "test:e2e": "node ./node_modules/@playwright/test/cli.js test",
+        "test:e2e:ui": "node ./node_modules/@playwright/test/cli.js test --ui",
+        "test:e2e:exploratory": "node ./node_modules/@playwright/test/cli.js test tests/e2e/exploratory.spec.ts",
+        "test:e2e:smoke": "node ./node_modules/@playwright/test/cli.js test tests/e2e/smoke.spec.ts",
+        "test:e2e:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile e2e run --rm e2e"
     },
     "devDependencies": {
+        "@playwright/test": "^1.49.0",
         "@tailwindcss/postcss": "4.1.18",
         "@vitejs/plugin-vue": "6.0.3",
         "axios": "1.13.2",

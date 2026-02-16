@@ -116,6 +116,8 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
+        // Fallback runs on the server; . /etc/os-release provides ID and VERSION_CODENAME
+        // (e.g. debian/trixie for Debian 13), so the Docker repo suite is correct for all Debian versions.
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
             'install -m 0755 -d /etc/apt/keyrings && '.

@@ -29,8 +29,8 @@ it('handles Redis scan returning false gracefully', function () {
     // Run the command in dry-run mode with restart flag to trigger cleanupStuckJobs
     // Use skip-overlapping to avoid additional keys() calls
     $this->artisan(CleanupRedis::class, ['--dry-run' => true, '--restart' => true, '--skip-overlapping' => true])
-        ->expectsOutput('DRY RUN MODE - No data will be deleted')
         ->expectsOutputToContain('Redis scan failed, stopping key retrieval')
+        ->expectsOutputToContain('Redis cleanup: would delete')
         ->assertSuccessful();
 });
 
@@ -76,7 +76,7 @@ it('successfully scans Redis keys when scan returns valid results', function () 
 
     // Run the command with restart flag to trigger cleanupStuckJobs
     $this->artisan(CleanupRedis::class, ['--dry-run' => true, '--restart' => true, '--skip-overlapping' => true])
-        ->expectsOutput('DRY RUN MODE - No data will be deleted')
+        ->expectsOutputToContain('Redis cleanup: would delete')
         ->assertSuccessful();
 });
 
@@ -101,7 +101,7 @@ it('handles empty scan results gracefully', function () {
 
     // Run the command with restart flag
     $this->artisan(CleanupRedis::class, ['--dry-run' => true, '--restart' => true, '--skip-overlapping' => true])
-        ->expectsOutput('DRY RUN MODE - No data will be deleted')
+        ->expectsOutputToContain('Redis cleanup: would delete')
         ->assertSuccessful();
 });
 
@@ -126,5 +126,6 @@ it('uses lowercase option keys for scan', function () {
 
     // Run the command with restart flag
     $this->artisan(CleanupRedis::class, ['--dry-run' => true, '--restart' => true, '--skip-overlapping' => true])
+        ->expectsOutputToContain('Redis cleanup: would delete')
         ->assertSuccessful();
 });

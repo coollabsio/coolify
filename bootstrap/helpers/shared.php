@@ -2945,6 +2945,10 @@ function convertToKeyValueCollection($environment)
 }
 function instanceSettings()
 {
+    if (app()->bound(InstanceSettings::class)) {
+        return app(InstanceSettings::class);
+    }
+
     return InstanceSettings::get();
 }
 

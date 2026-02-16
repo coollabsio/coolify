@@ -76,28 +76,31 @@ describe('Application Model Buildpack Cleanup', function () {
             'docker_compose_raw' => 'version: "3.8"\nservices:\n  app:\n    image: nginx',
         ]);
 
-        // Add environment variables that should be deleted
+        // Add environment variables that should be deleted (use polymorphic resourceable)
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'SERVICE_FQDN_APP',
             'value' => 'app.example.com',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'SERVICE_URL_APP',
             'value' => 'http://app.example.com',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
         EnvironmentVariable::create([
-            'application_id' => $application->id,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
             'key' => 'REGULAR_VAR',
             'value' => 'should_remain',
-            'is_build_time' => false,
+            'is_buildtime' => false,
             'is_preview' => false,
         ]);
 
