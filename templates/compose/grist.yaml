@@ -3,16 +3,15 @@
 # category: productivity
 # tags: lowcode, nocode, spreadsheet, database, relational
 # logo: svgs/grist.svg
-# port: 443
+# port: 8484
 
 services:
   grist:
     image: gristlabs/grist:latest
     environment:
-      - SERVICE_URL_GRIST_443
       - APP_HOME_URL=${SERVICE_URL_GRIST}
       - APP_DOC_URL=${SERVICE_URL_GRIST}
-      - GRIST_DOMAIN=${SERVICE_URL_GRIST}
+      - GRIST_DOMAIN=${SERVICE_FQDN_GRIST}
       - TZ=${TZ:-UTC}
       - GRIST_SUPPORT_ANON=${SUPPORT_ANON:-false}
       - GRIST_FORCE_LOGIN=${FORCE_LOGIN:-true}
@@ -20,7 +19,7 @@ services:
       - GRIST_PAGE_TITLE_SUFFIX=${PAGE_TITLE_SUFFIX:- - Suffix}
       - GRIST_HIDE_UI_ELEMENTS=${HIDE_UI_ELEMENTS:-billing,sendToDrive,supportGrist,multiAccounts,tutorials}
       - GRIST_UI_FEATURES=${UI_FEATURES:-helpCenter,billing,templates,createSite,multiSite,sendToDrive,tutorials,supportGrist}
-      - GRIST_DEFAULT_EMAIL=${DEFAULT_EMAIL:-test@example.com}
+      - GRIST_DEFAULT_EMAIL=${DEFAULT_EMAIL:-?}
       - GRIST_ORG_IN_PATH=${ORG_IN_PATH:-true}
       - GRIST_OIDC_SP_HOST=${SERVICE_URL_GRIST}
       - GRIST_OIDC_IDP_SCOPES=${OIDC_IDP_SCOPES:-openid profile email}
@@ -37,7 +36,7 @@ services:
       - TYPEORM_DATABASE=${POSTGRES_DATABASE:-grist-db}
       - TYPEORM_USERNAME=${SERVICE_USER_POSTGRES}
       - TYPEORM_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - TYPEORM_HOST=${TYPEORM_HOST}
+      - TYPEORM_HOST=${TYPEORM_HOST:-postgres}
       - TYPEORM_PORT=${TYPEORM_PORT:-5432}
       - TYPEORM_LOGGING=${TYPEORM_LOGGING:-false}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
