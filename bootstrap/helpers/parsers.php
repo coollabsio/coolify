@@ -2416,11 +2416,13 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Auto-inject per-container .env file for environment variable isolation
+        // Each container gets only its own variables, not all variables from the service
+        // This prevents security issues where container A can read container B's credentials
+        // See: https://github.com/coollabsio/coolify/issues/7655
         $existingEnvFiles = data_get($service, 'env_file');
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push(".env.{$serviceName}")
             ->unique()
             ->values();
 

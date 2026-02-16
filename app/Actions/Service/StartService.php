@@ -24,8 +24,9 @@ class StartService
         // $commands[] = "cd {$workdir}";
         $commands[] = "echo 'Saved configuration files to {$workdir}.'";
         // Ensure .env exists in the correct directory before docker compose tries to load it
-        // This is defensive programming - saveComposeConfigs() already creates it,
-        // but we guarantee it here in case of any edge cases or manual deployments
+        // This is defensive programming - saveComposeConfigs() creates per-container .env.{name} files
+        // and a shared .env file with only global/metadata variables
+        // The touch ensures backward compatibility with any manual references to .env
         $commands[] = "touch {$workdir}/.env";
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";

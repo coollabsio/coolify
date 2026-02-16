@@ -1545,23 +1545,13 @@ class Service extends BaseModel
         Storage::disk('local')->delete("tmp/{$filename}");
 
         $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        // Clean up old env files (both legacy .env and per-container .env.* files)
+        $commands[] = 'rm -f .env .env.* || true';
 
-        $envs = collect([]);
+        // Parse docker_compose_raw to understand which variables belong to which container
+        $containerEnvMappings = $this->getContainerEnvironmentMappings();
 
-        // Generate SERVICE_NAME_* environment variables from docker-compose services
-        if ($this->docker_compose) {
-            try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
-                $services = data_get($dockerCompose, 'services', []);
-                foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
-                }
-            } catch (\Exception $e) {
-                ray($e->getMessage());
-            }
-        }
-
+        // Get all environment variables from Coolify
         $envs_from_coolify = $this->environment_variables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
@@ -1573,17 +1563,206 @@ class Service extends BaseModel
 
             return 3;
         });
+
+        // Build a lookup map of all Coolify env vars
+        $allEnvVars = collect([]);
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            $allEnvVars->put($env->key, $env->real_value);
         }
-        if ($envs->count() === 0) {
+
+        // Generate SERVICE_NAME_* variables (these are shared across all containers)
+        $serviceNameVars = collect([]);
+        try {
+            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+            $services = data_get($dockerCompose, 'services', []);
+            foreach ($services as $serviceName => $_) {
+                $key = 'SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper();
+                $serviceNameVars->put($key, $serviceName);
+            }
+        } catch (\Exception $e) {
+            ray($e->getMessage());
+        }
+
+        // Create per-container env files
+        foreach ($containerEnvMappings as $serviceName => $containerVars) {
+            $envs = collect([]);
+
+            // Add SERVICE_NAME_* variables (shared)
+            foreach ($serviceNameVars as $key => $value) {
+                $envs->push("{$key}={$value}");
+            }
+
+            // Add variables that belong to this container
+            foreach ($containerVars as $varName) {
+                // Handle both direct variable names and ${VAR} syntax
+                $cleanVarName = str($varName)->replace('${', '')->replace('}', '')->replace('$', '')->value();
+
+                // Check for variables with default values (VAR:-default or VAR-default)
+                if (str_contains($cleanVarName, ':-')) {
+                    $cleanVarName = str($cleanVarName)->before(':-')->value();
+                } elseif (str_contains($cleanVarName, '-') && ! str($cleanVarName)->startsWith('SERVICE_')) {
+                    $cleanVarName = str($cleanVarName)->before('-')->value();
+                }
+
+                if ($allEnvVars->has($cleanVarName)) {
+                    $envs->push("{$cleanVarName}={$allEnvVars->get($cleanVarName)}");
+                }
+            }
+
+            // Add shared Coolify metadata variables (COOLIFY_*)
+            foreach ($allEnvVars as $key => $value) {
+                if (str($key)->startsWith('COOLIFY_')) {
+                    $envs->push("{$key}={$value}");
+                }
+            }
+
+            // Add SERVICE_URL_* and SERVICE_FQDN_* variables that match this container name
+            $normalizedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->upper()->value();
+            foreach ($allEnvVars as $key => $value) {
+                $keyStr = str($key);
+                if ($keyStr->startsWith('SERVICE_URL_') || $keyStr->startsWith('SERVICE_FQDN_')) {
+                    // Extract the service name part from the variable
+                    // SERVICE_URL_POSTGRES or SERVICE_URL_POSTGRES_5432
+                    $varServicePart = $keyStr->after('SERVICE_URL_')->value();
+                    if ($keyStr->startsWith('SERVICE_FQDN_')) {
+                        $varServicePart = $keyStr->after('SERVICE_FQDN_')->value();
+                    }
+
+                    // Check if this variable is for the current service (with or without port suffix)
+                    $varServiceName = str($varServicePart)->replaceMatches('/_\d+$/', '')->value();
+                    if ($varServiceName === $normalizedServiceName) {
+                        $envs->push("{$key}={$value}");
+                    }
+                }
+            }
+
+            // Remove duplicates
+            $envs = $envs->unique();
+
+            // Write the per-container env file
+            $envFileName = ".env.{$serviceName}";
+            if ($envs->count() === 0) {
+                $commands[] = "touch {$envFileName}";
+            } else {
+                $envs_base64 = base64_encode($envs->implode("\n"));
+                $commands[] = "echo '{$envs_base64}' | base64 -d | tee {$envFileName} > /dev/null";
+            }
+        }
+
+        // Also create a legacy .env file for backward compatibility with any manual references
+        // This contains only shared/global variables, not container-specific secrets
+        $sharedEnvs = collect([]);
+        foreach ($serviceNameVars as $key => $value) {
+            $sharedEnvs->push("{$key}={$value}");
+        }
+        foreach ($allEnvVars as $key => $value) {
+            if (str($key)->startsWith('COOLIFY_')) {
+                $sharedEnvs->push("{$key}={$value}");
+            }
+        }
+        if ($sharedEnvs->count() === 0) {
             $commands[] = 'touch .env';
         } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $sharedEnvs_base64 = base64_encode($sharedEnvs->implode("\n"));
+            $commands[] = "echo '{$sharedEnvs_base64}' | base64 -d | tee .env > /dev/null";
         }
 
         instant_remote_process($commands, $this->server);
+    }
+
+    /**
+     * Get the mapping of container names to their environment variable names.
+     * This parses docker_compose_raw to extract environment variables defined for each service.
+     *
+     * @return \Illuminate\Support\Collection<string, array<string>>
+     */
+    public function getContainerEnvironmentMappings(): \Illuminate\Support\Collection
+    {
+        $mappings = collect([]);
+
+        if (! $this->docker_compose_raw) {
+            // Fall back to parsed compose if raw is not available
+            if (! $this->docker_compose) {
+                return $mappings;
+            }
+            $composeContent = $this->docker_compose;
+        } else {
+            $composeContent = $this->docker_compose_raw;
+        }
+
+        try {
+            $yaml = \Symfony\Component\Yaml\Yaml::parse($composeContent);
+            $services = data_get($yaml, 'services', []);
+
+            foreach ($services as $serviceName => $service) {
+                $containerVars = collect([]);
+
+                // Get environment variables from environment: section
+                $environment = data_get($service, 'environment', []);
+                if (is_array($environment)) {
+                    foreach ($environment as $key => $value) {
+                        if (is_int($key)) {
+                            // List format: - VAR=value or - VAR
+                            $varName = str($value)->before('=')->value();
+                            $containerVars->push($varName);
+
+                            // Also extract any variable references in the value
+                            $this->extractVariableReferences($value, $containerVars);
+                        } else {
+                            // Map format: VAR: value
+                            $containerVars->push($key);
+
+                            // Also extract any variable references in the value
+                            if ($value !== null) {
+                                $this->extractVariableReferences($value, $containerVars);
+                            }
+                        }
+                    }
+                }
+
+                // Get variables from build.args section
+                $buildArgs = data_get($service, 'build.args', []);
+                if (is_array($buildArgs)) {
+                    foreach ($buildArgs as $key => $value) {
+                        if (is_int($key)) {
+                            $varName = str($value)->before('=')->value();
+                            $containerVars->push($varName);
+                        } else {
+                            $containerVars->push($key);
+                        }
+                    }
+                }
+
+                $mappings->put($serviceName, $containerVars->unique()->values()->toArray());
+            }
+        } catch (\Exception $e) {
+            ray('Failed to parse docker_compose for env mapping: '.$e->getMessage());
+        }
+
+        return $mappings;
+    }
+
+    /**
+     * Extract variable references (${VAR} or $VAR) from a string value.
+     *
+     * @param  string|null  $value
+     * @param  \Illuminate\Support\Collection  $containerVars
+     */
+    private function extractVariableReferences($value, \Illuminate\Support\Collection $containerVars): void
+    {
+        if (! is_string($value)) {
+            return;
+        }
+
+        // Match ${VAR}, ${VAR:-default}, ${VAR-default}, $VAR patterns
+        $regex = '/\$\{?([a-zA-Z_][a-zA-Z0-9_]*)(:-[^}]*|-[^}]*)?\}?/';
+        preg_match_all($regex, $value, $matches);
+
+        if (! empty($matches[1])) {
+            foreach ($matches[1] as $varName) {
+                $containerVars->push($varName);
+            }
+        }
     }
 
     public function parse(bool $isNew = false): Collection
