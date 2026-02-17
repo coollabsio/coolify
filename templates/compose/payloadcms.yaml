@@ -1,0 +1,57 @@
+# documentation: https://payloadcms.com/docs/getting-started/installation
+# slogan: The best way to build a modern backend + admin UI. No black magic, all TypeScript, and fully open-source.
+# category: cms
+# tags: cms, headless, typescript, nextjs, postgresql, api, content-management
+# logo: svgs/payloadcms.svg
+# port: 3000
+
+services:
+  payloadcms:
+    image: node:20-alpine
+    working_dir: /home/node/app
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ ! -f "package.json" ]; then
+          echo "Initializing PayloadCMS project..."
+          npx --yes create-payload-app@latest . --db postgres --no-deps -t blank 2>&1
+          cat > .env << ENVEOF
+        DATABASE_URI=postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgresql:5432/$${POSTGRES_DB}
+        PAYLOAD_SECRET=$${PAYLOAD_SECRET}
+        NEXT_PUBLIC_SERVER_URL=$${NEXT_PUBLIC_SERVER_URL}
+        ENVEOF
+          npm install
+        fi
+        npm run dev
+    environment:
+      - SERVICE_URL_PAYLOADCMS_3000
+      - PAYLOAD_SECRET=$SERVICE_BASE64_64_PAYLOAD
+      - "NEXT_PUBLIC_SERVER_URL=${SERVICE_URL_PAYLOADCMS}"
+      - "POSTGRES_USER=${SERVICE_USER_POSTGRESQL}"
+      - "POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}"
+      - "POSTGRES_DB=${POSTGRESQL_DATABASE:-payloadcms}"
+    volumes:
+      - payloadcms-data:/home/node/app
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/access || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 20
+      start_period: 120s
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - payloadcms-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - "POSTGRES_DB=${POSTGRESQL_DATABASE:-payloadcms}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
