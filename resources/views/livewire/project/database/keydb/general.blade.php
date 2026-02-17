@@ -115,6 +115,10 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="0" id="publicPortTimeout"
+                label="Proxy Timeout (seconds)"
+                helper="Timeout in seconds for the public database proxy. Set to 0 to use the default (10 minutes). Useful for long-running queries."
+                canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea
             helper="<a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>KeyDB Default Configuration</a>"
