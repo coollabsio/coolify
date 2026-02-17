@@ -157,7 +157,7 @@ class BackupEdit extends Component
         try {
             $server = null;
             if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
+                $server = $this->backup->database->serverResource();
             } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
                 $server = $this->backup->database->destination->server;
             }
@@ -184,6 +184,14 @@ class BackupEdit extends Component
 
             if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
+
+                if ($serviceDatabase->isOwnedByApplication()) {
+                    return redirect()->route('project.application.configuration', [
+                        'project_uuid' => $this->parameters['project_uuid'],
+                        'environment_uuid' => $this->parameters['environment_uuid'],
+                        'application_uuid' => $serviceDatabase->application->uuid,
+                    ]);
+                }
 
                 return redirect()->route('project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],

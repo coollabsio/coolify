@@ -31,9 +31,10 @@ class StartDatabaseProxy
 
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            $network = $database->service->uuid;
-            $server = data_get($database, 'service.destination.server');
-            $containerName = "{$database->name}-{$database->service->uuid}";
+            $owner = $database->owner();
+            $network = $owner->uuid;
+            $server = $database->serverResource();
+            $containerName = "{$database->name}-{$owner->uuid}";
         }
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,

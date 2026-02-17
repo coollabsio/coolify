@@ -915,6 +915,11 @@ class Application extends BaseModel
         return $this->hasMany(ApplicationDeploymentQueue::class);
     }
 
+    public function serviceDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function destination()
     {
         return $this->morphTo();

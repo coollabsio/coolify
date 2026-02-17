@@ -432,8 +432,8 @@ class CleanupStuckedResources extends Command
         try {
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
-                if (! data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service: '.$service->name.'\n';
+                if (! data_get($service, 'service') && ! data_get($service, 'application')) {
+                    echo 'ServiceDatabase without owner: '.$service->name.'\n';
                     $service->forceDelete();
 
                     continue;

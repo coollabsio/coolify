@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
@@ -27,7 +28,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +40,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +56,51 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Check if this ServiceDatabase is owned by an Application (docker compose).
+     */
+    public function isOwnedByApplication(): bool
+    {
+        return filled($this->application_id);
+    }
+
+    /**
+     * Get the owner of this ServiceDatabase (either Service or Application).
+     */
+    public function owner(): Service|Application|null
+    {
+        if ($this->isOwnedByApplication()) {
+            return $this->application;
+        }
+
+        return $this->service;
+    }
+
+    /**
+     * Get the server for this ServiceDatabase regardless of owner type.
+     */
+    public function serverResource(): ?Server
+    {
+        $owner = $this->owner();
+        if (! $owner) {
+            return null;
+        }
+
+        return data_get($owner, 'destination.server');
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $owner = $this->owner();
+        if (! $owner) {
+            return;
+        }
+
+        $container_id = $this->name.'-'.$owner->uuid;
+        $server = $this->serverResource();
+        if ($server) {
+            remote_process(["docker restart {$container_id}"], $server);
+        }
     }
 
     public function isRunning()
@@ -82,6 +130,10 @@ class ServiceDatabase extends BaseModel
 
     public function type()
     {
+        if ($this->isOwnedByApplication()) {
+            return 'application';
+        }
+
         return 'service';
     }
 
@@ -114,8 +166,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->serverResource();
+        if (! $server) {
+            return null;
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +180,31 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->isOwnedByApplication()) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $owner = $this->owner();
+        if ($owner instanceof Application) {
+            return application_configuration_dir()."/{$owner->uuid}";
+        }
+
+        return service_configuration_dir()."/{$owner->uuid}";
     }
 
-    public function service()
+    public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

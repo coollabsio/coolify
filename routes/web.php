@@ -207,6 +207,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
+        Route::get('/backups', ApplicationConfiguration::class)->name('project.application.backups');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
@@ -328,7 +329,7 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                $server = $execution->scheduledDatabaseBackup->database->serverResource();
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }

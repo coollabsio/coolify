@@ -2418,6 +2418,24 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // For Application-owned docker compose, create ServiceDatabase records for detected databases
+            if ($resource instanceof Application && $isDatabase && $pull_request_id === 0) {
+                $savedDb = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (is_null($savedDb)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($savedDb->image !== $image) {
+                    $savedDb->image = $image;
+                    $savedDb->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
