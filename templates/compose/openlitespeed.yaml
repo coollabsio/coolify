@@ -1,0 +1,23 @@
+# documentation: https://docs.linuxserver.io/images/docker-openlitespeed
+# slogan: OpenLiteSpeed is a high-performance, lightweight, open source web server.
+# category: web
+# tags: web, openlitespeed, php
+# logo: svgs/default.webp
+
+services:
+  openlitespeed:
+    image: lscr.io/linuxserver/openlitespeed:latest
+    environment:
+      - SERVICE_URL_OPENLITESPEED
+      - PUID=1000
+      - PGID=1000
+      - TZ=$TZ
+    volumes:
+      - openlitespeed-config:/config
+      - openlitespeed-www:/app/www/public
+      - openlitespeed-logs:/var/log/openlitespeed
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
