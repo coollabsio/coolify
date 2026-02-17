@@ -107,6 +107,14 @@ class CheckUpdates
                     $out['package_manager'] = $packageManager;
 
                     return $out;
+                case 'apk':
+                    instant_remote_process(['apk update'], $server);
+                    $output = instant_remote_process(['apk version -l "<" 2>/dev/null'], $server);
+                    $out = $this->parseApkOutput($output);
+                    $out['osId'] = $osId;
+                    $out['package_manager'] = $packageManager;
+
+                    return $out;
                 default:
                     return [
                         'osId' => $osId,
@@ -272,5 +280,33 @@ class CheckUpdates
         }
 
         return $result;
+    }
+
+    private function parseApkOutput(string $output): array
+    {
+        $updates = [];
+        $lines = explode("\n", $output);
+
+        foreach ($lines as $line) {
+            if (empty($line)) {
+                continue;
+            }
+
+            // apk version -l "<" output format: package-version < new-version
+            if (preg_match('/^(\S+)-(\S+)\s+<\s+(\S+)/', $line, $matches)) {
+                $updates[] = [
+                    'package' => $matches[1],
+                    'current_version' => $matches[2],
+                    'new_version' => $matches[3],
+                    'architecture' => 'unknown',
+                    'repository' => 'unknown',
+                ];
+            }
+        }
+
+        return [
+            'total_updates' => count($updates),
+            'updates' => $updates,
+        ];
     }
 }

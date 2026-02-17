@@ -80,6 +80,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -94,8 +96,8 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
+                'systemctl enable docker >/dev/null 2>&1 || rc-update add docker default 2>/dev/null || true',
+                'systemctl restart docker 2>/dev/null || rc-service docker restart 2>/dev/null || true',
             ]);
             if ($server->isSwarm()) {
                 $command = $command->merge([
@@ -116,12 +118,17 @@ class InstallDocker
 
     private function getDebianDockerInstallCommand(): string
     {
+        // Try Rancher and get.docker.com first, then fall back to manual apt repo setup.
+        // For the manual fallback, check if Docker has packages for the current VERSION_CODENAME
+        // (e.g. trixie for Debian 13). If not, fall back to bookworm which is the latest stable.
         return "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
             '. /etc/os-release && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
             'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'CODENAME=${VERSION_CODENAME} && '.
+            'if ! curl -fsSL --head "https://download.docker.com/linux/${ID}/dists/${CODENAME}/Release" >/dev/null 2>&1; then CODENAME=bookworm; fi && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
@@ -157,6 +164,15 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return "sed -i '/^#.*\\/community/s/^#//' /etc/apk/repositories && ".
+            'apk update && '.
+            'apk add docker docker-cli-compose && '.
+            'rc-update add docker default 2>/dev/null || true && '.
+            'rc-service docker start 2>/dev/null || service docker start 2>/dev/null || true';
     }
 
     private function getGenericDockerInstallCommand(): string
