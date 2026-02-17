@@ -11,6 +11,7 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
+use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -3519,6 +3520,602 @@ class ApplicationsController extends Controller
 
         return response()->json([
             'message' => 'Environment variable deleted.',
+        ]);
+    }
+
+    #[OA\Get(
+        summary: 'List Storages',
+        description: 'List all persistent storages by application UUID.',
+        path: '/applications/{uuid}/storages',
+        operationId: 'list-storages-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All persistent storages by application UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'id' => ['type' => 'integer'],
+                                    'name' => ['type' => 'string'],
+                                    'mount_path' => ['type' => 'string'],
+                                    'host_path' => ['type' => 'string', 'nullable' => true],
+                                    'created_at' => ['type' => 'string'],
+                                    'updated_at' => ['type' => 'string'],
+                                ],
+                            )
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function storages(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        $storages = $application->persistentStorages->sortBy('id')->values();
+
+        return response()->json($storages);
+    }
+
+    #[OA\Post(
+        summary: 'Create Storage',
+        description: 'Create persistent storage for an application by UUID.',
+        path: '/applications/{uuid}/storages',
+        operationId: 'create-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Storage created.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['name', 'mount_path'],
+                    properties: [
+                        'name' => ['type' => 'string', 'description' => 'The name of the storage volume (will be prefixed with app UUID).'],
+                        'mount_path' => ['type' => 'string', 'description' => 'The mount path inside the container.'],
+                        'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path on the server. If not set, a Docker named volume is used.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Persistent storage created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'id' => ['type' => 'integer'],
+                                'name' => ['type' => 'string'],
+                                'mount_path' => ['type' => 'string'],
+                                'host_path' => ['type' => 'string', 'nullable' => true],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Storage with this name already exists.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Storage with this name already exists.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+        ]
+    )]
+    public function create_storage(Request $request)
+    {
+        $allowedFields = ['name', 'mount_path', 'host_path'];
+        $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string|required',
+            'mount_path' => 'string|required',
+            'host_path' => 'string|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $name = $application->uuid.'-'.str($request->name)->trim()->value;
+
+        $existing = LocalPersistentVolume::where('name', $name)
+            ->where('resource_id', $application->id)
+            ->where('resource_type', $application->getMorphClass())
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'Storage with this name already exists.',
+            ], 409);
+        }
+
+        $storage = LocalPersistentVolume::create([
+            'name' => $name,
+            'mount_path' => $request->mount_path,
+            'host_path' => $request->host_path,
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]);
+
+        return response()->json([
+            'id' => $storage->id,
+            'name' => $storage->name,
+            'mount_path' => $storage->mount_path,
+            'host_path' => $storage->host_path,
+        ])->setStatusCode(201);
+    }
+
+    #[OA\Get(
+        summary: 'Get Storage',
+        description: 'Get persistent storage by ID for an application.',
+        path: '/applications/{uuid}/storages/{storage_id}',
+        operationId: 'get-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'storage_id',
+                in: 'path',
+                description: 'ID of the persistent storage.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Persistent storage details.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'id' => ['type' => 'integer'],
+                                'name' => ['type' => 'string'],
+                                'mount_path' => ['type' => 'string'],
+                                'host_path' => ['type' => 'string', 'nullable' => true],
+                                'created_at' => ['type' => 'string'],
+                                'updated_at' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function storage_by_id(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        $storage = LocalPersistentVolume::where('id', $request->storage_id)
+            ->where('resource_id', $application->id)
+            ->where('resource_type', $application->getMorphClass())
+            ->first();
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        return response()->json($storage);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Storage',
+        description: 'Update persistent storage by ID for an application.',
+        path: '/applications/{uuid}/storages/{storage_id}',
+        operationId: 'update-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'storage_id',
+                in: 'path',
+                description: 'ID of the persistent storage.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Storage updated.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string', 'description' => 'The name of the storage volume (will be prefixed with app UUID).'],
+                        'mount_path' => ['type' => 'string', 'description' => 'The mount path inside the container.'],
+                        'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path on the server. If not set, a Docker named volume is used.'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Persistent storage updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'id' => ['type' => 'integer'],
+                                'name' => ['type' => 'string'],
+                                'mount_path' => ['type' => 'string'],
+                                'host_path' => ['type' => 'string', 'nullable' => true],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Storage with this name already exists.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Storage with this name already exists.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+        ]
+    )]
+    public function update_storage(Request $request)
+    {
+        $allowedFields = ['name', 'mount_path', 'host_path'];
+        $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $storage = LocalPersistentVolume::where('id', $request->storage_id)
+            ->where('resource_id', $application->id)
+            ->where('resource_type', $application->getMorphClass())
+            ->first();
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'name' => 'string',
+            'mount_path' => 'string',
+            'host_path' => 'string|nullable',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if ($request->has('name')) {
+            $newName = $application->uuid.'-'.str($request->name)->trim()->value;
+
+            $existing = LocalPersistentVolume::where('name', $newName)
+                ->where('resource_id', $application->id)
+                ->where('resource_type', $application->getMorphClass())
+                ->where('id', '!=', $storage->id)
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'message' => 'Storage with this name already exists.',
+                ], 409);
+            }
+
+            $storage->name = $newName;
+        }
+
+        if ($request->has('mount_path')) {
+            $storage->mount_path = $request->mount_path;
+        }
+
+        if ($request->has('host_path')) {
+            $storage->host_path = $request->host_path;
+        }
+
+        $storage->save();
+
+        return response()->json([
+            'id' => $storage->id,
+            'name' => $storage->name,
+            'mount_path' => $storage->mount_path,
+            'host_path' => $storage->host_path,
+        ]);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Storage',
+        description: 'Delete persistent storage by ID for an application.',
+        path: '/applications/{uuid}/storages/{storage_id}',
+        operationId: 'delete-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'storage_id',
+                in: 'path',
+                description: 'ID of the persistent storage.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Persistent storage deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Storage deleted.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function delete_storage(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found.',
+            ], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $storage = LocalPersistentVolume::where('id', $request->storage_id)
+            ->where('resource_id', $application->id)
+            ->where('resource_type', $application->getMorphClass())
+            ->first();
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        $storage->delete();
+
+        return response()->json([
+            'message' => 'Storage deleted.',
         ]);
     }
 
