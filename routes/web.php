@@ -32,6 +32,7 @@ use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
+use App\Livewire\Project\Shared\FileBrowser;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
@@ -208,11 +209,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+        Route::get('/backups', ApplicationConfiguration::class)->name('project.application.backups');
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
+        Route::get('/files', FileBrowser::class)->name('project.application.files')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
@@ -230,6 +233,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/logs', Logs::class)->name('project.database.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
+        Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
@@ -244,6 +248,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
+        Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
@@ -302,6 +307,42 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
+    Route::get('/file-browser/download', function () {
+        try {
+            $user = auth()->user();
+            if ($user->isAdminFromSession() === false) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+
+            $path = request()->query('path');
+            $name = request()->query('name');
+
+            if (empty($path) || empty($name)) {
+                return response()->json(['message' => 'Missing parameters.'], 400);
+            }
+
+            if (! Storage::exists($path)) {
+                return response()->json(['message' => 'File not found.'], 404);
+            }
+
+            $expectedPrefix = 'file-browser/'.$user->id.'/';
+            if (! str_starts_with($path, $expectedPrefix)) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+
+            $content = Storage::get($path);
+            Storage::delete($path);
+
+            return response($content, 200, [
+                'Content-Type' => 'application/octet-stream',
+                'Content-Disposition' => 'attachment; filename="'.basename($name).'"',
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    })->name('file-browser.download');
+
     Route::get('/download/backup/{executionId}', function () {
         try {
             $user = auth()->user();
@@ -328,7 +369,7 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                $server = $execution->scheduledDatabaseBackup->database->serverResource();
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
