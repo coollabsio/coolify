@@ -27,7 +27,7 @@ class ScheduledTaskJob implements ShouldQueue
     /**
      * The number of times the job may be attempted.
      */
-    public $tries = 3;
+    public $tries = 1;
 
     /**
      * The maximum number of unhandled exceptions to allow before failing.
@@ -51,8 +51,9 @@ class ScheduledTaskJob implements ShouldQueue
 
     /**
      * Store execution ID to survive job serialization for timeout handling.
+     * Public so it is included in the queue payload and available in failed().
      */
-    protected ?int $executionId = null;
+    public ?int $executionId = null;
 
     public string $task_status = 'failed';
 
@@ -100,10 +101,9 @@ class ScheduledTaskJob implements ShouldQueue
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
                 'started_at' => $startTime,
-                'retry_count' => $this->attempts() - 1,
             ]);
 
-            // Store execution ID for timeout handling
+            // Store execution ID for timeout handling (public so it survives serialization)
             $this->executionId = $this->task_log->id;
 
             $this->server = $this->resource->destination->server;
@@ -139,9 +139,32 @@ class ScheduledTaskJob implements ShouldQueue
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $exec = "docker exec {$containerName} {$cmd}";
+
+                    // Run the command with throwError=false and redirect stderr to stdout
+                    // so we always capture all output even when the command fails.
+                    // Append a unique exit code marker so we can determine success/failure.
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $wrappedExec = '('.$exec.') 2>&1; echo "COOLIFY_EXIT_CODE:$?"';
+                    $rawOutput = instant_remote_process([$wrappedExec], $this->server, false, false, $this->timeout, disableMultiplexing: true);
+
+                    // Parse exit code and clean output
+                    $exitCode = $this->parseExitCode($rawOutput);
+                    $this->task_output = $this->stripExitCodeLine($rawOutput);
+
+                    if ($exitCode !== 0) {
+                        $failureMessage = $this->task_output ?: "Task failed with exit code {$exitCode} (no output)";
+
+                        $this->task_log->update([
+                            'status' => 'failed',
+                            'message' => $failureMessage,
+                        ]);
+
+                        $this->team?->notify(new TaskFailed($this->task, $failureMessage));
+
+                        return;
+                    }
+
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
@@ -156,10 +179,19 @@ class ScheduledTaskJob implements ShouldQueue
             // No valid container was found.
             throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
         } catch (\Throwable $e) {
+            // Build a meaningful error message that includes any captured output
+            $errorMessage = $e->getMessage();
+            if ($this->task_output) {
+                $errorMessage = $this->task_output."\n\n".$errorMessage;
+            }
+            if (empty($errorMessage)) {
+                $errorMessage = 'Task failed with unknown error (no output captured)';
+            }
+
             if ($this->task_log) {
                 $this->task_log->update([
                     'status' => 'failed',
-                    'message' => $this->task_output ?? $e->getMessage(),
+                    'message' => $errorMessage,
                 ]);
             }
 
@@ -169,14 +201,16 @@ class ScheduledTaskJob implements ShouldQueue
                 'task_id' => $this->task->uuid,
                 'task_name' => $this->task->name,
                 'server' => $this->server?->name ?? 'unknown',
-                'attempt' => $this->attempts(),
                 'error' => $e->getMessage(),
             ]);
 
-            // Only notify and throw on final failure
+            // Notify team about the failure
+            $this->team?->notify(new TaskFailed($this->task, $errorMessage));
 
-            // Re-throw to trigger Laravel's retry mechanism with backoff
-            throw $e;
+            // Do not re-throw: the execution log already records the failure status
+            // and message. Re-throwing would cause Laravel to invoke failed() in a
+            // potentially separate process (e.g., on timeout) where the execution
+            // record may not be reliably found, leading to missing logs.
         } finally {
             ScheduledTaskDone::dispatch($this->team->id);
             if ($this->task_log) {
@@ -192,15 +226,44 @@ class ScheduledTaskJob implements ShouldQueue
     }
 
     /**
-     * Calculate the number of seconds to wait before retrying the job.
+     * Parse the exit code from the wrapped command output.
+     * The output ends with "COOLIFY_EXIT_CODE:<code>" appended by the wrapper.
      */
-    public function backoff(): array
+    private function parseExitCode(?string $output): int
     {
-        return [30, 60, 120]; // 30s, 60s, 120s between retries
+        if ($output === null || $output === '') {
+            return 1;
+        }
+
+        if (preg_match('/COOLIFY_EXIT_CODE:(\d+)\s*$/', $output, $matches)) {
+            return (int) $matches[1];
+        }
+
+        // If we can't find the exit code marker, assume failure
+        return 1;
     }
 
     /**
-     * Handle a job failure.
+     * Strip the COOLIFY_EXIT_CODE marker line from the command output.
+     */
+    private function stripExitCodeLine(?string $output): ?string
+    {
+        if ($output === null || $output === '') {
+            return $output;
+        }
+
+        $cleaned = preg_replace('/\nCOOLIFY_EXIT_CODE:\d+\s*$/', '', $output);
+        // Handle case where the marker is the only output
+        $cleaned = preg_replace('/^COOLIFY_EXIT_CODE:\d+\s*$/', '', $cleaned);
+
+        $cleaned = trim($cleaned);
+
+        return $cleaned !== '' ? $cleaned : null;
+    }
+
+    /**
+     * Handle a job failure (e.g., timeout kills the worker process).
+     * This runs in a fresh process when a timeout occurs.
      */
     public function failed(?\Throwable $exception): void
     {
@@ -209,22 +272,16 @@ class ScheduledTaskJob implements ShouldQueue
             'task_id' => $this->task->uuid,
             'task_name' => $this->task->name,
             'server' => $this->server?->name ?? 'unknown',
-            'total_attempts' => $this->attempts(),
             'error' => $exception?->getMessage(),
-            'trace' => $exception?->getTraceAsString(),
         ]);
 
-        // Reload execution log from database
-        // When a job times out, failed() is called in a fresh process with the original
-        // queue payload, so $executionId will be null. We need to query for the latest execution.
+        // Find the execution record to update
         $execution = null;
 
-        // Try to find execution using stored ID first (works for non-timeout failures)
         if ($this->executionId) {
             $execution = ScheduledTaskExecution::find($this->executionId);
         }
 
-        // If no stored ID or not found, query for the most recent execution log for this task
         if (! $execution) {
             $execution = ScheduledTaskExecution::query()
                 ->where('scheduled_task_id', $this->task->id)
@@ -232,31 +289,36 @@ class ScheduledTaskJob implements ShouldQueue
                 ->first();
         }
 
-        // Last resort: check task_log property
-        if (! $execution && $this->task_log) {
-            $execution = $this->task_log;
-        }
-
         if ($execution) {
-            $errorMessage = 'Job permanently failed after '.$this->attempts().' attempts';
-            if ($exception) {
-                $errorMessage .= ': '.$exception->getMessage();
-            }
+            $errorMessage = $exception?->getMessage() ?? 'Unknown error';
+
+            // Preserve any output that was already captured before the failure
+            $message = $execution->message
+                ? $execution->message."\n\n".$errorMessage
+                : $errorMessage;
 
             $execution->update([
                 'status' => 'failed',
-                'message' => $errorMessage,
-                'error_details' => $exception?->getTraceAsString(),
+                'message' => $message,
                 'finished_at' => Carbon::now()->toImmutable(),
             ]);
         } else {
-            Log::channel('scheduled-errors')->warning('Could not find execution log to update', [
+            // Create an execution record as a last resort so the failure is visible in the UI
+            ScheduledTaskExecution::create([
+                'scheduled_task_id' => $this->task->id,
+                'status' => 'failed',
+                'message' => $exception?->getMessage() ?? 'Unknown error (no execution record found)',
+                'started_at' => Carbon::now(),
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+
+            Log::channel('scheduled-errors')->warning('Created new execution record for failed task (original not found)', [
                 'execution_id' => $this->executionId,
                 'task_id' => $this->task->uuid,
             ]);
         }
 
-        // Notify team about permanent failure
+        // Notify team about the failure
         $this->team?->notify(new TaskFailed($this->task, $exception?->getMessage() ?? 'Unknown error'));
     }
 }

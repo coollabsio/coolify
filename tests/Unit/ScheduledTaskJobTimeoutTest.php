@@ -14,9 +14,9 @@ it('has executionId property for timeout handling', function () {
     // Verify executionId property exists
     expect($reflection->hasProperty('executionId'))->toBeTrue();
 
-    // Verify it's protected (will be serialized with the job)
+    // Verify it's public (so it survives job serialization for timeout handling)
     $property = $reflection->getProperty('executionId');
-    expect($property->isProtected())->toBeTrue();
+    expect($property->isPublic())->toBeTrue();
 });
 
 it('has failed method that handles job failures', function () {
@@ -59,8 +59,8 @@ it('failed method implementation reloads execution from database', function () {
         ->toContain('notify');
 });
 
-it('failed method updates execution with error_details field', function () {
-    // Read the failed() method source code to verify error_details is populated
+it('failed method creates execution record as last resort', function () {
+    // Read the failed() method source code to verify fallback execution creation
     $reflection = new ReflectionClass(ScheduledTaskJob::class);
     $method = $reflection->getMethod('failed');
 
@@ -72,12 +72,14 @@ it('failed method updates execution with error_details field', function () {
     $source = file($filename);
     $methodSource = implode('', array_slice($source, $startLine - 1, $endLine - $startLine + 1));
 
-    // Verify the implementation populates error_details field
-    expect($methodSource)->toContain('error_details');
+    // Verify the implementation creates an execution record when none is found
+    expect($methodSource)
+        ->toContain('ScheduledTaskExecution::create')
+        ->toContain('last resort');
 });
 
-it('failed method logs when execution cannot be found', function () {
-    // Read the failed() method source code to verify defensive logging
+it('failed method preserves existing output in execution message', function () {
+    // Read the failed() method source code to verify it preserves existing output
     $reflection = new ReflectionClass(ScheduledTaskJob::class);
     $method = $reflection->getMethod('failed');
 
@@ -89,8 +91,75 @@ it('failed method logs when execution cannot be found', function () {
     $source = file($filename);
     $methodSource = implode('', array_slice($source, $startLine - 1, $endLine - $startLine + 1));
 
-    // Verify the implementation logs a warning if execution is not found
+    // Verify the implementation preserves existing message content
     expect($methodSource)
-        ->toContain('Could not find execution log')
-        ->toContain('warning');
+        ->toContain('$execution->message');
+});
+
+it('has parseExitCode method for extracting exit codes', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+
+    expect($reflection->hasMethod('parseExitCode'))->toBeTrue();
+
+    $method = $reflection->getMethod('parseExitCode');
+    expect($method->isPrivate())->toBeTrue();
+});
+
+it('has stripExitCodeLine method for cleaning output', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+
+    expect($reflection->hasMethod('stripExitCodeLine'))->toBeTrue();
+
+    $method = $reflection->getMethod('stripExitCodeLine');
+    expect($method->isPrivate())->toBeTrue();
+});
+
+it('parseExitCode correctly extracts exit codes from output', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+    $method = $reflection->getMethod('parseExitCode');
+    $method->setAccessible(true);
+
+    // Create an uninitialized instance to call the method on
+    $instance = $reflection->newInstanceWithoutConstructor();
+
+    // Test successful exit code
+    expect($method->invoke($instance, "some output\nCOOLIFY_EXIT_CODE:0"))->toBe(0);
+
+    // Test failed exit code
+    expect($method->invoke($instance, "error output\nCOOLIFY_EXIT_CODE:1"))->toBe(1);
+
+    // Test higher exit code
+    expect($method->invoke($instance, "output\nCOOLIFY_EXIT_CODE:127"))->toBe(127);
+
+    // Test null output
+    expect($method->invoke($instance, null))->toBe(1);
+
+    // Test empty output
+    expect($method->invoke($instance, ''))->toBe(1);
+
+    // Test output without marker
+    expect($method->invoke($instance, 'just some output'))->toBe(1);
+});
+
+it('stripExitCodeLine correctly removes the marker from output', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+    $method = $reflection->getMethod('stripExitCodeLine');
+    $method->setAccessible(true);
+
+    $instance = $reflection->newInstanceWithoutConstructor();
+
+    // Test normal output with marker
+    expect($method->invoke($instance, "hello world\nCOOLIFY_EXIT_CODE:0"))->toBe('hello world');
+
+    // Test multiline output with marker
+    expect($method->invoke($instance, "line1\nline2\nCOOLIFY_EXIT_CODE:1"))->toBe("line1\nline2");
+
+    // Test marker-only output
+    expect($method->invoke($instance, 'COOLIFY_EXIT_CODE:0'))->toBeNull();
+
+    // Test null output
+    expect($method->invoke($instance, null))->toBeNull();
+
+    // Test empty output
+    expect($method->invoke($instance, ''))->toBe('');
 });
