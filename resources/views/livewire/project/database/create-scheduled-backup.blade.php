@@ -2,6 +2,12 @@
     <x-forms.input placeholder="0 0 * * * or daily" id="frequency"
         helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." label="Frequency"
         required />
+    @if ($database->type() === 'standalone-postgresql')
+        <div class="mt-2">
+            <x-forms.checkbox wire:model.live="usePgbackrest" label="Use pgBackRest (Incremental Backups)"
+                helper="Enable pgBackRest for efficient incremental and differential backups. Recommended for large databases (100GB+). Can be configured in detail after creation." />
+        </div>
+    @endif
     <h2>S3</h2>
     @if ($definedS3s->count() === 0)
         <div class="text-red-500">No validated S3 Storages found.</div>

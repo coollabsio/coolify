@@ -87,6 +87,90 @@
             <x-forms.input label="Timeout" id="timeout" helper="The timeout of the backup job in seconds." />
         </div>
 
+        {{-- pgBackRest Section (PostgreSQL only) --}}
+        @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
+            <div class="mt-6 border border-gray-200 dark:border-coolgray-300 rounded-md p-4">
+                <h3 class="text-lg font-medium mb-2">pgBackRest (Incremental Backups)</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Enable pgBackRest for efficient incremental and differential backups. This is recommended for large databases (100GB+) as it significantly reduces backup time and storage costs.
+                    When enabled, this replaces the standard pg_dump backup method with pgBackRest's WAL-based backup system.
+                </p>
+                <div class="w-64 pb-4">
+                    <x-forms.checkbox instantSave label="Enable pgBackRest" id="usePgbackrest"
+                        helper="Use pgBackRest instead of pg_dump for backups. Enables WAL archiving, incremental backups, and efficient restores." />
+                </div>
+
+                @if ($usePgbackrest)
+                    <div class="flex flex-col gap-4">
+                        <div class="flex gap-2">
+                            <x-forms.select id="pgbackrestBackupType" label="Backup Type"
+                                helper="Full: Complete backup of all data. Differential: Only changes since last full backup. Incremental: Only changes since last backup of any type.">
+                                <option value="full">Full</option>
+                                <option value="diff">Differential</option>
+                                <option value="incr">Incremental</option>
+                            </x-forms.select>
+                            <x-forms.input label="Full Backup Retention" id="pgbackrestRetentionFull" type="number"
+                                min="1"
+                                helper="Number of full backups to retain. Older full backups and their dependent differential/incremental backups will be removed." />
+                            <x-forms.input label="Differential Backup Retention" id="pgbackrestRetentionDiff"
+                                type="number" min="1"
+                                helper="Number of differential backups to retain per full backup." />
+                        </div>
+
+                        <div class="flex gap-2">
+                            <x-forms.select id="pgbackrestRepoType" label="Repository Type" wire:model.live="pgbackrestRepoType"
+                                helper="Where to store pgBackRest backups. Local (posix) stores on the server's filesystem. S3 stores directly to an S3-compatible service (MinIO, AWS S3, etc).">
+                                <option value="posix">Local (posix)</option>
+                                <option value="s3">S3 / MinIO</option>
+                            </x-forms.select>
+                        </div>
+
+                        @if ($pgbackrestRepoType === 's3')
+                            <div class="border border-gray-200 dark:border-coolgray-300 rounded-md p-4">
+                                <h4 class="font-medium mb-3">S3 / MinIO Configuration</h4>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex gap-2">
+                                        <x-forms.input label="S3 Bucket" id="pgbackrestS3Bucket" required
+                                            helper="The S3 bucket name for storing backups." />
+                                        <x-forms.input label="S3 Endpoint" id="pgbackrestS3Endpoint" required
+                                            helper="The S3 endpoint URL (e.g., https://s3.amazonaws.com or http://minio:9000 for MinIO)." />
+                                        <x-forms.input label="S3 Region" id="pgbackrestS3Region"
+                                            helper="The S3 region (default: us-east-1)." />
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <x-forms.input label="S3 Access Key" id="pgbackrestS3Key" required
+                                            helper="The S3 access key ID." />
+                                        <x-forms.input label="S3 Secret Key" id="pgbackrestS3Secret" type="password"
+                                            required helper="The S3 secret access key." />
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="flex gap-2 mt-2">
+                            <x-forms.button wire:click.prevent="pgbackrestInfo" type="button">
+                                View Backup Info
+                            </x-forms.button>
+                            <x-forms.button wire:click.prevent="pgbackrestRestore" type="button" isError
+                                confirm="Are you sure you want to restore from the latest pgBackRest backup? This will stop the database, restore data, and restart it.">
+                                Restore Latest Backup
+                            </x-forms.button>
+                        </div>
+
+                        <div x-data="{ pgbackrestInfoText: '' }"
+                            x-on:pgbackrest-info.window="pgbackrestInfoText = $event.detail.info">
+                            <div x-show="pgbackrestInfoText" x-cloak>
+                                <h4 class="font-medium mt-2 mb-1">pgBackRest Repository Info</h4>
+                                <pre
+                                    class="text-xs bg-gray-100 dark:bg-coolgray-200 p-3 rounded-md overflow-x-auto whitespace-pre-wrap"
+                                    x-text="pgbackrestInfoText"></pre>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <h3 class="mt-6 mb-2 text-lg font-medium">Backup Retention Settings</h3>
         <div class="mb-4">
             <ul class="list-disc pl-6 space-y-2">

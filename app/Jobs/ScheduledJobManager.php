@@ -119,7 +119,11 @@ class ScheduledJobManager implements ShouldQueue
                 }
 
                 if ($this->shouldRunNow($frequency, $serverTimezone)) {
-                    DatabaseBackupJob::dispatch($backup);
+                    if ($backup->use_pgbackrest) {
+                        PgBackRestBackupJob::dispatch($backup);
+                    } else {
+                        DatabaseBackupJob::dispatch($backup);
+                    }
                 }
             } catch (\Exception $e) {
                 Log::channel('scheduled-errors')->error('Error processing backup', [

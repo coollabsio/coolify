@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Jobs\PgBackRestRestoreJob;
 use App\Models\ScheduledDatabaseBackup;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -78,6 +79,36 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $usePgbackrest = false;
+
+    #[Validate(['required', 'string', 'in:full,diff,incr'])]
+    public string $pgbackrestBackupType = 'full';
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionFull = 2;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionDiff = 7;
+
+    #[Validate(['required', 'string', 'in:posix,s3'])]
+    public string $pgbackrestRepoType = 'posix';
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Bucket = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Endpoint = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Region = 'us-east-1';
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Key = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Secret = null;
+
     public function mount()
     {
         try {
@@ -125,6 +156,16 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->use_pgbackrest = $this->usePgbackrest;
+            $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
+            $this->backup->pgbackrest_retention_full = $this->pgbackrestRetentionFull;
+            $this->backup->pgbackrest_retention_diff = $this->pgbackrestRetentionDiff;
+            $this->backup->pgbackrest_repo_type = $this->pgbackrestRepoType;
+            $this->backup->pgbackrest_s3_bucket = $this->pgbackrestS3Bucket;
+            $this->backup->pgbackrest_s3_endpoint = $this->pgbackrestS3Endpoint;
+            $this->backup->pgbackrest_s3_region = $this->pgbackrestS3Region;
+            $this->backup->pgbackrest_s3_key = $this->pgbackrestS3Key;
+            $this->backup->pgbackrest_s3_secret = $this->pgbackrestS3Secret;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +184,16 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->usePgbackrest = $this->backup->use_pgbackrest ?? false;
+            $this->pgbackrestBackupType = $this->backup->pgbackrest_backup_type ?? 'full';
+            $this->pgbackrestRetentionFull = $this->backup->pgbackrest_retention_full ?? 2;
+            $this->pgbackrestRetentionDiff = $this->backup->pgbackrest_retention_diff ?? 7;
+            $this->pgbackrestRepoType = $this->backup->pgbackrest_repo_type ?? 'posix';
+            $this->pgbackrestS3Bucket = $this->backup->pgbackrest_s3_bucket;
+            $this->pgbackrestS3Endpoint = $this->backup->pgbackrest_s3_endpoint;
+            $this->pgbackrestS3Region = $this->backup->pgbackrest_s3_region ?? 'us-east-1';
+            $this->pgbackrestS3Key = $this->backup->pgbackrest_s3_key;
+            $this->pgbackrestS3Secret = $this->backup->pgbackrest_s3_secret;
         }
     }
 
@@ -240,6 +291,65 @@ class BackupEdit extends Component
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function pgbackrestRestore(?string $backupLabel = null)
+    {
+        try {
+            $this->authorize('manageBackups', $this->backup->database);
+
+            if (! $this->backup->use_pgbackrest) {
+                $this->dispatch('error', 'pgBackRest is not enabled for this backup configuration.');
+
+                return;
+            }
+
+            PgBackRestRestoreJob::dispatch($this->backup, $backupLabel);
+            $this->dispatch('success', 'pgBackRest restore queued. The database will be restored shortly.');
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to queue restore: '.$e->getMessage());
+        }
+    }
+
+    public function pgbackrestInfo()
+    {
+        try {
+            $this->authorize('view', $this->backup->database);
+
+            if (! $this->backup->use_pgbackrest) {
+                $this->dispatch('error', 'pgBackRest is not enabled for this backup configuration.');
+
+                return;
+            }
+
+            $database = $this->backup->database;
+            if ($database instanceof \App\Models\ServiceDatabase) {
+                $server = $database->service->destination->server;
+                $serviceUuid = $database->service->uuid;
+                $containerName = "{$database->name}-$serviceUuid";
+            } else {
+                $server = $database->destination->server;
+                $containerName = $database->uuid;
+            }
+
+            $pgUser = 'postgres';
+            if ($database instanceof \App\Models\StandalonePostgresql) {
+                $pgUser = $database->postgres_user;
+            }
+
+            $output = instant_remote_process(
+                ["docker exec -u {$pgUser} {$containerName} pgbackrest --stanza=db info 2>&1"],
+                $server,
+                false,
+                false,
+                30,
+                disableMultiplexing: true
+            );
+
+            $this->dispatch('pgbackrest-info', info: trim($output));
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to get pgBackRest info: '.$e->getMessage());
         }
     }
 

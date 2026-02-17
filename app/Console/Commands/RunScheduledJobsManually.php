@@ -123,8 +123,13 @@ class RunScheduledJobsManually extends Command
                     if ($dryRun) {
                         $this->info("🔍 Would dispatch backup job for: {$scheduled_backup->name} (ID: {$scheduled_backup->id}, Frequency: {$scheduled_backup->frequency})");
                     } else {
-                        DatabaseBackupJob::dispatch($scheduled_backup);
-                        $this->info("✓ Dispatched backup job for: {$scheduled_backup->name} (ID: {$scheduled_backup->id}, Frequency: {$scheduled_backup->frequency})");
+                        if ($scheduled_backup->use_pgbackrest) {
+                            \App\Jobs\PgBackRestBackupJob::dispatch($scheduled_backup);
+                            $this->info("✓ Dispatched pgBackRest backup job for: {$scheduled_backup->name} (ID: {$scheduled_backup->id}, Frequency: {$scheduled_backup->frequency})");
+                        } else {
+                            DatabaseBackupJob::dispatch($scheduled_backup);
+                            $this->info("✓ Dispatched backup job for: {$scheduled_backup->name} (ID: {$scheduled_backup->id}, Frequency: {$scheduled_backup->frequency})");
+                        }
                     }
                 } catch (\Exception $e) {
                     $this->error("✗ Failed to dispatch backup job for {$scheduled_backup->id}: ".$e->getMessage());
