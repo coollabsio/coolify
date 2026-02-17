@@ -55,6 +55,15 @@ class Github extends Controller
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                $full_name = data_get($payload, 'repository.full_name');
+                $release_tag = data_get($payload, 'release.tag_name');
+                $branch = data_get($payload, 'release.target_commitish');
+                if ($action !== 'published') {
+                    return response("Release event received but action is '$action', not 'published'. Ignoring.");
+                }
+            }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
@@ -69,6 +78,12 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
+                }
+            }
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get();
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -181,6 +196,43 @@ class Github extends Controller
                             'message' => 'PR webhook received, processing queued.',
                         ]);
                     }
+                    if ($x_github_event === 'release') {
+                        if ($application->isReleaseDeployable()) {
+                            $deployment_uuid = new Cuid2;
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                commit: $release_tag,
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => "Release '$release_tag' deployment queued.",
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $result['deployment_uuid'],
+                                ]);
+                            }
+                        } else {
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Deploy on release is disabled for this application.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        }
+                    }
                 }
             }
 
@@ -246,6 +298,15 @@ class Github extends Controller
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                $id = data_get($payload, 'repository.id');
+                $release_tag = data_get($payload, 'release.tag_name');
+                $branch = data_get($payload, 'release.target_commitish');
+                if ($action !== 'published') {
+                    return response("Release event received but action is '$action', not 'published'. Ignoring.");
+                }
+            }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
@@ -262,6 +323,12 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $base_branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
+                }
+            }
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get();
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications found with branch '$branch'.");
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -357,6 +424,35 @@ class Github extends Controller
                             'status' => 'queued',
                             'message' => 'PR webhook received, processing queued.',
                         ]);
+                    }
+                    if ($x_github_event === 'release') {
+                        if ($application->isReleaseDeployable()) {
+                            $deployment_uuid = new Cuid2;
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                commit: $release_tag,
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            }
+                            $return_payloads->push([
+                                'status' => $result['status'],
+                                'message' => "Release '$release_tag' deployment queued.",
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'deployment_uuid' => $result['deployment_uuid'] ?? null,
+                            ]);
+                        } else {
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Deploy on release is disabled for this application.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        }
                     }
                 }
             }

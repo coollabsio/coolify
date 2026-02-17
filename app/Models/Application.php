@@ -985,6 +985,15 @@ class Application extends BaseModel
         return false;
     }
 
+    public function isReleaseDeployable(): bool
+    {
+        if ($this->settings->is_deploy_on_release_enabled) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function deploymentType()
     {
         if (isDev() && data_get($this, 'private_key_id') === 0) {
