@@ -1,0 +1,23 @@
+# documentation: https://github.com/felipekafuri/bandeira
+# slogan: Lightweight feature flag management tool with embedded SQLite.
+# category: development
+# tags: feature-flags,feature-management,go,lightweight
+# logo: svgs/bandeira.svg
+# port: 8080
+
+services:
+  bandeira:
+    image: ghcr.io/felipekafuri/bandeira:latest
+    environment:
+      - SERVICE_FQDN_BANDEIRA_8080
+      - BANDEIRA_APP_ENVIRONMENT=prod
+      - BANDEIRA_APP_ENCRYPTIONKEY=${SERVICE_PASSWORD_64_BANDEIRA}
+      - BANDEIRA_AUTH_ADMINPASSWORD=${SERVICE_PASSWORD_BANDEIRA}
+    volumes:
+      - bandeira-data:/app/dbs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
