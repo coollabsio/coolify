@@ -16,11 +16,23 @@
                 <div class="pb-4">Advanced settings for your Coolify instance.</div>
 
                 <div class="flex flex-col gap-1">
+                    <h4>Registration Settings</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
                             helper="Allow users to self-register. If disabled, only administrators can create accounts."
                             label="Registration Allowed" />
                     </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow new users to self-register via OAuth providers even when general registration is disabled. Existing OAuth users can always log in regardless of this setting."
+                            label="OAuth Registration Allowed" />
+                    </div>
+                    @if ($is_oauth_registration_enabled && $is_registration_enabled)
+                        <x-callout type="info" title="Note" class="mt-1 mb-2">
+                            General registration is already enabled, so all users (including OAuth) can register. This setting is most useful when general registration is disabled.
+                        </x-callout>
+                    @endif
+                    <h4 class="pt-4">General</h4>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."

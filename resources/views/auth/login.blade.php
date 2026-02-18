@@ -94,6 +94,11 @@
                                 </x-forms.button>
                             @endforeach
                         </div>
+                        @if (! $is_registration_enabled && $is_oauth_registration_enabled)
+                            <div class="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                                New accounts can be created via OAuth login.
+                            </div>
+                        @endif
                     @endif
                 </div>
             </div>
