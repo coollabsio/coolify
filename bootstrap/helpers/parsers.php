@@ -1184,6 +1184,22 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_FQDN', $urls->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+
+        // Inject server-level environment variables
+        $serverForEnvVars = null;
+        if ($resource instanceof \App\Models\Application) {
+            $serverForEnvVars = $resource->destination->server ?? null;
+        } elseif ($resource instanceof \App\Models\Service) {
+            $serverForEnvVars = $resource->server ?? null;
+        }
+        if ($serverForEnvVars) {
+            foreach ($serverForEnvVars->environmentVariables as $serverEnv) {
+                if ($serverEnv->value !== null) {
+                    $coolifyEnvironments->put($serverEnv->key, $serverEnv->value);
+                }
+            }
+        }
+
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -2286,6 +2302,22 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+
+        // Inject server-level environment variables
+        $serverForEnvVars = null;
+        if ($resource instanceof \App\Models\Application) {
+            $serverForEnvVars = $resource->destination->server ?? null;
+        } elseif ($resource instanceof \App\Models\Service) {
+            $serverForEnvVars = $resource->server ?? null;
+        }
+        if ($serverForEnvVars) {
+            foreach ($serverForEnvVars->environmentVariables as $serverEnv) {
+                if ($serverEnv->value !== null) {
+                    $coolifyEnvironments->put($serverEnv->key, $serverEnv->value);
+                }
+            }
+        }
+
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');

@@ -60,6 +60,7 @@ use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Sentinel as ServerSentinel;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Server\Swarm as ServerSwarm;
+use App\Livewire\Server\EnvironmentVariable\All as ServerEnvironmentVariables;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\Updates as SettingsUpdates;
@@ -265,6 +266,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
+        Route::get('/environment-variables', ServerEnvironmentVariables::class)->name('server.environment-variables');
         Route::get('/metrics', ServerCharts::class)->name('server.charts');
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');

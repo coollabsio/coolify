@@ -191,6 +191,7 @@ class Server extends BaseModel
             });
             $server->settings()->delete();
             $server->sslCertificates()->delete();
+            $server->environmentVariables()->delete();
         });
 
         static::updated(function () {
@@ -313,6 +314,11 @@ class Server extends BaseModel
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
+    }
+
+    public function environmentVariables()
+    {
+        return $this->hasMany(ServerEnvironmentVariable::class);
     }
 
     public function dockerCleanupExecutions()

@@ -1181,6 +1181,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+
+        // Inject server-level environment variables (between system defaults and app-level vars)
+        $serverEnvVars = $this->mainServer->environmentVariables()->get();
+        foreach ($serverEnvVars as $serverEnv) {
+            $envs->push($serverEnv->key.'='.$serverEnv->real_value);
+        }
+
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
@@ -1463,6 +1470,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         foreach ($coolify_envs as $key => $item) {
             $envs_dict[$key] = escapeBashEnvValue($item);
+        }
+
+        // 2.5. Add server-level environment variables (between system defaults and app-level vars)
+        $serverEnvVars = $this->mainServer->environmentVariables()->get();
+        foreach ($serverEnvVars as $serverEnv) {
+            $value = $serverEnv->value;
+            if ($value !== null) {
+                $envs_dict[$serverEnv->key] = escapeBashEnvValue($value);
+            }
         }
 
         // 3. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
@@ -2340,6 +2356,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function generate_coolify_env_variables(bool $forBuildTime = false): Collection
     {
         $coolify_envs = collect([]);
+
+        // Always inject server identification variables
+        $coolify_envs->put('COOLIFY_SERVER_NAME', $this->mainServer->name);
+        $coolify_envs->put('COOLIFY_SERVER_UUID', $this->mainServer->uuid);
+
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
             // Only add SOURCE_COMMIT for runtime OR when explicitly enabled for build-time
