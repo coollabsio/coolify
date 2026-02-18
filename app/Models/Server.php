@@ -1048,21 +1048,37 @@ $schema://$host {
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
+            if ($item->value() === '' || ! $item->contains('=')) {
+                continue;
+            }
+            $key = $item->before('=')->value();
+            $value = $item->after('=')->lower()->replace('"', '')->value();
+            if ($key !== '') {
+                $collectedData->put($key, $value);
+            }
         }
         $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        $versionCodename = data_get($collectedData, 'VERSION_CODENAME');
+
+        // Debian 13 (Trixie) and other Debian variants: recognize by ID or by VERSION_CODENAME
+        // when ID might be missing or inconsistent (e.g. testing/sid upgrades)
+        $debianCodenames = ['stretch', 'buster', 'bullseye', 'bookworm', 'trixie'];
+        if (($ID === '' || $ID === null) && in_array($versionCodename, $debianCodenames, true)) {
+            $ID = 'debian';
+        }
+
+        if ($ID === '' || $ID === null) {
+            return false;
+        }
+
         $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
-            }
+            return str($supportedOs)->contains($ID);
         });
         if ($supported->count() === 1) {
             return str($supported->first());
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function isTerminalEnabled()
