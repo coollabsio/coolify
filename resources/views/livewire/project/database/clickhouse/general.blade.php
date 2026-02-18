@@ -78,6 +78,9 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="0" id="publicProxyTimeout" label="Proxy Timeout (seconds)"
+                helper="Timeout in seconds for idle proxy connections. Set to 0 for no timeout (default)."
+                canGate="update" :canResource="$database" />
         </div>
     </form>
     <h3 class="pt-4">Advanced</h3>
