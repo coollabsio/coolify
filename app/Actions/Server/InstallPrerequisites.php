@@ -53,6 +53,8 @@ class InstallPrerequisites
                 "echo 'Installing Prerequisites for Arch Linux...'",
                 'pacman -Syu --noconfirm --needed curl wget git jq',
             ]);
+        } elseif ($supported_os_type->contains('alpine')) {
+            throw new \Exception('Alpine Linux is not supported for automated prerequisites installation. Please install curl, wget, git, and jq manually before connecting the server.');
         } else {
             throw new \Exception('Unsupported OS type for prerequisites installation');
         }
