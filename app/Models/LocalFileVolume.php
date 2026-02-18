@@ -51,6 +51,9 @@ class LocalFileVolume extends BaseModel
         if ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
+        } elseif ($this->resource instanceof \App\Models\ServiceDatabase && $this->resource->isApplicationOwned()) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
@@ -86,6 +89,9 @@ class LocalFileVolume extends BaseModel
         if ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
+        } elseif ($this->resource instanceof \App\Models\ServiceDatabase && $this->resource->isApplicationOwned()) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
@@ -123,6 +129,9 @@ class LocalFileVolume extends BaseModel
         if ($isService) {
             $workdir = $this->resource->service->workdir();
             $server = $this->resource->service->server;
+        } elseif ($this->resource instanceof \App\Models\ServiceDatabase && $this->resource->isApplicationOwned()) {
+            $workdir = $this->resource->workdir();
+            $server = $this->resource->getServer();
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;

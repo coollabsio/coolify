@@ -187,6 +187,11 @@ class Application extends BaseModel
                     $application->docker_compose_domains = null;
                     $application->docker_compose_raw = null;
 
+                    // Remove compose databases and their backups
+                    $application->composeDatabases()->each(function ($db) {
+                        $db->delete();
+                    });
+
                     // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
                     $application->environment_variables()
                         ->where(function ($q) {
@@ -235,6 +240,9 @@ class Application extends BaseModel
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
+            $application->composeDatabases()->each(function ($db) {
+                $db->delete();
+            });
             $application->settings()->delete();
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
@@ -488,6 +496,11 @@ class Application extends BaseModel
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
+    }
+
+    public function composeDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function persistentStorages()

@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,12 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +57,60 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Check if this ServiceDatabase is owned by an Application (Docker Compose via GitHub App).
+     */
+    public function isApplicationOwned(): bool
+    {
+        return filled($this->application_id) && is_null($this->service_id);
+    }
+
+    /**
+     * Get the owning resource (Service or Application).
+     */
+    public function getOwner(): Service|Application|null
+    {
+        return $this->service ?? $this->application;
+    }
+
+    /**
+     * Get the UUID of the owning resource.
+     */
+    public function getOwnerUuid(): ?string
+    {
+        return $this->getOwner()?->uuid;
+    }
+
+    /**
+     * Get the server for this database, resolving through either Service or Application.
+     */
+    public function getServer(): ?Server
+    {
+        if ($this->service_id) {
+            return $this->service?->server;
+        }
+
+        return $this->application?->destination?->server;
+    }
+
+    /**
+     * Get the network for this database.
+     */
+    public function getNetwork(): ?string
+    {
+        if ($this->service_id) {
+            return $this->service?->uuid;
+        }
+
+        return $this->application?->uuid;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $ownerUuid = $this->getOwnerUuid();
+        $server = $this->getServer();
+        $container_id = $this->name.'-'.$ownerUuid;
+        remote_process(["docker restart {$container_id}"], $server);
     }
 
     public function isRunning()
@@ -114,8 +172,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +183,28 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->service_id) {
+            return data_get($this, 'service.environment.project.team');
+        }
+
+        return data_get($this, 'application.environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $ownerUuid = $this->getOwnerUuid();
+
+        return service_configuration_dir()."/{$ownerUuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()
