@@ -502,7 +502,7 @@ services:
       ASSIST_JWT_SECRET: ${SERVICE_PASSWORD_ASSISTJWT}
       ASSIST_KEY: ${SERVICE_PASSWORD_ASSISTKEY}
       AWS_DEFAULT_REGION: us-east-1
-      REDIS_URL: redis-master.db.svc.cluster.local
+      REDIS_URL: redis://redis-master.db.svc.cluster.local:6379
       CLEAR_SOCKET_TIME: "720"
       debug: "0"
       redis: "false"
