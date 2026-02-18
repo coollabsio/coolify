@@ -10,6 +10,10 @@
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                     id="isAutoDeployEnabled" label="Auto Deploy" canGate="update" :canResource="$application" />
                 <x-forms.checkbox
+                    helper="Automatically deploy when a new release is published on GitHub. Your GitHub App or webhook must have the 'releases' event enabled."
+                    instantSave id="isDeployOnReleaseEnabled" label="Deploy on Release" canGate="update"
+                    :canResource="$application" />
+                <x-forms.checkbox
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" canGate="update"
                     :canResource="$application" />
