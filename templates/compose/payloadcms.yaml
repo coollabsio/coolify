@@ -1,0 +1,72 @@
+# documentation: https://payloadcms.com/docs/getting-started/installation
+# slogan: The best way to build a modern backend + admin UI. Open-source headless CMS and application framework built with Node.js and TypeScript.
+# category: cms
+# tags: cms, headless, typescript, nodejs, nextjs, api, content-management
+# logo: svgs/payloadcms.svg
+# port: 3000
+
+services:
+  payloadcms:
+    image: node:20-alpine
+    working_dir: /app
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ ! -f /app/package.json ]; then
+          echo "Initializing PayloadCMS project..."
+          npx --yes create-payload-app@latest /app/tmp-init --db postgres --no-deps -t blank 2>&1
+          cp -r /app/tmp-init/* /app/tmp-init/.* /app/ 2>/dev/null || true
+          rm -rf /app/tmp-init
+          cat > /app/.env <<ENVEOF
+        DATABASE_URI=postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgresql:5432/$${POSTGRES_DB}
+        PAYLOAD_SECRET=$${PAYLOAD_SECRET}
+        NEXT_PUBLIC_SERVER_URL=$${PAYLOAD_PUBLIC_URL}
+        ENVEOF
+          npm install
+          npm run build
+        fi
+        cat > /app/.env <<ENVEOF
+        DATABASE_URI=postgresql://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgresql:5432/$${POSTGRES_DB}
+        PAYLOAD_SECRET=$${PAYLOAD_SECRET}
+        NEXT_PUBLIC_SERVER_URL=$${PAYLOAD_PUBLIC_URL}
+        ENVEOF
+        npm run start
+    environment:
+      - SERVICE_FQDN_PAYLOADCMS_3000
+      - PAYLOAD_PUBLIC_URL=${SERVICE_FQDN_PAYLOADCMS}
+      - PAYLOAD_SECRET=$SERVICE_PASSWORD_64_PAYLOADSECRET
+      - POSTGRES_USER=$SERVICE_USER_POSTGRESQL
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-payload}
+      - NODE_ENV=production
+    volumes:
+      - payloadcms-data:/app
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:3000/admin"
+      interval: 10s
+      timeout: 30s
+      retries: 15
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - payloadcms-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRESQL
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-payload}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 20s
+      retries: 10
