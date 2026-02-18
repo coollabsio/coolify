@@ -1,0 +1,27 @@
+# documentation: https://docs.influxdata.com/influxdb/v2/
+# slogan: InfluxDB is a high-performance time series database built for metrics, events, and real-time analytics.
+# category: database
+# tags: database, timeseries, monitoring, metrics, analytics
+# logo: svgs/influxdb.svg
+# port: 8086
+
+services:
+  influxdb:
+    image: influxdb:2
+    environment:
+      - SERVICE_FQDN_INFLUXDB_8086
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${SERVICE_USER_INFLUXDB}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${SERVICE_PASSWORD_INFLUXDB}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG:-myorg}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET:-mybucket}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMINTOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
