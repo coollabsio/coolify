@@ -67,6 +67,10 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+
+            # Default `proxy_timeout` for nginx stream is 10m, which can break long-running
+            # queries or large result transfers. 0 disables the timeout.
+            proxy_timeout 0;
        }
     }
     EOF;
