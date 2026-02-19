@@ -1,0 +1,19 @@
+<svg width="500" height="500" viewBox="0 0 500 500" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs/>
+  <!-- Mail envelope background -->
+  <rect x="50" y="150" width="400" height="250" rx="20" ry="20" fill="#2563eb" stroke="#1e40af" stroke-width="2"/>
+  <!-- Envelope flap -->
+  <path d="M50 150 L250 280 L450 150" fill="#3b82f6" stroke="#1e40af" stroke-width="2"/>
+  <!-- Mail lines inside envelope -->
+  <rect x="100" y="220" width="300" height="8" rx="4" fill="#ffffff" opacity="0.3"/>
+  <rect x="100" y="250" width="250" height="8" rx="4" fill="#ffffff" opacity="0.3"/>
+  <rect x="100" y="280" width="200" height="8" rx="4" fill="#ffffff" opacity="0.3"/>
+  <!-- Docker container elements -->
+  <rect x="180" y="80" width="140" height="20" rx="10" fill="#0ea5e9" stroke="#0284c7" stroke-width="2"/>
+  <rect x="180" y="110" width="140" height="20" rx="10" fill="#06b6d4" stroke="#0891b2" stroke-width="2"/>
+  <!-- Server icon -->
+  <circle cx="100" cy="450" r="15" fill="#10b981"/>
+  <circle cx="150" cy="450" r="15" fill="#10b981"/>
+  <circle cx="200" cy="450" r="15" fill="#10b981"/>
+  <rect x="70" y="420" width="160" height="10" rx="5" fill="#059669"/>
+</svg>
