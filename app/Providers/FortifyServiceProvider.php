@@ -47,7 +47,8 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            $oauthEnabled = OauthSetting::where('enabled', true)->exists();
+            if (! $settings->is_registration_enabled || $oauthEnabled) {
                 return redirect()->route('login');
             }
 
@@ -59,14 +60,15 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(function () {
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
+            $oauthEnabled = $enabled_oauth_providers->isNotEmpty();
             $users = User::count();
-            if ($users == 0) {
-                // If there are no users, redirect to registration
+            if ($users == 0 && ! $oauthEnabled) {
+                // If there are no users and no OAuth providers, redirect to registration
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_registration_enabled' => $settings->is_registration_enabled && ! $oauthEnabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });

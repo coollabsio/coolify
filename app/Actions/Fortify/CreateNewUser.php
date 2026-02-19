@@ -19,7 +19,8 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        $oauthEnabled = \App\Models\OauthSetting::where('enabled', true)->exists();
+        if (! $settings->is_registration_enabled || $oauthEnabled) {
             abort(403);
         }
         Validator::make($input, [
