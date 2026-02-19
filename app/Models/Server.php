@@ -1052,7 +1052,11 @@ $schema://$host {
         }
         $ID = data_get($collectedData, 'ID');
         // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        // bounty fix for debian 13
+        if ($ID === 'debian' && $VERSION_ID === '13'){
+            return str($ID);
+        }
         $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
             if (str($supportedOs)->contains($ID)) {
                 return str($ID);

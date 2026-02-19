@@ -523,6 +523,9 @@ install_docker_manually() {
         chmod a+r /etc/apt/keyrings/docker.asc
 
         # Add the repository to Apt sources
+        if [ "$VERSION_CODENAME" = "trixie" ]; then
+            VERSION_CODENAME="bookworm"
+        fi
         echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
                   $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
