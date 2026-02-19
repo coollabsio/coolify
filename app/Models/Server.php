@@ -1050,19 +1050,30 @@ $schema://$host {
             $item = str($line)->trim();
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
-            }
+        return $this->resolveSupportedOsType($collectedData);
+    }
+
+    public function resolveSupportedOsType($osReleaseData): bool|Stringable
+    {
+        $ID = data_get($osReleaseData, 'ID');
+        $ID_LIKE = data_get($osReleaseData, 'ID_LIKE', '');
+
+        $detectedIds = collect([$ID])
+            ->merge(str($ID_LIKE)->explode(' '))
+            ->map(fn ($item) => str($item)->trim()->lower()->value())
+            ->filter()
+            ->unique();
+
+        $supported = collect(SUPPORTED_OS)->first(function ($supportedOs) use ($detectedIds) {
+            $supportedIds = str($supportedOs)
+                ->explode(' ')
+                ->map(fn ($item) => str($item)->trim()->lower()->value())
+                ->filter();
+
+            return $detectedIds->intersect($supportedIds)->isNotEmpty();
         });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
-            return false;
-        }
+
+        return $supported ? str($supported) : false;
     }
 
     public function isTerminalEnabled()

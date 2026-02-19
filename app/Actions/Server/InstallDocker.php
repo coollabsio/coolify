@@ -80,6 +80,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -94,8 +96,8 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
+                'command -v systemctl >/dev/null 2>&1 && systemctl enable docker >/dev/null 2>&1 || command -v rc-update >/dev/null 2>&1 && rc-update add docker default >/dev/null 2>&1 || true',
+                'command -v systemctl >/dev/null 2>&1 && systemctl restart docker || command -v rc-service >/dev/null 2>&1 && rc-service docker restart || command -v service >/dev/null 2>&1 && service docker restart || true',
             ]);
             if ($server->isSwarm()) {
                 $command = $command->merge([
@@ -157,6 +159,13 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk add --no-cache docker docker-cli-compose && '.
+            'command -v rc-update >/dev/null 2>&1 && rc-update add docker default >/dev/null 2>&1 || true && '.
+            'command -v rc-service >/dev/null 2>&1 && rc-service docker start || command -v service >/dev/null 2>&1 && service docker start || true';
     }
 
     private function getGenericDockerInstallCommand(): string
