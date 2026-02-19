@@ -1,0 +1,48 @@
+# documentation: https://openreplay.com/docs
+# slogan: OpenReplay is an open-source session replay and product analytics suite.
+# category: analytics
+# tags: analytics, session-replay, product, monitoring, debugging, frontend
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  openreplay:
+    image: openreplay/openreplay:latest
+    volumes:
+      - openreplay-data:/mnt/efs
+    environment:
+      - SERVICE_FQDN_OPENREPLAY_80
+      - DOMAIN_NAME=${SERVICE_FQDN_OPENREPLAY}
+      - POSTGRES_STRING=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-openreplay}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+  postgres:
+    image: postgres:16
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-openreplay}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: redis:7
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
