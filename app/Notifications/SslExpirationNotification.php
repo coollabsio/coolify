@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -146,6 +147,28 @@ class SslExpirationNotification extends CustomEmailNotification
             title: '🔒 SSL Certificates Renewed',
             description: $description,
             color: SlackMessage::warningColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        $resourceNames = $this->resources->pluck('name')->join(', ');
+        $message = "SSL certificates have been renewed for: **{$resourceNames}**\n\n";
+        $message .= '**Action Required:** These resources need to be redeployed manually for the new SSL certificates to take effect.';
+
+        $buttons = [];
+        foreach ($this->urls as $name => $url) {
+            $buttons[] = [
+                'text' => "View {$name}",
+                'url' => $url,
+            ];
+        }
+
+        return new GotifyMessage(
+            title: 'SSL Certificates Renewed',
+            level: 'warning',
+            message: $message,
+            buttons: $buttons,
         );
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -230,5 +231,32 @@ class DeploymentSuccess extends CustomEmailNotification
         }
 
         return $data;
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
+            $message = "**New PR#{$this->preview->pull_request_id} version successfully deployed of {$this->application_name}**\n\n";
+            if ($this->preview->fqdn) {
+                $message .= "**Preview URL:** [{$this->preview->fqdn}]({$this->preview->fqdn})\n";
+            }
+        } else {
+            $title = 'New version successfully deployed';
+            $message = "**New version successfully deployed of {$this->application_name}**\n\n";
+            if ($this->fqdn) {
+                $message .= "**Application URL:** [{$this->fqdn}]({$this->fqdn})\n";
+            }
+        }
+
+        $message .= '**Project:** '.data_get($this->application, 'environment.project.name')."\n";
+        $message .= "**Environment:** {$this->environment_name}\n";
+        $message .= "**Deployment Logs:** [{$this->deployment_url}]({$this->deployment_url})";
+
+        return new GotifyMessage(
+            title: $title,
+            message: $message,
+            level: 'success',
+        );
     }
 }

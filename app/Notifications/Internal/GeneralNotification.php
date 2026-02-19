@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
@@ -56,6 +57,15 @@ class GeneralNotification extends Notification implements ShouldQueue
             title: 'Coolify: General Notification',
             description: $this->message,
             color: SlackMessage::infoColor(),
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'General Notification',
+            level: 'info',
+            message: $this->message,
         );
     }
 }

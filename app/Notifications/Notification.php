@@ -4,6 +4,7 @@ namespace Illuminate\Notifications;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -13,6 +14,8 @@ interface Notification
     public function toMail(SendsEmail $notifiable): MailMessage;
 
     public function toPushover(): PushoverMessage;
+
+    public function toGotify(): GotifyMessage;
 
     public function toDiscord(): DiscordMessage;
 

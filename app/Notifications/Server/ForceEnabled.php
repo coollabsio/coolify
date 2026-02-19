@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -63,6 +64,15 @@ class ForceEnabled extends CustomEmailNotification
             title: 'Server enabled',
             description: "Server '{$this->server->name}' enabled again!",
             color: SlackMessage::successColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'Server enabled',
+            level: 'success',
+            message: "Server **({$this->server->name})** enabled again!",
         );
     }
 }

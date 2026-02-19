@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\GotifyChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -32,6 +33,7 @@ trait HasNotificationSettings
             'telegram' => $this->telegramNotificationSettings,
             'slack' => $this->slackNotificationSettings,
             'pushover' => $this->pushoverNotificationSettings,
+            'gotify' => $this->gotifyNotificationSettings,
             'webhook' => $this->webhookNotificationSettings,
             default => null,
         };
@@ -80,6 +82,7 @@ trait HasNotificationSettings
             'telegram' => TelegramChannel::class,
             'slack' => SlackChannel::class,
             'pushover' => PushoverChannel::class,
+            'gotify' => GotifyChannel::class,
             'webhook' => WebhookChannel::class,
         ];
 

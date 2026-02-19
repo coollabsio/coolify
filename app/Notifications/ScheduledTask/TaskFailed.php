@@ -5,6 +5,7 @@ namespace App\Notifications\ScheduledTask;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -115,6 +116,30 @@ class TaskFailed extends CustomEmailNotification
         );
     }
 
+    public function toGotify(): GotifyMessage
+    {
+        $message = "Scheduled task **({$this->task->name})** failed";
+
+        if ($this->output) {
+            $message .= "\n\n**Error Output:** {$this->output}";
+        }
+
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new GotifyMessage(
+            title: 'Scheduled task failed',
+            level: 'error',
+            message: $message,
+            buttons: $buttons,
+        );
+    }
+    
     public function toWebhook(): array
     {
         $data = [

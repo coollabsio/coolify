@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -72,6 +73,15 @@ class ForceDisabled extends CustomEmailNotification
             title: $title,
             description: $description,
             color: SlackMessage::errorColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'Server disabled',
+            level: 'error',
+            message: "Server **({$this->server->name})** disabled because it is not paid!\nAll automations and integrations are stopped.\n\nPlease update your subscription to enable the server again [here](https://app.coolify.io/subscriptions).",
         );
     }
 }

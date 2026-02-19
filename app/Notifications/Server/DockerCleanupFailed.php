@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -67,6 +68,15 @@ class DockerCleanupFailed extends CustomEmailNotification
         );
     }
 
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'Docker cleanup job failed',
+            level: 'error',
+            message: "**[ACTION REQUIRED]** Docker cleanup job failed on **{$this->server->name}**!\n\n{$this->message}",
+        );
+    }
+    
     public function toWebhook(): array
     {
         $url = base_url().'/server/'.$this->server->uuid;

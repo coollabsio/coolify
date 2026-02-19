@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -186,6 +187,31 @@ class DeploymentFailed extends CustomEmailNotification
         );
     }
 
+    public function toGotify(): GotifyMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
+            $message = "Pull request deployment failed for {$this->application_name}";
+        } else {
+            $title = 'Deployment failed';
+            $message = "Deployment failed for {$this->application_name}";
+        }
+
+        $buttons[] = [
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
+        ];
+
+        return new GotifyMessage(
+            title: $title,
+            level: 'error',
+            message: $message,
+            buttons: [
+                ...$buttons,
+            ],
+        );
+    }
+    
     public function toWebhook(): array
     {
         $data = [
