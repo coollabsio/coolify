@@ -1,0 +1,41 @@
+# documentation: https://payloadcms.com/docs
+# slogan: PayloadCMS is the open-source, headless CMS and application framework built with Next.js.
+# category: cms
+# tags: cms, headless, payloadcms, nextjs, api, content-management, typescript
+# logo: svgs/payloadcms.svg
+# port: 3000
+
+services:
+  payload:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npx create-payload-app@latest --db mongodb --no-deps . 2>/dev/null || true && npm run build && npm run serve"
+    volumes:
+      - payload-data:/app
+    environment:
+      - SERVICE_FQDN_PAYLOAD_3000
+      - DATABASE_URI=mongodb://${SERVICE_USER_MONGODB}:${SERVICE_PASSWORD_MONGODB}@mongodb:27017/${MONGODB_DATABASE:-payload}?authSource=admin
+      - PAYLOAD_SECRET=${SERVICE_PASSWORD_64_PAYLOAD}
+      - NODE_ENV=production
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/admin"]
+      interval: 10s
+      timeout: 30s
+      retries: 15
+      start_period: 60s
+  mongodb:
+    image: mongo:7
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE:-payload}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
