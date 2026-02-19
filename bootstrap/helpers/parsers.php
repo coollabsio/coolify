@@ -1219,19 +1219,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
-            $uuid = $resource->uuid;
-            $network = data_get($resource, 'destination.network');
+            // Use local variable to avoid mutating $uuid which is used for volume paths
+            $labelUuid = $resource->uuid;
+            $labelNetwork = data_get($resource, 'destination.network');
             if ($isPullRequest) {
-                $uuid = "{$resource->uuid}-{$pullRequestId}";
-            }
-            if ($isPullRequest) {
-                $network = "{$resource->destination->network}-{$pullRequestId}";
+                $labelUuid = "{$resource->uuid}-{$pullRequestId}";
+                $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $uuid,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
@@ -1243,8 +1242,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         break;
                     case ProxyTypes::CADDY->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $network,
-                            uuid: $uuid,
+                            network: $labelNetwork,
+                            uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
@@ -1258,7 +1257,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             } else {
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                    uuid: $uuid,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,
@@ -1268,8 +1267,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     image: $image
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $network,
-                    uuid: $uuid,
+                    network: $labelNetwork,
+                    uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: true,
                     serviceLabels: $serviceLabels,
