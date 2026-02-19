@@ -27,6 +27,10 @@ class ScheduledJobManager implements ShouldQueue
      */
     private ?Carbon $executionTime = null;
 
+    private int $dispatchedCount = 0;
+
+    private int $skippedCount = 0;
+
     /**
      * Create a new job instance.
      */
@@ -61,6 +65,12 @@ class ScheduledJobManager implements ShouldQueue
     {
         // Freeze the execution time at the start of the job
         $this->executionTime = Carbon::now();
+        $this->dispatchedCount = 0;
+        $this->skippedCount = 0;
+
+        Log::channel('scheduled')->info('ScheduledJobManager started', [
+            'execution_time' => $this->executionTime->toIso8601String(),
+        ]);
 
         // Process backups - don't let failures stop task processing
         try {
@@ -91,6 +101,13 @@ class ScheduledJobManager implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
         }
+
+        Log::channel('scheduled')->info('ScheduledJobManager completed', [
+            'execution_time' => $this->executionTime->toIso8601String(),
+            'duration_ms' => Carbon::now()->diffInMilliseconds($this->executionTime),
+            'dispatched' => $this->dispatchedCount,
+            'skipped' => $this->skippedCount,
+        ]);
     }
 
     private function processScheduledBackups(): void
@@ -101,8 +118,16 @@ class ScheduledJobManager implements ShouldQueue
 
         foreach ($backups as $backup) {
             try {
-                // Apply the same filtering logic as the original
-                if (! $this->shouldProcessBackup($backup)) {
+                $skipReason = $this->getBackupSkipReason($backup);
+                if ($skipReason !== null) {
+                    $this->skippedCount++;
+                    $this->logSkip('backup', $skipReason, [
+                        'backup_id' => $backup->id,
+                        'database_id' => $backup->database_id,
+                        'database_type' => $backup->database_type,
+                        'team_id' => $backup->team_id ?? null,
+                    ]);
+
                     continue;
                 }
 
@@ -120,6 +145,14 @@ class ScheduledJobManager implements ShouldQueue
 
                 if ($this->shouldRunNow($frequency, $serverTimezone)) {
                     DatabaseBackupJob::dispatch($backup);
+                    $this->dispatchedCount++;
+                    Log::channel('scheduled')->info('Backup dispatched', [
+                        'backup_id' => $backup->id,
+                        'database_id' => $backup->database_id,
+                        'database_type' => $backup->database_type,
+                        'team_id' => $backup->team_id ?? null,
+                        'server_id' => $server->id,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::channel('scheduled-errors')->error('Error processing backup', [
@@ -138,7 +171,15 @@ class ScheduledJobManager implements ShouldQueue
 
         foreach ($tasks as $task) {
             try {
-                if (! $this->shouldProcessTask($task)) {
+                $skipReason = $this->getTaskSkipReason($task);
+                if ($skipReason !== null) {
+                    $this->skippedCount++;
+                    $this->logSkip('task', $skipReason, [
+                        'task_id' => $task->id,
+                        'task_name' => $task->name,
+                        'team_id' => $task->server()?->team_id,
+                    ]);
+
                     continue;
                 }
 
@@ -156,6 +197,13 @@ class ScheduledJobManager implements ShouldQueue
 
                 if ($this->shouldRunNow($frequency, $serverTimezone)) {
                     ScheduledTaskJob::dispatch($task);
+                    $this->dispatchedCount++;
+                    Log::channel('scheduled')->info('Task dispatched', [
+                        'task_id' => $task->id,
+                        'task_name' => $task->name,
+                        'team_id' => $server->team_id,
+                        'server_id' => $server->id,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::channel('scheduled-errors')->error('Error processing task', [
@@ -166,33 +214,33 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
-    private function shouldProcessBackup(ScheduledDatabaseBackup $backup): bool
+    private function getBackupSkipReason(ScheduledDatabaseBackup $backup): ?string
     {
         if (blank(data_get($backup, 'database'))) {
             $backup->delete();
 
-            return false;
+            return 'database_deleted';
         }
 
         $server = $backup->server();
         if (blank($server)) {
             $backup->delete();
 
-            return false;
+            return 'server_deleted';
         }
 
         if ($server->isFunctional() === false) {
-            return false;
+            return 'server_not_functional';
         }
 
         if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
-            return false;
+            return 'subscription_unpaid';
         }
 
-        return true;
+        return null;
     }
 
-    private function shouldProcessTask(ScheduledTask $task): bool
+    private function getTaskSkipReason(ScheduledTask $task): ?string
     {
         $service = $task->service;
         $application = $task->application;
@@ -201,32 +249,32 @@ class ScheduledJobManager implements ShouldQueue
         if (blank($server)) {
             $task->delete();
 
-            return false;
+            return 'server_deleted';
         }
 
         if ($server->isFunctional() === false) {
-            return false;
+            return 'server_not_functional';
         }
 
         if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
-            return false;
+            return 'subscription_unpaid';
         }
 
         if (! $service && ! $application) {
             $task->delete();
 
-            return false;
+            return 'resource_deleted';
         }
 
         if ($application && str($application->status)->contains('running') === false) {
-            return false;
+            return 'application_not_running';
         }
 
         if ($service && str($service->status)->contains('running') === false) {
-            return false;
+            return 'service_not_running';
         }
 
-        return true;
+        return null;
     }
 
     private function shouldRunNow(string $frequency, string $timezone): bool
@@ -248,7 +296,15 @@ class ScheduledJobManager implements ShouldQueue
 
         foreach ($servers as $server) {
             try {
-                if (! $this->shouldProcessDockerCleanup($server)) {
+                $skipReason = $this->getDockerCleanupSkipReason($server);
+                if ($skipReason !== null) {
+                    $this->skippedCount++;
+                    $this->logSkip('docker_cleanup', $skipReason, [
+                        'server_id' => $server->id,
+                        'server_name' => $server->name,
+                        'team_id' => $server->team_id,
+                    ]);
+
                     continue;
                 }
 
@@ -270,6 +326,12 @@ class ScheduledJobManager implements ShouldQueue
                         $server->settings->delete_unused_volumes,
                         $server->settings->delete_unused_networks
                     );
+                    $this->dispatchedCount++;
+                    Log::channel('scheduled')->info('Docker cleanup dispatched', [
+                        'server_id' => $server->id,
+                        'server_name' => $server->name,
+                        'team_id' => $server->team_id,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::channel('scheduled-errors')->error('Error processing docker cleanup', [
@@ -296,19 +358,28 @@ class ScheduledJobManager implements ShouldQueue
         return $query->get();
     }
 
-    private function shouldProcessDockerCleanup(Server $server): bool
+    private function getDockerCleanupSkipReason(Server $server): ?string
     {
         if (! $server->isFunctional()) {
-            return false;
+            return 'server_not_functional';
         }
 
         // In cloud, check subscription status (except team 0)
         if (isCloud() && $server->team_id !== 0) {
             if (data_get($server->team->subscription, 'stripe_invoice_paid', false) === false) {
-                return false;
+                return 'subscription_unpaid';
             }
         }
 
-        return true;
+        return null;
+    }
+
+    private function logSkip(string $type, string $reason, array $context = []): void
+    {
+        Log::channel('scheduled')->info(ucfirst(str_replace('_', ' ', $type)).' skipped', array_merge([
+            'type' => $type,
+            'skip_reason' => $reason,
+            'execution_time' => $this->executionTime?->toIso8601String(),
+        ], $context));
     }
 }

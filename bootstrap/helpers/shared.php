@@ -167,6 +167,10 @@ function currentTeam()
 
 function showBoarding(): bool
 {
+    if (isDev()) {
+        return false;
+    }
+
     if (Auth::user()?->isMember()) {
         return false;
     }

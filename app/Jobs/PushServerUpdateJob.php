@@ -207,6 +207,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $serviceId = $labels->get('coolify.serviceId');
                 $subType = $labels->get('coolify.service.subType');
                 $subId = $labels->get('coolify.service.subId');
+                if (empty($subId)) {
+                    continue;
+                }
                 if ($subType === 'application') {
                     $this->foundServiceApplicationIds->push($subId);
                     // Store container status for aggregation

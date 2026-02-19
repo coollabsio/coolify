@@ -69,6 +69,7 @@
         "mockery/mockery": "^1.6.12",
         "nunomaduro/collision": "^8.8.3",
         "pestphp/pest": "^4.3.2",
+        "pestphp/pest-plugin-browser": "^4.2",
         "phpstan/phpstan": "^2.1.38",
         "rector/rector": "^2.3.5",
         "serversideup/spin": "^3.1.1",

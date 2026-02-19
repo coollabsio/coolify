@@ -19,8 +19,8 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -2919,10 +2919,7 @@ class ApplicationsController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
-                            ]
+                            ref: '#/components/schemas/EnvironmentVariable'
                         )
                     ),
                 ]

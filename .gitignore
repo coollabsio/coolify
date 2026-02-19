@@ -39,3 +39,5 @@ docker/coolify-realtime/node_modules
 CHANGELOG.md
 /.workspaces
 /.claude/settings.local.json
+tests/Browser/Screenshots
+tests/v4/Browser/Screenshots
