@@ -62,7 +62,7 @@
         </div>
         @forelse ($this->environmentVariables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
-                :env="$env" :type="$resource->type()" />
+                :env="$env" :type="$resource->type()" lazy />
         @empty
             <div>No environment variables found.</div>
         @endforelse
@@ -73,7 +73,7 @@
             </div>
             @foreach ($this->environmentVariablesPreview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
-                    :env="$env" :type="$resource->type()" />
+                    :env="$env" :type="$resource->type()" lazy />
             @endforeach
         @endif
     @else
