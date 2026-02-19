@@ -1,0 +1,73 @@
+# documentation: https://www.mongodb.com/docs/manual/replication/
+# slogan: MongoDB Replica Set - Highly available MongoDB with automatic failover.
+# category: database
+# tags: database, mongodb, replicaset, nosql, document, high-availability
+# logo: svgs/mongodb.svg
+# port: 27017
+
+services:
+  mongodb-primary:
+    image: mongo:7
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    volumes:
+      - mongodb-primary-data:/data/db
+      - mongodb-keyfile:/etc/mongo-keyfile:ro
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  mongodb-secondary:
+    image: mongo:7
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    volumes:
+      - mongodb-secondary-data:/data/db
+      - mongodb-keyfile:/etc/mongo-keyfile:ro
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB}
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  mongodb-arbiter:
+    image: mongo:7
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    volumes:
+      - mongodb-keyfile:/etc/mongo-keyfile:ro
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  mongodb-init:
+    image: mongo:7
+    command: >
+      mongosh --host mongodb-primary --username ${SERVICE_USER_MONGODB} --password ${SERVICE_PASSWORD_MONGODB} --authenticationDatabase admin --eval '
+        rs.initiate({
+          _id: "rs0",
+          members: [
+            { _id: 0, host: "mongodb-primary:27017", priority: 2 },
+            { _id: 1, host: "mongodb-secondary:27017", priority: 1 },
+            { _id: 2, host: "mongodb-arbiter:27017", arbiterOnly: true }
+          ]
+        })
+      '
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+      mongodb-secondary:
+        condition: service_healthy
+      mongodb-arbiter:
+        condition: service_healthy
+    restart: "no"
