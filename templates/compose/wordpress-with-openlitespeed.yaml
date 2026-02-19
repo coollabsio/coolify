@@ -1,0 +1,42 @@
+# documentation: https://openlitespeed.org
+# slogan: WordPress with OpenLiteSpeed - High-performance WordPress with the OpenLiteSpeed web server.
+# category: cms
+# tags: wordpress, cms, openlitespeed, litespeed, blog, content, web-server
+# logo: svgs/wordpress.svg
+# port: 443
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed-wordpress:latest
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - lsws-conf:/usr/local/lsws/conf
+      - lsws-admin-conf:/usr/local/lsws/admin/conf
+    environment:
+      - SERVICE_FQDN_OPENLITESPEED_443
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=${MYSQL_DATABASE:-wordpress}
+      - WORDPRESS_DB_USER=$SERVICE_USER_MYSQL
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
