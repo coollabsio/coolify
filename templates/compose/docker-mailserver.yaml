@@ -1,0 +1,60 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Docker Mailserver is a production-ready, full-featured mail server running in a Docker container.
+# category: hosting
+# tags: email, mail, smtp, imap, postfix, dovecot, mailserver, self-hosted
+# logo: svgs/docker-mailserver.svg
+# port: 443
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    volumes:
+      - mailserver-data:/var/mail
+      - mailserver-state:/var/mail-state
+      - mailserver-logs:/var/log/mail
+      - mailserver-config:/tmp/docker-mailserver
+    environment:
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+      - ENABLE_POSTGREY=${ENABLE_POSTGREY:-0}
+      - ENABLE_SASLAUTHD=${ENABLE_SASLAUTHD:-0}
+      - ONE_DIR=1
+      - TLS_LEVEL=${TLS_LEVEL:-modern}
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - PERMIT_DOCKER=none
+      - SSL_TYPE=${SSL_TYPE:-manual}
+      - SSL_CERT_PATH=${SSL_CERT_PATH:-/etc/letsencrypt/live/mail.example.com/fullchain.pem}
+      - SSL_KEY_PATH=${SSL_KEY_PATH:-/etc/letsencrypt/live/mail.example.com/privkey.pem}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "ss", "-tlnp", "|", "grep", "-q", "master"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    volumes:
+      - roundcube-data:/var/roundcube/db
+    environment:
+      - SERVICE_FQDN_ROUNDCUBE_443
+      - ROUNDCUBEMAIL_DEFAULT_HOST=mailserver
+      - ROUNDCUBEMAIL_SMTP_SERVER=mailserver
+      - ROUNDCUBEMAIL_SMTP_PORT=587
+      - ROUNDCUBEMAIL_DB_TYPE=sqlite
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
