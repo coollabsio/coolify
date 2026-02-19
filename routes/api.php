@@ -54,6 +54,10 @@ Route::group([
     Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}', [ProjectController::class, 'delete_environment'])->middleware(['api.ability:write']);
 
+    Route::get('/projects/{uuid}/members', [ProjectController::class, 'list_members'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/members', [ProjectController::class, 'add_member'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/members/{user_id}', [ProjectController::class, 'remove_member'])->middleware(['api.ability:write']);
+
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);

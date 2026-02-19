@@ -474,4 +474,19 @@ class User extends Authenticatable implements SendsEmail
     {
         return ! empty($this->password);
     }
+
+    public function projectMemberships()
+    {
+        return $this->belongsToMany(Project::class, 'project_members')->withPivot('role')->withTimestamps();
+    }
+
+    public function isProjectMember(Project $project): bool
+    {
+        return $this->projectMemberships()->where('project_id', $project->id)->exists();
+    }
+
+    public function projectRole(Project $project): ?string
+    {
+        return $this->projectMemberships()->where('project_id', $project->id)->first()?->pivot?->role;
+    }
 }

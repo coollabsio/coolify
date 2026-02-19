@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 
 class ProjectController extends Controller
@@ -726,4 +729,226 @@ class ProjectController extends Controller
 
         return response()->json(['message' => 'Environment deleted.']);
     }
-}
+
+    #[OA\Get(
+        summary: 'List Project Members',
+        description: 'Get all members of a project.',
+        path: '/projects/{uuid}/members',
+        operationId: 'list-project-members',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of project members.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/User')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function list_members(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Project UUID is required.'], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $members = $project->members;
+        $members->makeHidden(['pivot']);
+
+        return response()->json(serializeApiResponse($members));
+    }
+
+    #[OA\Post(
+        summary: 'Add Project Member',
+        description: 'Add a member to a project.',
+        path: '/projects/{uuid}/members',
+        operationId: 'add-project-member',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Member details.',
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'email' => ['type' => 'string', 'description' => 'Email of the user to add.'],
+                        'role' => ['type' => 'string', 'description' => 'Role of the member (member or admin).', 'default' => 'member'],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Member added.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Member added successfully.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function add_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Project UUID is required.'], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'role' => 'nullable|string|in:member,admin',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $email = strtolower($request->email);
+        $role = $request->role ?? 'member';
+
+        // Check if user is already a team member
+        $teamMember = User::where('email', $email)->first();
+        if ($teamMember && $teamMember->teams->contains('id', $teamId)) {
+            return response()->json(['message' => 'User is already a team member.'], 400);
+        }
+
+        // Check if already a project member
+        $existingMember = $project->members()->whereHas('user', function ($query) use ($email) {
+            $query->where('email', $email);
+        })->first();
+        if ($existingMember) {
+            return response()->json(['message' => 'User is already a member of this project.'], 409);
+        }
+
+        // Find or create user
+        $user = User::whereEmail($email)->first();
+        if (is_null($user)) {
+            $user = User::create([
+                'name' => str($email)->before('@'),
+                'email' => $email,
+                'password' => Hash::make(Str::password()),
+                'force_password_reset' => true,
+            ]);
+        }
+
+        // Add user to project
+        $project->members()->attach($user, ['role' => $role]);
+
+        return response()->json(['message' => 'Member added successfully.'])->setStatusCode(201);
+    }
+
+    #[OA\Delete(
+        summary: 'Remove Project Member',
+        description: 'Remove a member from a project.',
+        path: '/projects/{uuid}/members/{user_id}',
+        operationId: 'remove-project-member',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'user_id', in: 'path', required: true, description: 'User ID', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Member removed.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Member removed successfully.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',

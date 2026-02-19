@@ -165,4 +165,9 @@ class Project extends BaseModel
 
         return route('project.show', ['project_uuid' => $this->uuid]);
     }
+
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'project_members')->withPivot('role')->withTimestamps();
+    }
 }

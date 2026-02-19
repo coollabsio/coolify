@@ -20,8 +20,16 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
-        // return $user->teams->contains('id', $project->team_id);
-        return true;
+        // Team owner/admin has full access
+        if ($user->teams->contains('id', $project->team_id)) {
+            $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+            if ($role === 'owner' || $role === 'admin') {
+                return true;
+            }
+        }
+
+        // Check if user is a project member
+        return $user->isProjectMember($project);
     }
 
     /**
@@ -29,8 +37,8 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        // Only team admins/owners can create projects
+        return $user->isAdmin() || $user->isOwner();
     }
 
     /**
@@ -38,8 +46,16 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        // Team owner/admin has full access
+        if ($user->teams->contains('id', $project->team_id)) {
+            $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+            if ($role === 'owner' || $role === 'admin') {
+                return true;
+            }
+        }
+
+        // Project admin can update
+        return $user->projectRole($project) === 'admin';
     }
 
     /**
@@ -47,8 +63,14 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        // Only team owner/admin can delete projects
+        if (! $user->teams->contains('id', $project->team_id)) {
+            return false;
+        }
+
+        $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+
+        return $role === 'owner' || $role === 'admin';
     }
 
     /**
@@ -56,8 +78,14 @@ class ProjectPolicy
      */
     public function restore(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        // Only team owner/admin can restore projects
+        if (! $user->teams->contains('id', $project->team_id)) {
+            return false;
+        }
+
+        $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+
+        return $role === 'owner' || $role === 'admin';
     }
 
     /**
@@ -65,7 +93,47 @@ class ProjectPolicy
      */
     public function forceDelete(User $user, Project $project): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $project->team_id);
-        return true;
+        // Only team owner/admin can force delete projects
+        if (! $user->teams->contains('id', $project->team_id)) {
+            return false;
+        }
+
+        $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+
+        return $role === 'owner' || $role === 'admin';
+    }
+
+    /**
+     * Determine whether the user can manage project members.
+     */
+    public function manageMembers(User $user, Project $project): bool
+    {
+        // Team owner/admin has full access
+        if ($user->teams->contains('id', $project->team_id)) {
+            $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+            if ($role === 'owner' || $role === 'admin') {
+                return true;
+            }
+        }
+
+        // Project admin can manage members
+        return $user->projectRole($project) === 'admin';
+    }
+
+    /**
+     * Determine whether the user can create resources in the project.
+     */
+    public function createResources(User $user, Project $project): bool
+    {
+        // Team owner/admin has full access
+        if ($user->teams->contains('id', $project->team_id)) {
+            $role = $user->teams->where('id', $project->team_id)->first()?->pivot?->role;
+            if ($role === 'owner' || $role === 'admin') {
+                return true;
+            }
+        }
+
+        // Project members (admin or member) can create resources
+        return $user->isProjectMember($project);
     }
 }
