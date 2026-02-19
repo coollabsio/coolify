@@ -319,7 +319,7 @@ EOD;
                 abort(404, 'Server not found for this service database.');
             }
             $this->serverId = $server->id;
-            $this->container = $resource->name.'-'.$resource->service->uuid;
+            $this->container = $resource->containerName();
             $this->resourceUuid = $resource->uuid; // Use ServiceDatabase's own UUID
 
             // Determine database type for ServiceDatabase

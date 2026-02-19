@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -28,13 +29,18 @@ class ServiceApplication extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        instant_remote_process(["docker restart {$container_id}"], $this->service->server);
+        $ownerUuid = $this->service?->uuid ?? $this->application?->uuid;
+        $container_id = $this->name.'-'.$ownerUuid;
+        $server = $this->service?->server ?? data_get($this->application, 'destination.server');
+        instant_remote_process(["docker restart {$container_id}"], $server);
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceApplication::where(function (Builder $query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -43,7 +49,10 @@ class ServiceApplication extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceApplication::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceApplication::where(function (Builder $query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -88,12 +97,14 @@ class ServiceApplication extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return data_get($this, 'service.environment.project.team') ?? data_get($this, 'application.environment.project.team');
     }
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        $ownerUuid = $this->service?->uuid ?? $this->application?->uuid;
+
+        return service_configuration_dir()."/{$ownerUuid}";
     }
 
     public function serviceType()
@@ -111,6 +122,11 @@ class ServiceApplication extends BaseModel
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

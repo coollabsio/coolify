@@ -25,7 +25,7 @@ class StopDatabaseProxy
         $server = data_get($database, 'destination.server');
         $uuid = $database->uuid;
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $server = data_get($database, 'service.server');
+            $server = $database->server();
         }
         instant_remote_process(["docker rm -f {$uuid}-proxy"], $server);
 

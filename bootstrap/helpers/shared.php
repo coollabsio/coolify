@@ -559,9 +559,10 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
 
-    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // ServiceDatabase can belong to either a Service stack or an Application dockercompose resource
     if ($resource instanceof \App\Models\ServiceDatabase) {
-        if ($resource->service?->environment?->project?->team_id === $teamId) {
+        if ($resource->service?->environment?->project?->team_id === $teamId ||
+            $resource->application?->environment?->project?->team_id === $teamId) {
             return $resource;
         }
 
@@ -2421,6 +2422,56 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+
+            // Persist service subtype records for non-preview dockercompose applications
+            if ($pull_request_id === 0) {
+                $migratedApp = ServiceApplication::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+                $migratedDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+
+                if ($migratedApp || $migratedDb) {
+                    $isDatabase = (bool) $migratedDb;
+                    data_set($service, 'is_database', $isDatabase);
+                    $savedService = $migratedApp ?: $migratedDb;
+                } else {
+                    if ($isDatabase) {
+                        $savedService = ServiceDatabase::where([
+                            'name' => $serviceName,
+                            'application_id' => $resource->id,
+                        ])->first();
+                        if (is_null($savedService)) {
+                            $savedService = ServiceDatabase::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'application_id' => $resource->id,
+                            ]);
+                        }
+                    } else {
+                        $savedService = ServiceApplication::where([
+                            'name' => $serviceName,
+                            'application_id' => $resource->id,
+                        ])->first();
+                        if (is_null($savedService)) {
+                            $savedService = ServiceApplication::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'application_id' => $resource->id,
+                            ]);
+                        }
+                    }
+                }
+
+                // Check if image changed
+                if ($savedService->image !== $image) {
+                    $savedService->image = $image;
+                    $savedService->save();
+                }
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {

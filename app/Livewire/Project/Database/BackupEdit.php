@@ -157,7 +157,7 @@ class BackupEdit extends Component
         try {
             $server = null;
             if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
+                $server = $this->backup->database->server();
             } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
                 $server = $this->backup->database->destination->server;
             }
@@ -188,7 +188,7 @@ class BackupEdit extends Component
                 return redirect()->route('project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
                     'environment_uuid' => $this->parameters['environment_uuid'],
-                    'service_uuid' => $serviceDatabase->service->uuid,
+                    'service_uuid' => $serviceDatabase->network(),
                     'stack_service_uuid' => $serviceDatabase->uuid,
                 ]);
             } else {
