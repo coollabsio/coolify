@@ -56,7 +56,10 @@ jobs:
             SECURITY.md
             LICENSE
             CODE_OF_CONDUCT.md
+            templates/service-templates-latest.json
+            templates/service-templates.json
           require-final-newline: true
+
           # User Health Checks
           min-repo-merged-prs: 0
           min-repo-merge-ratio: 0
@@ -73,7 +76,7 @@ jobs:
             renovate[bot]
             github-actions[bot]
           exempt-draft-prs: false
-          exempt-label: "status/exempt"
+          exempt-label: "quality/exempt"
           exempt-pr-label: ""
           exempt-milestones: ""
           exempt-pr-milestones: ""
@@ -81,7 +84,7 @@ jobs:
           exempt-all-pr-milestones: false
 
           # PR Success Actions
-          success-add-pr-labels: "status/verified"
+          success-add-pr-labels: "quality/verified"
 
           # PR Failure Actions
           close-pr: true
@@ -90,4 +93,4 @@ jobs:
           failure-pr-message: "This PR did not pass quality checks so it will be closed. If you believe this is a mistake please let us know."
           failure-remove-pr-labels: ""
           failure-remove-all-pr-labels: true
-          failure-add-pr-labels: ""
+          failure-add-pr-labels: "quality/rejected"

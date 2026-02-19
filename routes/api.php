@@ -106,7 +106,7 @@ Route::group([
 
     /**
      * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is a unstable duplicate of POST /api/v1/services.
-     */    
+     */
     Route::post('/applications/dockercompose', [ApplicationsController::class, 'create_dockercompose_application'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
