@@ -49,3 +49,15 @@ it('returns false for unsupported os identifiers', function () {
 
     expect($result)->toBeFalse();
 });
+
+it('normalizes mixed casing and extra spaces in os release identifiers', function () {
+    $server = new Server;
+
+    $result = $server->resolveSupportedOsType(collect([
+        'ID' => '  AlPiNe  ',
+        'ID_LIKE' => '  MUSL   busybox  ',
+    ]));
+
+    expect($result)->not->toBeFalse()
+        ->and((string) $result)->toContain('alpine');
+});
