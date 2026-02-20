@@ -125,6 +125,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $docker_compose_base64;
 
+    /**
+     * Per-service env key lists for dockercompose builds.
+     * Populated during compose file generation so that save_runtime_environment_variables()
+     * can write per-service .env files instead of a single shared one.
+     *
+     * @var array<string, list<string>>
+     */
+    private array $composeServiceEnvKeys = [];
+
     private ?string $nixpacks_plan = null;
 
     private Collection $nixpacks_plan_json;
@@ -637,10 +646,33 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
+            // Parse the raw compose to discover which environment variable keys are declared
+            // for each service, so we can generate per-service .env files instead of sharing
+            // one global .env across all containers (security isolation, issue #7655).
+            $rawComposeForEnvParsing = Yaml::parse($this->application->docker_compose_raw) ?? [];
+            $rawServices = data_get($rawComposeForEnvParsing, 'services', []);
+
             $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
+            $services = $services->map(function ($service, $name) use ($rawServices) {
+                // Collect the env keys explicitly defined for this service in the raw compose.
+                $serviceEnvKeys = collect();
+                $rawEnv = data_get($rawServices, "$name.environment", []);
+                if (is_array($rawEnv)) {
+                    foreach ($rawEnv as $k => $v) {
+                        // Support both list form ("KEY=value") and map form (key: value)
+                        $serviceEnvKeys->push(is_int($k) ? str_before((string) $v, '=') : (string) $k);
+                    }
+                }
+                $this->composeServiceEnvKeys[$name] = $serviceEnvKeys->unique()->values()->all();
+
+                // Point each service at its own per-service env file; generated later in
+                // save_runtime_environment_variables() alongside the global .env file.
+                $envFileName = '.env.'.str($name)->slug('_');
+                $existing = collect(data_get($service, 'env_file', []));
+                if (! $existing->contains($envFileName)) {
+                    $existing->prepend($envFileName);
+                }
+                $service['env_file'] = $existing->values()->all();
 
                 return $service;
             });
@@ -1417,6 +1449,90 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
                 ]
             );
+        }
+
+        // For dockercompose deployments generate per-service env files so that each
+        // container only receives the variables it declared in its own `environment:`
+        // section plus Coolify metadata (COOLIFY_*, SERVICE_URL_*, SERVICE_FQDN_*,
+        // SERVICE_NAME_*).  This prevents unintended credential sharing across
+        // containers in a Compose project (issue #7655).
+        if ($this->build_pack === 'dockercompose' && ! empty($this->composeServiceEnvKeys)) {
+            $this->write_per_service_env_files($environment_variables);
+        }
+    }
+
+    /**
+     * Generate per-service .env files for Docker Compose deployments.
+     *
+     * Each file contains only:
+     *  - Variables explicitly declared in that service's `environment:` block
+     *  - Coolify-injected metadata variables (COOLIFY_*, SERVICE_URL_*, SERVICE_FQDN_*,
+     *    SERVICE_NAME_*)
+     *
+     * This ensures containers cannot read secrets that belong to sibling services.
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $allEnvLines  Full KEY=VALUE list from generate_runtime_environment_variables()
+     */
+    private function write_per_service_env_files(Collection $allEnvLines): void
+    {
+        // Build a lookup map of KEY => "KEY=value" from the full env list
+        $envMap = collect([]);
+        foreach ($allEnvLines as $line) {
+            $eq = strpos($line, '=');
+            if ($eq === false) {
+                continue;
+            }
+            $key = substr($line, 0, $eq);
+            $envMap->put($key, $line);
+        }
+
+        // Coolify-owned metadata keys that should be available to every service
+        $metadataPrefix = ['COOLIFY_', 'SERVICE_URL_', 'SERVICE_FQDN_', 'SERVICE_NAME_'];
+
+        $metadataLines = $envMap->filter(function ($_, $key) use ($metadataPrefix) {
+            foreach ($metadataPrefix as $prefix) {
+                if (str_starts_with($key, $prefix)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        foreach ($this->composeServiceEnvKeys as $serviceName => $declaredKeys) {
+            $slug = str($serviceName)->slug('_');
+            $envFileName = ".env.$slug";
+
+            // Start with Coolify metadata variables (always available to every container)
+            $serviceLines = $metadataLines->values();
+
+            // Add variables the service explicitly declared
+            foreach ($declaredKeys as $key) {
+                if ($envMap->has($key) && ! $serviceLines->contains($envMap->get($key))) {
+                    $serviceLines->push($envMap->get($key));
+                }
+            }
+
+            if ($serviceLines->isEmpty()) {
+                // Write an empty file to satisfy the env_file directive
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, "touch $this->workdir/$envFileName"),
+                    'hidden' => true,
+                ]);
+
+                continue;
+            }
+
+            $serviceEnvsBase64 = base64_encode($serviceLines->implode("\n"));
+            $this->application_deployment_queue->addLogEntry(
+                "Creating $envFileName for service '$serviceName' (".count($declaredKeys).' declared + '.
+                $metadataLines->count().' metadata variables).',
+                hidden: true
+            );
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "echo '$serviceEnvsBase64' | base64 -d | tee $this->workdir/$envFileName > /dev/null"),
+                'hidden' => true,
+            ]);
         }
     }
 
