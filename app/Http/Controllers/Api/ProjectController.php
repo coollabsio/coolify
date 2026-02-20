@@ -726,4 +726,303 @@ class ProjectController extends Controller
 
         return response()->json(['message' => 'Environment deleted.']);
     }
+
+    #[OA\Get(
+        summary: 'List Project Members',
+        description: 'Get all project-specific members for a project.',
+        path: '/projects/{uuid}/members',
+        operationId: 'list-project-members',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of project members.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/User')
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Unauthorized to access this project.',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Project not found.',
+            ),
+        ]
+    )]
+    public function get_project_members(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        // Check if user can view this project
+        if (! auth()->user()->can('view', $project)) {
+            return response()->json(['message' => 'Unauthorized to access this project.'], 403);
+        }
+
+        $members = $project->members()->get();
+        $members->makeHidden(['pivot', 'email_change_code', 'email_change_code_expires_at', 'password']);
+
+        return response()->json(serializeApiResponse($members));
+    }
+
+    #[OA\Post(
+        summary: 'Add Project Member',
+        description: 'Add a user as a project-specific member.',
+        path: '/projects/{uuid}/members',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['user_id'],
+                properties: [
+                    new OA\Property(property: 'user_id', type: 'integer', description: 'User ID to add as project member'),
+                    new OA\Property(property: 'role', type: 'string', enum: ['member', 'admin', 'owner'], description: 'Role for the project member (default: member)'),
+                    new OA\Property(property: 'can_create_resources', type: 'boolean', description: 'Whether the member can deploy resources (default: false)'),
+                ]
+            )
+        ),
+        operationId: 'add-project-member',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Member added successfully.',
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Bad request.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Unauthorized to manage this project.',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Project or user not found.',
+            ),
+        ]
+    )]
+    public function add_project_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        // Check if user can manage project members
+        if (! auth()->user()->can('manageMembers', $project)) {
+            return response()->json(['message' => 'Unauthorized to manage project members.'], 403);
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'role' => 'nullable|in:member,admin,owner',
+            'can_create_resources' => 'nullable|boolean',
+        ]);
+
+        $user = \App\Models\User::find($validated['user_id']);
+
+        // Check if user is already a project member
+        if ($project->hasMember($user)) {
+            return response()->json(['message' => 'User is already a project member.'], 400);
+        }
+
+        // Check if user is already a team member
+        if ($user->teams->contains('id', $project->team_id)) {
+            return response()->json(['message' => 'User is already a team member. Team members have access to all projects.'], 400);
+        }
+
+        $project->members()->attach($user->id, [
+            'role' => $validated['role'] ?? 'member',
+            'can_create_resources' => $validated['can_create_resources'] ?? false,
+        ]);
+
+        return response()->json(['message' => 'Member added successfully.'], 201);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Project Member',
+        description: 'Update a project member\'s permissions.',
+        path: '/projects/{uuid}/members/{user_id}',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'role', type: 'string', enum: ['member', 'admin', 'owner'], description: 'Role for the project member'),
+                    new OA\Property(property: 'can_create_resources', type: 'boolean', description: 'Whether the member can deploy resources'),
+                ]
+            )
+        ),
+        operationId: 'update-project-member',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'user_id', in: 'path', required: true, description: 'User ID', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Member updated successfully.',
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Bad request.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Unauthorized to manage this project.',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Project or member not found.',
+            ),
+        ]
+    )]
+    public function update_project_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        // Check if user can manage project members
+        if (! auth()->user()->can('manageMembers', $project)) {
+            return response()->json(['message' => 'Unauthorized to manage project members.'], 403);
+        }
+
+        $validated = $request->validate([
+            'role' => 'nullable|in:member,admin,owner',
+            'can_create_resources' => 'nullable|boolean',
+        ]);
+
+        $userId = $request->user_id;
+        $user = \App\Models\User::find($userId);
+
+        if (! $user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        if (! $project->hasMember($user)) {
+            return response()->json(['message' => 'User is not a project member.'], 404);
+        }
+
+        $project->members()->updateExistingPivot($userId, array_filter($validated));
+
+        return response()->json(['message' => 'Member updated successfully.']);
+    }
+
+    #[OA\Delete(
+        summary: 'Remove Project Member',
+        description: 'Remove a user from project-specific access.',
+        path: '/projects/{uuid}/members/{user_id}',
+        operationId: 'remove-project-member',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'user_id', in: 'path', required: true, description: 'User ID', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Member removed successfully.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Unauthorized to manage this project.',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Project or member not found.',
+            ),
+        ]
+    )]
+    public function remove_project_member(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        // Check if user can manage project members
+        if (! auth()->user()->can('manageMembers', $project)) {
+            return response()->json(['message' => 'Unauthorized to manage project members.'], 403);
+        }
+
+        $userId = $request->user_id;
+        $user = \App\Models\User::find($userId);
+
+        if (! $user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        if (! $project->hasMember($user)) {
+            return response()->json(['message' => 'User is not a project member.'], 404);
+        }
+
+        $project->members()->detach($userId);
+
+        return response()->json(['message' => 'Member removed successfully.']);
+    }
 }

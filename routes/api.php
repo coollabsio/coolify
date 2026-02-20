@@ -58,6 +58,12 @@ Route::group([
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);
 
+    // Project members routes
+    Route::get('/projects/{uuid}/members', [ProjectController::class, 'get_project_members'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/members', [ProjectController::class, 'add_project_member'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/members/{user_id}', [ProjectController::class, 'update_project_member'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/members/{user_id}', [ProjectController::class, 'remove_project_member'])->middleware(['api.ability:write']);
+
     Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware(['api.ability:write']);
 
