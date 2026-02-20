@@ -1048,21 +1048,38 @@ $schema://$host {
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
+            if ($item->isEmpty() || ! $item->contains('=')) {
+                continue;
+            }
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
+
+        $ID = str((string) data_get($collectedData, 'ID'))->trim();
+        $ID_LIKE = str((string) data_get($collectedData, 'ID_LIKE'))->trim();
+
+        // Some distros/environments may return unexpected ID values while still being Debian-compatible.
+        // Use both ID and ID_LIKE tokens to improve matching stability (e.g. Debian 13 derivatives).
+        $osTokens = collect([])
+            ->merge($ID->isNotEmpty() ? [$ID->value()] : [])
+            ->merge($ID_LIKE->isNotEmpty() ? preg_split('/\s+/', $ID_LIKE->value()) : [])
+            ->filter(fn ($token) => ! empty($token))
+            ->unique();
+
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($osTokens) {
+            foreach ($osTokens as $token) {
+                if (str($supportedOs)->contains($token)) {
+                    return true;
+                }
             }
+
+            return false;
         });
+
         if ($supported->count() === 1) {
             return str($supported->first());
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function isTerminalEnabled()
