@@ -1,0 +1,99 @@
+# documentation: https://www.mongodb.com/docs/manual/replication/
+# slogan: Highly available MongoDB replica set with one-click deployment.
+# category: database
+# tags: mongodb,replica-set,nosql,database,high-availability
+# logo: svgs/mongodb.svg
+# port: 27017
+
+services:
+  mongodb-primary:
+    image: 'mongo:8'
+    command: "sh -c \"chmod 400 /etc/mongo-keyfile/keyfile && exec mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all --keyFile /etc/mongo-keyfile/keyfile\""
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB:?}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB:?}
+    volumes:
+      - 'mongodb-primary-data:/data/db'
+      - type: bind
+        source: ./mongo-keyfile
+        target: /etc/mongo-keyfile/keyfile
+        content: |
+          ${SERVICE_PASSWORD_64_MONGODB_KEYFILE:?}
+    healthcheck:
+      test: ['CMD', 'mongosh', '--host', '127.0.0.1', '--port', '27017', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mongodb-secondary:
+    image: 'mongo:8'
+    command: "sh -c \"chmod 400 /etc/mongo-keyfile/keyfile && exec mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all --keyFile /etc/mongo-keyfile/keyfile\""
+    volumes:
+      - 'mongodb-secondary-data:/data/db'
+      - type: bind
+        source: ./mongo-keyfile
+        target: /etc/mongo-keyfile/keyfile
+        content: |
+          ${SERVICE_PASSWORD_64_MONGODB_KEYFILE:?}
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'mongosh', '--host', '127.0.0.1', '--port', '27017', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mongodb-arbiter:
+    image: 'mongo:8'
+    command: "sh -c \"chmod 400 /etc/mongo-keyfile/keyfile && exec mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all --keyFile /etc/mongo-keyfile/keyfile\""
+    volumes:
+      - type: bind
+        source: ./mongo-keyfile
+        target: /etc/mongo-keyfile/keyfile
+        content: |
+          ${SERVICE_PASSWORD_64_MONGODB_KEYFILE:?}
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'mongosh', '--host', '127.0.0.1', '--port', '27017', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  mongodb-init:
+    image: 'mongo:8'
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGODB:?}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGODB:?}
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+    command: >
+      sh -lc '
+      until mongosh --host mongodb-primary --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand(\"ping\")" >/dev/null 2>&1; do
+        sleep 2;
+      done;
+      mongosh --host mongodb-primary --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "
+        try {
+          rs.status();
+          print(\"Replica set already initialized\");
+        } catch (e) {
+          rs.initiate({
+            _id: \"${MONGODB_REPLICA_SET_NAME:-rs0}\",
+            members: [
+              { _id: 0, host: \"mongodb-primary:27017\", priority: 2 },
+              { _id: 1, host: \"mongodb-secondary:27017\", priority: 1 },
+              { _id: 2, host: \"mongodb-arbiter:27017\", arbiterOnly: true }
+            ]
+          });
+        }
+      "
+      '
+    depends_on:
+      mongodb-primary:
+        condition: service_healthy
+      mongodb-secondary:
+        condition: service_healthy
+      mongodb-arbiter:
+        condition: service_healthy
+    restart: 'no'
