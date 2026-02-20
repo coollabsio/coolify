@@ -55,6 +55,7 @@ class User extends Authenticatable implements SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'oauth_force_only' => 'boolean',
     ];
 
     /**

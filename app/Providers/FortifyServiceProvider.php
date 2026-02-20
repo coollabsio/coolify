@@ -47,6 +47,8 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
+            // Block the password-based register page when registration is disabled.
+            // OAuth-only registration bypasses this page entirely via OauthController.
             if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
@@ -74,6 +76,15 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
             $user = User::where('email', $email)->with('teams')->first();
+
+            // Block password-based login for users who are marked as OAuth-only.
+            // Return null here so Fortify treats it as an authentication failure —
+            // the user will see a generic "credentials do not match" message and
+            // must use their OAuth provider to sign in.
+            if ($user && ($user->oauth_force_only ?? false)) {
+                return null;
+            }
+
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
