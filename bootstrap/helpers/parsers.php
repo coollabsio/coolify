@@ -358,6 +358,34 @@ function parseDockerVolumeString(string $volumeString): array
     ];
 }
 
+
+/**
+ * Normalize env_file values while preserving only explicit compose entries.
+ *
+ * Docker Compose treats `.env` as interpolation input by default; it should not be
+ * injected as a runtime `env_file` unless the user explicitly sets it.
+ */
+function normalizeExplicitEnvFiles($existingEnvFiles): Collection
+{
+    if (is_null($existingEnvFiles)) {
+        return collect();
+    }
+
+    return collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+        ->map(function ($value) {
+            if (! is_string($value)) {
+                return null;
+            }
+
+            $trimmed = trim($value);
+
+            return $trimmed === '' ? null : $trimmed;
+        })
+        ->filter()
+        ->unique()
+        ->values();
+}
+
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
@@ -1317,17 +1345,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Preserve only explicitly defined env_file values.
-        // Do not auto-inject `.env` as runtime env_file to keep Docker Compose semantics.
-        $existingEnvFiles = data_get($service, 'env_file');
-        if (! is_null($existingEnvFiles)) {
-            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
-                ->filter(fn ($value) => ! is_null($value) && $value !== '')
-                ->unique()
-                ->values();
-            if ($envFiles->count() > 0) {
-                $payload['env_file'] = $envFiles;
-            }
+        $envFiles = normalizeExplicitEnvFiles(data_get($service, 'env_file'));
+        if ($envFiles->isNotEmpty()) {
+            $payload['env_file'] = $envFiles;
         }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
@@ -2419,17 +2439,9 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Preserve only explicitly defined env_file values.
-        // Do not auto-inject `.env` as runtime env_file to keep Docker Compose semantics.
-        $existingEnvFiles = data_get($service, 'env_file');
-        if (! is_null($existingEnvFiles)) {
-            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
-                ->filter(fn ($value) => ! is_null($value) && $value !== '')
-                ->unique()
-                ->values();
-            if ($envFiles->count() > 0) {
-                $payload['env_file'] = $envFiles;
-            }
+        $envFiles = normalizeExplicitEnvFiles(data_get($service, 'env_file'));
+        if ($envFiles->isNotEmpty()) {
+            $payload['env_file'] = $envFiles;
         }
 
         $parsedServices->put($serviceName, $payload);
