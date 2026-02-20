@@ -184,30 +184,41 @@ class PrivateKey extends BaseModel
     public function storeInFileSystem()
     {
         $filename = "ssh_key@{$this->uuid}";
-        $disk = Storage::disk('ssh-keys');
+        $finalPath = $this->getKeyLocation();
+        $tmpPath = $finalPath.'.tmp.'.getmypid();
 
         // Ensure the storage directory exists and is writable
         $this->ensureStorageDirectoryExists();
 
-        // Attempt to store the private key
-        $success = $disk->put($filename, $this->private_key);
+        // Atomic write: write to a temp file, then rename to final destination.
+        // This prevents other processes from reading a partially-written key file,
+        // which is a primary cause of intermittent "Permission denied (publickey)"
+        // errors in concurrent/cloud environments.
+        $written = file_put_contents($tmpPath, $this->private_key, LOCK_EX);
 
-        if (! $success) {
-            throw new \Exception("Failed to write SSH key to filesystem. Check disk space and permissions for: {$this->getKeyLocation()}");
+        if ($written === false) {
+            @unlink($tmpPath);
+            throw new \Exception("Failed to write SSH key to filesystem. Check disk space and permissions for: {$finalPath}");
         }
 
-        // Verify the file was actually created and has content
-        if (! $disk->exists($filename)) {
-            throw new \Exception("SSH key file was not created: {$this->getKeyLocation()}");
+        // Enforce strict permissions (SSH client refuses keys readable by others)
+        chmod($tmpPath, 0600);
+
+        // Verify content integrity before making it live
+        $storedContent = file_get_contents($tmpPath);
+        if ($storedContent === false || $storedContent !== $this->private_key) {
+            @unlink($tmpPath);
+            throw new \Exception("SSH key file content verification failed: {$finalPath}");
         }
 
-        $storedContent = $disk->get($filename);
-        if (empty($storedContent) || $storedContent !== $this->private_key) {
-            $disk->delete($filename); // Clean up the bad file
-            throw new \Exception("SSH key file content verification failed: {$this->getKeyLocation()}");
+        // Atomic rename — on POSIX systems this is guaranteed to be atomic,
+        // so readers always see either the old complete file or the new complete file.
+        if (! rename($tmpPath, $finalPath)) {
+            @unlink($tmpPath);
+            throw new \Exception("Failed to atomically install SSH key file: {$finalPath}");
         }
 
-        return $this->getKeyLocation();
+        return $finalPath;
     }
 
     public static function deleteFromStorage(self $privateKey)

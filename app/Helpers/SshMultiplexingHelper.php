@@ -13,11 +13,14 @@ class SshMultiplexingHelper
 {
     public static function serverSshConfiguration(Server $server)
     {
+        // Always do a fresh DB lookup so we never use a stale in-memory key
+        // reference when the private_key_id has been changed or the key rotated.
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
         $sshKeyLocation = $privateKey->getKeyLocation();
         $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_'.$server->uuid;
 
         return [
+            'privateKey' => $privateKey,      // expose resolved key so callers use the same instance
             'sshKeyLocation' => $sshKeyLocation,
             'muxFilename' => $muxFilename,
         ];
@@ -158,7 +161,12 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
 
-        self::validateSshKey($server->privateKey);
+        // Use the same PrivateKey instance resolved by serverSshConfiguration to
+        // guarantee that validateSshKey operates on the exact key whose path is
+        // embedded in $sshKeyLocation.  Previously $server->privateKey was used
+        // here, which is a cached Eloquent relation and could point to a
+        // different (stale) key object after a key rotation or update.
+        self::validateSshKey($sshConfig['privateKey']);
 
         $muxSocket = $sshConfig['muxFilename'];
 
@@ -204,10 +212,31 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        // Check existence AND content integrity.
+        //
+        // Previously only `ls` was used, which passes even when the file is
+        // empty or partially-written (a race window that causes SSH to send the
+        // wrong / corrupt key and get "Permission denied (publickey)").
+        $needsStore = false;
+
+        if (! file_exists($keyLocation)) {
+            $needsStore = true;
+        } else {
+            $onDisk = file_get_contents($keyLocation);
+            // Regenerate what the file should contain and compare.
+            // A mismatch means another process wrote a different key here
+            // (key rotation race) or the file is corrupt / truncated.
+            if ($onDisk === false || trim($onDisk) !== trim($privateKey->private_key)) {
+                $needsStore = true;
+            } elseif ((fileperms($keyLocation) & 0777) !== 0600) {
+                // Fix permissions without a full rewrite — SSH refuses keys
+                // that are readable by group/others.
+                chmod($keyLocation, 0600);
+            }
+        }
+
+        if ($needsStore) {
             $privateKey->storeInFileSystem();
         }
     }
