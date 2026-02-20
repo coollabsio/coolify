@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -201,14 +202,136 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
+    /**
+     * Validate SSH key file exists, has correct content, and proper permissions.
+     *
+     * Addresses issue #7724: Sporadic "Permission denied (publickey)" errors
+     * caused by stale/mismatched SSH key files in multi-instance deployments.
+     *
+     * This method ensures:
+     * 1. Key file exists on disk
+     * 2. File content matches the database (detects stale keys)
+     * 3. File has correct permissions (600 for SSH keys)
+     * 4. Invalidates multiplexed connections when key is re-stored
+     *
+     * @see https://github.com/coollabsio/coolify/issues/7724
+     */
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $filename = "ssh_key@{$privateKey->uuid}";
+        $disk = Storage::disk('ssh-keys');
+        
+        $needsRestore = false;
+        $reason = '';
 
-        if ($keyCheckProcess->exitCode() !== 0) {
-            $privateKey->storeInFileSystem();
+        // Check 1: File existence
+        if (! $disk->exists($filename)) {
+            $needsRestore = true;
+            $reason = 'file_not_found';
+            Log::info('SSH key file not found, will create', [
+                'key_uuid' => $privateKey->uuid,
+                'key_location' => $keyLocation,
+            ]);
+        } 
+        // Check 2: Content validation
+        else {
+            try {
+                $storedContent = $disk->get($filename);
+                
+                // Verify content matches database to prevent stale key issues
+                if ($storedContent !== $privateKey->private_key) {
+                    $needsRestore = true;
+                    $reason = 'content_mismatch';
+                    Log::warning('SSH key content mismatch detected', [
+                        'key_uuid' => $privateKey->uuid,
+                        'key_location' => $keyLocation,
+                        'stored_length' => strlen($storedContent ?? ''),
+                        'expected_length' => strlen($privateKey->private_key),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $needsRestore = true;
+                $reason = 'read_error';
+                Log::error('Failed to read SSH key file', [
+                    'key_uuid' => $privateKey->uuid,
+                    'key_location' => $keyLocation,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Check 3: File permissions (SSH keys should be 600 or 400)
+        if (! $needsRestore && file_exists($keyLocation)) {
+            $perms = substr(sprintf('%o', fileperms($keyLocation)), -3);
+            if ($perms !== '600' && $perms !== '400') {
+                Log::warning('SSH key has incorrect permissions, fixing', [
+                    'key_uuid' => $privateKey->uuid,
+                    'key_location' => $keyLocation,
+                    'current_perms' => $perms,
+                ]);
+                
+                // Fix permissions without full restore if content is valid
+                try {
+                    chmod($keyLocation, 0600);
+                } catch (\Exception $e) {
+                    Log::error('Failed to fix SSH key permissions', [
+                        'key_uuid' => $privateKey->uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $needsRestore = true;
+                    $reason = 'permission_fix_failed';
+                }
+            }
+        }
+
+        // Restore key if needed and invalidate affected connections
+        if ($needsRestore) {
+            Log::info('Re-storing SSH key to filesystem', [
+                'key_uuid' => $privateKey->uuid,
+                'reason' => $reason,
+            ]);
+
+            try {
+                $privateKey->storeInFileSystem();
+                
+                // Invalidate multiplexed connections using this key
+                // This prevents using stale connections with the old key
+                $serversAffected = 0;
+                foreach ($privateKey->servers as $server) {
+                    try {
+                        self::removeMuxFile($server);
+                        $serversAffected++;
+                        Log::debug('Invalidated multiplexed connection due to key update', [
+                            'server_uuid' => $server->uuid,
+                            'server_name' => $server->name ?? $server->ip,
+                            'key_uuid' => $privateKey->uuid,
+                            'reason' => $reason,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to invalidate multiplexed connection', [
+                            'server_uuid' => $server->uuid,
+                            'key_uuid' => $privateKey->uuid,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                if ($serversAffected > 0) {
+                    Log::info('SSH key validation completed', [
+                        'key_uuid' => $privateKey->uuid,
+                        'reason' => $reason,
+                        'servers_affected' => $serversAffected,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to restore SSH key to filesystem', [
+                    'key_uuid' => $privateKey->uuid,
+                    'key_location' => $keyLocation,
+                    'error' => $e->getMessage(),
+                ]);
+                throw new \RuntimeException("SSH key validation failed: {$e->getMessage()}");
+            }
         }
     }
 
