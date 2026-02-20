@@ -18,8 +18,18 @@
                 <div class="flex flex-col gap-1">
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
+                            helper="Allow users to self-register with a password. If disabled, only administrators can create accounts (unless OAuth registration is enabled)."
                             label="Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow new users to create accounts by signing in with an OAuth provider (e.g. GitHub, Google, Authentik), even when general registration is disabled. Useful for restricting signup to trusted identity providers only."
+                            label="OAuth Self-Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="oauth_force_only"
+                            helper="Prevent users from logging in with a local password if they have authenticated via OAuth. This allows you to suspend access by disabling the user in your identity provider (e.g. Authentik, GitHub org membership). Applies to users on their next OAuth login."
+                            label="Require OAuth Login (disable password auth)" />
                     </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
