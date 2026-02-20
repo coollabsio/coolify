@@ -5,6 +5,7 @@
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
 # port: 8000
+# mcp: This template includes MCP (Model Context Protocol) support for AI tools like Claude Code, Cursor, and Windsurf. MCP is DISABLED by default for security. See supabase-mcp-guide.md for setup instructions.
 
 services:
   supabase-kong:
@@ -274,6 +275,40 @@ services:
                     hide_groups_header: true
                     allow:
                       - admin
+
+            ## MCP endpoint - local/secure access only
+            ## Model Context Protocol for AI tools (Claude Code, Cursor, Windsurf)
+            ## ⚠️ SECURITY: MCP is BLOCKED by default. See supabase-mcp-guide.md to enable safely.
+            ## To enable MCP:
+            ## 1. Find your Docker bridge gateway IP: docker inspect <kong-container> --format '{{range .NetworkSettings.Networks}}{{println .Gateway}}{{end}}'
+            ## 2. Replace 'request-termination' plugin below with 'ip-restriction' plugin
+            ## 3. Add allowed IPs (Docker bridge, Wireguard VPN, etc.)
+            ## 4. Use SSH tunnel or Wireguard VPN to access securely
+            ## 5. NEVER expose MCP to public internet without authentication!
+            - name: mcp
+              _comment: 'MCP: /mcp -> http://studio:3000/api/mcp (local access only)'
+              url: http://supabase-studio:3000/api/mcp
+              routes:
+                - name: mcp
+                  strip_path: true
+                  paths:
+                    - /mcp
+              plugins:
+                - name: cors
+                # By default, block external access to MCP for security
+                - name: request-termination
+                  config:
+                    status_code: 403
+                    message: "MCP access is disabled. See supabase-mcp-guide.md in the Coolify templates directory for setup instructions."
+                # To enable MCP, replace request-termination above with ip-restriction below:
+                # - name: ip-restriction
+                #   config:
+                #     allow:
+                #       - 127.0.0.1
+                #       - ::1
+                #       # Add your Docker bridge gateway IP here (e.g., 172.18.0.1)
+                #       # Add your Wireguard VPN subnet here (e.g., 10.8.0.0/24)
+                #     deny: []
 
             ## Protected Dashboard - catch all remaining routes
             - name: dashboard
