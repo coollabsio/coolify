@@ -1,0 +1,47 @@
+# documentation: https://openlitespeed.org/kb/wordpress/
+# slogan: WordPress running on OpenLiteSpeed — a high-performance, open-source HTTP server with built-in LiteSpeed Cache support.
+# category: cms
+# tags: cms, blog, wordpress, openlitespeed, ols, litespeed, performance, cache
+# logo: svgs/wordpress.svg
+# port: 8088
+
+services:
+  wordpress-ols:
+    image: litespeedtech/openlitespeed:latest
+    environment:
+      - SERVICE_FQDN_WORDPRESSOLS_8088
+      - OLS_ADMIN_USERNAME=${OLS_ADMIN_USERNAME:-admin}
+      - OLS_ADMIN_PASSWORD=${SERVICE_PASSWORD_OLS}
+      - WORDPRESS_DB_HOST=wordpress-ols-db
+      - WORDPRESS_DB_USER=${SERVICE_USER_MYSQL}
+      - WORDPRESS_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - WORDPRESS_DB_NAME=${MYSQL_DATABASE:-wordpress}
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX:-wp_}
+      - WORDPRESS_DEBUG=${WORDPRESS_DEBUG:-false}
+    volumes:
+      - wordpress-ols-html:/var/www/vhosts/localhost/html
+      - wordpress-ols-conf:/usr/local/lsws/conf
+    depends_on:
+      wordpress-ols-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8088"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  wordpress-ols-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+    volumes:
+      - wordpress-ols-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${SERVICE_PASSWORD_ROOT}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
