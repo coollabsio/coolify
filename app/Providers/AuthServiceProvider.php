@@ -25,6 +25,7 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\Service::class => \App\Policies\ServicePolicy::class,
         \App\Models\ServiceApplication::class => \App\Policies\ServiceApplicationPolicy::class,
         \App\Models\ServiceDatabase::class => \App\Policies\ServiceDatabasePolicy::class,
+        \App\Models\ApplicationDatabase::class => \App\Policies\ApplicationDatabasePolicy::class,
         \App\Models\Project::class => \App\Policies\ProjectPolicy::class,
         \App\Models\Environment::class => \App\Policies\EnvironmentPolicy::class,
         \App\Models\EnvironmentVariable::class => \App\Policies\EnvironmentVariablePolicy::class,

@@ -925,6 +925,11 @@ class Application extends BaseModel
         return $this->morphTo();
     }
 
+    public function databases()
+    {
+        return $this->hasMany(ApplicationDatabase::class)->orderBy('name', 'asc');
+    }
+
     public function isDeploymentInprogress()
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
