@@ -235,6 +235,9 @@
                                 </div>
                                 <x-forms.input canGate="update" :canResource="$serviceDatabase" placeholder="5432"
                                     disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
+                                <x-forms.input canGate="update" :canResource="$serviceDatabase"
+                                    placeholder="db.example.com" id="publicHost" label="Public Host / Domain"
+                                    helper="Optional. Use a domain or host instead of direct server IP in the public database URL." />
                                 @if ($db_url_public)
                                     <x-forms.input label="Database IP:PORT (public)"
                                         helper="Your credentials are available in your environment variables." type="password"

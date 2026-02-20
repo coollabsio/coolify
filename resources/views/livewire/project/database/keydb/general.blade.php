@@ -115,6 +115,9 @@
             </div>
             <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
                 canGate="update" :canResource="$database" />
+            <x-forms.input placeholder="db.example.com" id="publicHost" label="Public Host / Domain"
+                helper="Optional. Use a domain or host instead of direct server IP in the public database URL."
+                canGate="update" :canResource="$database" />
         </div>
         <x-forms.textarea
             helper="<a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/Snapchat/KeyDB/unstable/keydb.conf'>KeyDB Default Configuration</a>"

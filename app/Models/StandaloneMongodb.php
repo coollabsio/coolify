@@ -290,13 +290,18 @@ class StandaloneMongodb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $serverIp = $this->destination->server->getIp;
-                    if (empty($serverIp)) {
+                    $publicHost = trim((string) ($this->public_host ?? ''));
+                    $publicHost = preg_replace('/^https?:\/\//i', '', $publicHost) ?? '';
+                    $publicHost = trim(explode('/', $publicHost)[0] ?? '');
+                    if ($publicHost === '') {
+                        $publicHost = $this->destination->server->getIp;
+                    }
+                    if (empty($publicHost)) {
                         return null;
                     }
                     $encodedUser = rawurlencode($this->mongo_initdb_root_username);
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
-                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$publicHost}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
