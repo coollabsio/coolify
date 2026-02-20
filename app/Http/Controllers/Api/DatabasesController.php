@@ -92,7 +92,17 @@ class DatabasesController extends Controller
             ->groupBy('database_id');
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
-            $database->backup_configs = $backupConfigs->get($database->id, collect())->values();
+            $configs = $backupConfigs->get($database->id, collect());
+
+            // Enrich each backup config with a human-friendly last_successful_backup timestamp
+            $database->backup_configs = $configs->map(function ($config) {
+                $latestLog = $config->latest_log;
+                $config->last_successful_backup = $latestLog && $latestLog->status === 'success'
+                    ? $latestLog->created_at->toIso8601String()
+                    : null;
+
+                return $config;
+            })->values();
 
             return $this->removeSensitiveData($database);
         });
@@ -293,6 +303,19 @@ class DatabasesController extends Controller
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
+                        'backup_save_s3' => ['type' => 'boolean', 'description' => 'Configure backup: save to S3'],
+                        'backup_frequency' => ['type' => 'string', 'description' => 'Configure backup: cron expression or alias (every_minute, hourly, daily, weekly, monthly, yearly)'],
+                        'backup_s3_storage_uuid' => ['type' => 'string', 'description' => 'Configure backup: S3 storage UUID (required when backup_save_s3 is true)'],
+                        'backup_enabled' => ['type' => 'boolean', 'description' => 'Configure backup: enable or disable the backup schedule'],
+                        'backup_disable_local_backup' => ['type' => 'boolean', 'description' => 'Configure backup: skip saving backup files locally'],
+                        'backup_databases_to_backup' => ['type' => 'string', 'description' => 'Configure backup: comma-separated list of databases to backup'],
+                        'backup_dump_all' => ['type' => 'boolean', 'description' => 'Configure backup: dump all databases'],
+                        'backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Configure backup: number of local backups to keep'],
+                        'backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Configure backup: days to keep local backups'],
+                        'backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Configure backup: max local storage in MB'],
+                        'backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Configure backup: number of S3 backups to keep'],
+                        'backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Configure backup: days to keep S3 backups'],
+                        'backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Configure backup: max S3 storage in MB'],
                     ],
                 ),
             )
@@ -580,13 +603,116 @@ class DatabasesController extends Controller
             $whatToDoWithDatabaseProxy = 'start';
         }
 
-        // Only update database fields, not backup configuration
+        // Update core database fields
         $database->update($request->only($allowedFields));
 
         if ($whatToDoWithDatabaseProxy === 'start') {
             StartDatabaseProxy::dispatch($database);
         } elseif ($whatToDoWithDatabaseProxy === 'stop') {
             StopDatabaseProxy::dispatch($database);
+        }
+
+        // Optionally update the default backup configuration if backup fields were provided.
+        // This allows callers to configure/reconfigure backup settings via a single PATCH call
+        // without having to know the scheduled_backup_uuid in advance.
+        $backupFields = ['backup_save_s3', 'backup_frequency', 'backup_s3_storage_uuid', 'backup_enabled',
+            'backup_disable_local_backup', 'backup_databases_to_backup', 'backup_dump_all',
+            'backup_retention_amount_locally', 'backup_retention_days_locally', 'backup_retention_max_storage_locally',
+            'backup_retention_amount_s3', 'backup_retention_days_s3', 'backup_retention_max_storage_s3'];
+
+        $hasBackupFields = collect($backupFields)->some(fn ($field) => $request->has($field));
+
+        if ($hasBackupFields) {
+            // Validate backup-specific fields
+            $backupValidator = customApiValidator($request->all(), [
+                'backup_frequency' => 'string|nullable',
+                'backup_enabled' => 'boolean',
+                'backup_save_s3' => 'boolean',
+                'backup_disable_local_backup' => 'boolean',
+                'backup_dump_all' => 'boolean',
+                'backup_s3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
+                'backup_databases_to_backup' => 'string|nullable',
+                'backup_retention_amount_locally' => 'integer|min:0',
+                'backup_retention_days_locally' => 'integer|min:0',
+                'backup_retention_max_storage_locally' => 'integer|min:0',
+                'backup_retention_amount_s3' => 'integer|min:0',
+                'backup_retention_days_s3' => 'integer|min:0',
+                'backup_retention_max_storage_s3' => 'integer|min:0',
+            ]);
+
+            if ($backupValidator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $backupValidator->errors(),
+                ], 422);
+            }
+
+            if ($request->filled('backup_frequency') && ! validate_cron_expression($request->backup_frequency)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['backup_frequency' => ['Invalid cron expression or frequency format.']],
+                ], 422);
+            }
+
+            if ($request->boolean('backup_save_s3') && ! $request->filled('backup_s3_storage_uuid')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['backup_s3_storage_uuid' => ['The backup_s3_storage_uuid field is required when backup_save_s3 is true.']],
+                ], 422);
+            }
+
+            // Build the backup data mapping (strip the backup_ prefix)
+            $backupData = [];
+            $fieldMap = [
+                'backup_save_s3' => 'save_s3',
+                'backup_frequency' => 'frequency',
+                'backup_enabled' => 'enabled',
+                'backup_disable_local_backup' => 'disable_local_backup',
+                'backup_dump_all' => 'dump_all',
+                'backup_databases_to_backup' => 'databases_to_backup',
+                'backup_retention_amount_locally' => 'database_backup_retention_amount_locally',
+                'backup_retention_days_locally' => 'database_backup_retention_days_locally',
+                'backup_retention_max_storage_locally' => 'database_backup_retention_max_storage_locally',
+                'backup_retention_amount_s3' => 'database_backup_retention_amount_s3',
+                'backup_retention_days_s3' => 'database_backup_retention_days_s3',
+                'backup_retention_max_storage_s3' => 'database_backup_retention_max_storage_s3',
+            ];
+
+            foreach ($fieldMap as $requestKey => $dbKey) {
+                if ($request->has($requestKey)) {
+                    $backupData[$dbKey] = $request->input($requestKey);
+                }
+            }
+
+            // Resolve S3 storage UUID → ID
+            if ($request->filled('backup_s3_storage_uuid')) {
+                $s3 = S3Storage::ownedByCurrentTeam()->where('uuid', $request->backup_s3_storage_uuid)->first();
+                if (! $s3) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['backup_s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                    ], 422);
+                }
+                $backupData['s3_storage_id'] = $s3->id;
+            }
+
+            // Find the first (most recently created) backup config for this database, or create one
+            $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)
+                ->where('database_id', $database->id)
+                ->orderBy('created_at', 'asc')
+                ->first();
+
+            if ($backupConfig) {
+                $backupConfig->update($backupData);
+            } else {
+                // Auto-create with sensible defaults if none exists yet
+                $backupData['database_id'] = $database->id;
+                $backupData['database_type'] = $database->getMorphClass();
+                $backupData['team_id'] = $teamId;
+                $backupData['frequency'] ??= 'daily';
+                $backupData['enabled'] ??= true;
+                ScheduledDatabaseBackup::create($backupData);
+            }
         }
 
         return response()->json([
@@ -629,6 +755,7 @@ class DatabasesController extends Controller
                         's3_storage_uuid' => ['type' => 'string', 'description' => 'S3 storage UUID (required if save_s3 is true)'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether to dump all databases', 'default' => false],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Skip saving backup files locally (useful when only storing to S3)', 'default' => false],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Whether to trigger backup immediately after creation'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Number of backups to retain locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Number of days to retain backups locally'],
@@ -672,7 +799,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'disable_local_backup', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -690,6 +817,7 @@ class DatabasesController extends Controller
             'enabled' => 'boolean',
             'save_s3' => 'boolean',
             'dump_all' => 'boolean',
+            'disable_local_backup' => 'boolean',
             'backup_now' => 'boolean|nullable',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
             'databases_to_backup' => 'string|nullable',
@@ -854,7 +982,8 @@ class DatabasesController extends Controller
                         'enabled' => ['type' => 'boolean', 'description' => 'Whether the backup is enabled or not'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Whether all databases are dumped or not'],
-                        'frequency' => ['type' => 'string', 'description' => 'Frequency of the backup'],
+                        'disable_local_backup' => ['type' => 'boolean', 'description' => 'Skip saving backup files locally'],
+                        'frequency' => ['type' => 'string', 'description' => 'Frequency of the backup (cron expression or: every_minute, hourly, daily, weekly, monthly, yearly)'],
                         'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Retention amount of the backup locally'],
                         'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Retention days of the backup locally'],
                         'database_backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Max storage of the backup locally'],
@@ -890,7 +1019,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'disable_local_backup', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -906,9 +1035,10 @@ class DatabasesController extends Controller
             'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
             'dump_all' => 'boolean',
+            'disable_local_backup' => 'boolean',
             's3_storage_uuid' => 'string|exists:s3_storages,uuid|nullable',
             'databases_to_backup' => 'string|nullable',
-            'frequency' => 'string|in:every_minute,hourly,daily,weekly,monthly,yearly',
+            'frequency' => 'string',  // validated via validate_cron_expression() below
             'database_backup_retention_amount_locally' => 'integer|min:0',
             'database_backup_retention_days_locally' => 'integer|min:0',
             'database_backup_retention_max_storage_locally' => 'integer|min:0',
@@ -953,6 +1083,16 @@ class DatabasesController extends Controller
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                ], 422);
+            }
+        }
+
+        // Validate frequency as a cron expression when provided
+        if ($request->filled('frequency')) {
+            if (! validate_cron_expression($request->frequency)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['frequency' => ['Invalid cron expression or frequency format.']],
                 ], 422);
             }
         }
