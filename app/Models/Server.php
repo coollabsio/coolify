@@ -1043,8 +1043,14 @@ $schema://$host {
 
     public function validateOS(): bool|Stringable
     {
-        $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
+        $osRelease = instant_remote_process(['cat /etc/os-release'], $this);
+
+        return self::detectSupportedOsFromRelease($osRelease);
+    }
+
+    public static function detectSupportedOsFromRelease(string $osRelease): bool|Stringable
+    {
+        $releaseLines = collect(explode("\n", $osRelease));
         $collectedData = collect([]);
         foreach ($releaseLines as $line) {
             $item = str($line)->trim();
