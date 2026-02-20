@@ -1,0 +1,105 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Docker Mailserver is a production-ready, self-hosted email server stack supporting SMTP, IMAP, DKIM, DMARC, SPF, and antispam.
+# category: email
+# tags: email, mail, smtp, imap, dkim, dmarc, spf, mailserver, postfix, dovecot
+# logo: svgs/docker-mailserver.svg
+# minMemory: 1024
+# port: 80
+
+# ⚠️  Before deploying, ensure your domain has correct DNS records:
+#     - MX  →  your server IP
+#     - A   →  mail.yourdomain.com → your server IP
+#     - PTR →  your server IP → mail.yourdomain.com  (set with your VPS provider)
+#     - SPF, DKIM, DMARC TXT records (DKIM key generated after first start)
+#
+# After deploy, add your first mail account:
+#   docker exec mailserver setup email add user@yourdomain.com <password>
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    ports:
+      - "25:25"       # SMTP (receiving)
+      - "465:465"     # SMTPS (submission, TLS)
+      - "587:587"     # SMTP submission (STARTTLS)
+      - "143:143"     # IMAP
+      - "993:993"     # IMAPS (TLS)
+    volumes:
+      - mailserver-data:/var/mail
+      - mailserver-state:/var/mail-state
+      - mailserver-logs:/var/log/mail
+      - mailserver-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      # General
+      - OVERRIDE_HOSTNAME=${MAIL_HOSTNAME:-mail.example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
+      - SUPERVISOR_LOGLEVEL=${LOG_LEVEL:-warn}
+
+      # TLS — set to "letsencrypt" for automatic certs (requires ports 80/443 exposed),
+      # or "manual" and mount your own certs into /tmp/docker-mailserver/ssl/
+      - SSL_TYPE=${SSL_TYPE:-letsencrypt}
+
+      # DKIM
+      - ENABLE_OPENDKIM=1
+      - ENABLE_OPENDMARC=1
+      - ENABLE_POLICYD_SPF=1
+
+      # Antispam / antivirus
+      - ENABLE_SPAMASSASSIN=${ENABLE_SPAMASSASSIN:-1}
+      - ENABLE_CLAMAV=${ENABLE_CLAMAV:-0}
+      - SPAMASSASSIN_SPAM_TO_JUNK=${SPAMASSASSIN_SPAM_TO_JUNK:-1}
+
+      # Fail2ban
+      - ENABLE_FAIL2BAN=${ENABLE_FAIL2BAN:-1}
+
+      # SMTP
+      - ENABLE_POSTFIX_VIRTUAL_TRANSPORT=
+
+      # IMAP
+      - ENABLE_DOVECOT=1
+
+      # Postmaster
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+
+      # Relay (optional)
+      - RELAY_HOST=${RELAY_HOST:-}
+      - RELAY_PORT=${RELAY_PORT:-587}
+      - RELAY_USER=${RELAY_USER:-}
+      - RELAY_PASSWORD=${RELAY_PASSWORD:-}
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    restart: unless-stopped
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD", "ss", "--listening", "--tcp", "|", "grep", "-P", "LISTEN.+:smtp"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    environment:
+      - SERVICE_FQDN_ROUNDCUBE_80
+      - ROUNDCUBEMAIL_DB_TYPE=sqlite
+      - ROUNDCUBEMAIL_DEFAULT_HOST=ssl://mailserver
+      - ROUNDCUBEMAIL_DEFAULT_PORT=993
+      - ROUNDCUBEMAIL_SMTP_SERVER=tls://mailserver
+      - ROUNDCUBEMAIL_SMTP_PORT=587
+      - ROUNDCUBEMAIL_SKIN=${ROUNDCUBE_SKIN:-elastic}
+      - ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE=${ROUNDCUBE_UPLOAD_MAX:-25M}
+    volumes:
+      - roundcube-data:/var/roundcube/db
+      - roundcube-temp:/tmp/roundcube-temp
+    depends_on:
+      - mailserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
