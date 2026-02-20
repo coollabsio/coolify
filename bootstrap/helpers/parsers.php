@@ -1317,15 +1317,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // Preserve only explicitly defined env_file values.
+        // Do not auto-inject `.env` as runtime env_file to keep Docker Compose semantics.
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->filter(fn ($value) => ! is_null($value) && $value !== '')
+                ->unique()
+                ->values();
+            if ($envFiles->count() > 0) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -2416,15 +2419,18 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Preserve only explicitly defined env_file values.
+        // Do not auto-inject `.env` as runtime env_file to keep Docker Compose semantics.
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->filter(fn ($value) => ! is_null($value) && $value !== '')
+                ->unique()
+                ->values();
+            if ($envFiles->count() > 0) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         $parsedServices->put($serviceName, $payload);
     }
