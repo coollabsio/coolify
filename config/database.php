@@ -54,18 +54,10 @@ return [
         ],
 
         'testing' => [
-            'driver' => 'pgsql',
-            'url' => env('DATABASE_TEST_URL'),
-            'host' => env('DB_TEST_HOST', 'postgres'),
-            'port' => env('DB_TEST_PORT', '5432'),
-            'database' => env('DB_TEST_DATABASE', 'coolify_test'),
-            'username' => env('DB_TEST_USERNAME', 'coolify'),
-            'password' => env('DB_TEST_PASSWORD', 'password'),
-            'charset' => 'utf8',
+            'driver' => 'sqlite',
+            'database' => ':memory:',
             'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
+            'foreign_key_constraints' => true,
         ],
 
     ],

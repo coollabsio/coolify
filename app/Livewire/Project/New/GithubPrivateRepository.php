@@ -75,6 +75,11 @@ class GithubPrivateRepository extends Component
         $this->github_apps = GithubApp::private();
     }
 
+    public function updatedSelectedRepositoryId(): void
+    {
+        $this->loadBranches();
+    }
+
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {

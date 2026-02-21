@@ -189,12 +189,16 @@ class Show extends Component
             $this->validate();
 
             $this->authorize('update', $this->server);
-            if (Server::where('team_id', currentTeam()->id)
-                ->where('ip', $this->ip)
+            $foundServer = Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
-                ->exists()) {
+                ->first();
+            if ($foundServer) {
                 $this->ip = $this->server->ip;
-                throw new \Exception('This IP/Domain is already in use by another server in your team.');
+                if ($foundServer->team_id === currentTeam()->id) {
+                    throw new \Exception('A server with this IP/Domain already exists in your team.');
+                }
+
+                throw new \Exception('A server with this IP/Domain is already in use by another team.');
             }
 
             $this->server->name = $this->name;

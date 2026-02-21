@@ -47,6 +47,9 @@ RUN apk add --no-cache \
     lsof \
     vim
 
+# Install PHP extensions
+RUN install-php-extensions sockets
+
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \

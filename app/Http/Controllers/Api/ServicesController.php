@@ -1141,10 +1141,7 @@ class ServicesController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
-                            ]
+                            ref: '#/components/schemas/EnvironmentVariable'
                         )
                     ),
                 ]
@@ -1265,10 +1262,8 @@ class ServicesController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variables updated.'],
-                            ]
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
                 ]
