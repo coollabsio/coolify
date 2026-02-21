@@ -35,6 +35,7 @@ use OpenApi\Attributes as OA;
         'only_this_server' => ['type' => 'boolean'],
         'rollback' => ['type' => 'boolean'],
         'commit_message' => ['type' => 'string'],
+        'commit_author' => ['type' => 'string'],
     ],
 )]
 class ApplicationDeploymentQueue extends Model

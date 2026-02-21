@@ -6,5 +6,9 @@ Failed to deploy a pull request #{{ $pull_request_id }} of {{ $name }} at
 [{{ $fqdn }}]({{ $fqdn }}).
 @endif
 
+@if (isset($commit_author))
+Commit Author: {{ $commit_author }}
+@endif
+
 [View Deployment Logs]({{ $deployment_url }})
 </x-emails.layout>

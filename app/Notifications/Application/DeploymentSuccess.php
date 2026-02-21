@@ -3,6 +3,7 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
@@ -63,11 +64,14 @@ class DeploymentSuccess extends CustomEmailNotification
             $fqdn = $this->preview->fqdn;
             $mail->subject("Coolify: Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
         }
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+
         $mail->view('emails.application-deployment-success', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,
             'pull_request_id' => $pull_request_id,
+            'commit_author' => $deployment?->commit_author,
         ]);
 
         return $mail;
@@ -108,6 +112,11 @@ class DeploymentSuccess extends CustomEmailNotification
             $message->addField('Deployment logs', '[Link]('.$this->deployment_url.')');
         }
 
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+        if ($deployment && $deployment->commit_author) {
+            $message->addField('Commit Author', $deployment->commit_author, true);
+        }
+
         return $message;
     }
 
@@ -130,6 +139,12 @@ class DeploymentSuccess extends CustomEmailNotification
                 ];
             }
         }
+
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+        if ($deployment && $deployment->commit_author) {
+            $message .= "\nCommit Author: {$deployment->commit_author}";
+        }
+
         $buttons[] = [
             'text' => 'Deployment logs',
             'url' => $this->deployment_url,
@@ -164,6 +179,12 @@ class DeploymentSuccess extends CustomEmailNotification
                 ];
             }
         }
+
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+        if ($deployment && $deployment->commit_author) {
+            $message .= "\nCommit Author: {$deployment->commit_author}";
+        }
+
         $buttons[] = [
             'text' => 'Deployment logs',
             'url' => $this->deployment_url,
@@ -193,6 +214,10 @@ class DeploymentSuccess extends CustomEmailNotification
             if ($this->fqdn) {
                 $description .= "\nApplication URL: {$this->fqdn}";
             }
+        }
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+        if ($deployment && $deployment->commit_author) {
+            $description .= "\n*Commit Author:* {$deployment->commit_author}";
         }
 
         $description .= "\n\n*Project:* ".data_get($this->application, 'environment.project.name');
@@ -227,6 +252,11 @@ class DeploymentSuccess extends CustomEmailNotification
 
         if ($this->fqdn) {
             $data['fqdn'] = $this->fqdn;
+        }
+
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $this->deployment_uuid)->first();
+        if ($deployment && $deployment->commit_author) {
+            $data['commit_author'] = $deployment->commit_author;
         }
 
         return $data;
