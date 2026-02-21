@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
@@ -11,12 +12,18 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Services\RepositoryDetector;
+use App\Traits\HasRepositoryDetection;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class PublicGitRepository extends Component
 {
+    use HasRepositoryDetection;
+
     public string $repository_url;
 
     public int $port = 3000;
@@ -177,10 +184,15 @@ class PublicGitRepository extends Component
                 $this->git_branch = 'master';
             }
             $this->selectedBranch = $this->git_branch;
+
+            if ($this->branchFound) {
+                $this->detectRepository();
+            }
         } catch (\Throwable $e) {
             if ($this->rate_limit_remaining == 0) {
                 $this->selectedBranch = $this->git_branch;
                 $this->branchFound = true;
+                $this->detectRepository();
 
                 return;
             }
@@ -188,6 +200,9 @@ class PublicGitRepository extends Component
                 try {
                     $this->git_branch = 'master';
                     $this->getBranch();
+                    if ($this->branchFound) {
+                        $this->detectRepository();
+                    }
                 } catch (\Throwable $e) {
                     return handleError($e, $this);
                 }
@@ -195,6 +210,35 @@ class PublicGitRepository extends Component
                 return handleError($e, $this);
             }
         }
+    }
+
+    public function detectRepository(): void
+    {
+        $this->detectionRan = false;
+        $this->envImported = false;
+
+        try {
+            $serverId = data_get($this->query, 'server_id');
+            $teamId = currentTeam()->id;
+
+            $repoUrl = $this->git_source === 'other'
+                ? $this->git_repository
+                : "https://github.com/{$this->git_repository}";
+
+            $detector = new RepositoryDetector(
+                repositoryUrl: $repoUrl,
+                branch: $this->git_branch,
+                baseDirectory: $this->base_directory,
+                serverId: (int) $serverId,
+                teamId: $teamId,
+            );
+
+            $this->applyDetectionResult($detector->detect());
+        } catch (\Throwable $e) {
+            Log::debug('Repository detection failed in component', ['error' => $e->getMessage()]);
+        }
+
+        $this->detectionRan = true;
     }
 
     private function getGitSource()
@@ -351,6 +395,9 @@ class PublicGitRepository extends Component
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
                 $application_init['health_check_enabled'] = false;
             }
+            if ($this->build_pack === 'dockerfile' && $this->selectedDockerfile) {
+                $application_init['dockerfile_location'] = $this->selectedDockerfile;
+            }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
@@ -362,11 +409,20 @@ class PublicGitRepository extends Component
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->save();
-            if ($this->checkCoolifyConfig) {
-                // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
-                // if ($config) {
-                //     $application->setConfig($config);
-                // }
+
+            // Import environment variables from .env.example
+            if ($this->envImported && count($this->envExampleVars) > 0) {
+                DB::transaction(function () use ($application): void {
+                    foreach ($this->envExampleVars as $key => $value) {
+                        EnvironmentVariable::create([
+                            'key' => $key,
+                            'value' => $value,
+                            'resourceable_type' => $application->getMorphClass(),
+                            'resourceable_id' => $application->id,
+                            'is_preview' => false,
+                        ]);
+                    }
+                });
             }
 
             return redirect()->route('project.application.configuration', [

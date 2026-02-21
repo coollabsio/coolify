@@ -3,17 +3,24 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
+use App\Services\RepositoryDetector;
+use App\Traits\HasRepositoryDetection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
+    use HasRepositoryDetection;
+
     public $current_step = 'github_apps';
 
     public $github_apps;
@@ -135,6 +142,8 @@ class GithubPrivateRepository extends Component
         }
         $this->branches = sortBranchesByPriority($this->branches);
         $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
+
+        $this->detectRepository();
     }
 
     protected function loadBranchByPage()
@@ -153,6 +162,33 @@ class GithubPrivateRepository extends Component
 
         $this->total_branches_count = count($json);
         $this->branches = $this->branches->concat(collect($json));
+    }
+
+    public function detectRepository(): void
+    {
+        $this->detectionRan = false;
+        $this->envImported = false;
+
+        try {
+            $serverId = data_get($this->query, 'server_id');
+            $teamId = currentTeam()->id;
+
+            $repoUrl = "https://github.com/{$this->selected_repository_owner}/{$this->selected_repository_repo}";
+
+            $detector = new RepositoryDetector(
+                repositoryUrl: $repoUrl,
+                branch: $this->selected_branch_name,
+                baseDirectory: $this->base_directory ?? '/',
+                serverId: (int) $serverId,
+                teamId: $teamId,
+            );
+
+            $this->applyDetectionResult($detector->detect());
+        } catch (\Throwable $e) {
+            Log::debug('Repository detection failed in component', ['error' => $e->getMessage()]);
+        }
+
+        $this->detectionRan = true;
     }
 
     public function submit()
@@ -186,7 +222,7 @@ class GithubPrivateRepository extends Component
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
-            $application = Application::create([
+            $application_init = [
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
@@ -200,21 +236,42 @@ class GithubPrivateRepository extends Component
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
                 'source_type' => $this->github_app->getMorphClass(),
-            ]);
+            ];
+
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application_init['health_check_enabled'] = false;
+            }
+            if ($this->build_pack === 'dockerfile' && $this->selectedDockerfile) {
+                $application_init['dockerfile_location'] = $this->selectedDockerfile;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application_init['docker_compose_location'] = $this->docker_compose_location;
+            }
+
+            $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-                $application->health_check_enabled = false;
-            }
-            if ($this->build_pack === 'dockercompose') {
-                $application['docker_compose_location'] = $this->docker_compose_location;
-            }
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
 
             $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
+
+            // Import environment variables from .env.example
+            if ($this->envImported && count($this->envExampleVars) > 0) {
+                DB::transaction(function () use ($application): void {
+                    foreach ($this->envExampleVars as $key => $value) {
+                        EnvironmentVariable::create([
+                            'key' => $key,
+                            'value' => $value,
+                            'resourceable_type' => $application->getMorphClass(),
+                            'resourceable_id' => $application->id,
+                            'is_preview' => false,
+                        ]);
+                    }
+                });
+            }
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

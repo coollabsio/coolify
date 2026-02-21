@@ -1,4 +1,4 @@
-<div>
+<div x-data="{ envModalOpen: false }">
     <h1>Create a new Application</h1>
     <div class="pb-4">Deploy any public or private Git repositories through a Deploy Key.</div>
     <div class="flex flex-col ">
@@ -60,6 +60,60 @@
                         <x-forms.input id="publish_directory" required label="Publish Directory" />
                     @endif
                 </div>
+
+                {{-- Repository Detection --}}
+                <div class="pt-6 mt-4 border-t border-neutral-200 dark:border-coolgray-300">
+                    <h3 class="text-lg font-bold">Smart Scan</h3>
+                    <p class="pt-1 pb-3 text-sm dark:text-neutral-400">Scan for Dockerfiles, Docker Compose files, and environment configuration.</p>
+
+                    <div class="flex items-center gap-3">
+                        <x-forms.button type="button" wire:click="detectRepository">
+                            <span wire:loading.remove wire:target="detectRepository">Detect Repository</span>
+                            <span wire:loading wire:target="detectRepository" class="inline-flex items-center gap-2">
+                                <x-loading /> Scanning...
+                            </span>
+                        </x-forms.button>
+                    </div>
+
+                    @if ($detectionRan)
+                        <div wire:loading.remove wire:target="detectRepository" class="pt-3">
+                            <div class="flex items-center gap-3 flex-wrap text-sm">
+                                @if (count($detectedDockerfiles))
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
+                                        <span class="badge badge-success"></span>
+                                        Dockerfile{{ count($detectedDockerfiles) > 1 ? 's' : '' }}
+                                        <span class="dark:text-neutral-400">({{ count($detectedDockerfiles) }})</span>
+                                    </span>
+                                @endif
+                                @if (count($detectedDockerComposeFiles))
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
+                                        <span class="badge badge-success"></span>
+                                        Docker Compose
+                                        <span class="dark:text-neutral-400">({{ count($detectedDockerComposeFiles) }})</span>
+                                    </span>
+                                @endif
+                                @include('livewire.project.new.partials.env-detection-badges')
+                                @if (!count($detectedDockerfiles) && !count($detectedDockerComposeFiles) && !count($detectedEnvFiles))
+                                    <span class="dark:text-neutral-400">No Dockerfile, Docker Compose, or env files detected.</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Configuration --}}
+                <h3 class="pt-6 text-lg font-bold">Configuration</h3>
+
+                {{-- Dockerfile selector when multiple detected --}}
+                @if ($build_pack === 'dockerfile' && count($detectedDockerfiles) > 1)
+                    <x-forms.select wire:model.live="selectedDockerfile" label="Dockerfile"
+                        helper="Multiple Dockerfiles were detected in your repository. Select which one to use.">
+                        @foreach ($detectedDockerfiles as $df)
+                            <option value="{{ $df }}">{{ $df }}</option>
+                        @endforeach
+                    </x-forms.select>
+                @endif
+
                 @if ($build_pack === 'dockercompose')
                     <div x-data="{
                         baseDir: '{{ $base_directory }}',
@@ -67,9 +121,7 @@
                         normalizePath(path) {
                             if (!path || path.trim() === '') return '/';
                             path = path.trim();
-                            // Remove trailing slashes
                             path = path.replace(/\/+$/, '');
-                            // Ensure leading slash
                             if (!path.startsWith('/')) {
                                 path = '/' + path;
                             }
@@ -109,6 +161,9 @@
                     Continue
                 </x-forms.button>
             </form>
+
+            {{-- Environment Variables Import Modal --}}
+            @include('livewire.project.new.partials.env-import-modal')
         @endif
     </div>
 </div>
