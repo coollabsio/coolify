@@ -1,0 +1,40 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Full-featured self-hosted email server with SMTP, IMAP, and spam filtering
+# category: email
+# tags: email,mail,smtp,imap,docker-mailserver,postfix,dovecot,spam
+# logo: svgs/mailserver.svg
+# port: 25
+
+services:
+  mailserver:
+    image: docker/mailserver:latest
+    container_name: mailserver
+    ports:
+      - "25:25"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+    environment:
+      - ENABLE_MANAGESIEVE=1
+      - ENABLE_QUOTAS=1
+      - POSTFIX_MESSAGE_SIZE_LIMIT=64000000
+      - ENABLE_SRS=1
+      - PERMIT_DOCKER=network
+      - TZ=${TZ}
+    hostname: mail
+    domainname: ${DOMAIN}
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "25"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mail-data:
+  mail-state:
+  mail-logs:
