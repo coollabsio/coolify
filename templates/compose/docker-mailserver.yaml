@@ -1,0 +1,41 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: Full-fledged email server with SMTP, IMAP, and spam filtering
+# category: email
+# tags: email,mail,smtp,imap,docker-mailserver,postfix,dovecot
+# logo: svgs/mailserver.svg
+# port: 25
+
+services:
+  mailserver:
+    image: docker/mailserver:latest
+    container_name: mailserver
+    ports:
+      - "25:25"    # SMTP
+      - "143:143"   # IMAP
+      - "993:993"   # IMAPS
+      - "587:587"   # SMTP submission
+    volumes:
+      - "mail-data:/var/mail"
+      - "mail-state:/var/mail-state"
+      - "mail-logs:/var/log/mail"
+      - ./docker-data/dms/mailboxes:/var/mail
+      - ./docker-data/dms/config:/tmp/docker-mailserver
+    environment:
+      - ENABLE_MANAGESIEVE=1
+      - ENABLE_QUOTAS=1
+      - POSTFIX_MESSAGE_SIZE_LIMIT=64000000
+      - Dovecot quota plugin: 200MB
+      - ENABLE_SRS=1
+      - SRS_DOMAIN_NAME=example.com
+      - SSL_TYPE=letsencrypt
+      - PERMIT_DOCKER=host
+      - TZ=UTC
+    hostname: mail
+    domainname: example.com
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "25"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
