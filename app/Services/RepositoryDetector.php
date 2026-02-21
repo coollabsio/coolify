@@ -30,6 +30,11 @@ class RepositoryDetector
             ->first();
 
         if (! $server) {
+            Log::debug('Repository detection skipped: server not found', [
+                'serverId' => $this->serverId,
+                'teamId' => $this->teamId,
+            ]);
+
             return RepositoryDetectionResult::none();
         }
 
@@ -48,13 +53,16 @@ class RepositoryDetector
         $workDir = escapeshellarg("{$tempDir}{$cdBase}");
         $envPattern = self::ENV_FILE_PATTERN;
 
+        $escapedTempDir = escapeshellarg($tempDir);
+
         $commands = collect([
-            'rm -rf -- '.escapeshellarg($tempDir),
-            'git clone --depth 1 -b '.escapeshellarg($this->branch).' '.escapeshellarg($this->repositoryUrl).' '.escapeshellarg($tempDir).' >/dev/null 2>&1',
+            'rm -rf -- '.$escapedTempDir,
+            "trap 'rm -rf -- {$escapedTempDir}' EXIT",
+            'git clone --depth 1 -b '.escapeshellarg($this->branch).' '.escapeshellarg($this->repositoryUrl).' '.escapeshellarg($tempDir).' >/dev/null 2>&1 || git clone --depth 1 '.escapeshellarg($this->repositoryUrl).' '.escapeshellarg($tempDir).' >/dev/null 2>&1',
             "cd {$workDir}",
             // Collect file lists into shell variables
-            'df_list=$(git ls-files | grep -i \'dockerfile\' || true)',
-            'compose_list=$(git ls-files | grep -iE \'^(docker-compose\.(yml|yaml)|compose\.(yml|yaml))$\' || true)',
+            'df_list=$(git ls-files | grep -iE \'(^|/)Dockerfile(\.[a-zA-Z0-9_-]+)?$\' || true)',
+            'compose_list=$(git ls-files | grep -iE \'(^|/)(docker-compose\.(yml|yaml)|compose\.(yml|yaml))$\' || true)',
             'env_list=$(git ls-files | grep -iE \''.$envPattern.'\' || true)',
             // Build env file contents as a JSON object (uses jq to safely encode file content)
             'env_json=\'{}\'',
@@ -79,7 +87,6 @@ class RepositoryDetector
             '  --argjson envFiles "$env_json" \\',
             '  --argjson dockerfilePorts "$port_json" \\',
             '  \'$ARGS.named\'',
-            'rm -rf -- '.escapeshellarg($tempDir),
         ]);
 
         try {
@@ -111,7 +118,7 @@ class RepositoryDetector
 
         $dockerfilePorts = [];
         foreach ($data['dockerfilePorts'] ?? [] as $file => $port) {
-            $dockerfilePorts[$file] = is_int($port) ? $port : null;
+            $dockerfilePorts[$file] = is_numeric($port) ? (int) $port : null;
         }
 
         return new RepositoryDetectionResult(

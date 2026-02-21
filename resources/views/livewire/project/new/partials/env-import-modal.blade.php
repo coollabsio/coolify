@@ -42,7 +42,7 @@
                         <div class="flex gap-3 items-center">
                             <label class="w-1/3 text-sm font-mono truncate dark:text-neutral-400" title="{{ $key }}">{{ $key }}</label>
                             <input type="text" class="w-2/3 input"
-                                wire:model.defer="envExampleVars.{{ $key }}" />
+                                wire:model="envExampleVars.{{ $key }}" />
                         </div>
                     @endforeach
                 </div>

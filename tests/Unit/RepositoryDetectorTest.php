@@ -171,6 +171,31 @@ test('parseOutput handles multiple env files', function () {
         ->and($result->hasEnvFiles())->toBeTrue();
 });
 
+test('parseOutput handles string port values from JSON', function () {
+    $output = json_encode([
+        'dockerfiles' => ['Dockerfile'],
+        'dockerComposeFiles' => [],
+        'envFiles' => (object) [],
+        'dockerfilePorts' => ['Dockerfile' => '3000'],
+    ]);
+
+    $detector = new RepositoryDetector(
+        repositoryUrl: 'https://github.com/test/repo',
+        branch: 'main',
+        baseDirectory: '/',
+        serverId: 1,
+        teamId: 1,
+    );
+
+    $reflection = new ReflectionClass($detector);
+    $method = $reflection->getMethod('parseOutput');
+
+    $result = $method->invoke($detector, $output);
+
+    expect($result->dockerfilePorts)->toBe(['Dockerfile' => 3000])
+        ->and($result->dockerfilePorts['Dockerfile'])->toBeInt();
+});
+
 test('parseOutput returns none for invalid JSON', function () {
     $detector = new RepositoryDetector(
         repositoryUrl: 'https://github.com/test/repo',

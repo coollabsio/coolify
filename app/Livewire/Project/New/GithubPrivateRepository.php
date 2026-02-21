@@ -242,9 +242,17 @@ class GithubPrivateRepository extends Component
                 $application_init['health_check_enabled'] = false;
             }
             if ($this->build_pack === 'dockerfile' && $this->selectedDockerfile) {
+                if (! empty($this->detectedDockerfiles) && ! in_array($this->selectedDockerfile, $this->detectedDockerfiles, true)) {
+                    $this->selectedDockerfile = $this->detectedDockerfiles[0];
+                }
                 $application_init['dockerfile_location'] = $this->selectedDockerfile;
             }
             if ($this->build_pack === 'dockercompose') {
+                if (! empty($this->detectedDockerComposeFiles) && $this->selectedDockerComposeFile
+                    && ! in_array($this->selectedDockerComposeFile, $this->detectedDockerComposeFiles, true)) {
+                    $this->selectedDockerComposeFile = $this->detectedDockerComposeFiles[0];
+                    $this->docker_compose_location = '/'.$this->selectedDockerComposeFile;
+                }
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
             }
 

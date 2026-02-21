@@ -204,7 +204,9 @@ class PublicGitRepository extends Component
                         $this->detectRepository();
                     }
                 } catch (\Throwable $e) {
-                    return handleError($e, $this);
+                    // Both main and master failed — still run detection
+                    // with clone fallback to the repo's default branch
+                    $this->detectRepository();
                 }
             } else {
                 return handleError($e, $this);
@@ -396,9 +398,17 @@ class PublicGitRepository extends Component
                 $application_init['health_check_enabled'] = false;
             }
             if ($this->build_pack === 'dockerfile' && $this->selectedDockerfile) {
+                if (! empty($this->detectedDockerfiles) && ! in_array($this->selectedDockerfile, $this->detectedDockerfiles, true)) {
+                    $this->selectedDockerfile = $this->detectedDockerfiles[0];
+                }
                 $application_init['dockerfile_location'] = $this->selectedDockerfile;
             }
             if ($this->build_pack === 'dockercompose') {
+                if (! empty($this->detectedDockerComposeFiles) && $this->selectedDockerComposeFile
+                    && ! in_array($this->selectedDockerComposeFile, $this->detectedDockerComposeFiles, true)) {
+                    $this->selectedDockerComposeFile = $this->detectedDockerComposeFiles[0];
+                    $this->docker_compose_location = '/'.$this->selectedDockerComposeFile;
+                }
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }

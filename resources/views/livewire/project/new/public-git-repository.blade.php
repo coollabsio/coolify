@@ -99,6 +99,14 @@
                 @endif
 
                 @if ($build_pack === 'dockercompose')
+                    @if (count($detectedDockerComposeFiles) > 1)
+                        <x-forms.select wire:model.live="selectedDockerComposeFile" label="Docker Compose File"
+                            helper="Multiple Docker Compose files were detected. Select which one to use.">
+                            @foreach ($detectedDockerComposeFiles as $cf)
+                                <option value="{{ $cf }}">{{ $cf }}</option>
+                            @endforeach
+                        </x-forms.select>
+                    @endif
                     <div x-data="{
                         baseDir: '{{ $base_directory }}',
                         composeLocation: '{{ $docker_compose_location }}',
