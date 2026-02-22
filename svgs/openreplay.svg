@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="OpenReplay">
+  <rect width="256" height="256" rx="48" fill="#111827"/>
+  <path fill="#22C55E" d="M128 48c-44.2 0-80 35.8-80 80s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80Zm0 24c30.9 0 56 25.1 56 56s-25.1 56-56 56-56-25.1-56-56 25.1-56 56-56Z"/>
+  <path fill="#E5E7EB" d="M118 104v48l44-24-44-24Z"/>
+</svg>

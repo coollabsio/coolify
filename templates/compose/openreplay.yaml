@@ -1,0 +1,70 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Session replay, co-browsing and product analytics you can self-host.
+# category: analytics
+# tags: analytics, session-replay, openreplay
+# logo: svgs/openreplay.svg
+
+services:
+  openreplay-postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-16}
+    container_name: openreplay-postgres
+    volumes:
+      - openreplay-pgdata:/bitnami/postgresql
+    environment:
+      POSTGRES_PASSWORD: ${OPENREPLAY_COMMON_PG_PASSWORD:-$SERVICE_PASSWORD_64_OPENREPLAY}
+
+  openreplay-clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.1}
+    container_name: openreplay-clickhouse
+    volumes:
+      - openreplay-clickhouse:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+
+  openreplay-redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION:-7}
+    container_name: openreplay-redis
+    volumes:
+      - openreplay-redisdata:/bitnami/redis/data
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+
+  openreplay-minio:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-2024-01-16}
+    container_name: openreplay-minio
+    volumes:
+      - openreplay-miniodata:/bitnami/minio/data
+    environment:
+      MINIO_ROOT_USER: ${OPENREPLAY_COMMON_S3_KEY:-$SERVICE_USER_OPENREPLAY}
+      MINIO_ROOT_PASSWORD: ${OPENREPLAY_COMMON_S3_SECRET:-$SERVICE_PASSWORD_OPENREPLAY}
+
+  openreplay-api:
+    image: public.ecr.aws/p1t3u8a3/api:${OPENREPLAY_VERSION:-latest}
+    container_name: openreplay-api
+    depends_on:
+      - openreplay-postgresql
+      - openreplay-clickhouse
+      - openreplay-redis
+      - openreplay-minio
+    env_file:
+      - docker-envs/api.env
+    environment: {}
+    restart: unless-stopped
+
+  openreplay-http:
+    image: public.ecr.aws/p1t3u8a3/http:${OPENREPLAY_VERSION:-latest}
+    container_name: openreplay-http
+    depends_on:
+      - openreplay-api
+    env_file:
+      - docker-envs/http.env
+    environment: {}
+    restart: unless-stopped
+
+volumes:
+  openreplay-pgdata:
+  openreplay-clickhouse:
+  openreplay-redisdata:
+  openreplay-miniodata:
