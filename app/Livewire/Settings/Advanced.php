@@ -37,6 +37,12 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_wire_navigate_enabled;
 
+    #[Validate('boolean')]
+    public bool $oauth_registration_enabled;
+
+    #[Validate('boolean')]
+    public bool $oauth_only_mode;
+
     public function rules()
     {
         return [
@@ -49,6 +55,8 @@ class Advanced extends Component
             'is_sponsorship_popup_enabled' => 'boolean',
             'disable_two_step_confirmation' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
+            'oauth_registration_enabled' => 'boolean',
+            'oauth_only_mode' => 'boolean',
         ];
     }
 
@@ -67,6 +75,8 @@ class Advanced extends Component
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
+        $this->oauth_registration_enabled = $this->settings->oauth_registration_enabled ?? false;
+        $this->oauth_only_mode = $this->settings->oauth_only_mode ?? false;
     }
 
     public function submit()
@@ -146,6 +156,8 @@ class Advanced extends Component
             $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
             $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
+            $this->settings->oauth_registration_enabled = $this->oauth_registration_enabled;
+            $this->settings->oauth_only_mode = $this->oauth_only_mode;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
