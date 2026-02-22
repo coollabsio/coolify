@@ -128,6 +128,12 @@ class DeployController extends Controller
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
 
+        // Verify the deployment belongs to the user's team
+        $servers = Server::whereTeamId($teamId)->pluck('id');
+        if (! $servers->contains($deployment->server_id)) {
+            return response()->json(['message' => 'Deployment not found.'], 404);
+        }
+
         return response()->json($this->removeSensitiveData($deployment));
     }
 
