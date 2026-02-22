@@ -1,0 +1,54 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) running inside a Docker container.
+# category: email
+# tags: email, smtp, imap, mailserver, docker-mailserver, postfix, dovecot, spamassassin, clamav
+# logo: svgs/mailpit.svg
+# port: 25
+
+services:
+  docker-mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${SERVICE_FQDN_DOCKER_MAILSERVER}
+    environment:
+      - SERVICE_URL_DOCKER_MAILSERVER_25
+      - OVERRIDE_HOSTNAME=${SERVICE_FQDN_DOCKER_MAILSERVER}
+      - SSL_TYPE=self-signed
+      - PERMIT_DOCKER=none
+      - ENABLE_SPAMASSASSIN=0
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=0
+      - POSTMASTER_ADDRESS=postmaster@${SERVICE_FQDN_DOCKER_MAILSERVER}
+      - POSTFIX_INET_PROTOCOLS=ipv4
+      - DOVECOT_INET_PROTOCOLS=ipv4
+      - TZ=${TZ:-UTC}
+      - LOG_LEVEL=info
+      - ENABLE_UPDATE_CHECK=0
+      - ONE_DIR=1
+      - ENABLE_POP3=0
+      - ENABLE_IMAP=1
+      - SMTP_ONLY=0
+      - SPOOF_PROTECTION=1
+      - ENABLE_SRS=0
+      - ENABLE_OPENDKIM=1
+      - ENABLE_OPENDMARC=1
+      - ENABLE_POLICYD_SPF=1
+      - ENABLE_QUOTAS=1
+      - ENABLE_MTA_STS=0
+    ports:
+      - "25:25"    # SMTP (explicit TLS => STARTTLS)
+      - "143:143"  # IMAP4 (explicit TLS => STARTTLS)
+      - "465:465"  # ESMTP (implicit TLS)
+      - "587:587"  # ESMTP (explicit TLS => STARTTLS)
+      - "993:993"  # IMAP4 (implicit TLS)
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      timeout: 3s
+      retries: 0
