@@ -332,7 +332,12 @@ services:
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
+      - 'SNIPPETS_MANAGEMENT_FOLDER=/app/snippets'
+      - 'EDGE_FUNCTIONS_MANAGEMENT_FOLDER=/app/edge-functions'
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
+    volumes:
+      - './volumes/snippets:/app/snippets:Z'
+      - './volumes/functions:/app/edge-functions:Z'
   supabase-db:
     image: supabase/postgres:15.8.1.048
     healthcheck:
