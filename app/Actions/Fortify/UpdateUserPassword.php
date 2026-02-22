@@ -17,6 +17,15 @@ class UpdateUserPassword implements UpdatesUserPasswords
      */
     public function update(User $user, array $input): void
     {
+        // Check if OAuth-only mode is enabled and user is an OAuth user (no password)
+        $settings = instanceSettings();
+        if ($settings->oauth_only_mode &&! $user->hasPassword()) {
+            Validator::make([], [])->errors()->add(
+                'password',
+                __('OAuth users cannot set passwords when OAuth-only mode is enabled.')
+            )->throw();
+        }
+
         Validator::make($input, [
             'current_password' => ['required', 'string', 'current_password:web'],
             'password' => ['required', Password::defaults(), 'confirmed'],

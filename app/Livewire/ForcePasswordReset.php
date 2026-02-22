@@ -27,10 +27,20 @@ class ForcePasswordReset extends Component
 
     public function mount()
     {
-        if (auth()->user()->force_password_reset === false) {
+        $user = auth()->user();
+        $settings = instanceSettings();
+        
+        // Skip password reset for OAuth-only users
+        if ($settings->oauth_only_mode && ! $user->hasPassword()) {
+            $user->force_password_reset = false;
+            $user->save();
             return redirect()->route('dashboard');
         }
-        $this->email = auth()->user()->email;
+        
+        if ($user->force_password_reset === false) {
+            return redirect()->route('dashboard');
+        }
+        $this->email = $user->email;
     }
 
     public function render()
