@@ -43,6 +43,7 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $skip_deploy_commits = self::allCommitsSkipDeploy(data_get($payload, 'commits', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -102,31 +103,39 @@ class Github extends Controller
                         if ($application->isDeployable()) {
                             $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                             if ($is_watch_path_triggered || blank($application->watch_paths)) {
-                                $deployment_uuid = new Cuid2;
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    deployment_uuid: $deployment_uuid,
-                                    force_rebuild: false,
-                                    commit: data_get($payload, 'after', 'HEAD'),
-                                    is_webhook: true,
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
-                                } elseif ($result['status'] === 'skipped') {
+                                if ($skip_deploy_commits ?? false) {
                                     $return_payloads->push([
                                         'application' => $application->name,
                                         'status' => 'skipped',
-                                        'message' => $result['message'],
+                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
                                     ]);
                                 } else {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'success',
-                                        'message' => 'Deployment queued.',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                        'deployment_uuid' => $result['deployment_uuid'],
-                                    ]);
+                                    $deployment_uuid = new Cuid2;
+                                    $result = queue_application_deployment(
+                                        application: $application,
+                                        deployment_uuid: $deployment_uuid,
+                                        force_rebuild: false,
+                                        commit: data_get($payload, 'after', 'HEAD'),
+                                        is_webhook: true,
+                                    );
+                                    if ($result['status'] === 'queue_full') {
+                                        return response($result['message'], 429)->header('Retry-After', 60);
+                                    } elseif ($result['status'] === 'skipped') {
+                                        $return_payloads->push([
+                                            'application' => $application->name,
+                                            'status' => 'skipped',
+                                            'message' => $result['message'],
+                                        ]);
+                                    } else {
+                                        $return_payloads->push([
+                                            'application' => $application->name,
+                                            'status' => 'success',
+                                            'message' => 'Deployment queued.',
+                                            'application_uuid' => $application->uuid,
+                                            'application_name' => $application->name,
+                                            'deployment_uuid' => $result['deployment_uuid'],
+                                        ]);
+                                    }
                                 }
                             } else {
                                 $paths = str($application->watch_paths)->explode("\n");
@@ -234,6 +243,7 @@ class Github extends Controller
                 $removed_files = data_get($payload, 'commits.*.removed');
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
+                $skip_deploy_commits = self::allCommitsSkipDeploy(data_get($payload, 'commits', []));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -285,24 +295,33 @@ class Github extends Controller
                         if ($application->isDeployable()) {
                             $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                             if ($is_watch_path_triggered || blank($application->watch_paths)) {
-                                $deployment_uuid = new Cuid2;
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    deployment_uuid: $deployment_uuid,
-                                    commit: data_get($payload, 'after', 'HEAD'),
-                                    force_rebuild: false,
-                                    is_webhook: true,
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
+                                if ($skip_deploy_commits ?? false) {
+                                    $return_payloads->push([
+                                        'status' => 'skipped',
+                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                    ]);
+                                } else {
+                                    $deployment_uuid = new Cuid2;
+                                    $result = queue_application_deployment(
+                                        application: $application,
+                                        deployment_uuid: $deployment_uuid,
+                                        commit: data_get($payload, 'after', 'HEAD'),
+                                        force_rebuild: false,
+                                        is_webhook: true,
+                                    );
+                                    if ($result['status'] === 'queue_full') {
+                                        return response($result['message'], 429)->header('Retry-After', 60);
+                                    }
+                                    $return_payloads->push([
+                                        'status' => $result['status'],
+                                        'message' => $result['message'],
+                                        'application_uuid' => $application->uuid,
+                                        'application_name' => $application->name,
+                                        'deployment_uuid' => $result['deployment_uuid'] ?? null,
+                                    ]);
                                 }
-                                $return_payloads->push([
-                                    'status' => $result['status'],
-                                    'message' => $result['message'],
-                                    'application_uuid' => $application->uuid,
-                                    'application_name' => $application->name,
-                                    'deployment_uuid' => $result['deployment_uuid'] ?? null,
-                                ]);
                             } else {
                                 $paths = str($application->watch_paths)->explode("\n");
                                 $return_payloads->push([
@@ -417,5 +436,22 @@ class Github extends Controller
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Returns true if there is at least one commit and every commit message
+     * contains [skip cd] or [skip ci] (case-insensitive).
+     *
+     * @param  array<int, array<string, mixed>>  $commits
+     */
+    public static function allCommitsSkipDeploy(array $commits): bool
+    {
+        $commitList = collect($commits);
+
+        return $commitList->isNotEmpty() && $commitList->every(function (array $commit): bool {
+            $message = strtolower((string) data_get($commit, 'message', ''));
+
+            return str_contains($message, '[skip cd]') || str_contains($message, '[skip ci]');
+        });
     }
 }
