@@ -124,7 +124,7 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()

@@ -207,6 +207,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $serviceId = $labels->get('coolify.serviceId');
                 $subType = $labels->get('coolify.service.subType');
                 $subId = $labels->get('coolify.service.subId');
+                if (empty($subId)) {
+                    continue;
+                }
                 if ($subType === 'application') {
                     $this->foundServiceApplicationIds->push($subId);
                     // Store container status for aggregation
@@ -496,7 +499,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
-            } else {
+            }
+        } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
+            // Clean up orphaned proxy containers when is_public=false
+            $orphanedProxy = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
+                return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
+            })->first();
+            if ($orphanedProxy) {
+                StopDatabaseProxy::dispatch($database);
             }
         }
     }

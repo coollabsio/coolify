@@ -1,0 +1,19 @@
+# documentation: https://www.goatcounter.com/help
+# slogan: Lightweight web analytics platform.
+# category: analytics
+# tags: analytics, insights, privacy
+# logo: svgs/goatcounter.svg
+# port: 8080
+
+services:
+  goatcounter:
+    image: arp242/goatcounter:2.7
+    environment:
+      - SERVICE_URL_GOATCOUNTER_8080
+    volumes:
+      - goatcounter-data:/home/goatcounter/goatcounter-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/status >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

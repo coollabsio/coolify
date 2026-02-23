@@ -845,15 +845,7 @@ class Application extends BaseModel
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', false)
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+            ->where('is_preview', false);
     }
 
     public function runtime_environment_variables()
@@ -1669,7 +1661,7 @@ class Application extends BaseModel
             $this->custom_labels = base64_encode($customLabels);
         }
         $customLabels = base64_decode($this->custom_labels);
-        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+        if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
         $this->custom_labels = base64_encode($customLabels);

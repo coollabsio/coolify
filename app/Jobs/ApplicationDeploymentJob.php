@@ -263,7 +263,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->build_pack === 'dockerfile') {
                 if (data_get($this->application, 'dockerfile_location')) {
-                    $this->dockerfile_location = $this->application->dockerfile_location;
+                    $this->dockerfile_location = $this->validatePathField($this->application->dockerfile_location, 'dockerfile_location');
                 }
             }
         }
@@ -583,7 +583,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function deploy_docker_compose_buildpack()
     {
         if (data_get($this->application, 'docker_compose_location')) {
-            $this->docker_compose_location = $this->application->docker_compose_location;
+            $this->docker_compose_location = $this->validatePathField($this->application->docker_compose_location, 'docker_compose_location');
         }
         if (data_get($this->application, 'docker_compose_custom_start_command')) {
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
@@ -843,7 +843,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         }
         if (data_get($this->application, 'dockerfile_location')) {
-            $this->dockerfile_location = $this->application->dockerfile_location;
+            $this->dockerfile_location = $this->validatePathField($this->application->dockerfile_location, 'dockerfile_location');
         }
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
@@ -1220,7 +1220,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             }
 
@@ -1277,8 +1277,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
-                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyUrl->__toString());
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$coolifyFqdn);
                     }
                 }
 
@@ -1286,7 +1286,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
             }
 
@@ -1402,13 +1402,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
-            ],
-            [
-                executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
-                'hidden' => true,
-
             ]
         );
+
+        if (isDev()) {
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
+                    'hidden' => true,
+                ]
+            );
+        }
 
         // Write .env file to configuration directory
         if ($this->use_build_server) {
@@ -1484,7 +1488,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($serviceName)->upper()] = escapeBashEnvValue($serviceName);
+                    $envs_dict['SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($serviceName);
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
@@ -1497,8 +1501,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             } else {
@@ -1506,7 +1510,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -1519,8 +1523,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $envs_dict['SERVICE_URL_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
-                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->upper()] = escapeBashEnvValue($coolifyFqdn);
+                        $envs_dict['SERVICE_URL_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyUrl->__toString());
+                        $envs_dict['SERVICE_FQDN_'.str($forServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($coolifyFqdn);
                     }
                 }
             }
@@ -1661,12 +1665,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
-                ],
-                [
-                    executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
-                    'hidden' => true,
-                ],
+                ]
             );
+
+            if (isDev()) {
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
+                        'hidden' => true,
+                    ]
+                );
+            }
         } elseif ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerfile') {
             // For Docker Compose and Dockerfile, create an empty .env file even if there are no build-time variables
             // This ensures the file exists when referenced in build commands
@@ -2277,7 +2286,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->nixpacks_plan_json = collect($parsed);
-                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+
+                if (isDev()) {
+                    $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
+                } else {
+                    $parsedForLog = $parsed;
+                    unset($parsedForLog['variables']); // remove variables section to avoid exposing ENVs in production logs
+                    $this->application_deployment_queue->addLogEntry('Final Nixpacks plan: '.json_encode($parsedForLog, JSON_PRETTY_PRINT), hidden: true);
+                }
                 if ($this->nixpacks_type === 'rust') {
                     // temporary: disable healthcheck for rust because the start phase does not have curl/wget
                     $this->application->health_check_enabled = false;
@@ -3874,6 +3890,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Added build secrets configuration to docker-compose file (using environment variables).');
 
         return $composeFile;
+    }
+
+    private function validatePathField(string $value, string $fieldName): string
+    {
+        if (! preg_match('/^\/[a-zA-Z0-9._\-\/]+$/', $value)) {
+            throw new \RuntimeException("Invalid {$fieldName}: contains forbidden characters.");
+        }
+        if (str_contains($value, '..')) {
+            throw new \RuntimeException("Invalid {$fieldName}: path traversal detected.");
+        }
+
+        return $value;
     }
 
     private function run_pre_deployment_command()

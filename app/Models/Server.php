@@ -108,6 +108,12 @@ class Server extends BaseModel
 
     public static $batch_counter = 0;
 
+    /**
+     * Identity map cache for request-scoped Server lookups.
+     * Prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    private static ?array $identityMapCache = null;
+
     protected $appends = ['is_coolify_host'];
 
     protected static function booted()
@@ -186,6 +192,40 @@ class Server extends BaseModel
             $server->settings()->delete();
             $server->sslCertificates()->delete();
         });
+
+        static::updated(function () {
+            static::flushIdentityMap();
+        });
+    }
+
+    /**
+     * Find a Server by ID using the identity map cache.
+     * This prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    public static function findCached($id): ?static
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        if (static::$identityMapCache === null) {
+            static::$identityMapCache = [];
+        }
+
+        if (! isset(static::$identityMapCache[$id])) {
+            static::$identityMapCache[$id] = static::query()->find($id);
+        }
+
+        return static::$identityMapCache[$id];
+    }
+
+    /**
+     * Flush the identity map cache.
+     * Called automatically on update, and should be called in tests.
+     */
+    public static function flushIdentityMap(): void
+    {
+        static::$identityMapCache = null;
     }
 
     protected $casts = [

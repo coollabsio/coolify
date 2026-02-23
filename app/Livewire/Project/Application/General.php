@@ -73,7 +73,7 @@ class General extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $dockerfile = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'])]
     public ?string $dockerfileLocation = null;
 
     #[Validate(['string', 'nullable'])]
@@ -85,7 +85,7 @@ class General extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageTag = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'])]
     public ?string $dockerComposeLocation = null;
 
     #[Validate(['string', 'nullable'])]

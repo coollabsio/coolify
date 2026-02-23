@@ -107,7 +107,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
 
         // Apply watch path filtering
         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-        if (! $is_watch_path_triggered && ! is_null($application->watch_paths)) {
+        if (! $is_watch_path_triggered && ! blank($application->watch_paths)) {
             return;
         }
 

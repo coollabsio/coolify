@@ -500,8 +500,8 @@
                         @endif
                     @endif
                     @if (!$application->destination->server->isSwarm())
-                        <x-forms.input placeholder="3000:3000" id="portsMappings" label="Ports Mappings"
-                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."
+                        <x-forms.input placeholder="3000:3000" id="portsMappings" label="Port Mappings"
+                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Format:</span> host:container<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span> 3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."
                             x-bind:disabled="!canUpdate" />
                     @endif
                     @if (!$application->destination->server->isSwarm())
