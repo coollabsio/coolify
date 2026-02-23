@@ -6,22 +6,22 @@ return [
     'version' => '5.0.0-alpha.1',
     'helper_version' => '2.0.0',
     'self_hosted' => env('SELF_HOSTED', true),
-    'autoupdate' => env('AUTOUPDATE', false),
+    'autoupdate' => env('AUTOUPDATE_ENABLED', false),
     'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io/v5.x'),
 
     'migrations' => [
-        'enabled' => env('IS_MIGRATIONS_ENABLED', true),
+        'enabled' => env('MIGRATIONS_ENABLED', true),
     ],
 
     'seeders' => [
-        'enabled' => env('IS_SEEDERS_ENABLED', true),
+        'enabled' => env('SEEDERS_ENABLED', true),
     ],
 
     'scheduler' => [
-        'enabled' => env('IS_SCHEDULER_ENABLED', true),
+        'enabled' => env('SCHEDULER_ENABLED', true),
     ],
 
     'horizon' => [
-        'enabled' => env('IS_HORIZON_ENABLED', true),
+        'enabled' => env('HORIZON_ENABLED', true),
     ],
 ];

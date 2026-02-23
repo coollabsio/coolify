@@ -192,7 +192,7 @@ return [
     */
 
     'defaults' => [
-        ...((bool) env('IS_WORKER_SERVER', false) ? [] : [
+        ...((bool) env('WORKER_SERVER', false) ? [] : [
             'jobs' => [
                 'connection' => 'redis',
                 'queue' => ['high', 'default'],
@@ -220,7 +220,7 @@ return [
                 'workers-name' => 'deployments',
             ],
         ]),
-        ...((bool) env('IS_WORKER_SERVER', false) ? [
+        ...((bool) env('WORKER_SERVER', false) ? [
             'worker-jobs' => [
                 'connection' => 'redis',
                 'queue' => ['worker-high', 'worker-default'],
@@ -252,7 +252,7 @@ return [
 
     'environments' => [
         '*' => [
-            ...((bool) env('IS_WORKER_SERVER', false) ? [] : [
+            ...((bool) env('WORKER_SERVER', false) ? [] : [
                 'jobs' => [
                     'minProcesses' => env('HORIZON_JOBS_MIN_PROCESSES', 1),
                     'maxProcesses' => env('HORIZON_JOBS_MAX_PROCESSES', 4),
@@ -266,7 +266,7 @@ return [
                     'balanceCooldown' => env('HORIZON_DEPLOYMENTS_BALANCE_COOLDOWN', 2),
                 ],
             ]),
-            ...((bool) env('IS_WORKER_SERVER', false) ? [
+            ...((bool) env('WORKER_SERVER', false) ? [
                 'worker-jobs' => [
                     'minProcesses' => env('HORIZON_JOBS_MIN_PROCESSES', 1),
                     'maxProcesses' => env('HORIZON_JOBS_MAX_PROCESSES', 6),
