@@ -1882,6 +1882,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        if ($this->application->build_pack === 'static') {
+            $this->deploy_static_buildpack();
+
+            return;
+        }
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
