@@ -65,6 +65,8 @@ All notable changes to this project will be documented in this file.
 - Completely refactor all database migrations for a cleaner, more consistent and stable database schema
 - Completely refactor all database models
 - Replace hardcoded queue strings with a `ProcessingQueue` enum
+- `config/constants.php` to `config/coolify.php` for all Coolify-specific settings
+- Environment variable naming to be shorter and more consistent
 
 ### Maintenance
 
