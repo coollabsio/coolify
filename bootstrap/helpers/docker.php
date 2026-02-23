@@ -985,7 +985,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?((?!--)[^\s]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
