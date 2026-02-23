@@ -657,8 +657,9 @@ PUSHER_EOF
 
     # Write tunnel config — always include both wildcard levels so manually set app domains
     # at either scope (vps or apex) are routed correctly.
-    # ws. and terminal. hostnames route Soketi WebSocket and terminal services through the
-    # tunnel so the browser can reach them over HTTPS without exposing extra ports.
+    # ws.DOMAIN routes Soketi WebSocket traffic.
+    # Terminal WebSocket uses path /terminal/ws on the dashboard hostname, so this
+    # rule must come before the dashboard catch-all (cloudflared is first-match).
     local extra_apex_ingress=""
     if [[ "${APP_DOMAIN}" != "${CF_ZONE_NAME}" ]]; then
       extra_apex_ingress="  - hostname: \"*.${CF_ZONE_NAME}\"
@@ -671,11 +672,12 @@ credentials-file: /etc/cloudflared/${TUNNEL_ID}.json
 
 ingress:
   - hostname: ${DOMAIN}
+    path: /terminal/ws
+    service: http://localhost:6002
+  - hostname: ${DOMAIN}
     service: http://localhost:8000
   - hostname: ws.${DOMAIN}
     service: http://localhost:6001
-  - hostname: terminal.${DOMAIN}
-    service: http://localhost:6002
   - hostname: "*.${APP_DOMAIN}"
     service: http://localhost:80
 ${extra_apex_ingress}  - service: http_status:404

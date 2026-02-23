@@ -56,6 +56,12 @@ DEPLOY_MATRIX="${PROJECT_ROOT}/docs/deploy_setup_functionality_test_matrix.md"
   ! grep -Fq "<<'INNER'" "${DEPLOY_SCRIPT}"
 }
 
+@test "deploy: tunnel terminal ingress uses dashboard path (not terminal subdomain)" {
+  grep -Fq 'path: /terminal/ws' "${DEPLOY_SCRIPT}"
+  grep -Fq 'service: http://localhost:6002' "${DEPLOY_SCRIPT}"
+  ! grep -Fq 'hostname: terminal.${DOMAIN}' "${DEPLOY_SCRIPT}"
+}
+
 @test "deploy: gate E fails when exposure checks do not pass" {
   grep -Fq "Gate E: Checking dashboard accessibility..." "${DEPLOY_SCRIPT}"
   grep -Fq "Gate E failed: dashboard not reachable via Tailscale" "${DEPLOY_SCRIPT}"

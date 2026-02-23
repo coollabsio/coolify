@@ -115,22 +115,23 @@ unset _i
 # Verify security posture
 log "Verifying bindings..."
 
-BOUND_8000="$(ss -tlnp 2>/dev/null | grep ':8000 ' || true)"
-if [[ -n "${BOUND_8000}" ]]; then
+local bound_8000 bound_6001 bound_6002 public_ip
+bound_8000="$(ss -tlnp 2>/dev/null | grep ':8000 ' || true)"
+if [[ -n "${bound_8000}" ]]; then
   log "PASS: Port 8000 is listening"
 else
   warn "Port 8000 not yet listening. Check: ss -tlnp | grep 8000"
 fi
 
-BOUND_6001="$(ss -tlnp 2>/dev/null | grep ':6001 ' || true)"
-if [[ -n "${BOUND_6001}" ]]; then
+bound_6001="$(ss -tlnp 2>/dev/null | grep ':6001 ' || true)"
+if [[ -n "${bound_6001}" ]]; then
   log "PASS: Port 6001 is listening"
 else
   warn "Port 6001 not yet listening (may start later). Check: ss -tlnp | grep 6001"
 fi
 
-BOUND_6002="$(ss -tlnp 2>/dev/null | grep ':6002 ' || true)"
-if [[ -n "${BOUND_6002}" ]]; then
+bound_6002="$(ss -tlnp 2>/dev/null | grep ':6002 ' || true)"
+if [[ -n "${bound_6002}" ]]; then
   log "PASS: Port 6002 is listening"
 else
   warn "Port 6002 not yet listening (may start later). Check: ss -tlnp | grep 6002"
@@ -138,12 +139,12 @@ fi
 
 # Test that public IP is NOT serving the dashboard (UFW should block it)
 if command -v nc >/dev/null 2>&1; then
-  PUBLIC_IP="$(ip -o route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')"
-  if [[ -n "${PUBLIC_IP}" && "${PUBLIC_IP}" != "${TAILSCALE_IP}" ]]; then
-    if nc -z -w2 "${PUBLIC_IP}" 8000 2>/dev/null; then
-      warn "Port 8000 still appears reachable on public IP ${PUBLIC_IP}. Check UFW rules."
+  public_ip="$(ip -o route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')"
+  if [[ -n "${public_ip}" && "${public_ip}" != "${TAILSCALE_IP}" ]]; then
+    if nc -z -w2 "${public_ip}" 8000 2>/dev/null; then
+      warn "Port 8000 still appears reachable on public IP ${public_ip}. Check UFW rules."
     else
-      log "PASS: Port 8000 not reachable on public IP ${PUBLIC_IP}"
+      log "PASS: Port 8000 not reachable on public IP ${public_ip}"
     fi
   fi
 fi

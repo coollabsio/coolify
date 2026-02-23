@@ -52,6 +52,12 @@ DEPLOY_MATRIX="${PROJECT_ROOT}/docs/deploy_setup_functionality_test_matrix.md"
   grep -Fq "sed '/^PUSHER_HOST=/d; /^PUSHER_PORT=/d; /^PUSHER_SCHEME=/d'" "${SETUP_SCRIPT}"
 }
 
+@test "setup: tunnel terminal ingress uses dashboard path (not terminal subdomain)" {
+  grep -Fq 'path: /terminal/ws' "${SETUP_SCRIPT}"
+  grep -Fq 'service: http://localhost:6002' "${SETUP_SCRIPT}"
+  ! grep -Fq 'hostname: terminal.${DOMAIN}' "${SETUP_SCRIPT}"
+}
+
 @test "setup: gate E requires operator laptop verification" {
   grep -Fq 'Gate E: Operator verifies from laptop' "${SETUP_SCRIPT}"
 }

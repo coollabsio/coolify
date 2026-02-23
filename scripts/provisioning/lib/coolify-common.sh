@@ -49,7 +49,8 @@ prompt_value() {
   local val
   # When --yes is set and a default exists, accept it without prompting
   if is_true "${AUTO_YES}" && [[ -n "${default}" ]]; then
-    eval "${var_name}=\${default}"
+    # Use declare -g for safer variable assignment (bash 4.2+)
+    declare -g "${var_name}=${default}"
     return 0
   fi
   printf '%s' "${prompt}"
@@ -60,7 +61,7 @@ prompt_value() {
   if [[ -n "${regex}" ]] && ! [[ "${val}" =~ ${regex} ]]; then
     die "Invalid input for ${var_name}: '${val}' does not match ${regex}"
   fi
-  eval "${var_name}=\${val}"
+  declare -g "${var_name}=${val}"
 }
 
 prompt_secret() {
@@ -70,7 +71,7 @@ prompt_secret() {
   read -rs val
   printf '\n'
   [[ -n "${val}" ]] || die "${var_name} cannot be empty."
-  eval "${var_name}=\${val}"
+  declare -g "${var_name}=${val}"
 }
 
 prompt_choice() {
@@ -79,7 +80,7 @@ prompt_choice() {
   local options=("$@")
   # When --yes is set, accept the default without prompting
   if is_true "${AUTO_YES}"; then
-    eval "${var_name}=\${default}"
+    declare -g "${var_name}=${default}"
     return 0
   fi
   printf '%s [%s] (%s): ' "${prompt}" "${default}" "$(IFS=/; echo "${options[*]}")"
@@ -90,7 +91,7 @@ prompt_choice() {
     [[ "${val}" == "${opt}" ]] && valid=true
   done
   ${valid} || die "Invalid choice for ${var_name}: '${val}'. Options: ${options[*]}"
-  eval "${var_name}=\${val}"
+  declare -g "${var_name}=${val}"
 }
 
 # ── Cloudflare API ─────────────────────────────────────────────────────────
@@ -323,7 +324,7 @@ print_deployment_summary() {
       && printf '│                   + CNAME *.%-32s│\n' "${CF_ZONE_NAME}"
     printf '│  Tunnel ID        : %-40s│\n' "${TUNNEL_ID}"
     printf '│  WebSocket (Soketi): ws.%-36s│\n' "${DOMAIN} → tunnel"
-    printf '│  Terminal         : terminal.%-31s│\n' "${DOMAIN} → tunnel"
+    printf '│  Terminal         : %-40s│\n' "${DOMAIN}/terminal/ws → tunnel"
   fi
   printf '└─────────────────────────────────────────────────────────────┘\n'
   printf '\n'

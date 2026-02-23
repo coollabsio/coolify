@@ -1716,9 +1716,24 @@ configure_hardening_validation_timer() {
     return 0
   fi
 
-  # Locate validate_hardening.sh relative to this script, with realpath fallback
+  # Locate validate_hardening.sh relative to this script, with multiple fallbacks
   local script_dir validate_src validate_dest
-  script_dir="$(cd "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)" || script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    script_dir="$(cd "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)" || {
+      # Fallback 1: realpath (common on Linux)
+      if command -v realpath >/dev/null 2>&1; then
+        script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")" 2>/dev/null)" || script_dir=""
+      fi
+      # Fallback 2: readlink -f (macOS/BSD)
+      if [[ -z "${script_dir}" ]] && command -v readlink >/dev/null 2>&1; then
+        script_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")"
+      fi
+    }
+  fi
+
+  # Final fallback: use directory of script invocation
+  script_dir="${script_dir:-$(pwd)}"
+
   validate_src="${script_dir}/validate_hardening.sh"
   validate_dest="/usr/local/sbin/validate-hardening"
 
