@@ -1,0 +1,43 @@
+# documentation: https://payloadcms.com/docs
+# slogan: Developer-first headless CMS built with Node.js.
+# category: cms
+# tags: cms, headless, nodejs, mongodb
+# logo: svgs/payloadcms.svg
+# port: 3000
+
+services:
+  payload:
+    image: payloadcms/payload:latest
+    environment:
+      - SERVICE_URL_PAYLOAD_3000
+      - SERVICE_FQDN_PAYLOAD
+      - PAYLOAD_PUBLIC_SERVER_URL=$SERVICE_URL_PAYLOAD
+      - DATABASE_URI=mongodb://mongodb:27017/payload
+      - PAYLOAD_SECRET=$SERVICE_BASE64_64_SECRET
+      - NODE_ENV=production
+    depends_on:
+      mongodb:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:3000/"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  mongodb:
+    image: mongo:7-jammy
+    volumes:
+      - payload-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  payload-mongodb-data:
