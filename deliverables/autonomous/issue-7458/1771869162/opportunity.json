@@ -1,0 +1,18 @@
+{
+  "headline": "GitHub[coollabsio/coolify]: [Bug + Multiple Bounties]: Official Selfhosted Supabase MCP Setup hindered by Coolify AND Bounty List",
+  "url": "https://github.com/coollabsio/coolify/issues/7458",
+  "expected_usd": 35.0,
+  "strategy": "锁定明码 bounty；交付代码+run_log+sample_data，并准备自动交割链接。",
+  "raw_expected": "35.00 USD",
+  "bounty_literal": "$35",
+  "source_line": "## 🚨 发现新商机：GitHub[coollabsio/coolify]: [Bug + Multiple Bounties]: Official Selfhosted Supabase MCP Setup hindered by Coolify AND Bounty List",
+  "kind": "generic_automation",
+  "difficulty": 1.0,
+  "score": 35.0,
+  "oid": "293dfafd59f41c3603224a35b1c5b1ba79bfd82c6577008835cb8f81390bf708",
+  "payout": {
+    "asset": "USDT",
+    "chain": "EVM",
+    "wallet": "0xF57503F99fA20b912200ed90D26d945093136ef5"
+  }
+}
