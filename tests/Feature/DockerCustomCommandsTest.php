@@ -198,3 +198,20 @@ test('ConvertEntrypointSingleQuotedWithDoubleQuotesInside', function () {
         'entrypoint' => 'python -c "print(\"hi\")"',
     ]);
 });
+
+test('ConvertSecurityOptWithHyphenatedValue', function () {
+    $input = '--cap-drop ALL --security-opt no-new-privileges:true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_drop' => ['ALL'],
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+});
+
+test('ConvertSecurityOptWithEqualsSign', function () {
+    $input = '--security-opt=no-new-privileges:true';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['no-new-privileges:true'],
+    ]);
+});
