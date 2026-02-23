@@ -8,25 +8,25 @@
     "license": "AGPL-3.0",
     "require": {
         "php": "^8.5",
-        "laravel/framework": "^12.40.2",
-        "laravel/horizon": "^5.40",
-        "laravel/tinker": "^2.10.2"
+        "laravel/framework": "^12.53.0",
+        "laravel/horizon": "^5.45",
+        "laravel/tinker": "^2.11.1"
     },
     "require-dev": {
-        "driftingly/rector-laravel": "^2.1.4",
+        "driftingly/rector-laravel": "^2.1.9",
         "fakerphp/faker": "^1.24.1",
-        "larastan/larastan": "^3.8.0",
-        "laravel/pail": "^1.2.4",
-        "laravel/pint": "^1.26.0",
+        "larastan/larastan": "^3.9.2",
+        "laravel/pail": "^1.2.6",
+        "laravel/pint": "^1.27.1",
         "mockery/mockery": "^1.6.12",
-        "nunomaduro/collision": "^8.8.3",
-        "pestphp/pest": "^4.1.6",
-        "pestphp/pest-plugin-laravel": "^4.0.0",
+        "nunomaduro/collision": "^8.9.1",
+        "pestphp/pest": "^4.4.1",
+        "pestphp/pest-plugin-laravel": "^4.1.0",
         "pestphp/pest-plugin-type-coverage": "^4.0.3",
-        "phpstan/phpstan-deprecation-rules": "^2.0.3",
-        "phpstan/phpstan-strict-rules": "^2.0.7",
-        "rector/rector": "^2.2.10",
-        "spatie/laravel-ray": "^1.43.1"
+        "phpstan/phpstan-deprecation-rules": "^2.0.4",
+        "phpstan/phpstan-strict-rules": "^2.0.10",
+        "rector/rector": "^2.3.8",
+        "spatie/laravel-ray": "^1.43.6"
     },
     "autoload": {
         "psr-4": {
