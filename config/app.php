@@ -57,6 +57,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Coolify Application Options
+    |--------------------------------------------------------------------------
+    |
+    | These are custom configuration options specific to Coolify. They allow
+    | you to configure the application port and whether HTTPS should be
+    | forced for all requests to the application.
+    |
+    */
+
+    'port' => env('APP_PORT', 8000),
+
+    'force_https' => env('APP_FORCE_HTTPS', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
