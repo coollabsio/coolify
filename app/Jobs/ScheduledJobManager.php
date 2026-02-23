@@ -104,7 +104,7 @@ class ScheduledJobManager implements ShouldQueue
 
         Log::channel('scheduled')->info('ScheduledJobManager completed', [
             'execution_time' => $this->executionTime->toIso8601String(),
-            'duration_ms' => Carbon::now()->diffInMilliseconds($this->executionTime),
+            'duration_ms' => $this->executionTime->diffInMilliseconds(Carbon::now()),
             'dispatched' => $this->dispatchedCount,
             'skipped' => $this->skippedCount,
         ]);

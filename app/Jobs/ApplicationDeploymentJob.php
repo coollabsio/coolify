@@ -251,7 +251,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->application->build_pack === 'dockerfile') {
                 if (data_get($this->application, 'dockerfile_location')) {
-                    $this->dockerfile_location = $this->application->dockerfile_location;
+                    $this->dockerfile_location = $this->validatePathField($this->application->dockerfile_location, 'dockerfile_location');
                 }
             }
         }
@@ -571,7 +571,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function deploy_docker_compose_buildpack()
     {
         if (data_get($this->application, 'docker_compose_location')) {
-            $this->docker_compose_location = $this->application->docker_compose_location;
+            $this->docker_compose_location = $this->validatePathField($this->application->docker_compose_location, 'docker_compose_location');
         }
         if (data_get($this->application, 'docker_compose_custom_start_command')) {
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
@@ -831,7 +831,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         }
         if (data_get($this->application, 'dockerfile_location')) {
-            $this->dockerfile_location = $this->application->dockerfile_location;
+            $this->dockerfile_location = $this->validatePathField($this->application->dockerfile_location, 'dockerfile_location');
         }
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
@@ -3877,6 +3877,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Added build secrets configuration to docker-compose file (using environment variables).');
 
         return $composeFile;
+    }
+
+    private function validatePathField(string $value, string $fieldName): string
+    {
+        if (! preg_match('/^\/[a-zA-Z0-9._\-\/]+$/', $value)) {
+            throw new \RuntimeException("Invalid {$fieldName}: contains forbidden characters.");
+        }
+        if (str_contains($value, '..')) {
+            throw new \RuntimeException("Invalid {$fieldName}: path traversal detected.");
+        }
+
+        return $value;
     }
 
     private function run_pre_deployment_command()
