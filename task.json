@@ -1,0 +1,47 @@
+{
+  "project": "bounty-algora-coollabsio-coolify-7743",
+  "source": "algora",
+  "bounty_id": "algora-coollabsio-coolify-7743",
+  "amount_usd": 100,
+  "repo_url": "https://github.com/coollabsio/coolify",
+  "issue_url": "https://github.com/coollabsio/coolify/issues/7743",
+  "language": "php",
+  "feasibility_score": 0,
+  "recommendation": "unknown",
+  "created_at": "2026-02-23T00:11:53.796819+00:00",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Clone and set up repository from https://github.com/coollabsio/coolify",
+      "passes": false,
+      "steps": [
+        "Clone the repository",
+        "Install dependencies",
+        "Verify the project builds/runs"
+      ]
+    },
+    {
+      "id": 2,
+      "description": "Fix: Don't timeout public database proxies after 10 min",
+      "passes": false,
+      "steps": [
+        "Read and understand the issue: https://github.com/coollabsio/coolify/issues/7743",
+        "Identify the root cause",
+        "Implement the fix",
+        "Write or update tests",
+        "Verify all tests pass"
+      ]
+    },
+    {
+      "id": 3,
+      "description": "Submit pull request",
+      "passes": false,
+      "steps": [
+        "Create a feature branch",
+        "Commit changes with descriptive message",
+        "Push branch and open PR referencing the issue",
+        "Verify CI passes on the PR"
+      ]
+    }
+  ]
+}
