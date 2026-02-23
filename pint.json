@@ -153,21 +153,6 @@
             ],
             "sort_algorithm": "none"
         },
-        "php_unit_assert_new_names": true,
-        "php_unit_construct": true,
-        "php_unit_data_provider_method_order": {
-            "placement": "before"
-        },
-        "php_unit_dedicate_assert": true,
-        "php_unit_dedicate_assert_internal_type": true,
-        "php_unit_expectation": true,
-        "php_unit_mock": true,
-        "php_unit_mock_short_will_return": true,
-        "php_unit_namespaced": true,
-        "php_unit_no_expectation_annotation": true,
-        "php_unit_strict": true,
-        "php_unit_test_annotation": true,
-        "php_unit_test_case_static_method_calls": true,
         "phpdoc_annotation_without_dot": true,
         "phpdoc_line_span": true,
         "phpdoc_no_alias_tag": true,
