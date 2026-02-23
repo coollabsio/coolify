@@ -990,7 +990,7 @@ class Application extends BaseModel
         if (isDev() && data_get($this, 'private_key_id') === 0) {
             return 'deploy_key';
         }
-        if (data_get($this, 'private_key_id')) {
+        if (! is_null(data_get($this, 'private_key_id'))) {
             return 'deploy_key';
         } elseif (data_get($this, 'source')) {
             return 'source';
