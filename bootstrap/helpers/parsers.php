@@ -788,10 +788,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
-                        $source = replaceLocalSource($source, $mainDirectory);
                         if ($isPullRequest) {
-                            $source = addPreviewDeploymentSuffix($source, $pull_request_id);
+                            $mainDirectory = str(addPreviewDeploymentSuffix($mainDirectory, $pull_request_id));
                         }
+                        $source = replaceLocalSource($source, $mainDirectory);
                         LocalFileVolume::updateOrCreate(
                             [
                                 'mount_path' => $target,
