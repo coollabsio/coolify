@@ -95,7 +95,8 @@ All notable changes to this project will be documented in this file.
   - Rename all GitHub Action workflows for improved clarity
   - Cancel in-progress action runs when a new run is triggered
   - Improve `SECURITY.md` formatting and wording and add the support policy for `v5.x`
-  - Refactor the GitHub issue templates to use issue types and improve formatting and wording
+  - Add 3 PR templates: `version.md` for release PRs, `default.md` for non-version PRs and a contributor template as the default for external PRs
+  - Improve the GitHub issue templates to use issue types and improve formatting and wording
   - Move `README.md` assets into `.github/assets/` to more easily exclude them from the core repository code
   - Remove the `chore-remove-labels-and-assignees-on-close.yml` workflow as labels and assignees are now kept when closing issues and PRs
 
