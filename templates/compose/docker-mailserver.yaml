@@ -1,0 +1,37 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/edge/
+# slogan: A fullstack but simple containerized email server solution (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.)
+# category: communication
+# tags: email,smtp,imap,mailserver,self-hosted
+# logo: svgs/mail.svg
+
+services:
+  mailserver:
+    image: docker.io/mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail
+    domainname: ${DOMAIN}
+    environment:
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=1
+      - ENABLE_FAIL2BAN=1
+      - SSL_TYPE=letsencrypt
+      - PERMIT_DOCKER=host
+      - SPOOF_PROTECTION=1
+      - ONE_DIR=1
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - maillogs:/var/log/mail
+      - ./config/:/tmp/docker-mailserver/:ro
+    restart: always
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", " supervisorctl status | grep -E '(postfix|dovecot)' | grep -q RUNNING"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
