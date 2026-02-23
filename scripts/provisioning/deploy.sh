@@ -348,20 +348,14 @@ EOF
   # we cannot open a new root SSH session to run 'tailscale ip -4'. Instead, bootstrap
   # prints 'HARDEN_RESULT_TAILSCALE_IP=<ip>' as the last stdout line; we parse that.
   log "Running bootstrap_hardening.sh (this may take a few minutes)..."
-  local harden_tmp harden_exit_code
+  local harden_tmp
   harden_tmp="$(mktemp)"
 
-  # Capture both stdout and stderr, preserving exit code.
-  # Using a subshell to properly handle pipeline exit status with set -Eeuo pipefail.
-  set +e
-  ssh_root "/root/bootstrap_hardening.sh --env-file /root/deploy.env --install-tailscale --force" \
-    2>&1 | tee "${harden_tmp}"
-  harden_exit_code="${PIPESTATUS[0]}"
-  set -E
-
-  if [[ "${harden_exit_code}" -ne 0 ]]; then
+  # Capture stdout/stderr while preserving failure semantics from the SSH command.
+  if ! ssh_root "/root/bootstrap_hardening.sh --env-file /root/deploy.env --install-tailscale --force" \
+    2>&1 | tee "${harden_tmp}"; then
     rm -f "${harden_tmp}"
-    die "bootstrap_hardening.sh failed (exit code ${harden_exit_code}). Check server logs: /var/log/bootstrap-hardening.log"
+    die "bootstrap_hardening.sh failed. Check server logs: /var/log/bootstrap-hardening.log"
   fi
   pass "Hardening completed"
 
@@ -433,8 +427,8 @@ phase3_docker_coolify() {
     log "Docker already installed — skipping install."
   else
     log "Installing Docker..."
-    # Use bash -c under sudo so the entire pipeline runs as root
-    ssh_admin_sudo 'bash -c "curl -fsSL https://get.docker.com | sh"' \
+    # Use pipefail so curl/network failures are not masked by the shell pipeline.
+    ssh_admin_sudo "bash -o pipefail -c 'curl -fsSL https://get.docker.com | sh'" \
       || die "Docker installation failed."
     pass "Docker installed"
   fi
@@ -453,8 +447,8 @@ phase3_docker_coolify() {
     pass "Coolify already installed"
   else
     log "Installing Coolify (this may take a few minutes)..."
-    # Use bash -c under sudo so the entire pipeline runs as root
-    ssh_admin_sudo 'bash -c "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash"' \
+    # Use pipefail so curl/network failures are not masked by the shell pipeline.
+    ssh_admin_sudo "bash -o pipefail -c 'curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash'" \
       || die "Coolify installation failed."
     pass "Coolify installed"
   fi

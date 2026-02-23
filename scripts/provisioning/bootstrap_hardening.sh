@@ -377,9 +377,9 @@ check_disk_space() {
     return 0
   fi
 
-  # If a stale swapfile exists and will be removed, we can reclaim that space
+  # If a stale swapfile exists and will be removed, we can reclaim that space.
   local swapfile_mb=0
-  if [[ -f /swapfile && ! swapon --show --noheadings | grep -q /swapfile ]]; then
+  if [[ -f /swapfile ]] && ! swapon --show --noheadings 2>/dev/null | grep -q '/swapfile'; then
     swapfile_mb="$(du -m /swapfile 2>/dev/null | cut -f1)" || swapfile_mb=0
   fi
 
@@ -477,6 +477,16 @@ retry_apt_update() {
 
 verify_tailscale_iface() {
   ip link show "${TAILSCALE_IFACE}" >/dev/null 2>&1 || die "Interface ${TAILSCALE_IFACE} not found. Refusing Tailscale-only SSH hardening."
+}
+
+warn_on_state_version_mismatch() {
+  [[ -f "${STATE_FILE}" ]] || return 0
+
+  local existing_version
+  existing_version="$(grep -m1 '^script_version=' "${STATE_FILE}" | cut -d= -f2- || true)"
+  if [[ -n "${existing_version}" && "${existing_version}" != "${SCRIPT_VERSION}" ]]; then
+    warn "Existing hardening state found (v${existing_version}), re-running v${SCRIPT_VERSION}."
+  fi
 }
 
 # Store detected Tailscale IP for split-horizon binding
@@ -651,20 +661,23 @@ configure_coolify_binding() {
 
   if command -v ufw >/dev/null 2>&1; then
     # Idempotent — ufw silently skips duplicate rules
-    local ufw_result
+    local ufw_result ufw_ok=true
     ufw_result="$(ufw allow in on "${TAILSCALE_IFACE}" proto tcp to any port 8000 \
       comment "coolify-hardening-dashboard-tailscale" 2>&1)" || {
       warn "UFW rule for port 8000 on ${TAILSCALE_IFACE} failed: ${ufw_result}"
+      ufw_ok=false
     }
     ufw_result="$(ufw allow in on "${TAILSCALE_IFACE}" proto tcp to any port 6001 \
       comment "coolify-hardening-soketi-tailscale" 2>&1)" || {
       warn "UFW rule for port 6001 on ${TAILSCALE_IFACE} failed: ${ufw_result}"
+      ufw_ok=false
     }
     ufw_result="$(ufw allow in on "${TAILSCALE_IFACE}" proto tcp to any port 6002 \
       comment "coolify-hardening-terminal-tailscale" 2>&1)" || {
       warn "UFW rule for port 6002 on ${TAILSCALE_IFACE} failed: ${ufw_result}"
+      ufw_ok=false
     }
-    log "UFW rules verified for ports 8000, 6001, and 6002 on ${TAILSCALE_IFACE}."
+    is_true "${ufw_ok}" && log "UFW rules verified for ports 8000, 6001, and 6002 on ${TAILSCALE_IFACE}."
   else
     warn "ufw not found — skipping UFW rule verification."
   fi
@@ -1750,6 +1763,7 @@ main() {
   setup_logging
 
   log "Starting ${SCRIPT_NAME} v${SCRIPT_VERSION}"
+  warn_on_state_version_mismatch
   validate_inputs
   detect_os
   check_disk_space

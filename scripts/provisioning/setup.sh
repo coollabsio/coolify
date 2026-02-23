@@ -301,7 +301,7 @@ phase3_docker_coolify() {
     log "Docker already installed — skipping install."
   else
     log "Installing Docker..."
-    curl -fsSL https://get.docker.com | sh \
+    bash -o pipefail -c 'curl -fsSL https://get.docker.com | sh' \
       || die "Docker installation failed."
     pass "Docker installed"
   fi
@@ -320,7 +320,7 @@ phase3_docker_coolify() {
     pass "Coolify already installed"
   else
     log "Installing Coolify (this may take a few minutes)..."
-    curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash \
+    bash -o pipefail -c 'curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash' \
       || die "Coolify installation failed."
     pass "Coolify installed"
   fi

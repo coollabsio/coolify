@@ -152,6 +152,18 @@ cf_get_account_id() {
   log "Cloudflare account ID: ${CF_ACCOUNT_ID}"
 }
 
+cf_expect_success() {
+  local action="$1" resp="$2"
+  local success
+  success="$(printf '%s' "${resp}" | jq -r '.success // false' 2>/dev/null || echo "false")"
+  if [[ "${success}" != "true" ]]; then
+    local err
+    err="$(printf '%s' "${resp}" | jq -r '[.errors[]?.message] | join("; ")' 2>/dev/null || true)"
+    [[ -n "${err}" && "${err}" != "null" ]] || err="unknown"
+    die "${action} failed: ${err}"
+  fi
+}
+
 cf_upsert_a_record() {
   local name="$1" ip="$2" proxied="${3:-true}"
   local existing
@@ -161,12 +173,15 @@ cf_upsert_a_record() {
   local body
   body="$(jq -n --arg name "${name}" --arg ip "${ip}" --argjson proxied "${proxied}" \
     '{type:"A",name:$name,content:$ip,proxied:$proxied,ttl:1}')"
+  local resp
 
   if [[ -n "${record_id}" ]]; then
-    cf_api PUT "/zones/${CF_ZONE_ID}/dns_records/${record_id}" "${body}" >/dev/null
+    resp="$(cf_api PUT "/zones/${CF_ZONE_ID}/dns_records/${record_id}" "${body}")"
+    cf_expect_success "Cloudflare A record update (${name})" "${resp}"
     log "Updated A record: ${name} → ${ip} (proxied=${proxied})"
   else
-    cf_api POST "/zones/${CF_ZONE_ID}/dns_records" "${body}" >/dev/null
+    resp="$(cf_api POST "/zones/${CF_ZONE_ID}/dns_records" "${body}")"
+    cf_expect_success "Cloudflare A record create (${name})" "${resp}"
     log "Created A record: ${name} → ${ip} (proxied=${proxied})"
   fi
 }
@@ -211,12 +226,15 @@ cf_upsert_cname() {
   local body
   body="$(jq -n --arg name "${name}" --arg target "${target}" \
     '{type:"CNAME",name:$name,content:$target,proxied:true,ttl:1}')"
+  local resp
 
   if [[ -n "${record_id}" ]]; then
-    cf_api PUT "/zones/${CF_ZONE_ID}/dns_records/${record_id}" "${body}" >/dev/null
+    resp="$(cf_api PUT "/zones/${CF_ZONE_ID}/dns_records/${record_id}" "${body}")"
+    cf_expect_success "Cloudflare CNAME update (${name})" "${resp}"
     log "Updated CNAME: ${name} → ${target}"
   else
-    cf_api POST "/zones/${CF_ZONE_ID}/dns_records" "${body}" >/dev/null
+    resp="$(cf_api POST "/zones/${CF_ZONE_ID}/dns_records" "${body}")"
+    cf_expect_success "Cloudflare CNAME create (${name})" "${resp}"
     log "Created CNAME: ${name} → ${target}"
   fi
 }

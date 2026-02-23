@@ -3,15 +3,24 @@ set -Eeuo pipefail
 
 # validate_hardening.sh — Standalone health-check companion for bootstrap_hardening.sh
 # Re-runnable: prints PASS/FAIL per check, exits 0 if all pass, 1 if any fail.
-# Usage: sudo ./validate_hardening.sh [--json]
+# Usage: sudo ./validate_hardening.sh [--json|--health-check]
 
 STATE_FILE="/var/lib/bootstrap-hardening/state"
 JOURNALD_DROPIN="/etc/systemd/journald.conf.d/60-persistent.conf"
 JSON_MODE="false"
+HEALTH_CHECK_MODE="false"
 IS_CONTAINER="false"
 
-if [[ "${1:-}" == "--json" ]]; then
-  JSON_MODE="true"
+for arg in "$@"; do
+  case "${arg}" in
+    --json) JSON_MODE="true" ;;
+    --health-check) HEALTH_CHECK_MODE="true" ;;
+  esac
+done
+
+if [[ "${JSON_MODE}" == "true" && "${HEALTH_CHECK_MODE}" == "true" ]]; then
+  printf 'Error: --json and --health-check are mutually exclusive.\n' >&2
+  exit 1
 fi
 
 if [[ -f /.dockerenv || "${container:-}" == "docker" ]]; then
@@ -40,8 +49,10 @@ record() {
     escaped_name="$(printf '%s' "${name}" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')"
     escaped_detail="$(printf '%s' "${detail}" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')"
     RESULTS+=("{\"check\":\"${escaped_name}\",\"status\":\"${status}\",\"detail\":\"${escaped_detail}\"}")
-  else
+  elif [[ "${HEALTH_CHECK_MODE}" != "true" ]]; then
     printf '%-6s %-45s %s\n' "[${status}]" "${name}" "${detail}"
+  else
+    :
   fi
 }
 
@@ -175,6 +186,14 @@ ssh_check() {
 ufw_check() {
   local ufw_out
   ufw_out="$(ufw status verbose 2>/dev/null)" || { record "FAIL" "ufw: status query" "cannot run ufw"; return; }
+  ufw_has_port_on_iface() {
+    local port="$1" iface="$2"
+    grep -qE "${port}/tcp.*(on[[:space:]]+${iface}.*ALLOW IN|ALLOW IN.*on[[:space:]]+${iface})" <<< "${ufw_out}"
+  }
+  ufw_has_port_anywhere_unscoped() {
+    local port="$1"
+    grep -qE "${port}/tcp[[:space:]]+ALLOW IN[[:space:]]+Anywhere([[:space:]]+\\(v6\\))?$" <<< "${ufw_out}"
+  }
 
   if grep -q "^Status: active$" <<< "${ufw_out}"; then
     record "PASS" "ufw: active"
@@ -183,7 +202,7 @@ ufw_check() {
     return
   fi
 
-  if grep -qE "${SSH_PORT}/tcp.*on ${TAILSCALE_IFACE}.*ALLOW IN" <<< "${ufw_out}"; then
+  if ufw_has_port_on_iface "${SSH_PORT}" "${TAILSCALE_IFACE}"; then
     record "PASS" "ufw: SSH on ${TAILSCALE_IFACE}"
   else
     record "FAIL" "ufw: SSH on ${TAILSCALE_IFACE}" "rule missing"
@@ -199,7 +218,7 @@ ufw_check() {
   # Coolify dashboard (8000), Soketi (6001), terminal (6002) on Tailscale only.
   for port_label in "8000:dashboard" "6001:soketi" "6002:terminal"; do
     local port="${port_label%%:*}" label="${port_label##*:}"
-    if grep -qE "${port}/tcp.*on ${TAILSCALE_IFACE}.*ALLOW IN" <<< "${ufw_out}"; then
+    if ufw_has_port_on_iface "${port}" "${TAILSCALE_IFACE}"; then
       record "PASS" "ufw: Coolify ${label} (${port}) on ${TAILSCALE_IFACE}"
     else
       record "FAIL" "ufw: Coolify ${label} (${port})" "port ${port} not allowed on ${TAILSCALE_IFACE}"
@@ -208,7 +227,8 @@ ufw_check() {
 
   if [[ -n "${WAN_IFACE}" ]]; then
     # SSH must not be on WAN
-    if grep -qE "${SSH_PORT}/tcp.*on ${WAN_IFACE}.*ALLOW IN" <<< "${ufw_out}"; then
+    if ufw_has_port_on_iface "${SSH_PORT}" "${WAN_IFACE}" \
+      || ufw_has_port_anywhere_unscoped "${SSH_PORT}"; then
       record "FAIL" "ufw: SSH NOT on WAN" "SSH allowed on ${WAN_IFACE}"
     else
       record "PASS" "ufw: SSH NOT on WAN"
@@ -217,8 +237,8 @@ ufw_check() {
     # Coolify ports must not be on WAN (must only be on tailscale0)
     for port_label in "8000:dashboard" "6001:soketi" "6002:terminal"; do
       local port="${port_label%%:*}" label="${port_label##*:}"
-      if grep -qE "${port}/tcp.*on ${WAN_IFACE}.*ALLOW IN" <<< "${ufw_out}" \
-         || grep -qE "${port}/tcp\s+ALLOW IN\s+Anywhere" <<< "${ufw_out}"; then
+      if ufw_has_port_on_iface "${port}" "${WAN_IFACE}" \
+         || ufw_has_port_anywhere_unscoped "${port}"; then
         record "FAIL" "ufw: ${label} (${port}) NOT on WAN" \
           "port ${port} allowed on WAN — must be tailscale0-only"
       else
@@ -227,12 +247,14 @@ ufw_check() {
     done
 
     if is_true "${TUNNEL_MODE}"; then
-      if grep -qE "80/tcp.*on ${WAN_IFACE}.*ALLOW IN" <<< "${ufw_out}"; then
+      if ufw_has_port_on_iface "80" "${WAN_IFACE}" \
+        || ufw_has_port_anywhere_unscoped "80"; then
         record "FAIL" "ufw: tunnel-mode no port 80" "WAN 80 rule exists"
       else
         record "PASS" "ufw: tunnel-mode no port 80"
       fi
-      if grep -qE "443/tcp.*on ${WAN_IFACE}.*ALLOW IN" <<< "${ufw_out}"; then
+      if ufw_has_port_on_iface "443" "${WAN_IFACE}" \
+        || ufw_has_port_anywhere_unscoped "443"; then
         record "FAIL" "ufw: tunnel-mode no port 443" "WAN 443 rule exists"
       else
         record "PASS" "ufw: tunnel-mode no port 443"
@@ -629,7 +651,8 @@ admin_sudo_check() {
     # non-matching lines (the success case). Capture output first, then count.
     auth_content=$(grep -vE '^(#|[[:space:]]*$|ssh-[a-z0-9-]+[[:space:]]|ecdsa-sha2-[a-z0-9-]+[[:space:]]|sk-[a-z0-9@.-]+[[:space:]])' \
       "${auth_file}" 2>/dev/null) || auth_content=""
-    bad_lines=$(wc -l <<< "${auth_content}" 2>/dev/null || echo "0")
+    # Avoid here-string counting an empty input as one line.
+    bad_lines="$(printf '%s' "${auth_content}" | awk 'END {print NR+0}' 2>/dev/null || echo "0")"
     if [[ "${bad_lines}" -eq 0 ]]; then
       record "PASS" "admin: authorized_keys format"
     else
@@ -1152,7 +1175,7 @@ validate_timer_check() {
 
 [[ "$(id -u)" -eq 0 ]] || { echo "Run as root." >&2; exit 1; }
 
-if [[ "${JSON_MODE}" == "false" ]]; then
+if [[ "${JSON_MODE}" == "false" && "${HEALTH_CHECK_MODE}" != "true" ]]; then
   printf '%-6s %-45s %s\n' "STATUS" "CHECK" "DETAIL"
   printf '%s\n' "--------------------------------------------------------------"
 fi
@@ -1183,7 +1206,14 @@ cloudflared_check
 
 # ── Summary ──
 
-if [[ "${JSON_MODE}" == "true" ]]; then
+if [[ "${HEALTH_CHECK_MODE}" == "true" ]]; then
+  if ((FAIL_COUNT > 0)); then
+    echo "UNHEALTHY"
+    exit 1
+  fi
+  echo "HEALTHY"
+  exit 0
+elif [[ "${JSON_MODE}" == "true" ]]; then
   printf '{"pass":%d,"fail":%d,"info":%d,"checks":[' "${PASS_COUNT}" "${FAIL_COUNT}" "${INFO_COUNT}"
   first="true"
   for r in "${RESULTS[@]}"; do
