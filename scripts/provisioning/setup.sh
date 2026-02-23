@@ -410,7 +410,7 @@ phase4_binding_dns() {
   # Run configure_coolify_binding.sh directly
   log "Binding Coolify dashboard to Tailscale IP..."
   "${SCRIPT_DIR}/configure_coolify_binding.sh" --tailscale-ip "${TS_IP}" \
-    || warn "configure_coolify_binding.sh returned non-zero (may be ok if Coolify is still starting)"
+    || die "configure_coolify_binding.sh failed. Fix binding errors before continuing."
   pass "Dashboard binding configured"
 
   # Set Coolify wildcard domain directly in the database.
@@ -432,25 +432,39 @@ phase4_binding_dns() {
     || warn "psql update failed — set Wildcard Domain manually in Coolify UI > Servers > localhost"
   pass "Coolify wildcard domain: http://${APP_DOMAIN}"
 
-  # In tunnel mode, set PUSHER_* env vars so the browser connects to Soketi via the
-  # tunnel (wss://ws.DOMAIN) instead of trying to reach localhost:6001 directly.
-  # Standard mode does not need this — browser connects to the Tailscale IP on port 6001.
+  # Configure PUSHER_* for the selected mode.
+  # Tunnel mode requires ws.DOMAIN over 443; standard mode must clear tunnel-specific values.
+  log "Reconciling PUSHER env vars for ${DEPLOY_MODE} mode..."
+  local coolify_env="/data/coolify/source/.env"
+  local pusher_tmp
+  pusher_tmp="$(mktemp)"
+  # Remove stale values first (supports mode switches on rerun).
+  sed '/^PUSHER_HOST=/d; /^PUSHER_PORT=/d; /^PUSHER_SCHEME=/d' "${coolify_env}" > "${pusher_tmp}"
+
   if [[ "${DEPLOY_MODE}" == "tunnel" ]]; then
-    log "Setting PUSHER env vars for tunnel-mode WebSocket routing..."
-    local coolify_env="/data/coolify/source/.env"
-    # Idempotent: remove existing PUSHER_HOST/PORT/SCHEME lines, then append
-    sed -i '/^PUSHER_HOST=/d; /^PUSHER_PORT=/d; /^PUSHER_SCHEME=/d' "${coolify_env}"
-    cat >> "${coolify_env}" <<PUSHER_INNER
+    cat >> "${pusher_tmp}" <<PUSHER_INNER
 PUSHER_HOST=ws.${DOMAIN}
 PUSHER_PORT=443
 PUSHER_SCHEME=https
 PUSHER_INNER
-    log "PUSHER env vars written to ${coolify_env}"
-    # Recreate coolify + soketi to pick up the new env (fast — ~10s, no DB/redis restart)
+  fi
+
+  if ! cmp -s "${pusher_tmp}" "${coolify_env}"; then
+    install -m 0644 "${pusher_tmp}" "${coolify_env}"
+    log "PUSHER env updated for mode=${DEPLOY_MODE}"
+    # Apply env changes immediately.
     docker compose -f /data/coolify/source/docker-compose.yml \
                    -f /data/coolify/source/docker-compose.prod.yml \
                    up -d --force-recreate coolify soketi 2>&1 | tail -5
+  else
+    log "PUSHER env unchanged for mode=${DEPLOY_MODE}"
+  fi
+  rm -f "${pusher_tmp}"
+
+  if [[ "${DEPLOY_MODE}" == "tunnel" ]]; then
     pass "PUSHER env vars configured: ws.${DOMAIN}:443 (wss)"
+  else
+    pass "PUSHER env vars cleared for standard mode"
   fi
 
   if [[ "${DEPLOY_MODE}" == "standard" ]]; then

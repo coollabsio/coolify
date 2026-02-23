@@ -74,6 +74,7 @@ WAN_IFACE=""
 TAILSCALE_IFACE="tailscale0"
 BIND_DASHBOARD_TO_TAILSCALE="false"
 TAILSCALE_IP=""
+TAILSCALE_CIDR="100.64.0.0/10"
 COOLIFY_ENV_FILE="/data/coolify/source/.env"
 
 if [[ -f "${STATE_FILE}" ]]; then
@@ -86,6 +87,7 @@ if [[ -f "${STATE_FILE}" ]]; then
   swap_size="${swap_size:-2G}"
   BIND_DASHBOARD_TO_TAILSCALE="${bind_dashboard_to_tailscale:-false}"
   TAILSCALE_IP="${tailscale_ip:-}"
+  TAILSCALE_CIDR="${tailscale_cidr:-100.64.0.0/10}"
 fi
 
 is_true() {
@@ -429,12 +431,12 @@ fail2ban_check() {
   fi
 
   local _jail_file="/etc/fail2ban/jail.d/coolify-hardening.local"
-  if [[ -f "${_jail_file}" ]] && grep -q "100.64.0.0/10" "${_jail_file}"; then
+  if [[ -f "${_jail_file}" ]] && grep -Fq "${TAILSCALE_CIDR}" "${_jail_file}"; then
     record "PASS" "fail2ban: ignoreip includes Tailscale CIDR"
   elif [[ ! -f "${_jail_file}" ]]; then
     record "FAIL" "fail2ban: ignoreip" "jail file missing"
   else
-    record "FAIL" "fail2ban: ignoreip" "100.64.0.0/10 not in ignoreip"
+    record "FAIL" "fail2ban: ignoreip" "${TAILSCALE_CIDR} not in ignoreip"
   fi
 
   # Functional check: verify fail2ban's ban backend is operational.
@@ -644,15 +646,18 @@ admin_sudo_check() {
   elif [[ ! -s "${auth_file}" ]]; then
     record "FAIL" "admin: authorized_keys non-empty" "${auth_file} is empty"
   else
-    # Every non-comment, non-blank line must start with a recognised key type.
-    # A line starting with anything else (e.g. two keys fused together) will fail this check.
-    local bad_lines auth_content
-    # Check each line for valid key format. grep -v exits 1 when it finds no
-    # non-matching lines (the success case). Capture output first, then count.
-    auth_content=$(grep -vE '^(#|[[:space:]]*$|ssh-[a-z0-9-]+[[:space:]]|ecdsa-sha2-[a-z0-9-]+[[:space:]]|sk-[a-z0-9@.-]+[[:space:]])' \
-      "${auth_file}" 2>/dev/null) || auth_content=""
-    # Avoid here-string counting an empty input as one line.
-    bad_lines="$(printf '%s' "${auth_content}" | awk 'END {print NR+0}' 2>/dev/null || echo "0")"
+    # Allow valid key lines with optional OpenSSH options prefix:
+    # from="...",command="...",no-agent-forwarding,... ssh-ed25519 AAAA...
+    # Flag only lines that do not contain a recognized key type token.
+    local bad_lines
+    bad_lines="$(
+      awk '
+        /^[[:space:]]*($|#)/ { next }
+        /(^|[[:space:]])(ssh-[^[:space:]]+|ecdsa-sha2-[^[:space:]]+|sk-[^[:space:]]+)[[:space:]]+/ { next }
+        { bad++ }
+        END { print bad + 0 }
+      ' "${auth_file}" 2>/dev/null
+    )" || bad_lines="0"
     if [[ "${bad_lines}" -eq 0 ]]; then
       record "PASS" "admin: authorized_keys format"
     else
