@@ -19,8 +19,8 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -1101,7 +1101,6 @@ class ApplicationsController extends Controller
                 'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -1297,7 +1296,6 @@ class ApplicationsController extends Controller
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -1525,7 +1523,6 @@ class ApplicationsController extends Controller
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -2470,7 +2467,6 @@ class ApplicationsController extends Controller
             'description' => 'string|nullable',
             'static_image' => 'string',
             'watch_paths' => 'string|nullable',
-            'docker_compose_location' => 'string',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_domains.*' => 'array:name,domain',
             'docker_compose_domains.*.name' => 'string|required',
@@ -2919,10 +2915,7 @@ class ApplicationsController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
-                            ]
+                            ref: '#/components/schemas/EnvironmentVariable'
                         )
                     ),
                 ]

@@ -24,6 +24,7 @@
         "@tailwindcss/typography": "0.5.16",
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
-        "ioredis": "5.6.1"
+        "ioredis": "5.6.1",
+        "playwright": "^1.58.2"
     }
 }

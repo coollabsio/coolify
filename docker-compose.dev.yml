@@ -26,6 +26,8 @@ services:
     volumes:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
+    networks:
+      - coolify
   postgres:
     pull_policy: always
     ports:
