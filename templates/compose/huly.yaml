@@ -1,6 +1,5 @@
-# ignore: true
-# documentation: https://huly.io/
-# category: cms
+# documentation: https://github.com/hcengineering/huly-selfhost
+# category: productivity
 # slogan: Open Source All-in-One Project Management Platform
 # tags: linear,jira,slack,project,management,notion,motion
 # port: 8080
