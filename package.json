@@ -3,7 +3,7 @@
     "private": true,
     "type": "module",
     "dependencies": {
-        "@sveltejs/vite-plugin-svelte": "^6.2.4",
+        "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "svelte": "^5.53.7"
     },
     "devDependencies": {
@@ -11,7 +11,10 @@
         "concurrently": "^9.2.1",
         "laravel-vite-plugin": "^2.1.0",
         "tailwindcss": "^4.2.1",
-        "vite": "^7.3.1"
+        "vite": "^8.0.0-beta.16"
+    },
+    "overrides": {
+        "vite": "8.0.0-beta.16"
     },
     "scripts": {
         "build": "vite build",
