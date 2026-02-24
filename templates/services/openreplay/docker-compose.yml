@@ -1,0 +1,210 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: openreplay-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - nginx-conf:/etc/nginx/conf.d
+    depends_on:
+      - chalice
+      - db
+      - redis
+      - minio
+      - clickhouse
+    networks:
+      - openreplay-network
+
+  chalice:
+    image: openreplay/chalice:latest
+    container_name: openreplay-chalice
+    restart: unless-stopped
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+      - POSTGRES_DB=openreplay
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+    depends_on:
+      - db
+      - redis
+      - minio
+      - clickhouse
+    networks:
+      - openreplay-network
+
+  db:
+    image: postgres:14-alpine
+    container_name: openreplay-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+      - POSTGRES_DB=openreplay
+    volumes:
+      - openreplay-postgres:/var/lib/postgresql/data
+    networks:
+      - openreplay-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: openreplay-redis
+    restart: unless-stopped
+    volumes:
+      - openreplay-redis:/data
+    networks:
+      - openreplay-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: openreplay-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minio123}
+    volumes:
+      - openreplay-minio:/data
+    networks:
+      - openreplay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: openreplay-clickhouse
+    restart: unless-stopped
+    volumes:
+      - openreplay-clickhouse:/var/lib/clickhouse
+    networks:
+      - openreplay-network
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    image: openreplay/frontend:latest
+    container_name: openreplay-frontend
+    restart: unless-stopped
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+    depends_on:
+      - chalice
+    networks:
+      - openreplay-network
+
+  peers:
+    image: openreplay/peers:latest
+    container_name: openreplay-peers
+    restart: unless-stopped
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    networks:
+      - openreplay-network
+
+  assets:
+    image: openreplay/assets:latest
+    container_name: openreplay-assets
+    restart: unless-stopped
+    environment:
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+    depends_on:
+      - minio
+    networks:
+      - openreplay-network
+
+  http:
+    image: openreplay/http:latest
+    container_name: openreplay-http
+    restart: unless-stopped
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+    depends_on:
+      - minio
+    networks:
+      - openreplay-network
+
+  sink:
+    image: openreplay/sink:latest
+    container_name: openreplay-sink
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - clickhouse
+      - redis
+    networks:
+      - openreplay-network
+
+  storage:
+    image: openreplay/storage:latest
+    container_name: openreplay-storage
+    restart: unless-stopped
+    environment:
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+    depends_on:
+      - minio
+      - clickhouse
+    networks:
+      - openreplay-network
+
+volumes:
+  nginx-conf:
+  openreplay-postgres:
+  openreplay-redis:
+  openreplay-minio:
+  openreplay-clickhouse:
+
+networks:
+  openreplay-network:
+    driver: bridge

@@ -1,0 +1,72 @@
+{
+  "name": "OpenReplay",
+  "description": "Self-hosted session replay and analytics platform",
+  "logo": "https://avatars.githubusercontent.com/u/50668931",
+  "categories": ["Monitoring", "Analytics", "Developer Tools"],
+  "tags": ["session-replay", "analytics", "privacy", "self-hosted"],
+  "version": "1.0.0",
+  "author": "openreplay",
+  "repository": "https://github.com/openreplay/openreplay",
+  "documentation": "https://docs.openreplay.com",
+  "minResources": {
+    "cpu": 2,
+    "memory": 8192,
+    "storage": 51200
+  },
+  "environmentVariables": {
+    "DOMAIN_NAME": {
+      "description": "Domain name for OpenReplay (e.g., openreplay.yourdomain.com)",
+      "required": true,
+      "default": "localhost"
+    },
+    "POSTGRES_PASSWORD": {
+      "description": "PostgreSQL database password",
+      "required": true,
+      "default": "change_me_in_production"
+    },
+    "MINIO_ACCESS_KEY": {
+      "description": "MinIO access key",
+      "required": true,
+      "default": "minio"
+    },
+    "MINIO_SECRET_KEY": {
+      "description": "MinIO secret key",
+      "required": true,
+      "default": "minio123"
+    }
+  },
+  "ports": [
+    {
+      "port": 8080,
+      "name": "Web UI",
+      "description": "OpenReplay web interface"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "openreplay-postgres",
+      "description": "PostgreSQL database data"
+    },
+    {
+      "name": "openreplay-redis",
+      "description": "Redis cache data"
+    },
+    {
+      "name": "openreplay-minio",
+      "description": "MinIO object storage data"
+    },
+    {
+      "name": "openreplay-clickhouse",
+      "description": "ClickHouse analytics data"
+    }
+  ],
+  "postInstallation": {
+    "message": "OpenReplay is being deployed. This may take a few minutes.",
+    "steps": [
+      "Wait for all services to be healthy",
+      "Access OpenReplay at http://your-domain:8080",
+      "Create an account at /signup",
+      "Install the tracker in your application"
+    ]
+  }
+}
