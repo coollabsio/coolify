@@ -28,7 +28,12 @@ class Index extends Component
 
     public ?string $pull_request_id = null;
 
-    protected $queryString = ['pull_request_id'];
+    // New filters
+    public ?string $status_filter = null;
+    public ?string $source_filter = null;
+    public ?string $server_filter = null;
+
+    protected $queryString = ['pull_request_id', 'status_filter', 'source_filter', 'server_filter'];
 
     public function getListeners()
     {
@@ -64,7 +69,7 @@ class Index extends Component
             }
         }
 
-        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, $this->defaultTake, $this->pull_request_id);
+        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, $this->defaultTake, $this->pull_request_id, $this->status_filter, $this->source_filter, $this->server_filter);
         $this->application = $application;
         $this->deployments = $deployments;
         $this->deployments_count = $count;
@@ -116,7 +121,7 @@ class Index extends Component
 
     public function loadDeployments()
     {
-        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->defaultTake, $this->pull_request_id);
+        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->defaultTake, $this->pull_request_id, $this->status_filter, $this->source_filter, $this->server_filter);
         $this->deployments = $deployments;
         $this->deployments_count = $count;
         $this->showMore();
@@ -149,6 +154,33 @@ class Index extends Component
     public function clearFilter()
     {
         $this->pull_request_id = null;
+        $this->status_filter = null;
+        $this->source_filter = null;
+        $this->server_filter = null;
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
+    }
+
+    public function updatedStatusFilter($value)
+    {
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
+    }
+
+    public function updatedSourceFilter($value)
+    {
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
+    }
+
+    public function updatedServerFilter($value)
+    {
         $this->skip = 0;
         $this->showPrev = false;
         $this->updateCurrentPage();

@@ -28,8 +28,24 @@
         </div>
         <form class="flex items-end gap-2">
             <x-forms.input id="pull_request_id" type="number" min="1" label="Pull Request Id"></x-forms.input>
+            <x-forms.select id="status_filter" label="Status" wire:change="updatedStatusFilter">
+                <option value="">All Status</option>
+                <option value="in_progress">In Progress</option>
+                <option value="queued">Queued</option>
+                <option value="finished">Finished</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled-by-user">Cancelled</option>
+            </x-forms.select>
+            <x-forms.select id="source_filter" label="Source" wire:change="updatedSourceFilter">
+                <option value="">All Sources</option>
+                <option value="manual">Manual</option>
+                <option value="webhook">Webhook</option>
+                <option value="pull_request">Pull Request</option>
+                <option value="api">API</option>
+                <option value="rollback">Rollback</option>
+            </x-forms.select>
             <x-forms.button type="submit">Filter</x-forms.button>
-            @if ($pull_request_id)
+            @if ($pull_request_id || $status_filter || $source_filter)
                 <x-forms.button type="button" wire:click="clearFilter">Clear</x-forms.button>
             @endif
         </form>

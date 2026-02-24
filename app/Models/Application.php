@@ -945,12 +945,43 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
     }
 
-    public function deployments(int $skip = 0, int $take = 10, ?string $pullRequestId = null)
+    public function deployments(int $skip = 0, int $take = 10, ?string $pullRequestId = null, ?string $status = null, ?string $source = null, ?string $server = null)
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
 
         if ($pullRequestId) {
             $deployments = $deployments->where('pull_request_id', $pullRequestId);
+        }
+
+        // Filter by status
+        if ($status) {
+            $deployments = $deployments->where('status', $status);
+        }
+
+        // Filter by source (webhook, pull_request, api, manual, rollback)
+        if ($source) {
+            switch ($source) {
+                case 'webhook':
+                    $deployments = $deployments->where('is_webhook', true);
+                    break;
+                case 'pull_request':
+                    $deployments = $deployments->whereNotNull('pull_request_id');
+                    break;
+                case 'api':
+                    $deployments = $deployments->where('is_api', true);
+                    break;
+                case 'rollback':
+                    $deployments = $deployments->where('rollback', true);
+                    break;
+                case 'manual':
+                    $deployments = $deployments->where('is_webhook', false)->whereNull('pull_request_id')->where('is_api', false)->where('rollback', false);
+                    break;
+            }
+        }
+
+        // Filter by server
+        if ($server) {
+            $deployments = $deployments->where('server_name', $server);
         }
 
         $count = $deployments->count();
