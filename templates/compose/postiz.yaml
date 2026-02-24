@@ -5,9 +5,12 @@
 # logo: svgs/postiz.svg
 # port: 5000
 
+configs:
+  temporal-dynamicconfig:
+    content: "system.forceSearchAttributesCacheRefreshOnRead:\n  - value: true\n    constraints: {}\nlimit.maxIDLength:\n  - value: 255\n    constraints: {}\nfrontend.keepAliveMaxConnectionAge:\n  - value: 5m\n    constraints: {}\nfrontend.keepAliveMaxConnectionAgeGrace:\n  - value: 70s\n    constraints: {}\nfrontend.enableReadVisibilityFromES:\n  - value: true\n    constraints:\n      namespace: default\nhistory.defaultActivityRetryPolicy:\n  - value:\n      InitialIntervalInSeconds: 1\n      MaximumIntervalCoefficient: 100.0\n      BackoffCoefficient: 2.0\n      MaximumAttempts: 0\n"
 services:
   postiz:
-    image: ghcr.io/gitroomhq/postiz-app:v2.10.1
+    image: ghcr.io/gitroomhq/postiz-app:v2.19.0
     environment:
       - SERVICE_URL_POSTIZ_5000
       - MAIN_URL=${SERVICE_URL_POSTIZ}
@@ -17,6 +20,9 @@ services:
       - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
       - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
       - BACKEND_INTERNAL_URL=http://localhost:3000
+      - TEMPORAL_ADDRESS=temporal:7233
+      - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-false}
+      - RUN_CRON=${RUN_CRON:-true}
 
       # Cloudflare R2 Settings
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
@@ -78,7 +84,7 @@ services:
       # Misc Settings
       - NEXT_PUBLIC_DISCORD_SUPPORT=${NEXT_PUBLIC_DISCORD_SUPPORT}
       - NEXT_PUBLIC_POLOTNO=${NEXT_PUBLIC_POLOTNO}
-      - IS_GENERAL=true
+      - IS_GENERAL=${IS_GENERAL:-true}
       - NX_ADD_PLUGINS=${NX_ADD_PLUGINS:-false}
       - NOT_SECURED=${NOT_SECURED:-false}
 
@@ -88,10 +94,15 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_SIGNING_KEY=${STRIPE_SIGNING_KEY}
       - STRIPE_SIGNING_KEY_CONNECT=${STRIPE_SIGNING_KEY_CONNECT}
-
+    
+    expose:
+      - 5000 
     volumes:
       - postiz_config:/config/
       - postiz_uploads:/uploads/
+    networks:
+      - postiz-network
+      - temporal-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,13 +111,13 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - wget -qO- http://127.0.0.1:5000/
+        - "node -e \"require('http').get('http://localhost:5000/', (r) => { process.exit(r.statusCode < 400 ? 0 : 1) }).on('error', () => process.exit(1))\""
       interval: 5s
       timeout: 20s
       retries: 10
 
   postgres:
-    image: postgres:14.5
+    image: postgres:17-alpine
     volumes:
       - postiz_postgresql_data:/var/lib/postgresql/data
     environment:
@@ -136,3 +147,92 @@ services:
       interval: 5s
       timeout: 10s
       retries: 20
+  spotlight:
+    pull_policy: always
+    container_name: spotlight
+    ports:
+      - '8969:8969/tcp'
+    image: 'ghcr.io/getsentry/spotlight:latest'
+    networks:
+      - postiz-network
+  temporal-elasticsearch:
+    container_name: temporal-elasticsearch
+    image: 'elasticsearch:7.17.27'
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - 'ES_JAVA_OPTS=-Xms256m -Xmx256m'
+      - xpack.security.enabled=false
+    networks:
+      - temporal-network
+    expose:
+      - 9200
+    volumes:
+      - 'temporal_es_data:/var/lib/elasticsearch/data'
+  temporal-postgresql:
+    container_name: temporal-postgresql
+    image: 'postgres:16'
+    environment:
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+    networks:
+      - temporal-network
+    expose:
+      - 5432
+    volumes:
+      - 'temporal_pg_data:/var/lib/postgresql/data'
+  temporal:
+    container_name: temporal
+    ports:
+      - '7233:7233'
+    image: 'temporalio/auto-setup:1.28.1'
+    configs:
+      -
+        source: temporal-dynamicconfig
+        target: /etc/temporal/config/dynamicconfig/development-sql.yaml
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PWD=${SERVICE_PASSWORD_POSTGRES}'
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - ENABLE_ES=true
+      - ES_SEEDS=temporal-elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_NAMESPACE=default
+    networks:
+      - temporal-network
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    image: 'temporalio/admin-tools:1.28.1-tctl-1.18.4-cli-1.4.1'
+    environment:
+      - 'TEMPORAL_ADDRESS=temporal:7233'
+      - 'TEMPORAL_CLI_ADDRESS=temporal:7233'
+    networks:
+      - temporal-network
+    stdin_open: true
+    depends_on:
+      - temporal
+    tty: true
+  temporal-ui:
+    container_name: temporal-ui
+    image: 'temporalio/ui:2.34.0'
+    environment:
+      - 'TEMPORAL_ADDRESS=temporal:7233'
+      - 'TEMPORAL_CORS_ORIGINS=http://localhost:3000'
+    networks:
+      - temporal-network
+    ports:
+      - '8082:8080'
+networks:
+  postiz-network:
+    external: false
+  temporal-network:
+    driver: bridge
