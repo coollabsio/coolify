@@ -96,21 +96,33 @@ function format_docker_labels_to_json(string|array $rawOutput): Collection
     if (is_array($rawOutput)) {
         return collect($rawOutput);
     }
-    $outputLines = explode(PHP_EOL, $rawOutput);
+    $outputLines = collect(explode(PHP_EOL, $rawOutput))
+        ->reject(fn ($line) => empty($line));
 
-    return collect($outputLines)
-        ->reject(fn ($line) => empty($line))
+    if ($outputLines->isEmpty()) {
+        return collect([]);
+    }
+
+    return $outputLines
         ->map(function ($outputLine) {
             $outputArray = explode(',', $outputLine);
 
             return collect($outputArray)
                 ->map(function ($outputLine) {
-                    return explode('=', $outputLine);
+                    return explode('=', $outputLine, 2);
                 })
                 ->mapWithKeys(function ($outputLine) {
-                    return [$outputLine[0] => $outputLine[1]];
+                    $key = $outputLine[0] ?? null;
+                    $value = $outputLine[1] ?? '';
+
+                    if (empty($key)) {
+                        return [];
+                    }
+
+                    return [$key => $value];
                 });
-        })[0];
+        })
+        ->first() ?? collect([]);
 }
 
 function format_docker_envs_to_json($rawOutput)
