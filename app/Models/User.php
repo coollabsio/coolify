@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
- * @property int $id
- * @property string $name
- * @property string $email
- * @property CarbonInterface|null $email_verified_at
- * @property string $password
- * @property CarbonInterface $created_at
- * @property CarbonInterface $updated_at
+ * @property-read int $id
+ * @property-read string $name
+ * @property-read string $email
+ * @property-read CarbonInterface|null $email_verified_at
+ * @property-read string $password
+ * @property-read CarbonInterface $created_at
+ * @property-read CarbonInterface $updated_at
  */
 final class User extends Authenticatable
 {
@@ -29,7 +29,6 @@ final class User extends Authenticatable
      */
     protected $hidden = [
         'password',
-        'remember_token',
     ];
 
     /**
@@ -40,8 +39,13 @@ final class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'id' => 'int',
+            'name' => 'string',
+            'email' => 'string',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 }
