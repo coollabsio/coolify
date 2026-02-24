@@ -18,8 +18,10 @@ parameters:
     tipsOfTheDay: false
     
     # Additional Larastan Rules
+    enableMigrationCache: true
     noUnnecessaryEnumerableToArrayCalls: true
     checkModelProperties: true
+    parseModelCastsMethod: true
     checkOctaneCompatibility: true
     checkModelMethodVisibility: true
     checkAuthCallsWhenInRequestScope: true

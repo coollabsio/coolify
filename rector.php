@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
-use Rector\CodingStyle\Rector\ClassLike\NewlineBetweenClassLikeStmtsRector;
 use Rector\Config\RectorConfig;
 use Rector\Php80\Rector\NotIdentical\MbStrContainsRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Php85\Rector\Expression\NestedFuncCallsToPipeOperatorRector;
+use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\Php85\Rector\StmtsAwareInterface\SequentialAssignmentsToPipeOperatorRector;
 use RectorLaravel\Rector\Class_\RemoveModelPropertyFromFactoriesRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
 use RectorLaravel\Rector\FuncCall\ConfigToTypedConfigMethodCallRector;
 use RectorLaravel\Rector\FuncCall\RemoveDumpDataDeadCodeRector;
-use RectorLaravel\Rector\MethodCall\WhereToWhereLikeRector;
+use RectorLaravel\Rector\MethodCall\WhereNullComparisonToWhereNullRector;
 use RectorLaravel\Rector\StaticCall\RequestStaticValidateToInjectRector;
 use RectorLaravel\Set\LaravelSetList;
 use RectorLaravel\Set\LaravelSetProvider;
@@ -32,7 +32,7 @@ return RectorConfig::configure()
     ->withSkip([
         __DIR__.'/bootstrap/cache',
         AddOverrideAttributeToOverriddenMethodsRector::class,
-        NewlineBetweenClassLikeStmtsRector::class,
+        AddOverrideAttributeToOverriddenPropertiesRector::class,
     ])
     ->withCache(__DIR__.'/storage/rector', FileCacheStorage::class)
     ->withPhpSets()
@@ -42,7 +42,7 @@ return RectorConfig::configure()
         codeQuality: true,
         codingStyle: true,
         typeDeclarations: true,
-        typeDeclarationDocblocks: true,
+        // typeDeclarationDocblocks: true,
         privatization: true,
         instanceOf: true,
         earlyReturn: true,
@@ -75,13 +75,11 @@ return RectorConfig::configure()
         ConfigToTypedConfigMethodCallRector::class,
         RemoveModelPropertyFromFactoriesRector::class,
         RequestStaticValidateToInjectRector::class,
+        WhereNullComparisonToWhereNullRector::class,
     ])
     ->withConfiguredRule(RemoveDumpDataDeadCodeRector::class, [
         'dd',
         'ddd',
         'dump',
         'ray',
-    ])
-    ->withConfiguredRule(WhereToWhereLikeRector::class, [
-        WhereToWhereLikeRector::USING_POSTGRES_DRIVER => true,
     ]);

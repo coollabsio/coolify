@@ -6,6 +6,7 @@
         },
         "array_push": true,
         "assign_null_coalescing_to_coalesce_equal": true,
+        "attribute_block_no_spaces": true,
         "attribute_empty_parentheses": {
             "use_parentheses": false
         },
@@ -64,6 +65,7 @@
         "logical_operators": true,
         "long_to_shorthand_operator": true,
         "mb_str_functions": true,
+        "modern_serialization_methods": true,
         "modernize_strpos": {
             "modernize_stripos": true
         },
@@ -96,6 +98,7 @@
         },
         "no_homoglyph_names": true,
         "no_php4_constructor": true,
+        "no_redundant_readonly_property": true,
         "no_superfluous_elseif": true,
         "no_unneeded_braces": {
             "namespaces": true
@@ -150,28 +153,20 @@
             ],
             "sort_algorithm": "none"
         },
-        "php_unit_assert_new_names": true,
-        "php_unit_construct": true,
-        "php_unit_data_provider_method_order": {
-            "placement": "before"
-        },
-        "php_unit_dedicate_assert": true,
-        "php_unit_dedicate_assert_internal_type": true,
-        "php_unit_expectation": true,
-        "php_unit_mock": true,
-        "php_unit_mock_short_will_return": true,
-        "php_unit_namespaced": true,
-        "php_unit_no_expectation_annotation": true,
-        "php_unit_strict": true,
-        "php_unit_test_annotation": true,
-        "php_unit_test_case_static_method_calls": true,
         "phpdoc_annotation_without_dot": true,
-        "phpdoc_no_alias_tag": true,
+        "phpdoc_line_span": true,
+        "phpdoc_no_alias_tag": {
+            "replacements": {
+                "type": "var",
+                "link": "see"
+            }
+        },
         "phpdoc_no_empty_return": true,
         "phpdoc_return_self_reference": true,
         "phpdoc_scalar": true,
         "phpdoc_tag_casing": true,
         "phpdoc_trim_consecutive_blank_line_separation": true,
+        "phpdoc_types_no_duplicates": true,
         "phpdoc_types_order": {
             "null_adjustment": "always_last"
         },
@@ -189,6 +184,7 @@
         "strict_param": true,
         "string_length_to_empty": true,
         "string_line_ending": true,
+        "stringable_for_to_string": true,
         "ternary_to_null_coalescing": true,
         "trailing_comma_in_multiline": {
             "elements": [

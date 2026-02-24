@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
       - name: Manage stale threads (Issues & PRs)
-        uses: actions/stale@5f858e3efba33a5ca4407a664cc011ad407f2008 # https://github.com/actions/stale/releases/tag/v10.1.0
+        uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # https://github.com/actions/stale/releases/tag/v10.2.0
         with:
           stale-issue-message: |
             This issue has been marked as stale due to inactivity. It will be automatically closed in 7 days if no update is received.
