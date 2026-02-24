@@ -96,7 +96,17 @@ body {
 }
 
 body {
-    @apply min-h-screen text-sm antialiased scrollbar;
+    @apply min-h-screen text-sm antialiased scrollbar overflow-x-hidden;
+}
+
+.coolify-monaco-editor {
+    @apply min-w-0 w-full;
+    overflow-x: hidden;
+}
+
+.coolify-monaco-editor .monaco-editor,
+.coolify-monaco-editor .overflow-guard {
+    max-width: 100%;
 }
 
 option {

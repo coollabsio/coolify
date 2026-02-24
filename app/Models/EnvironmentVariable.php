@@ -123,6 +123,12 @@ class EnvironmentVariable extends BaseModel
                 }
 
                 $real_value = $this->get_real_environment_variables($this->value, $resource);
+
+                // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+                if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
+                    return $real_value;
+                }
+
                 if ($this->is_literal || $this->is_multiline) {
                     $real_value = '\''.$real_value.'\'';
                 } else {

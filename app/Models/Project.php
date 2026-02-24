@@ -15,12 +15,6 @@ use Visus\Cuid2\Cuid2;
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
         'description' => ['type' => 'string'],
-        'environments' => new OA\Property(
-            property: 'environments',
-            type: 'array',
-            items: new OA\Items(ref: '#/components/schemas/Environment'),
-            description: 'The environments of the project.'
-        ),
     ]
 )]
 class Project extends BaseModel

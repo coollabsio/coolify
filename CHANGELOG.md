@@ -1170,7 +1170,27 @@ All notable changes to this project will be documented in this file.
 - *(service)* Upgrade docker registry template (#7034)
 - *(service)* Add esphome template (#6532)
 - *(service)* Add hatchet template (#6711)
-- *(service)* Improve sftpgo
+- *(service)* Add sftpgo template (#6415)
+- *(service)* Add cloudreve template (#6774)
+- *(service)* Add silverbullet template (#6425)
+- *(ui)* Add port mapping format to helper and fix typo
+- *(service)* Add nocobase template (#7347)
+- *(api)* Allow to escape special characters in labels (#7886)
+- *(service)* Upgrade trigger template to v4 (#7808)
+- *(service)* Add redmine template (#6429)
+- *(service)* Add autobase template (#6299)
+- *(service)* Add uptime kuma v2 with mysql
+- *(service)* Add uptime kuma with mariadb template (#7256)
+- *(service)* Add calibre web automated with downloader template (#6419)
+- *(service)* Improve matrix templates (#7560)
+- *(service)* Add booklore template (#7838)
+- *(service)* Add seaweedfs template (#7617)
+- Add application logs link to preview deployments PR comment (#7906)
+- *(api)* Add tag filtering on the applications list endpoint (#7360)
+- *(service)* Update autobase to version 2.5 (#7923)
+- *(service)* Add chibisafe template (#5808)
+- *(ui)* Improve sidebar menu items styling (#7928)
+- *(service)* Improve open-archiver
 
 ### 🐛 Bug Fixes
 
@@ -3753,7 +3773,6 @@ All notable changes to this project will be documented in this file.
 - *(scheduling)* Change redis cleanup command frequency from hourly to weekly for better resource management
 - *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.5 and 4.0.0-beta.420.6
 - *(database)* Ensure internal port defaults correctly for unsupported database types in StartDatabaseProxy
-- *(git)* Tracking issue due to case sensitivity
 - *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.6 and 4.0.0-beta.420.7
 - *(scheduling)* Remove unnecessary padding from scheduled task form layout for improved UI consistency
 - *(horizon)* Update queue configuration to use environment variable for dynamic queue management
@@ -3777,6 +3796,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Triliumnext platform and link
 - *(application)* Update service environment variables when generating domain for Docker Compose
 - *(application)* Add option to suppress toast notifications when loading compose file
+- *(git)* Tracking issue due to case sensitivity
 - *(git)* Tracking issue due to case sensitivity
 - *(git)* Tracking issue due to case sensitivity
 - *(ui)* Delete button width on small screens (#6308)
@@ -4371,6 +4391,37 @@ All notable changes to this project will be documented in this file.
 - Disable prepared statements for PgBouncer compatibility
 - Make PgBouncer prepared statement disabling configurable
 - Make PgBouncer prepared statement disabling configurable (#7876)
+- *(service)* Add instagram envs to postiz template (#6424)
+- *(service)* Use fqdn for server host in sequin template (#6528)
+- *(service)* Wireguard easy host to use fqdn (#7354)
+- *(log)* Preserve leading whitespace in logs (#7879)
+- *(docs)* Remove environments from projects endpoint
+- Instance public ips initialization validation (#7762)
+- *(ui)* Instance public ips ui validation
+- Cast docker version to int for proper comparison (#7760)
+- *(docs)* Api docs for bulk env update response (#7714)
+- Db public port instant save and simplify if condition (#7883)
+- *(ui)* Empty network destinations when cloning a resource (#7309)
+- *(env)* Custom environment variable sorting (#7887)
+- *(service)* Budibase worker envs
+- *(docker)* Add fallback for Docker Swarm container labels
+- Prevent timing attack in GitLab webhook token validation
+- GitLab webhook validation (#7899)
+- *(service)* Supabase studio fails to load schemas
+- *(git)* Trigger deployments when watch_paths is empty
+- *(backup)* Database restores with custom db name
+- *(service)* Twenty template (#6996)
+- *(docker)* Use dynamic OS ID for Docker repository URL
+- *(docker)* Use dynamic OS ID for Docker repository URL (#7907)
+- *(scripts)* Add jean run
+- *(service)* Signoz metrics env (#7927)
+- *(ui)* Hide already registered button when there are 0 users (#7918)
+- *(api)* Add custom_network_aliases to allowed fields
+- *(api)* Create service validation and docs
+- *(api)* Create service endpoint validation and docs (#7916)
+- *(api)* Deprecate applications compose endpoint
+- *(api)* Applications post and patch endpoints
+- *(api)* Applications create and patch endpoints (#7917)
 
 ### 💼 Other
 
@@ -5455,6 +5506,10 @@ All notable changes to this project will be documented in this file.
 - *(server)* Remove unused destinationsByServer method
 - *(service)* Improve evolution-api
 - Remove duplicated validation messages
+- *(service)* Remove unused envs from hoppscotch (#6513)
+- Move all env sorting to one place
+- *(api)* Make docker_compose_raw description more clear
+- *(api)* Update application create endpoints docs
 
 ### 📚 Documentation
 
@@ -5561,6 +5616,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - *(tests)* Update testing guidelines for unit and feature tests
 - *(sync)* Create AI Instructions Synchronization Guide and update CLAUDE.md references
+- Update changelog
 - *(database-patterns)* Add critical note on mass assignment protection for new columns
 - Clarify cloud-init script compatibility
 - Update changelog
@@ -5589,6 +5645,8 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Replace brittle line number references with maintainable method descriptions
 - Update application architecture and database patterns for request-level caching best practices
+- Remove git worktree symlink instructions from CLAUDE.md
+- Remove git worktree symlink instructions from CLAUDE.md (#7908)
 - Update changelog
 
 ### ⚡ Performance
@@ -6235,10 +6293,10 @@ All notable changes to this project will be documented in this file.
 - *(versions)* Update Coolify versions to 4.0.0-beta.420.2 and 4.0.0-beta.420.3 in multiple files
 - *(versions)* Bump coolify and nightly versions to 4.0.0-beta.420.3 and 4.0.0-beta.420.4 respectively
 - *(versions)* Update coolify and nightly versions to 4.0.0-beta.420.4 and 4.0.0-beta.420.5 respectively
-- *(bump)* Update composer deps
-- *(version)* Bump Coolify version to 4.0.0-beta.420.6
 - *(service)* Update Nitropage template (#6181)
 - *(versions)* Update all version
+- *(bump)* Update composer deps
+- *(version)* Bump Coolify version to 4.0.0-beta.420.6
 - *(service)* Improve matrix service
 - *(service)* Format runner service
 - *(service)* Improve sequin
@@ -6334,6 +6392,13 @@ All notable changes to this project will be documented in this file.
 - *(service)* Improve n8n v2
 - *(services)* Update service json
 - *(service)* Change sqlite pool size to v2 default
+- *(service)* Improve mosquitto template (#6227)
+- *(services)* Update service json
+- Remove raw sql from env relationship
+- *(service)* Improve uptime kuma
+- *(services)* Upgrade service template json files
+- *(api)* Update openapi json and yaml
+- *(api)* Regenerate openapi docs
 
 ### ◀️ Revert
 

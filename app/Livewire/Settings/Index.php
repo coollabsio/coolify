@@ -14,7 +14,7 @@ class Index extends Component
 
     public ?Server $server = null;
 
-    #[Validate('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
     #[Validate('required|integer|min:1025|max:65535')]
@@ -26,10 +26,10 @@ class Index extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $instance_name = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv4')]
     public ?string $public_ipv4 = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv6')]
     public ?string $public_ipv6 = null;
 
     #[Validate('required|string|timezone')]
@@ -45,6 +45,11 @@ class Index extends Component
     public bool $forceSaveDomains = false;
 
     public $buildActivityId = null;
+
+    protected array $messages = [
+        'fqdn.url' => 'Invalid instance URL.',
+        'fqdn.max' => 'URL must not exceed 255 characters.',
+    ];
 
     public function render()
     {

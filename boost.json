@@ -1,0 +1,23 @@
+{
+    "agents": [
+        "cursor",
+        "claude_code",
+        "codex",
+        "opencode"
+    ],
+    "guidelines": true,
+    "herd_mcp": false,
+    "mcp": true,
+    "packages": [
+        "laravel/fortify",
+        "spatie/laravel-ray"
+    ],
+    "sail": false,
+    "skills": [
+        "livewire-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "developing-with-fortify",
+        "debugging-output-and-previewing-html-using-ray"
+    ]
+}

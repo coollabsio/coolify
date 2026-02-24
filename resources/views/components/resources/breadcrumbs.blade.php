@@ -2,12 +2,28 @@
     'lastDeploymentInfo' => null,
     'lastDeploymentLink' => null,
     'resource' => null,
+    'projects' => null,
+    'environments' => null,
 ])
 @php
-    $projects = auth()->user()->currentTeam()->projects()->get();
-    $environments = $resource->environment->project
+    use App\Models\Project;
+
+    // Use passed props if available, otherwise query (backwards compatible)
+    $projects = $projects ?? Project::ownedByCurrentTeamCached();
+    $environments = $environments ?? $resource->environment->project
         ->environments()
-        ->with(['applications', 'services'])
+        ->with([
+            'applications',
+            'services',
+            'postgresqls',
+            'redis',
+            'mongodbs',
+            'mysqls',
+            'mariadbs',
+            'keydbs',
+            'dragonflies',
+            'clickhouses',
+        ])
         ->get();
     $currentProjectUuid = data_get($resource, 'environment.project.uuid');
     $currentEnvironmentUuid = data_get($resource, 'environment.uuid');
@@ -74,6 +90,16 @@
                         class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                         @foreach ($environments as $environment)
                             @php
+                                // Use pre-loaded relations instead of databases() method to avoid N+1 queries
+                                $envDatabases = collect()
+                                    ->merge($environment->postgresqls ?? collect())
+                                    ->merge($environment->redis ?? collect())
+                                    ->merge($environment->mongodbs ?? collect())
+                                    ->merge($environment->mysqls ?? collect())
+                                    ->merge($environment->mariadbs ?? collect())
+                                    ->merge($environment->keydbs ?? collect())
+                                    ->merge($environment->dragonflies ?? collect())
+                                    ->merge($environment->clickhouses ?? collect());
                                 $envResources = collect()
                                     ->merge(
                                         $environment->applications->map(
@@ -81,9 +107,7 @@
                                         ),
                                     )
                                     ->merge(
-                                        $environment
-                                            ->databases()
-                                            ->map(fn($db) => ['type' => 'database', 'resource' => $db]),
+                                        $envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]),
                                     )
                                     ->merge(
                                         $environment->services->map(
@@ -173,7 +197,9 @@
                                                 ]),
                                             };
                                             $isCurrentResource = $res->uuid === $currentResourceUuid;
-                                            $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') && $res->additional_servers()->count() > 0;
+                                            // Use loaded relation count if available, otherwise check additional_servers_count attribute
+                                            $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') &&
+                                                ($res->relationLoaded('additional_servers') ? $res->additional_servers->count() > 0 : ($res->additional_servers_count ?? 0) > 0);
                                             $resServerName = $resHasMultipleServers ? null : data_get($res, 'destination.server.name');
                                         @endphp
                                         <div @mouseenter="openRes('{{ $environment->uuid }}-{{ $res->uuid }}'); resPositions['{{ $environment->uuid }}-{{ $res->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
@@ -405,7 +431,9 @@
             $isApplication = $resourceType === 'App\Models\Application';
             $isService = $resourceType === 'App\Models\Service';
             $isDatabase = str_contains($resourceType, 'Database') || str_contains($resourceType, 'Standalone');
-            $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') && $resource->additional_servers()->count() > 0;
+            // Use loaded relation count if available, otherwise check additional_servers_count attribute
+            $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') &&
+                ($resource->relationLoaded('additional_servers') ? $resource->additional_servers->count() > 0 : ($resource->additional_servers_count ?? 0) > 0);
             $serverName = $hasMultipleServers ? null : data_get($resource, 'destination.server.name');
             $routeParams = [
                 'project_uuid' => $currentProjectUuid,

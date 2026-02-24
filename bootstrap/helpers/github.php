@@ -61,7 +61,14 @@ function generateGithubToken(GithubApp $source, string $type)
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->timeout($timeout)
-                ->retry(3, 200, throw: false)
+                ->retry(3, 200, function (\Exception $exception) {
+                    // Don't retry auth errors — the same JWT won't become valid on retry
+                    if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+                        return ! in_array($exception->response->status(), [401, 403]);
+                    }
+
+                    return true;
+                }, throw: false)
                 ->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {

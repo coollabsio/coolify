@@ -97,10 +97,13 @@ class ByIp extends Component
         $this->validate();
         try {
             $this->authorize('create', Server::class);
-            if (Server::where('team_id', currentTeam()->id)
-                ->where('ip', $this->ip)
-                ->exists()) {
-                return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
+            $foundServer = Server::whereIp($this->ip)->first();
+            if ($foundServer) {
+                if ($foundServer->team_id === currentTeam()->id) {
+                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
+                }
+
+                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
             }
 
             if (is_null($this->private_key_id)) {

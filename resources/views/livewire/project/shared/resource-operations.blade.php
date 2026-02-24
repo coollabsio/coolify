@@ -23,7 +23,7 @@
                 ],
             ),
         ],
-    ),
+    )->values(),
 ),
         projects: @js(
     $projects->map(
