@@ -155,7 +155,12 @@
         },
         "phpdoc_annotation_without_dot": true,
         "phpdoc_line_span": true,
-        "phpdoc_no_alias_tag": true,
+        "phpdoc_no_alias_tag": {
+            "replacements": {
+                "type": "var",
+                "link": "see"
+            }
+        },
         "phpdoc_no_empty_return": true,
         "phpdoc_return_self_reference": true,
         "phpdoc_scalar": true,
