@@ -50,6 +50,9 @@ class StartDatabaseProxy
             };
         }
 
+        $timeoutSeconds = (int) ($database->public_proxy_timeout ?? 0);
+        $proxyTimeout = $timeoutSeconds > 0 ? "{$timeoutSeconds}s" : '365d';
+
         $configuration_dir = database_proxy_dir($database->uuid);
         if (isDev()) {
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
@@ -67,6 +70,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $containerName:$internalPort;
+            proxy_timeout {$proxyTimeout};
        }
     }
     EOF;

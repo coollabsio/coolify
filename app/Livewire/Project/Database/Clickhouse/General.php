@@ -36,6 +36,8 @@ class General extends Component
 
     public ?int $publicPort = null;
 
+    public int $publicProxyTimeout = 0;
+
     public ?string $customDockerRunOptions = null;
 
     public ?string $dbUrl = null;
@@ -80,6 +82,7 @@ class General extends Component
             'portsMappings' => 'nullable|string',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
+            'publicProxyTimeout' => 'nullable|integer|min:0',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',
@@ -115,6 +118,7 @@ class General extends Component
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
             $this->database->public_port = $this->publicPort;
+            $this->database->public_proxy_timeout = $this->publicProxyTimeout;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
@@ -130,6 +134,7 @@ class General extends Component
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
+            $this->publicProxyTimeout = $this->database->public_proxy_timeout ?? 0;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->dbUrl = $this->database->internal_db_url;
