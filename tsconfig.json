@@ -1,0 +1,50 @@
+{
+    "$schema": "https://www.schemastore.org/tsconfig.json",
+    "files": ["vite.config.ts", "svelte.config.ts"],
+    "include": ["resources/js/**/*.ts", "resources/js/**/*.svelte"],
+
+    "compilerOptions": {
+        // Type Checking
+        "allowUnreachableCode": false,
+        "allowUnusedLabels": false,
+        "exactOptionalPropertyTypes": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "noUncheckedIndexedAccess": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "strict": true,
+
+        // Modules
+        "allowImportingTsExtensions": true,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "noUncheckedSideEffectImports": true,
+        "resolveJsonModule": true,
+        "types": ["vite/client"],
+
+        // Emit
+        "noEmit": true,
+        "sourceMap": true, // Needed to have warnings/errors of the Svelte compiler at the correct position.
+
+        // Interop Constraints
+        "erasableSyntaxOnly": true,
+        "esModuleInterop": true,
+        "verbatimModuleSyntax": true,
+
+        // Language
+        "lib": ["ES2024", "DOM"],
+        "libReplacement": false,
+        "moduleDetection": "force",
+        "target": "ES2024",
+
+        // Projects
+        "incremental": true,
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildInfo",
+
+        // Completeness
+        "skipLibCheck": true
+    }
+}
