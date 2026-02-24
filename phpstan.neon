@@ -26,7 +26,6 @@ parameters:
     checkModelMethodVisibility: true
     checkAuthCallsWhenInRequestScope: true
     checkConfigTypes: true
-    generalizeEnvReturnType: true
 
     tmpDir: ./storage/phpstan
     paths:
