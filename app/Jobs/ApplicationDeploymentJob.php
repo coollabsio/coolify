@@ -217,15 +217,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
 
-        // Pre-generate GitHub installation token once to avoid multiple API calls during deployment
-        if ($this->source instanceof GithubApp && ! $this->source->is_public) {
-            try {
-                $this->github_access_token = generateGithubInstallationToken($this->source);
-            } catch (\Exception $e) {
-                // Token generation will be retried later if needed
-                $this->github_access_token = null;
-            }
-        }
         $this->server = Server::find($this->application_deployment_queue->server_id);
         $this->timeout = $this->server->settings->dynamic_timeout;
         $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
@@ -291,6 +282,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+
+        // Generate GitHub installation token once per deployment execution (not in constructor,
+        // since queued jobs may sit in the queue long enough for tokens to expire)
+        if ($this->source instanceof GithubApp && ! $this->source->is_public) {
+            try {
+                $this->github_access_token = generateGithubInstallationToken($this->source);
+            } catch (\Exception $e) {
+                // Token generation will be retried later via null-coalesce fallback
+                $this->github_access_token = null;
+            }
+        }
+
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
