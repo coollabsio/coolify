@@ -8,12 +8,14 @@ use Throwable;
 
 arch()->preset()->php();
 arch()->preset()->security();
-arch()->preset()->strict();
-
 arch('App')
     ->expect('App')
+    ->toUseStrictTypes()
+    ->toUseStrictEquality()
     ->not->toBeEnums()
     ->ignoring('App\Enums')
+    ->classes()->not->toBeAbstract()
+    ->classes()->toBeFinal()
     ->not->toExtend(\Illuminate\Database\Eloquent\Model::class)
     ->ignoring('App\Models')
     ->not->toExtend(\Illuminate\Foundation\Http\FormRequest::class)
@@ -218,5 +220,5 @@ arch('Providers')
     ->toHaveSuffix('ServiceProvider');
 
 arch('Functions')
-    ->expect(['dd', 'ddd', 'dump', 'env', 'exit', 'ray'])
+    ->expect(['dd', 'ddd', 'dump', 'env', 'exit', 'ray', 'sleep', 'usleep'])
     ->not->toBeUsed();
