@@ -16,6 +16,7 @@ use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\ComposeServiceBackups;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -209,6 +210,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
+        // Database backups for compose services (dockercompose buildpack)
+        Route::get('/compose-databases/{service_name}/backups', ComposeServiceBackups::class)
+            ->name('project.application.compose.database.backups');
+
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
@@ -328,7 +333,7 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                $server = $execution->scheduledDatabaseBackup->database->getServer();
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }

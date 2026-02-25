@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereHas('service.environment.project.team', fn ($q) => $q->where('id', $teamId))
+                ->orWhereHas('application.environment.project.team', fn ($q) => $q->where('id', $teamId));
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,12 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereHas('service.environment.project.team', fn ($q) => $q->where('id', $teamId))
+                ->orWhereHas('application.environment.project.team', fn ($q) => $q->where('id', $teamId));
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +57,71 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Get the parent resource — either a Service or Application.
+     */
+    public function getParentResource(): Service|Application|null
+    {
+        if ($this->application_id) {
+            return $this->application;
+        }
+
+        return $this->service;
+    }
+
+    /**
+     * Get the server for this database (works for both Service and Application parents).
+     */
+    public function getServer(): ?Server
+    {
+        if ($this->application_id) {
+            return $this->application?->destination?->server;
+        }
+
+        return $this->service?->destination?->server;
+    }
+
+    /**
+     * Get the Docker network for this database.
+     */
+    public function getDestinationNetwork(): ?string
+    {
+        if ($this->application_id) {
+            return $this->application?->destination?->network;
+        }
+
+        return $this->service?->destination?->network;
+    }
+
+    /**
+     * Get the container name for this database.
+     */
+    public function getContainerName(): string
+    {
+        $parentUuid = $this->application_id
+            ? $this->application?->uuid
+            : $this->service?->uuid;
+
+        return "{$this->name}-{$parentUuid}";
+    }
+
+    /**
+     * Get the parent UUID (service or application).
+     */
+    public function getParentUuid(): ?string
+    {
+        if ($this->application_id) {
+            return $this->application?->uuid;
+        }
+
+        return $this->service?->uuid;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $containerName = $this->getContainerName();
+        $server = $this->getServer();
+        remote_process(["docker restart {$containerName}"], $server);
     }
 
     public function isRunning()
@@ -114,8 +183,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server?->ip;
+        if ($server?->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +194,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->application_id) {
+            return data_get($this->application, 'environment.project.team');
+        }
+
+        return data_get($this->service, 'environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->application_id) {
+            return service_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

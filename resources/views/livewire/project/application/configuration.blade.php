@@ -54,6 +54,22 @@
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Healthcheck</span></a>
             @endif
+            @if ($application->build_pack === 'dockercompose')
+                @php
+                    $composeDbCount = \App\Models\ServiceDatabase::where('application_id', $application->id)->count();
+                @endphp
+                @if ($composeDbCount > 0)
+                    <div class="px-4 py-1 text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">Database Backups</div>
+                    @foreach (\App\Models\ServiceDatabase::where('application_id', $application->id)->get() as $composeDb)
+                        @if ($composeDb->isBackupSolutionAvailable())
+                            <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                                href="{{ route('project.application.compose.database.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid, 'service_name' => $composeDb->name]) }}">
+                                <span class="menu-item-label">{{ $composeDb->name }}</span>
+                            </a>
+                        @endif
+                    @endforeach
+                @endif
+            @endif
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Rollback</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"

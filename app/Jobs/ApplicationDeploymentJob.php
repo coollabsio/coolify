@@ -10,6 +10,8 @@ use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ServiceDatabase;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
@@ -265,6 +267,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Deployment was cancelled before starting.');
 
             return;
+        }
+
+        // For dockercompose buildpack: guard against deploying while a database backup is in progress.
+        // An active backup could be interrupted mid-stream by a container restart, producing a corrupt dump.
+        if ($this->application->build_pack === 'dockercompose') {
+            $activeBackup = ScheduledDatabaseBackupExecution::where('status', 'running')
+                ->whereHas('scheduledDatabaseBackup.database', function ($query) {
+                    $query->where('application_id', $this->application->id);
+                })
+                ->first();
+            if ($activeBackup) {
+                $this->application_deployment_queue->addLogEntry(
+                    'A database backup is currently in progress for a service in this Compose deployment. '.
+                    'The deployment has been cancelled to prevent a corrupt backup. Please retry after the backup completes.'
+                );
+                $this->application_deployment_queue->update([
+                    'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                ]);
+
+                return;
+            }
         }
 
         $this->application_deployment_queue->update([

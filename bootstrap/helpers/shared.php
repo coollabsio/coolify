@@ -2418,6 +2418,28 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create or update ServiceDatabase record for Application-based Docker Compose deployments.
+            // This enables backup scheduling for databases defined in GitHub App (dockercompose buildpack) deploys,
+            // mirroring the same logic used in the Service model path above.
+            if ($isDatabase && $pull_request_id === 0) {
+                $existingServiceDb = \App\Models\ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (is_null($existingServiceDb)) {
+                    \App\Models\ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image->value(),
+                        'application_id' => $resource->id,
+                    ]);
+                } else {
+                    if ($existingServiceDb->image !== $image->value()) {
+                        $existingServiceDb->image = $image->value();
+                        $existingServiceDb->save();
+                    }
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -2813,6 +2835,19 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
+
+        // Cleanup stale ServiceDatabase records for compose services that no longer exist.
+        // If a database service is removed or renamed in the compose file, its ServiceDatabase record
+        // (and any associated scheduled backups) should be removed to avoid orphaned backup jobs.
+        if ($pull_request_id === 0) {
+            $currentServiceNames = collect(data_get($yaml, 'services', []))->keys()->toArray();
+            \App\Models\ServiceDatabase::where('application_id', $resource->id)
+                ->whereNotIn('name', $currentServiceNames)
+                ->each(function ($staleServiceDb) {
+                    $staleServiceDb->scheduledBackups()->delete();
+                    $staleServiceDb->delete();
+                });
+        }
 
         return collect($finalServices);
     }
