@@ -191,6 +191,10 @@ function clone_application(Application $source, $destination, array $overrides =
     $uuid = $overrides['uuid'] ?? (string) new Cuid2;
     $server = $destination->server;
 
+    if ($server->team_id !== currentTeam()->id) {
+        throw new \RuntimeException('Destination does not belong to the current team.');
+    }
+
     // Prepare name and URL
     $name = $overrides['name'] ?? 'clone-of-'.str($source->name)->limit(20).'-'.$uuid;
     $applicationSettings = $source->settings;

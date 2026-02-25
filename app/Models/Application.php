@@ -61,6 +61,8 @@ use Visus\Cuid2\Cuid2;
         'health_check_timeout' => ['type' => 'integer', 'description' => 'Health check timeout in seconds.'],
         'health_check_retries' => ['type' => 'integer', 'description' => 'Health check retries count.'],
         'health_check_start_period' => ['type' => 'integer', 'description' => 'Health check start period in seconds.'],
+        'health_check_type' => ['type' => 'string', 'description' => 'Health check type: http or cmd.', 'enum' => ['http', 'cmd']],
+        'health_check_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check command for CMD type.'],
         'limits_memory' => ['type' => 'string', 'description' => 'Memory limit.'],
         'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit.'],
         'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness.'],
@@ -1959,16 +1961,6 @@ class Application extends BaseModel
         }
     }
 
-    public static function getDomainsByUuid(string $uuid): array
-    {
-        $application = self::where('uuid', $uuid)->first();
-
-        if ($application) {
-            return $application->fqdns;
-        }
-
-        return [];
-    }
 
     public function getLimits(): array
     {

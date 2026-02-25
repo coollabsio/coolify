@@ -290,9 +290,12 @@ class ServersController extends Controller
         }
         $uuid = $request->get('uuid');
         if ($uuid) {
-            $domains = Application::getDomainsByUuid($uuid);
+            $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
 
-            return response()->json(serializeApiResponse($domains));
+            return response()->json(serializeApiResponse($application->fqdns));
         }
         $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
