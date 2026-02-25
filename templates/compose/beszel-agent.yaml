@@ -6,7 +6,7 @@
 
 services:
   beszel-agent:
-    image: 'henrygd/beszel-agent:0.16.1' # Released on 14 Nov 2025
+    image: 'henrygd/beszel-agent:lastest'
     environment:
       - LISTEN=/beszel_socket/beszel.sock
       - HUB_URL=${HUB_URL?}
