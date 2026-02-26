@@ -155,6 +155,13 @@ services:
     image: 'ghcr.io/getsentry/spotlight:latest'
     networks:
       - postiz-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -c 'echo > /dev/tcp/localhost/8969'"
+      interval: 5s
+      timeout: 10s
+      retries: 10
   temporal-elasticsearch:
     container_name: temporal-elasticsearch
     image: 'elasticsearch:7.17.27'
@@ -172,6 +179,14 @@ services:
       - 9200
     volumes:
       - 'temporal_es_data:/var/lib/elasticsearch/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -sf "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s" || exit 1'
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
   temporal-postgresql:
     container_name: temporal-postgresql
     image: 'postgres:16'
@@ -184,6 +199,13 @@ services:
       - 5432
     volumes:
       - 'temporal_pg_data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER}'
+      interval: 5s
+      timeout: 20s
+      retries: 10
   temporal:
     container_name: temporal
     ports:
@@ -209,6 +231,18 @@ services:
       - TEMPORAL_NAMESPACE=default
     networks:
       - temporal-network
+    healthcheck:
+      test:
+        - CMD
+        - tctl
+        - '--address'
+        - 'localhost:7233'
+        - cluster
+        - health
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
   temporal-admin-tools:
     container_name: temporal-admin-tools
     image: 'temporalio/admin-tools:1.28.1-tctl-1.18.4-cli-1.4.1'
@@ -221,6 +255,16 @@ services:
     depends_on:
       - temporal
     tty: true
+    healthcheck:
+      test:
+        - CMD
+        - tctl
+        - cluster
+        - health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
   temporal-ui:
     container_name: temporal-ui
     image: 'temporalio/ui:2.34.0'
@@ -231,6 +275,14 @@ services:
       - temporal-network
     ports:
       - '8082:8080'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -q --spider http://localhost:8080 || exit 1'
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
 networks:
   postiz-network:
     external: false
