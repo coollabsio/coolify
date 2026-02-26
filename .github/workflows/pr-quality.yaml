@@ -1,0 +1,96 @@
+name: PR Quality
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+jobs:
+  pr-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peakoss/anti-slop@v0
+        with:
+          # General Settings
+          max-failures: 3
+
+          # PR Branch Checks
+          allowed-target-branches: "next"
+          blocked-target-branches: ""
+          allowed-source-branches: ""
+          blocked-source-branches: |
+            main
+            master
+            v4.x
+            next
+
+          # PR Quality Checks
+          max-negative-reactions: 0
+          require-maintainer-can-modify: true
+
+          # PR Title Checks
+          require-conventional-title: true
+
+          # PR Description Checks
+          require-description: true
+          max-description-length: 0
+          max-emoji-count: 2
+          require-pr-template: true
+          require-linked-issue: false
+          blocked-terms: "STRAWBERRY"
+          blocked-issue-numbers: 8154
+
+          # Commit Message Checks
+          require-conventional-commits: false
+          blocked-commit-authors: "claude,copilot"
+
+          # File Checks
+          allowed-file-extensions: ""
+          allowed-paths: ""
+          blocked-paths: |
+            README.md
+            SECURITY.md
+            LICENSE
+            CODE_OF_CONDUCT.md
+            templates/service-templates-latest.json
+            templates/service-templates.json
+          require-final-newline: true
+
+          # User Health Checks
+          min-repo-merged-prs: 0
+          min-repo-merge-ratio: 0
+          min-global-merge-ratio: 30
+          global-merge-ratio-exclude-own: false
+          min-account-age: 10
+
+          # Exemptions
+          exempt-author-association: "OWNER,MEMBER,COLLABORATOR"
+          exempt-users: ""
+          exempt-bots: |
+            actions-user
+            dependabot[bot]
+            renovate[bot]
+            github-actions[bot]
+          exempt-draft-prs: false
+          exempt-label: "quality/exempt"
+          exempt-pr-label: ""
+          exempt-milestones: ""
+          exempt-pr-milestones: ""
+          exempt-all-milestones: false
+          exempt-all-pr-milestones: false
+
+          # PR Success Actions
+          success-add-pr-labels: "quality/verified"
+
+          # PR Failure Actions
+          close-pr: true
+          lock-pr: false
+          delete-branch: false
+          failure-pr-message: "This PR did not pass quality checks so it will be closed. If you believe this is a mistake please let us know."
+          failure-remove-pr-labels: ""
+          failure-remove-all-pr-labels: true
+          failure-add-pr-labels: "quality/rejected"
