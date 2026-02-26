@@ -15,7 +15,9 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 class ScheduledJobManager implements ShouldQueue
 {
@@ -54,11 +56,44 @@ class ScheduledJobManager implements ShouldQueue
      */
     public function middleware(): array
     {
+        // Self-healing: clear any stale lock before WithoutOverlapping tries to acquire it.
+        // Stale locks (TTL = -1) can occur during upgrades, Redis restarts, or edge cases.
+        // @see https://github.com/coollabsio/coolify/issues/8327
+        self::clearStaleLockIfPresent();
+
         return [
             (new WithoutOverlapping('scheduled-job-manager'))
                 ->expireAfter(90)   // Lock expires after 90s to handle high-load environments with many tasks
                 ->dontRelease(),    // Don't re-queue on lock conflict
         ];
+    }
+
+    /**
+     * Clear a stale WithoutOverlapping lock if it has no TTL (TTL = -1).
+     *
+     * This provides continuous self-healing since it runs every time the job is dispatched.
+     * Stale locks permanently block all scheduled job executions with no user-visible error.
+     */
+    private static function clearStaleLockIfPresent(): void
+    {
+        try {
+            $cachePrefix = config('cache.prefix', '');
+            $lockKey = $cachePrefix.'laravel-queue-overlap:'.self::class.':scheduled-job-manager';
+
+            $ttl = Redis::connection('default')->ttl($lockKey);
+
+            if ($ttl === -1) {
+                Redis::connection('default')->del($lockKey);
+                Log::channel('scheduled')->warning('Cleared stale ScheduledJobManager lock', [
+                    'lock_key' => $lockKey,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Never let lock cleanup failure prevent the job from running
+            Log::channel('scheduled-errors')->error('Failed to check/clear stale lock', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function handle(): void
@@ -108,6 +143,13 @@ class ScheduledJobManager implements ShouldQueue
             'dispatched' => $this->dispatchedCount,
             'skipped' => $this->skippedCount,
         ]);
+
+        // Write heartbeat so the UI can detect when the scheduler has stopped
+        try {
+            Cache::put('scheduled-job-manager:heartbeat', now()->toIso8601String(), 300);
+        } catch (\Throwable) {
+            // Non-critical; don't let heartbeat failure affect the job
+        }
     }
 
     private function processScheduledBackups(): void

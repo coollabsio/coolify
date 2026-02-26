@@ -60,9 +60,15 @@ class Show extends Component
                 throw new \Exception('Certificate content cannot be empty.');
             }
 
-            if (! openssl_x509_read($this->certificateContent)) {
+            $parsedCert = openssl_x509_read($this->certificateContent);
+            if (! $parsedCert) {
                 throw new \Exception('Invalid certificate format.');
             }
+
+            if (! openssl_x509_export($parsedCert, $cleanedCertificate)) {
+                throw new \Exception('Failed to process certificate.');
+            }
+            $this->certificateContent = $cleanedCertificate;
 
             if ($this->caCertificate) {
                 $this->caCertificate->ssl_certificate = $this->certificateContent;
@@ -114,12 +120,14 @@ class Show extends Component
     {
         $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
+        $base64Cert = base64_encode($this->certificateContent);
+
         $commands = collect([
             "mkdir -p $caCertPath",
             "chown -R 9999:root $caCertPath",
             "chmod -R 700 $caCertPath",
             "rm -rf $caCertPath/coolify-ca.crt",
-            "echo '{$this->certificateContent}' > $caCertPath/coolify-ca.crt",
+            "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
             "chmod 644 $caCertPath/coolify-ca.crt",
         ]);
 
