@@ -1,0 +1,587 @@
+# documentation: https://docs.openreplay.com?utm_source=coolify.io
+# slogan: Open-source session replay and product analytics for developers.
+# category: analytics
+# tags: session-replay, analytics, monitoring, product-analytics, debugging, open-source, user-experience
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  nginx:
+    image: nginx:latest
+    environment:
+      - SERVICE_FQDN_OPENREPLAY
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        content: |
+          map $$arg_peerId $$sessionid {
+            default "";
+            "~.*-(\d+)(?:-.*|$$)" $$1;
+          }
+          map $$http_x_forwarded_for $$real_ip {
+            ~^(\d+\.\d+\.\d+\.\d+) $$1;
+            default $$remote_addr;
+          }
+          map $$http_upgrade $$connection_upgrade {
+            default upgrade;
+            '' close;
+          }
+          map $$http_x_forwarded_proto $$origin_proto {
+            default $$http_x_forwarded_proto;
+            '' $$scheme;
+          }
+          server {
+            listen 80;
+            client_body_buffer_size 512k;
+            client_max_body_size 10m;
+            proxy_buffer_size 64k;
+            proxy_buffers 32 64k;
+            proxy_busy_buffers_size 128k;
+            proxy_max_temp_file_size 2048m;
+            proxy_buffering on;
+            proxy_connect_timeout 120s;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            real_ip_header X-Forwarded-For;
+            set_real_ip_from 0.0.0.0/0;
+            real_ip_recursive on;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "same-origin" always;
+            server_tokens off;
+
+            location ~ ^/(mobs|sessions-assets|frontend|static|sourcemaps|ios-images|uxtesting-records|records|spots)/ {
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Host $$http_host;
+              proxy_http_version 1.1;
+              proxy_set_header Connection "";
+              chunked_transfer_encoding off;
+              proxy_pass http://minio:9000;
+            }
+            location /minio/ {
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $$host;
+              proxy_pass http://minio:9000;
+            }
+            location /ingest/ {
+              rewrite ^/ingest/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_set_header X-Forwarded-Host $$host;
+              proxy_set_header X-Real-IP $$real_ip;
+              proxy_set_header Host $$host;
+              proxy_pass http://http-openreplay:8080;
+              proxy_read_timeout 300s;
+              proxy_connect_timeout 120s;
+              proxy_send_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '*' always;
+              add_header 'Access-Control-Allow-Methods' 'POST' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type,Authorization,Content-Encoding' always;
+            }
+            location /integrations/ {
+              rewrite ^/integrations/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_set_header Host $$host;
+              proxy_pass http://integrations-openreplay:8080;
+              proxy_read_timeout 300s;
+            }
+            location /v2/api/ {
+              rewrite ^/v2/api/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_set_header X-Real-IP $$real_ip;
+              proxy_pass http://api-openreplay:8080;
+              proxy_read_timeout 300s;
+              add_header 'Access-Control-Allow-Origin' '$$http_origin' always;
+              add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+              add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+              add_header 'Access-Control-Allow-Credentials' 'true' always;
+              if ($$request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'POST, GET, PATCH, DELETE, OPTIONS, PUT' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch' always;
+                add_header 'Access-Control-Max-Age' '3600' always;
+                add_header 'Content-Length' '0';
+                add_header 'Content-Type' 'text/plain';
+                return 204;
+              }
+            }
+            location /api/ {
+              rewrite ^/api/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection "Upgrade";
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_pass http://chalice-openreplay:8000;
+              add_header Cache-Control "no-store,no-cache" always;
+              add_header Pragma "no-cache" always;
+            }
+            location /spot/ {
+              rewrite ^/spot/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_pass http://spot-openreplay:8080;
+              proxy_read_timeout 300s;
+            }
+            location /assist/ {
+              rewrite ^/assist/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection $$connection_upgrade;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$real_ip;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+              proxy_buffering off;
+              proxy_pass http://assist-openreplay:9001;
+            }
+            location /ws-assist/ {
+              rewrite ^/ws-assist/(.*) /$$1 break;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection $$connection_upgrade;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$real_ip;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+              proxy_buffering off;
+              proxy_pass http://assist-openreplay:9001;
+            }
+            location / {
+              index /index.html;
+              rewrite ^((?!.(js|css|png|svg|jpg|woff|woff2)).)*$$ /index.html break;
+              proxy_set_header Host $$http_host;
+              proxy_set_header X-Forwarded-For $$real_ip;
+              proxy_set_header X-Forwarded-Proto $$origin_proto;
+              proxy_pass http://frontend-openreplay:8080;
+              proxy_intercept_errors on;
+              error_page 404 =200 /index.html;
+            }
+          }
+    depends_on:
+      frontend-openreplay:
+        condition: service_started
+      chalice-openreplay:
+        condition: service_started
+      api-openreplay:
+        condition: service_started
+      assist-openreplay:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:80']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgresql:
+    image: 'postgres:17-alpine'
+    volumes:
+      - openreplay-pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${OPENREPLAY_PG_DB:-openreplay}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: 'clickhouse/clickhouse-server:25.6-alpine'
+    volumes:
+      - openreplay-clickhouse:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: ['CMD-SHELL', 'clickhouse-client --query "SELECT 1"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: 'redis:7-alpine'
+    volumes:
+      - openreplay-redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: 'minio/minio:latest'
+    command: 'server /data --console-address ":9001"'
+    volumes:
+      - openreplay-miniodata:/data
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    exclude_from_hc: true
+    image: 'minio/mc:latest'
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mc alias set orminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}
+        mc mb --ignore-existing orminio/mobs
+        mc mb --ignore-existing orminio/sessions-assets
+        mc mb --ignore-existing orminio/sourcemaps
+        mc mb --ignore-existing orminio/frontend
+        mc mb --ignore-existing orminio/static
+        mc mb --ignore-existing orminio/records
+        mc mb --ignore-existing orminio/uxtesting-records
+        mc mb --ignore-existing orminio/spots
+        mc mb --ignore-existing orminio/ios-images
+        mc anonymous set download orminio/frontend
+        mc anonymous set download orminio/static
+        echo "MinIO buckets initialized"
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+
+  db-init:
+    exclude_from_hc: true
+    image: 'postgres:17-alpine'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: on-failure
+    environment:
+      - PGHOST=postgresql
+      - PGPORT=5432
+      - PGDATABASE=${OPENREPLAY_PG_DB:-openreplay}
+      - PGUSER=${SERVICE_USER_POSTGRES}
+      - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until psql -c '\q'; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        echo "PostgreSQL is ready"
+
+  frontend-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/frontend:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - TRACKER_HOST=${SERVICE_FQDN_OPENREPLAY}/script
+      - HTTP_PORT=80
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  chalice-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/chalice:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - REDIS_STRING=redis://redis:6379
+      - ch_username=default
+      - ch_password=
+      - ch_host=clickhouse
+      - ch_port=9000
+      - ch_port_http=8123
+      - sourcemaps_reader=http://sourcemapreader-openreplay:9000/{}/sourcemaps
+      - ASSIST_URL=http://assist-openreplay:9001/assist/%s
+      - JWT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTREFRESH}
+      - JWT_SPOT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWTSPOTREFRESH}
+      - ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}
+      - pg_host=postgresql
+      - pg_port=5432
+      - pg_dbname=${OPENREPLAY_PG_DB:-openreplay}
+      - pg_user=${SERVICE_USER_POSTGRES}
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - SITE_URL=${SERVICE_FQDN_OPENREPLAY}
+      - S3_HOST=${SERVICE_FQDN_OPENREPLAY}
+      - S3_KEY=${SERVICE_USER_MINIO}
+      - S3_SECRET=${SERVICE_PASSWORD_MINIO}
+      - AWS_DEFAULT_REGION=us-east-1
+      - sessions_region=us-east-1
+      - ASSIST_RECORDS_BUCKET=records
+      - sessions_bucket=mobs
+      - IOS_VIDEO_BUCKET=mobs
+      - sourcemaps_bucket=sourcemaps
+      - js_cache_bucket=sessions-assets
+      - CH_COMPRESSION=false
+      - JWT_EXPIRATION=86400
+      - LOGLEVEL=INFO
+      - PYTHONUNBUFFERED=0
+      - jwt_algorithm=HS512
+      - root_path=/api
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/api:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - AWS_ENDPOINT=${SERVICE_FQDN_OPENREPLAY}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - CH_USERNAME=default
+      - CH_PASSWORD=
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - CLICKHOUSE_HTTP_STRING=clickhouse:8123/default
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_STRING=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${OPENREPLAY_PG_DB:-openreplay}?sslmode=disable
+      - ASSIST_URL=http://assist-openreplay:9001/assist/%s
+      - ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - REDIS_STRING=redis://redis:6379
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  http-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/http:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - BUCKET_NAME=uxtesting-records
+      - CACHE_ASSETS=true
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT=${SERVICE_FQDN_OPENREPLAY}
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_STRING=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${OPENREPLAY_PG_DB:-openreplay}?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - JWT_SPOT_SECRET=${SERVICE_PASSWORD_64_JWTSPOT}
+      - TOKEN_SECRET=${SERVICE_PASSWORD_64_TOKEN}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  sink-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/sink:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - ASSETS_ORIGIN=${SERVICE_FQDN_OPENREPLAY}/sessions-assets
+      - REDIS_STRING=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  storage-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/storage:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - AWS_ENDPOINT=${SERVICE_FQDN_OPENREPLAY}
+      - AWS_REGION=us-east-1
+      - BUCKET_NAME=mobs
+      - REDIS_STRING=redis://redis:6379
+      - FS_CLEAN_HRS=24
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  ender-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/ender:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_STRING=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${OPENREPLAY_PG_DB:-openreplay}?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/db:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - CH_USERNAME=default
+      - CH_PASSWORD=
+      - CLICKHOUSE_STRING=clickhouse:9000/default
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_STRING=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${OPENREPLAY_PG_DB:-openreplay}?sslmode=disable
+      - REDIS_STRING=redis://redis:6379
+      - ch_db=default
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  alerts-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/alerts:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - pg_host=postgresql
+      - pg_port=5432
+      - pg_dbname=${OPENREPLAY_PG_DB:-openreplay}
+      - pg_user=${SERVICE_USER_POSTGRES}
+      - pg_password=${SERVICE_PASSWORD_POSTGRES}
+      - ch_host=clickhouse
+      - ch_port=9000
+      - ch_port_http=8123
+      - ch_username=default
+      - ch_password=
+      - SITE_URL=${SERVICE_FQDN_OPENREPLAY}
+      - S3_HOST=${SERVICE_FQDN_OPENREPLAY}
+      - S3_KEY=${SERVICE_USER_MINIO}
+      - S3_SECRET=${SERVICE_PASSWORD_MINIO}
+      - AWS_DEFAULT_REGION=us-east-1
+      - LOGLEVEL=INFO
+      - PYTHONUNBUFFERED=0
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  assist-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/assist:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    environment:
+      - ASSIST_JWT_SECRET=${SERVICE_PASSWORD_64_ASSISTJWT}
+      - ASSIST_KEY=${SERVICE_PASSWORD_64_ASSISTKEY}
+      - AWS_DEFAULT_REGION=us-east-1
+      - REDIS_URL=redis
+      - CLEAR_SOCKET_TIME=720
+      - debug=0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  heuristics-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/heuristics:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  integrations-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/integrations:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  sourcemapreader-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/sourcemapreader:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+
+  assets-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/assets:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+
+  images-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/images:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+
+  spot-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/spot:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
+
+  canvases-openreplay:
+    image: 'public.ecr.aws/p1t3u8a3/canvases:v1.23.0'
+    volumes:
+      - openreplay-shared:/mnt/efs
