@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Support\Facades\DB;
@@ -207,7 +208,14 @@ class PrivateKey extends BaseModel
             throw new \Exception("SSH key file content verification failed: {$this->getKeyLocation()}");
         }
 
-        return $this->getKeyLocation();
+        // SSH requires key files to have exactly 0600 permissions; enforce this explicitly
+        // rather than relying on Flysystem's 'visibility: private' which may not map to 0600 on all systems.
+        $keyLocation = $this->getKeyLocation();
+        if (! chmod($keyLocation, 0600)) {
+            throw new \Exception("Failed to set SSH key file permissions: {$keyLocation}");
+        }
+
+        return $keyLocation;
     }
 
     public static function deleteFromStorage(self $privateKey)
@@ -249,9 +257,9 @@ class PrivateKey extends BaseModel
         return "/var/www/html/storage/app/ssh/keys/ssh_key@{$this->uuid}";
     }
 
-    public function updatePrivateKey(array $data)
+    public function updatePrivateKey(array $data): static
     {
-        return DB::transaction(function () use ($data) {
+        DB::transaction(function () use ($data) {
             $this->update($data);
 
             try {
@@ -259,9 +267,16 @@ class PrivateKey extends BaseModel
             } catch (\Exception $e) {
                 throw new \Exception('Failed to update SSH key: '.$e->getMessage());
             }
-
-            return $this;
         });
+
+        // Invalidate multiplexed SSH connections AFTER the transaction commits so the
+        // next SSH command re-authenticates with the new key instead of reusing a stale
+        // socket that was authenticated with the old (now-replaced) key.
+        foreach ($this->servers as $server) {
+            SshMultiplexingHelper::removeMuxFile($server);
+        }
+
+        return $this;
     }
 
     public function servers()

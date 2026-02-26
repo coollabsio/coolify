@@ -204,17 +204,25 @@ class SshMultiplexingHelper
     private static function validateSshKey(PrivateKey $privateKey): void
     {
         $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        if (! file_exists($keyLocation)) {
             $privateKey->storeInFileSystem();
+        }
+
+        // Ensure permissions are exactly 0600 regardless of how the file was created,
+        // as SSH will reject keys with overly permissive modes.
+        $perms = fileperms($keyLocation) & 0777;
+        if ($perms !== 0600) {
+            if (! chmod($keyLocation, 0600)) {
+                Log::warning('Failed to set SSH key file permissions', ['path' => $keyLocation]);
+            }
         }
     }
 
     private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
         $options = "-i {$sshKeyLocation} "
+            .'-o IdentitiesOnly=yes '
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             .'-o PasswordAuthentication=no '
             ."-o ConnectTimeout=$connectionTimeout "
