@@ -44,6 +44,96 @@
             </x-forms.select>
         </div>
     @endif
+    @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
+        <div class="pb-4">
+            <x-forms.select id="backupEngine" label="Backup Engine"
+                helper="Choose the backup engine. 'pg_dump' uses traditional dump/restore. 'pgBackRest' enables WAL-based incremental backups with point-in-time recovery.">
+                <option value="dump">pg_dump (Traditional)</option>
+                <option value="pgbackrest">pgBackRest (Incremental / PITR)</option>
+            </x-forms.select>
+        </div>
+
+        @if ($backupEngine === 'pgbackrest')
+            <div class="pb-4 border-l-2 border-blue-500/50 pl-4">
+                <h3 class="mb-3">pgBackRest Configuration</h3>
+                <div class="flex flex-col gap-3">
+                    <div class="flex gap-2">
+                        <x-forms.select id="pgbackrestBackupType" label="Backup Type"
+                            helper="Full: complete backup every time. Differential: changes since last full backup. Incremental: changes since last backup of any type.">
+                            <option value="full">Full</option>
+                            <option value="diff">Differential</option>
+                            <option value="incr">Incremental</option>
+                        </x-forms.select>
+                        <x-forms.input label="Stanza Name" id="pgbackrestStanza"
+                            helper="Custom stanza name. Leave empty to use the auto-generated name based on the database UUID."
+                            placeholder="Auto-generated" />
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.select id="pgbackrestRepoType" label="Repository Type"
+                            helper="Posix: store backups on local disk. S3: store backups in an S3-compatible bucket.">
+                            <option value="posix">Local Disk (posix)</option>
+                            <option value="s3">S3 Storage</option>
+                        </x-forms.select>
+                        <x-forms.select id="pgbackrestCompressType" label="Compression">
+                            <option value="gz">gzip</option>
+                            <option value="lz4">LZ4</option>
+                            <option value="zst">Zstandard</option>
+                            <option value="none">None</option>
+                        </x-forms.select>
+                        <x-forms.input label="Compression Level" id="pgbackrestCompressLevel" type="number" min="0"
+                            max="9" />
+                    </div>
+
+                    @if ($pgbackrestRepoType === 's3')
+                        <h4 class="mt-2 font-medium">S3 Repository Settings</h4>
+                        <div class="flex gap-2">
+                            <x-forms.input label="S3 Bucket" id="pgbackrestS3Bucket" required />
+                            <x-forms.input label="S3 Endpoint" id="pgbackrestS3Endpoint" required
+                                placeholder="s3.amazonaws.com" />
+                            <x-forms.input label="S3 Region" id="pgbackrestS3Region" placeholder="us-east-1" />
+                        </div>
+                        <div class="flex gap-2">
+                            <x-forms.input label="S3 Access Key" id="pgbackrestS3Key" type="password" />
+                            <x-forms.input label="S3 Secret Key" id="pgbackrestS3Secret" type="password" />
+                        </div>
+                    @endif
+
+                    <h4 class="mt-2 font-medium">Retention</h4>
+                    <div class="flex gap-2">
+                        <x-forms.input label="Full Backup Retention" id="pgbackrestRetentionFull" type="number"
+                            min="1"
+                            helper="Number of full backups to retain. Older full backups and their dependent incremental/differential backups will be expired." />
+                        <x-forms.input label="Differential Backup Retention" id="pgbackrestRetentionDiff" type="number"
+                            min="1"
+                            helper="Number of differential backups to retain. Only applies when using differential backup type." />
+                    </div>
+
+                    <h4 class="mt-2 font-medium">Logging</h4>
+                    <div class="flex gap-2">
+                        <x-forms.select id="pgbackrestLogLevelConsole" label="Console Log Level">
+                            <option value="off">Off</option>
+                            <option value="error">Error</option>
+                            <option value="warn">Warn</option>
+                            <option value="info">Info</option>
+                            <option value="detail">Detail</option>
+                            <option value="debug">Debug</option>
+                            <option value="trace">Trace</option>
+                        </x-forms.select>
+                        <x-forms.select id="pgbackrestLogLevelFile" label="File Log Level">
+                            <option value="off">Off</option>
+                            <option value="error">Error</option>
+                            <option value="warn">Warn</option>
+                            <option value="info">Info</option>
+                            <option value="detail">Detail</option>
+                            <option value="debug">Debug</option>
+                            <option value="trace">Trace</option>
+                        </x-forms.select>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endif
+
     <div class="flex flex-col gap-2">
         <h3>Settings</h3>
         <div class="flex gap-2 flex-col ">

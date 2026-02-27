@@ -14,7 +14,13 @@ class ScheduledDatabaseBackupExecution extends BaseModel
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',
+            'finished_at' => 'datetime',
         ];
+    }
+
+    public function isPgBackrest(): bool
+    {
+        return $this->backup_engine === 'pgbackrest';
     }
 
     public function scheduledDatabaseBackup(): BelongsTo

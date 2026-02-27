@@ -10,6 +10,19 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'pgbackrest_s3_key' => 'encrypted',
+            'pgbackrest_s3_secret' => 'encrypted',
+        ];
+    }
+
+    public function isPgBackrest(): bool
+    {
+        return $this->backup_engine === 'pgbackrest';
+    }
+
     public static function ownedByCurrentTeam()
     {
         return ScheduledDatabaseBackup::whereRelation('team', 'id', currentTeam()->id)->orderBy('created_at', 'desc');

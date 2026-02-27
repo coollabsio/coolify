@@ -672,7 +672,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'backup_engine', 'pgbackrest_stanza', 'pgbackrest_backup_type', 'pgbackrest_repo_type', 'pgbackrest_s3_bucket', 'pgbackrest_s3_endpoint', 'pgbackrest_s3_region', 'pgbackrest_s3_key', 'pgbackrest_s3_secret', 'pgbackrest_compress_type', 'pgbackrest_compress_level', 'pgbackrest_retention_full', 'pgbackrest_retention_diff', 'pgbackrest_log_level_console', 'pgbackrest_log_level_file'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -699,6 +699,21 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'backup_engine' => 'string|in:dump,pgbackrest',
+            'pgbackrest_stanza' => 'string|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,incr,diff|nullable',
+            'pgbackrest_repo_type' => 'string|in:posix,s3|nullable',
+            'pgbackrest_s3_bucket' => 'string|nullable',
+            'pgbackrest_s3_endpoint' => 'string|nullable',
+            'pgbackrest_s3_region' => 'string|nullable',
+            'pgbackrest_s3_key' => 'string|nullable',
+            'pgbackrest_s3_secret' => 'string|nullable',
+            'pgbackrest_compress_type' => 'string|in:gz,lz4,zst,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_retention_full' => 'integer|min:1|nullable',
+            'pgbackrest_retention_diff' => 'integer|min:1|nullable',
+            'pgbackrest_log_level_console' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_log_level_file' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
         ]);
 
         if ($validator->fails()) {
@@ -890,7 +905,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'backup_engine', 'pgbackrest_stanza', 'pgbackrest_backup_type', 'pgbackrest_repo_type', 'pgbackrest_s3_bucket', 'pgbackrest_s3_endpoint', 'pgbackrest_s3_region', 'pgbackrest_s3_key', 'pgbackrest_s3_secret', 'pgbackrest_compress_type', 'pgbackrest_compress_level', 'pgbackrest_retention_full', 'pgbackrest_retention_diff', 'pgbackrest_log_level_console', 'pgbackrest_log_level_file'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -915,6 +930,21 @@ class DatabasesController extends Controller
             'database_backup_retention_amount_s3' => 'integer|min:0',
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'integer|min:0',
+            'backup_engine' => 'string|in:dump,pgbackrest',
+            'pgbackrest_stanza' => 'string|nullable',
+            'pgbackrest_backup_type' => 'string|in:full,incr,diff|nullable',
+            'pgbackrest_repo_type' => 'string|in:posix,s3|nullable',
+            'pgbackrest_s3_bucket' => 'string|nullable',
+            'pgbackrest_s3_endpoint' => 'string|nullable',
+            'pgbackrest_s3_region' => 'string|nullable',
+            'pgbackrest_s3_key' => 'string|nullable',
+            'pgbackrest_s3_secret' => 'string|nullable',
+            'pgbackrest_compress_type' => 'string|in:gz,lz4,zst,none|nullable',
+            'pgbackrest_compress_level' => 'integer|min:0|max:9|nullable',
+            'pgbackrest_retention_full' => 'integer|min:1|nullable',
+            'pgbackrest_retention_diff' => 'integer|min:1|nullable',
+            'pgbackrest_log_level_console' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
+            'pgbackrest_log_level_file' => 'string|in:off,error,warn,info,detail,debug,trace|nullable',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -2501,6 +2531,97 @@ class DatabasesController extends Controller
         return response()->json([
             'executions' => $executions,
         ]);
+    }
+
+    #[OA\Get(
+        summary: 'pgBackRest Info',
+        description: 'Get pgBackRest backup information for a PostgreSQL database.',
+        path: '/databases/{uuid}/pgbackrest/info',
+        operationId: 'get-database-pgbackrest-info',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'pgBackRest backup information.',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function pgbackrest_info(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        if (! ($database instanceof StandalonePostgresql)) {
+            return response()->json(['message' => 'pgBackRest is only supported for PostgreSQL databases.'], 400);
+        }
+
+        if (! $database->isPgBackrestEnabled()) {
+            return response()->json(['message' => 'pgBackRest is not enabled for this database.'], 400);
+        }
+
+        $backup = ScheduledDatabaseBackup::where('database_id', $database->id)
+            ->where('database_type', $database->getMorphClass())
+            ->where('backup_engine', 'pgbackrest')
+            ->first();
+
+        if (! $backup) {
+            return response()->json(['message' => 'No pgBackRest backup configuration found.'], 404);
+        }
+
+        $service = new \App\Services\Backup\PgBackrestService($database, $backup);
+        $server = $database->destination->server;
+        $containerName = $database->uuid;
+
+        try {
+            $infoCmd = executeInDocker($containerName, $service->getInfoCommand('json'));
+            $infoOutput = instant_remote_process([$infoCmd], $server, true, false, 60, disableMultiplexing: true);
+            $backups = $service->parseBackupInfo($infoOutput);
+
+            return response()->json([
+                'stanza' => $service->getStanza(),
+                'backups' => $backups,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to retrieve pgBackRest info: '.$e->getMessage()], 500);
+        }
     }
 
     #[OA\Get(

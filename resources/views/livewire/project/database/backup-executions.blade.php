@@ -83,6 +83,15 @@
                         @if(data_get($execution, 'size'))
                             • Size: {{ formatBytes(data_get($execution, 'size')) }}
                         @endif
+                        @if(data_get($execution, 'backup_engine') === 'pgbackrest')
+                            • Engine: pgBackRest
+                            @if(data_get($execution, 'pgbackrest_backup_type'))
+                                ({{ ucfirst(data_get($execution, 'pgbackrest_backup_type')) }})
+                            @endif
+                            @if(data_get($execution, 'pgbackrest_backup_label'))
+                                • Label: {{ data_get($execution, 'pgbackrest_backup_label') }}
+                            @endif
+                        @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         Location: {{ data_get($execution, 'filename', 'N/A') }}

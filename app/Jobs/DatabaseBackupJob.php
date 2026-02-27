@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Services\Backup\PgBackrestService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -289,6 +290,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
+
+            // pgBackRest flow: handle separately from the traditional per-database dump loop
+            if ($this->backup->isPgBackrest() && str($databaseType)->contains('postgres') && $this->database instanceof StandalonePostgresql) {
+                $this->run_pgbackrest_backup($databaseType);
+                if ($this->backup_log && $this->backup_log->status === 'success') {
+                    removeOldBackups($this->backup);
+                }
+
+                return;
+            }
+
             foreach ($databasesToBackup as $database) {
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
@@ -680,6 +692,94 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    private function run_pgbackrest_backup(string $databaseType): void
+    {
+        try {
+            $service = new PgBackrestService($this->database, $this->backup);
+
+            // Generate unique UUID for the backup execution
+            $attempts = 0;
+            do {
+                $this->backup_log_uuid = (string) new Cuid2;
+                $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
+                $attempts++;
+                if ($attempts >= 3 && $exists) {
+                    throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
+                }
+            } while ($exists);
+
+            $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                'uuid' => $this->backup_log_uuid,
+                'database_name' => $this->database->postgres_db,
+                'filename' => 'pgbackrest://'.$service->getStanza(),
+                'scheduled_database_backup_id' => $this->backup->id,
+                'backup_engine' => 'pgbackrest',
+                'pgbackrest_backup_type' => $this->backup->pgbackrest_backup_type ?? 'full',
+                'local_storage_deleted' => false,
+            ]);
+
+            $containerName = $this->database->uuid;
+
+            // Write pgbackrest.conf into the container
+            $setupCommands = [];
+            foreach ($service->getSetupCommands() as $cmd) {
+                $setupCommands[] = executeInDocker($containerName, $cmd);
+            }
+            instant_remote_process($setupCommands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+
+            // Create stanza if it doesn't exist
+            $stanzaCheck = executeInDocker($containerName, $service->getStanzaCheckCommand());
+            try {
+                instant_remote_process([$stanzaCheck], $this->server, true, false, 60, disableMultiplexing: true);
+            } catch (\Throwable) {
+                $stanzaCreate = executeInDocker($containerName, $service->getStanzaCreateCommand());
+                instant_remote_process([$stanzaCreate], $this->server, true, false, 120, disableMultiplexing: true);
+            }
+
+            // Run the backup
+            $backupCmd = executeInDocker($containerName, $service->getBackupCommand());
+            $this->backup_output = instant_remote_process([$backupCmd], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+
+            // Run expire to enforce retention
+            $expireCmd = executeInDocker($containerName, $service->getExpireCommand());
+            instant_remote_process([$expireCmd], $this->server, false, false, 120, disableMultiplexing: true);
+
+            // Get backup info for label and size
+            $infoCmd = executeInDocker($containerName, $service->getInfoCommand('json'));
+            $infoOutput = instant_remote_process([$infoCmd], $this->server, true, false, 60, disableMultiplexing: true);
+
+            $backups = $service->parseBackupInfo($infoOutput);
+            $latestBackup = ! empty($backups) ? end($backups) : null;
+
+            $this->backup_log->update([
+                'status' => 'success',
+                'message' => $this->backup_output,
+                'size' => $latestBackup['repository_size'] ?? 0,
+                'pgbackrest_backup_label' => $latestBackup['label'] ?? null,
+                's3_uploaded' => $this->backup->pgbackrest_repo_type === 's3' ? true : null,
+            ]);
+
+            $this->team->notify(new BackupSuccess($this->backup, $this->database, $this->database->postgres_db));
+        } catch (\Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+
+            if ($this->backup_log) {
+                $this->backup_log->update([
+                    'status' => 'failed',
+                    'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                    'size' => 0,
+                ]);
+            }
+
+            $this->team?->notify(new BackupFailed(
+                $this->backup,
+                $this->database,
+                $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                $this->database->postgres_db
+            ));
+        }
     }
 
     public function failed(?Throwable $exception): void

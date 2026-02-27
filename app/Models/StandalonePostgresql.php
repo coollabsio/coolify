@@ -20,6 +20,7 @@ class StandalonePostgresql extends BaseModel
     protected $casts = [
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
+        'pgbackrest_enabled' => 'boolean',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',
@@ -343,5 +344,15 @@ class StandalonePostgresql extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return true;
+    }
+
+    public function isPgBackrestEnabled(): bool
+    {
+        return (bool) $this->pgbackrest_enabled;
+    }
+
+    public function pgbackrestVolumeName(): string
+    {
+        return 'pgbackrest-'.$this->uuid;
     }
 }

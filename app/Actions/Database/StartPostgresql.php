@@ -3,8 +3,10 @@
 namespace App\Actions\Database;
 
 use App\Helpers\SslHelper;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Services\Backup\PgBackrestService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -98,6 +100,27 @@ class StartPostgresql
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
         $this->add_custom_conf();
+
+        // Check if any pgBackRest backup schedules exist for WAL archiving setup
+        $pgbackrestBackup = $this->database->isPgBackrestEnabled()
+            ? ScheduledDatabaseBackup::where('database_id', $this->database->id)
+                ->where('database_type', $this->database->getMorphClass())
+                ->where('backup_engine', 'pgbackrest')
+                ->first()
+            : null;
+
+        $pgbackrestService = null;
+        if ($pgbackrestBackup) {
+            $pgbackrestService = new PgBackrestService($this->database, $pgbackrestBackup);
+
+            // Add pgBackRest repo volumes
+            foreach ($pgbackrestService->getDockerVolumes() as $vol) {
+                $persistent_storages[] = $vol;
+            }
+            foreach ($pgbackrestService->getDockerVolumeDefinitions() as $name => $def) {
+                $volume_names[$name] = $def;
+            }
+        }
 
         $docker_compose = [
             'services' => [
@@ -208,6 +231,11 @@ class StartPostgresql
             ]);
         }
 
+        // Add WAL archiving config for pgBackRest
+        if ($pgbackrestService) {
+            $command = array_merge($command, $pgbackrestService->getWalArchivingParams());
+        }
+
         // Add custom docker run options
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
@@ -229,6 +257,22 @@ class StartPostgresql
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
+
+        // Install and configure pgBackRest inside the container after startup
+        if ($pgbackrestService) {
+            $this->commands[] = "echo 'Installing pgBackRest...'";
+            foreach ($pgbackrestService->getInstallCommands() as $cmd) {
+                $this->commands[] = executeInDocker($this->database->uuid, $cmd);
+            }
+            $this->commands[] = "echo 'Configuring pgBackRest...'";
+            foreach ($pgbackrestService->getSetupCommands() as $cmd) {
+                $this->commands[] = executeInDocker($this->database->uuid, $cmd);
+            }
+            $this->commands[] = "echo 'Creating pgBackRest stanza...'";
+            $this->commands[] = executeInDocker($this->database->uuid, $pgbackrestService->getStanzaCreateCommand());
+            $this->commands[] = "echo 'pgBackRest setup completed.'";
+        }
+
         $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');

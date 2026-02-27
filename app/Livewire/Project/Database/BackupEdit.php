@@ -78,6 +78,51 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int $timeout = 3600;
 
+    #[Validate(['required', 'string', 'in:dump,pgbackrest'])]
+    public string $backupEngine = 'dump';
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestStanza = null;
+
+    #[Validate(['required', 'string', 'in:full,incr,diff'])]
+    public string $pgbackrestBackupType = 'full';
+
+    #[Validate(['required', 'string', 'in:posix,s3'])]
+    public string $pgbackrestRepoType = 'posix';
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Bucket = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Endpoint = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Region = 'us-east-1';
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Key = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $pgbackrestS3Secret = null;
+
+    #[Validate(['required', 'string', 'in:gz,lz4,zst,none'])]
+    public string $pgbackrestCompressType = 'gz';
+
+    #[Validate(['required', 'integer', 'min:0', 'max:9'])]
+    public int $pgbackrestCompressLevel = 6;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionFull = 2;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int $pgbackrestRetentionDiff = 7;
+
+    #[Validate(['required', 'string', 'in:off,error,warn,info,detail,debug,trace'])]
+    public string $pgbackrestLogLevelConsole = 'warn';
+
+    #[Validate(['required', 'string', 'in:off,error,warn,info,detail,debug,trace'])]
+    public string $pgbackrestLogLevelFile = 'info';
+
     public function mount()
     {
         try {
@@ -125,6 +170,31 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->backup_engine = $this->backupEngine;
+            $this->backup->pgbackrest_stanza = $this->pgbackrestStanza;
+            $this->backup->pgbackrest_backup_type = $this->pgbackrestBackupType;
+            $this->backup->pgbackrest_repo_type = $this->pgbackrestRepoType;
+            $this->backup->pgbackrest_s3_bucket = $this->pgbackrestS3Bucket;
+            $this->backup->pgbackrest_s3_endpoint = $this->pgbackrestS3Endpoint;
+            $this->backup->pgbackrest_s3_region = $this->pgbackrestS3Region;
+            $this->backup->pgbackrest_s3_key = $this->pgbackrestS3Key;
+            $this->backup->pgbackrest_s3_secret = $this->pgbackrestS3Secret;
+            $this->backup->pgbackrest_compress_type = $this->pgbackrestCompressType;
+            $this->backup->pgbackrest_compress_level = $this->pgbackrestCompressLevel;
+            $this->backup->pgbackrest_retention_full = $this->pgbackrestRetentionFull;
+            $this->backup->pgbackrest_retention_diff = $this->pgbackrestRetentionDiff;
+            $this->backup->pgbackrest_log_level_console = $this->pgbackrestLogLevelConsole;
+            $this->backup->pgbackrest_log_level_file = $this->pgbackrestLogLevelFile;
+
+            // Enable pgbackrest on the database model when engine is pgbackrest
+            if ($this->backupEngine === 'pgbackrest' && $this->backup->database_type === 'App\Models\StandalonePostgresql') {
+                $db = $this->backup->database;
+                if ($db && ! $db->pgbackrest_enabled) {
+                    $db->pgbackrest_enabled = true;
+                    $db->save();
+                }
+            }
+
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -143,6 +213,21 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->backupEngine = $this->backup->backup_engine ?? 'dump';
+            $this->pgbackrestStanza = $this->backup->pgbackrest_stanza;
+            $this->pgbackrestBackupType = $this->backup->pgbackrest_backup_type ?? 'full';
+            $this->pgbackrestRepoType = $this->backup->pgbackrest_repo_type ?? 'posix';
+            $this->pgbackrestS3Bucket = $this->backup->pgbackrest_s3_bucket;
+            $this->pgbackrestS3Endpoint = $this->backup->pgbackrest_s3_endpoint;
+            $this->pgbackrestS3Region = $this->backup->pgbackrest_s3_region ?? 'us-east-1';
+            $this->pgbackrestS3Key = $this->backup->pgbackrest_s3_key;
+            $this->pgbackrestS3Secret = $this->backup->pgbackrest_s3_secret;
+            $this->pgbackrestCompressType = $this->backup->pgbackrest_compress_type ?? 'gz';
+            $this->pgbackrestCompressLevel = $this->backup->pgbackrest_compress_level ?? 6;
+            $this->pgbackrestRetentionFull = $this->backup->pgbackrest_retention_full ?? 2;
+            $this->pgbackrestRetentionDiff = $this->backup->pgbackrest_retention_diff ?? 7;
+            $this->pgbackrestLogLevelConsole = $this->backup->pgbackrest_log_level_console ?? 'warn';
+            $this->pgbackrestLogLevelFile = $this->backup->pgbackrest_log_level_file ?? 'info';
         }
     }
 
