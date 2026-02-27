@@ -21,6 +21,7 @@ class StandaloneRedis extends BaseModel
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',
+        'public_port_timeout' => 'integer',
     ];
 
     protected static function booted()

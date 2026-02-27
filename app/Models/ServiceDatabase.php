@@ -11,6 +11,10 @@ class ServiceDatabase extends BaseModel
 
     protected $guarded = [];
 
+    protected $casts = [
+        'public_port_timeout' => 'integer',
+    ];
+
     protected static function booted()
     {
         static::deleting(function ($service) {
