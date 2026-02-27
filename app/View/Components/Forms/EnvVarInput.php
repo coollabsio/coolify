@@ -86,6 +86,7 @@ class EnvVarInput extends Component
                     'environment_uuid' => $this->environmentUuid,
                 ])
                 : route('shared-variables.environment.index'),
+            'server' => route('shared-variables.server.index'),
             'default' => route('shared-variables.index'),
         ];
 

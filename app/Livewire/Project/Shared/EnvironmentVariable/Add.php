@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Server;
 use App\Traits\EnvironmentVariableAnalyzer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
@@ -67,6 +68,7 @@ class Add extends Component
             'team' => [],
             'project' => [],
             'environment' => [],
+            'server' => [],
         ];
 
         // Early return if no team
@@ -120,6 +122,21 @@ class Add extends Component
                     // User not authorized to view project variables
                 }
             }
+        }
+
+        // Get server variables from all servers owned by the current team
+        try {
+            $servers = Server::ownedByCurrentTeam()->get();
+            $serverVars = [];
+            foreach ($servers as $server) {
+                $vars = $server->environment_variables()
+                    ->pluck('key')
+                    ->toArray();
+                $serverVars = array_merge($serverVars, $vars);
+            }
+            $result['server'] = array_unique($serverVars);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            // User not authorized to view server variables
         }
 
         return $result;

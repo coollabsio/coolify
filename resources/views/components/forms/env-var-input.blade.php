@@ -17,7 +17,7 @@
             selectedIndex: 0,
             cursorPosition: 0,
             currentScope: null,
-            availableScopes: ['team', 'project', 'environment'],
+            availableScopes: ['team', 'project', 'environment', 'server'],
             availableVars: @js($availableVars),
             scopeUrls: @js($scopeUrls),
 

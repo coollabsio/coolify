@@ -27,4 +27,9 @@ class SharedEnvironmentVariable extends Model
     {
         return $this->belongsTo(Environment::class);
     }
+
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
+    }
 }

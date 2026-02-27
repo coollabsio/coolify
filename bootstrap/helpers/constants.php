@@ -81,4 +81,4 @@ const NEEDS_TO_DISABLE_GZIP = [
 const NEEDS_TO_DISABLE_STRIPPREFIX = [
     'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
 ];
-const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];
+const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];

@@ -1181,6 +1181,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+
+        // Inject server-level shared environment variables
+        // These are added before application variables so apps can override them
+        $this->inject_server_environment_variables($envs);
+
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
@@ -1465,6 +1470,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $envs_dict[$key] = escapeBashEnvValue($item);
         }
 
+        // 2.5 Add server-level shared environment variables (can be overridden by user vars)
+        $serverEnvVars = $this->mainServer->environment_variables()->get();
+        foreach ($serverEnvVars as $env) {
+            $envs_dict[$env->key] = escapeBashEnvValue($env->value);
+        }
+
         // 3. Add SERVICE_NAME, SERVICE_FQDN, SERVICE_URL variables for Docker Compose builds
         if ($this->build_pack === 'dockercompose') {
             if ($this->pull_request_id === 0) {
@@ -1637,6 +1648,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         return $envs;
+    }
+
+    private function inject_server_environment_variables(Collection $envs): void
+    {
+        $server = $this->mainServer;
+        $serverEnvVars = $server->environment_variables()->get();
+        foreach ($serverEnvVars as $env) {
+            $value = $env->value;
+            if ($env->is_literal || $env->is_multiline) {
+                $value = '\''.$value.'\'';
+            } else {
+                $value = escapeEnvVariables($value);
+            }
+            $envs->push($env->key.'='.$value);
+        }
     }
 
     private function save_buildtime_environment_variables()
