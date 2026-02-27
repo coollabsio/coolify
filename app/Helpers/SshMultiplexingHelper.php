@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -158,7 +159,7 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
 
-        self::validateSshKey($server->privateKey);
+        self::validateSshKey($server);
 
         $muxSocket = $sshConfig['muxFilename'];
 
@@ -201,14 +202,32 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
-    private static function validateSshKey(PrivateKey $privateKey): void
+    private static function validateSshKey(Server $server): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $privateKey = $server->privateKey;
+        if (! $privateKey instanceof PrivateKey) {
+            return;
+        }
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        $keyFile = "ssh_key@{$privateKey->uuid}";
+        $sshKeysDisk = Storage::disk('ssh-keys');
+
+        $missingKeyFile = ! $sshKeysDisk->exists($keyFile);
+        $mismatchedKeyFile = false;
+
+        if (! $missingKeyFile) {
+            $storedKey = (string) $sshKeysDisk->get($keyFile);
+            $expectedKey = (string) $privateKey->private_key;
+            $mismatchedKeyFile = ! hash_equals($expectedKey, $storedKey);
+        }
+
+        if ($missingKeyFile || $mismatchedKeyFile) {
             $privateKey->storeInFileSystem();
+
+            if ($mismatchedKeyFile) {
+                Storage::disk('ssh-mux')->delete($server->muxFilename());
+                self::clearConnectionMetadata($server);
+            }
         }
     }
 
