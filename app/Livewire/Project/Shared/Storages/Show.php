@@ -51,14 +51,22 @@ class Show extends Component
      */
     private function syncData(bool $toModel = false): void
     {
+        $uuidPrefix = $this->resource->uuid . '-';
         if ($toModel) {
             // Sync TO model (before save)
-            $this->storage->name = $this->name;
+            $nameToSave = $this->name;
+            if (!str_starts_with($nameToSave, $uuidPrefix)) {
+                $nameToSave = $uuidPrefix . $nameToSave;
+            }
+            $this->storage->name = $nameToSave;
             $this->storage->mount_path = $this->mountPath;
             $this->storage->host_path = $this->hostPath;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->storage->name;
+            if (str_starts_with($this->name, $uuidPrefix)) {
+                $this->name = substr($this->name, strlen($uuidPrefix));
+            }
             $this->mountPath = $this->storage->mount_path;
             $this->hostPath = $this->storage->host_path;
         }

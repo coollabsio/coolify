@@ -25,9 +25,9 @@
                             directoryModalOpen: false
                         }"
                             @close-storage-modal.window="
-                            if ($event.detail === 'volume') volumeModalOpen = false;
-                            if ($event.detail === 'file') fileModalOpen = false;
-                            if ($event.detail === 'directory') directoryModalOpen = false;
+                            if ($event.detail[0] === 'volume') volumeModalOpen = false;
+                            if ($event.detail[0] === 'file') fileModalOpen = false;
+                            if ($event.detail[0] === 'directory') directoryModalOpen = false;
                         ">
                             <div class="relative" @click.outside="dropdownOpen = false">
                                 <x-forms.button @click="dropdownOpen = !dropdownOpen">
