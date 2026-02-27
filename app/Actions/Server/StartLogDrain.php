@@ -53,10 +53,9 @@ class StartLogDrain
     Name                modify
     Match               *
     Set                 coolify.server_name {$server->name}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
+    Rename              coolify.serviceName coolify.service_name
+    Rename              coolify.projectName coolify.project_name
+    Rename              coolify.environmentName coolify.environment_name
 [OUTPUT]
     Name nrlogs
     Match *
@@ -108,10 +107,9 @@ class StartLogDrain
     Name                modify
     Match               *
     Set                 coolify.server_name {$server->name}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
+    Rename              coolify.serviceName coolify.service_name
+    Rename              coolify.projectName coolify.project_name
+    Rename              coolify.environmentName coolify.environment_name
 [OUTPUT]
     Name            http
     Match           *
