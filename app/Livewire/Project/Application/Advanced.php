@@ -178,6 +178,23 @@ class Advanced extends Component
                 $reset = true;
             }
 
+            // Check if a deployment-relevant setting changed before dispatching configurationChanged.
+            // Settings like preview deployments, auto deploy, and git clone options don't require redeployment.
+            $deploymentRelevantChanged = $reset
+                || $this->application->isLogDrainEnabled() !== $this->isLogDrainEnabled
+                || $this->application->settings->is_gpu_enabled !== $this->isGpuEnabled
+                || $this->application->settings->gpu_driver !== $this->gpuDriver
+                || $this->application->settings->gpu_count !== $this->gpuCount
+                || $this->application->settings->gpu_device_ids !== $this->gpuDeviceIds
+                || $this->application->settings->gpu_options !== $this->gpuOptions
+                || $this->application->settings->is_build_server_enabled !== $this->isBuildServerEnabled
+                || $this->application->settings->is_consistent_container_name_enabled !== $this->isConsistentContainerNameEnabled
+                || $this->application->settings->is_raw_compose_deployment_enabled !== $this->isRawComposeDeploymentEnabled
+                || $this->application->settings->connect_to_docker_network !== $this->isConnectToDockerNetworkEnabled
+                || $this->application->settings->disable_build_cache !== $this->disableBuildCache
+                || $this->application->settings->inject_build_args_to_dockerfile !== $this->injectBuildArgsToDockerfile
+                || $this->application->settings->include_source_commit_in_build !== $this->includeSourceCommitInBuild;
+
             if ($this->application->settings->is_raw_compose_deployment_enabled) {
                 $this->application->oldRawParser();
             } else {
@@ -190,7 +207,9 @@ class Advanced extends Component
             }
 
             $this->dispatch('success', 'Settings saved.');
-            $this->dispatch('configurationChanged');
+            if ($deploymentRelevantChanged) {
+                $this->dispatch('configurationChanged');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
