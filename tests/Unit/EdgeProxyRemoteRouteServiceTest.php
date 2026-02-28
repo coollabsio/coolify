@@ -267,3 +267,108 @@ YAML;
         ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/service-remote-service-without-tunnel-host.yaml')
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
 });
+
+it('returns warning instead of throwing when edge route file write fails', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            if (str_contains(implode("\n", $commands), 'tee')) {
+                throw new RuntimeException('edge ssh unavailable');
+            }
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 14;
+    $deploymentServer->ip = '10.8.0.19';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $service = new Service;
+    $service->uuid = 'service-write-failure';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "9010:3000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://write-failure.example.com:3000';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $warnings = $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and(collect($warnings)->contains(fn (string $warning) => str_contains($warning, 'failed to write dynamic route configuration')))
+        ->and($manager->calls)->toHaveCount(1);
+});
+
+it('normalizes remote tunnel host values before generating upstream url', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 15;
+    $deploymentServer->ip = '';
+    $deploymentServer->proxy = ['type' => 'NONE', 'tunnel_host' => 'https://10.8.0.20:9443/path'];
+
+    $service = new Service;
+    $service->uuid = 'service-normalized-host';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "9010:3000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://normalized.example.com:3000';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $warnings = $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+    expect($warnings)->toBe([]);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('http://10.8.0.20:9010')
+        ->and($payload)->not->toContain('9443');
+});

@@ -21,7 +21,21 @@ class EdgeProxyRemoteRouteService
         $edgeProxyServer = $this->resolveEdgeProxyServer($service);
         $deploymentServer = $this->resolveDeploymentServer($service);
 
-        if (! $edgeProxyServer instanceof Server || ! $deploymentServer instanceof Server) {
+        if (! $deploymentServer instanceof Server) {
+            return [];
+        }
+
+        if (! $edgeProxyServer instanceof Server) {
+            if ($deploymentServer->id !== 0) {
+                $warning = sprintf(
+                    'Edge proxy route skipped for service %s: edge proxy server (id=0) was not found for the current team.',
+                    $service->uuid
+                );
+                $this->logWarning($warning);
+
+                return [$warning];
+            }
+
             return [];
         }
 
@@ -112,7 +126,17 @@ class EdgeProxyRemoteRouteService
         }
 
         $config = $this->generateTraefikConfig($service->uuid, $routes);
-        $this->writeRouteFile($edgeProxyServer, $service->uuid, $config);
+        try {
+            $this->writeRouteFile($edgeProxyServer, $service->uuid, $config);
+        } catch (\Throwable $exception) {
+            $warning = sprintf(
+                'Edge proxy route partially applied for service %s: failed to write dynamic route configuration on edge proxy (%s).',
+                $service->uuid,
+                $exception->getMessage()
+            );
+            $this->logWarning($warning);
+            $warnings[] = $warning;
+        }
 
         return $warnings;
     }
@@ -323,9 +347,9 @@ class EdgeProxyRemoteRouteService
         ];
 
         foreach ($candidates as $candidate) {
-            $value = trim((string) $candidate);
-            if ($value !== '') {
-                return $value;
+            $normalizedHost = $this->normalizeRemoteHost((string) $candidate);
+            if (! is_null($normalizedHost)) {
+                return $normalizedHost;
             }
         }
 
@@ -546,5 +570,43 @@ class EdgeProxyRemoteRouteService
         }
 
         error_log($message);
+    }
+
+    private function normalizeRemoteHost(string $rawHost): ?string
+    {
+        $host = trim($rawHost);
+        if ($host === '') {
+            return null;
+        }
+
+        // Allow values like https://10.8.0.15:8080/path and extract only host.
+        if (Str::startsWith($host, ['http://', 'https://'])) {
+            $parsedHost = parse_url($host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        } elseif (str_contains($host, '/')) {
+            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        }
+
+        $host = trim($host, '[]');
+        if ($host === '') {
+            return null;
+        }
+
+        // Drop accidental host:port values so published compose port remains authoritative.
+        if (str_contains($host, ':') && ! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        }
+
+        if ($host === '') {
+            return null;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return '['.$host.']';
+        }
+
+        return $host;
     }
 }

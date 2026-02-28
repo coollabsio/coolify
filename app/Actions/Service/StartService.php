@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Models\Service;
 use App\Services\EdgeProxyRemoteRouteService;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -16,7 +17,16 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
-        $edgeRoutingWarnings = app(EdgeProxyRemoteRouteService::class)->syncService($service);
+        $edgeRoutingWarnings = [];
+        try {
+            $edgeRoutingWarnings = app(EdgeProxyRemoteRouteService::class)->syncService($service);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to sync edge proxy route for service start.', [
+                'service_uuid' => $service->uuid,
+                'error' => $exception->getMessage(),
+            ]);
+            $edgeRoutingWarnings[] = 'Failed to sync edge proxy route configuration. Check edge proxy connectivity and server settings.';
+        }
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
         }
