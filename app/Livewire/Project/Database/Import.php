@@ -401,20 +401,24 @@ EOD;
         }
     }
 
-    public function runImport()
+    public function runImport(string $password = ''): bool|string
     {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
         $this->authorize('update', $this->resource);
 
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
-            return;
+            return true;
         }
 
         if (! $this->server) {
             $this->dispatch('error', 'Server not found. Please refresh the page.');
 
-            return;
+            return true;
         }
 
         try {
@@ -434,7 +438,7 @@ EOD;
                 if (! $this->validateServerPath($this->customLocation)) {
                     $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters.');
 
-                    return;
+                    return true;
                 }
                 $tmpPath = '/tmp/restore_'.$this->resourceUuid;
                 $escapedCustomLocation = escapeshellarg($this->customLocation);
@@ -442,7 +446,7 @@ EOD;
             } else {
                 $this->dispatch('error', 'The file does not exist or has been deleted.');
 
-                return;
+                return true;
             }
 
             // Copy the restore command to a script file
@@ -474,11 +478,15 @@ EOD;
                 $this->dispatch('databaserestore');
             }
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
+
+            return true;
         } finally {
             $this->filename = null;
             $this->importCommands = [];
         }
+
+        return true;
     }
 
     public function loadAvailableS3Storages()
@@ -577,26 +585,30 @@ EOD;
         }
     }
 
-    public function restoreFromS3()
+    public function restoreFromS3(string $password = ''): bool|string
     {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
         $this->authorize('update', $this->resource);
 
         if (! $this->s3StorageId || blank($this->s3Path)) {
             $this->dispatch('error', 'Please select S3 storage and provide a path first.');
 
-            return;
+            return true;
         }
 
         if (is_null($this->s3FileSize)) {
             $this->dispatch('error', 'Please check the file first by clicking "Check File".');
 
-            return;
+            return true;
         }
 
         if (! $this->server) {
             $this->dispatch('error', 'Server not found. Please refresh the page.');
 
-            return;
+            return true;
         }
 
         try {
@@ -613,7 +625,7 @@ EOD;
             if (! $this->validateBucketName($bucket)) {
                 $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
 
-                return;
+                return true;
             }
 
             // Clean the S3 path
@@ -623,7 +635,7 @@ EOD;
             if (! $this->validateS3Path($cleanPath)) {
                 $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
 
-                return;
+                return true;
             }
 
             // Get helper image
@@ -711,9 +723,12 @@ EOD;
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (\Throwable $e) {
             $this->importRunning = false;
+            handleError($e, $this);
 
-            return handleError($e, $this);
+            return true;
         }
+
+        return true;
     }
 
     public function buildRestoreCommand(string $tmpPath): string
