@@ -68,12 +68,12 @@ class Terminal extends Component
 
             // Escape the identifier for shell usage
             $escapedIdentifier = escapeshellarg($identifier);
-            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+            $shellCommand = 'export TERM=xterm-256color; PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
             $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'");
         } else {
-            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+            $shellCommand = 'export TERM=xterm-256color; PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
                             'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
                             'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
             $command = SshMultiplexingHelper::generateSshCommand($server, $shellCommand);

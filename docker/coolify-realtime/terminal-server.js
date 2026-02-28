@@ -159,7 +159,7 @@ async function handleCommand(ws, command, userId) {
     }
 
     const options = {
-        name: 'xterm-color',
+        name: 'xterm-256color',
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
