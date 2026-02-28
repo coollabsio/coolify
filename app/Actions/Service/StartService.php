@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Models\Service;
+use App\Services\EdgeProxyRemoteRouteService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -15,6 +16,7 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        $edgeRoutingWarnings = app(EdgeProxyRemoteRouteService::class)->syncService($service);
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
         }
@@ -23,6 +25,9 @@ class StartService
         $workdir = $service->workdir();
         // $commands[] = "cd {$workdir}";
         $commands[] = "echo 'Saved configuration files to {$workdir}.'";
+        foreach ($edgeRoutingWarnings as $warning) {
+            $commands[] = 'echo '.escapeshellarg("Edge proxy routing warning: {$warning}");
+        }
         // Ensure .env exists in the correct directory before docker compose tries to load it
         // This is defensive programming - saveComposeConfigs() already creates it,
         // but we guarantee it here in case of any edge cases or manual deployments
