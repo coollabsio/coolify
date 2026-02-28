@@ -156,6 +156,68 @@ YAML;
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
 });
 
+it('keeps valid edge routes when one domain port cannot be resolved and returns warning only for invalid domain', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 13;
+    $deploymentServer->ip = '10.8.0.18';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $service = new Service;
+    $service->uuid = 'service-partial-routes';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "9010:3000"
+      - "9020:4000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://good.example.com:3000,https://bad.example.com:9999';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $warnings = $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and($warnings[0])->toContain('published host port could not be resolved')
+        ->and($manager->calls)->toHaveCount(1);
+
+    $writeCommands = implode("\n", $manager->calls[0]['commands']);
+    expect($writeCommands)->toContain('/tmp/proxy/dynamic/service-remote-service-partial-routes.yaml')
+        ->and($writeCommands)->toContain('tee')
+        ->and($writeCommands)->not->toContain('rm -f');
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`good.example.com`)')
+        ->and($payload)->not->toContain('Host(`bad.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.18:9010');
+});
+
 it('does not generate edge route file when remote host is missing and returns actionable warning', function () {
     $manager = new class extends EdgeProxyRemoteRouteService
     {

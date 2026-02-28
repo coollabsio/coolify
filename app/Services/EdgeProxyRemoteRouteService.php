@@ -103,22 +103,18 @@ class EdgeProxyRemoteRouteService
             foreach ($warnings as $warning) {
                 $this->logWarning($warning);
             }
-
-            $this->deleteRouteFile($edgeProxyServer, $service->uuid);
-
-            return $warnings;
         }
 
         if (empty($routes)) {
             $this->deleteRouteFile($edgeProxyServer, $service->uuid);
 
-            return [];
+            return $warnings;
         }
 
         $config = $this->generateTraefikConfig($service->uuid, $routes);
         $this->writeRouteFile($edgeProxyServer, $service->uuid, $config);
 
-        return [];
+        return $warnings;
     }
 
     public function deleteService(Service $service): void
