@@ -5731,6 +5731,7 @@ All notable changes to this project will be documented in this file.
 - *(api)* Change domains to urls
 - *(api)* Improve domains API docs
 - *(api)* Improve app endpoint deprecation description
+- Update changelog
 
 ### ⚡ Performance
 
