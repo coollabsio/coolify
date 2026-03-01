@@ -18,8 +18,13 @@
                 <div class="flex flex-col gap-1">
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="is_registration_enabled"
-                            helper="Allow users to self-register. If disabled, only administrators can create accounts."
+                            helper="Allow users to self-register via email/password. If disabled, only administrators can create accounts (unless OAuth-only registration is enabled)."
                             label="Registration Allowed" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only_registration_enabled"
+                            helper="Allow new users to self-register only through configured OAuth2 providers (e.g., GitHub, Google, Authentik). Email/password registration remains disabled. This is useful for controlling access via an external identity provider."
+                            label="OAuth-Only Registration" />
                     </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"

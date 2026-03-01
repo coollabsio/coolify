@@ -19,6 +19,7 @@
     "auth.logout": "Logout",
     "auth.register": "Register",
     "auth.registration_disabled": "Registration is disabled. Please contact the administrator.",
+    "auth.oauth_only_registration": "New accounts can only be created via OAuth. Use one of the providers below to sign up.",
     "auth.reset_password": "Reset password",
     "auth.failed": "These credentials do not match our records.",
     "auth.failed.callback": "Failed to process callback from login provider.",
