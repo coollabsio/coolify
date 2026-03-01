@@ -87,6 +87,11 @@
 ]) }}" {{ wireNavigate() }}>
                 Resources
             </a>
+            <a class="{{ request()->routeIs('server.environment-variables') ? 'dark:text-white' : '' }}" href="{{ route('server.environment-variables', [
+    'server_uuid' => data_get($server, 'uuid'),
+]) }}" {{ wireNavigate() }}>
+                Environment
+            </a>
             @can('canAccessTerminal')
                         <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}" href="{{ route('server.command', [
                     'server_uuid' => data_get($server, 'uuid'),

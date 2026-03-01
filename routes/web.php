@@ -59,6 +59,7 @@ use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Sentinel as ServerSentinel;
 use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Server\EnvironmentVariable\All as ServerEnvironmentVariables;
 use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
@@ -262,6 +263,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
         Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
+        Route::get('/environment-variables', ServerEnvironmentVariables::class)->name('server.environment-variables');
         Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');

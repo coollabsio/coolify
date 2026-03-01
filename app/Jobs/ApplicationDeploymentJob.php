@@ -1181,6 +1181,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
@@ -1304,6 +1305,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Add HOST if not exists
             if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
+            }
+        }
+
+        // Inject server-level runtime environment variables (app vars take precedence)
+        $existingKeys = $envs->map(function ($item) {
+            return str($item)->before('=')->value();
+        })->toArray();
+
+        $serverEnvVars = $this->mainServer->environmentVariables()->get();
+        foreach ($serverEnvVars as $env) {
+            if (! in_array($env->key, $existingKeys)) {
+                $envs->push($env->key.'='.$env->real_value);
             }
         }
 
@@ -1516,6 +1529,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+        }
+
+        // 3.5. Add server-level build-time environment variables (app vars override these)
+        $serverBuildEnvVars = $this->mainServer->environmentVariables()
+            ->where('is_buildtime', true)
+            ->get();
+        foreach ($serverBuildEnvVars as $env) {
+            $envs_dict[$env->key] = escapeBashEnvValue($env->value);
         }
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
