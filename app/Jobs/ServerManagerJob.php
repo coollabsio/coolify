@@ -64,11 +64,11 @@ class ServerManagerJob implements ShouldQueue
 
     private function getServers(): Collection
     {
-        $allServers = Server::where('ip', '!=', '1.2.3.4');
+        $allServers = Server::with('settings')->where('ip', '!=', '1.2.3.4');
 
         if (isCloud()) {
             $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers;
+            $own = Team::find(0)->servers()->with('settings')->get();
 
             return $servers->merge($own);
         } else {
@@ -82,6 +82,10 @@ class ServerManagerJob implements ShouldQueue
         if ($this->shouldRunNow($this->checkFrequency)) {
             $servers->each(function (Server $server) {
                 try {
+                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
+                    if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
+                        return;
+                    }
                     ServerConnectionCheckJob::dispatch($server);
                 } catch (\Exception $e) {
                     Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
@@ -134,9 +138,7 @@ class ServerManagerJob implements ShouldQueue
         // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
 
         if ($shouldRestartSentinel) {
-            dispatch(function () use ($server) {
-                $server->restartContainer('coolify-sentinel');
-            });
+            CheckAndStartSentinelJob::dispatch($server);
         }
 
         // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
@@ -160,11 +162,8 @@ class ServerManagerJob implements ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Sentinel update checks (hourly) - check for updates to Sentinel version
-        // No timezone needed for hourly - runs at top of every hour
-        if ($isSentinelEnabled && $this->shouldRunNow('0 * * * *')) {
-            CheckAndStartSentinelJob::dispatch($server);
-        }
+        // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
+        // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 
     private function shouldRunNow(string $frequency, ?string $timezone = null): bool
