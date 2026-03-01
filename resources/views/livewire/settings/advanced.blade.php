@@ -22,6 +22,16 @@
                             label="Registration Allowed" />
                     </div>
                     <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_registration_enabled"
+                            helper="Allow users to self-register via OAuth providers even when general registration is disabled."
+                            label="Allow OAuth Self-Registration" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="is_oauth_only_allowed"
+                            helper="Restrict authentication to OAuth providers only. Password-based login will be disabled for all users."
+                            label="OAuth Only Mode" />
+                    </div>
+                    <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."
                             label="Do Not Track" />

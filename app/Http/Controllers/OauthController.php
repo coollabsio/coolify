@@ -20,9 +20,9 @@ class OauthController extends Controller
         try {
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
+            $settings = instanceSettings();
             if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                if (! $settings->is_registration_enabled && ! $settings->is_oauth_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
 
@@ -30,6 +30,8 @@ class OauthController extends Controller
                     'name' => $oauthUser->name,
                     'email' => $oauthUser->email,
                 ]);
+            } elseif ($settings->is_oauth_only_allowed) {
+                // User exists but OAuth-only mode is enabled — allow login via OAuth
             }
             Auth::login($user);
 

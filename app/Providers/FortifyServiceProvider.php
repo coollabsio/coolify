@@ -73,6 +73,10 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
+            $settings = instanceSettings();
+            if ($settings->is_oauth_only_allowed) {
+                return null;
+            }
             $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&

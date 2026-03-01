@@ -29,6 +29,7 @@
                         </div>
                     @endif
 
+                    @if (!($is_oauth_only_allowed ?? false))
                     <form action="/login" method="POST" class="flex flex-col gap-4">
                         @csrf
                         @env('local')
@@ -54,8 +55,9 @@
                             {{ __('auth.login') }}
                         </x-forms.button>
                     </form>
+                    @endif
 
-                    @if ($is_registration_enabled)
+                    @if ($is_registration_enabled || ($is_oauth_registration_enabled ?? false))
                         <div class="relative my-6">
                             <div class="absolute inset-0 flex items-center">
                                 <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
