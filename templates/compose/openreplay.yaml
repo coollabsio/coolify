@@ -1,0 +1,141 @@
+# documentation: https://docs.openreplay.com/
+# slogan: Open-source session replay and product analytics
+# category: analytics
+# tags: session-replay, product-analytics, error-tracking, self-hosted, open-source
+# logo: svgs/openreplay.svg
+# port: 80
+
+services:
+  openreplay-http:
+    image: ghcr.io/openreplay/http:${OPENREPLAY_VERSION:-v1.21.0}
+    environment:
+      - SERVICE_FQDN_OPENREPLAY_80
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=80
+      - COMMON_PG_HOST=postgresql
+      - COMMON_PG_PORT=5432
+      - COMMON_PG_USER=postgres
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - COMMON_PG_DATABASE=or_app
+      - LICENSE_KEY=${LICENSE_KEY:-}
+      - REDIS_STRING=redis://redis:6379
+      - COMMON_S3_HOST=http://minio:9000
+      - COMMON_S3_KEY=${SERVICE_PASSWORD_64_MINIOKEY}
+      - COMMON_S3_SECRET=${SERVICE_PASSWORD_64_MINIOSECRET}
+      - ASSETS_ORIGIN=${SERVICE_FQDN_OPENREPLAY}
+      - SITE_URL=${SERVICE_FQDN_OPENREPLAY}
+      - S3_BUCKET_IOS_IMAGES=ios-images
+      - S3_BUCKET_SESSIONS=sessions-assets
+      - S3_BUCKET_SOURCEMAPS=sourcemaps
+      - COMMON_CH_HOST=clickhouse
+      - COMMON_CH_PORT=8123
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --timeout=5 http://localhost:80/healthz -O /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  openreplay-sink:
+    image: ghcr.io/openreplay/sink:${OPENREPLAY_VERSION:-v1.21.0}
+    environment:
+      - COMMON_PG_HOST=postgresql
+      - COMMON_PG_PORT=5432
+      - COMMON_PG_USER=postgres
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - COMMON_PG_DATABASE=or_app
+      - REDIS_STRING=redis://redis:6379
+      - COMMON_S3_HOST=http://minio:9000
+      - COMMON_S3_KEY=${SERVICE_PASSWORD_64_MINIOKEY}
+      - COMMON_S3_SECRET=${SERVICE_PASSWORD_64_MINIOSECRET}
+      - COMMON_CH_HOST=clickhouse
+      - COMMON_CH_PORT=8123
+      - TOPIC_RAW_WEB=raw
+      - S3_BUCKET_SESSIONS=sessions-assets
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  openreplay-worker:
+    image: ghcr.io/openreplay/chalice:${OPENREPLAY_VERSION:-v1.21.0}
+    environment:
+      - COMMON_PG_HOST=postgresql
+      - COMMON_PG_PORT=5432
+      - COMMON_PG_USER=postgres
+      - COMMON_PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - COMMON_PG_DATABASE=or_app
+      - REDIS_STRING=redis://redis:6379
+      - COMMON_S3_HOST=http://minio:9000
+      - COMMON_S3_KEY=${SERVICE_PASSWORD_64_MINIOKEY}
+      - COMMON_S3_SECRET=${SERVICE_PASSWORD_64_MINIOSECRET}
+      - COMMON_CH_HOST=clickhouse
+      - COMMON_CH_PORT=8123
+      - S3_BUCKET_SESSIONS=sessions-assets
+      - S3_BUCKET_SOURCEMAPS=sourcemaps
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  postgresql:
+    image: ghcr.io/openreplay/postgres:${POSTGRES_VERSION:-16}
+    environment:
+      - POSTGRESQL_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRESQL_DATABASE=or_app
+    volumes:
+      - openreplay-pgdata:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.3}
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - openreplay-clickhouse:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --timeout=5 http://localhost:8123/ping -O /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: ghcr.io/openreplay/valkey:${REDIS_VERSION:-8.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - openreplay-redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: ghcr.io/openreplay/minio:${MINIO_VERSION:-2024.6.13}
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_PASSWORD_64_MINIOKEY}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MINIOSECRET}
+    volumes:
+      - openreplay-miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
