@@ -1010,6 +1010,8 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
         '--entrypoint' => 'entrypoint',
+        '--runtime' => 'runtime',
+        '--pids-limit' => 'pids_limit',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -1025,6 +1027,26 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
             preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
             $value = $hostname_matches[1] ?? null;
+            if ($value && ! empty(trim($value))) {
+                $options[$option][] = $value;
+                $options[$option] = array_unique($options[$option]);
+            }
+        }
+        if ($option === '--runtime') {
+            // Match --runtime=value or --runtime value (e.g., --runtime=runsc, --runtime runc)
+            $regexForParsingRuntime = '/--runtime(?:=|\s+)([^\s]+)/';
+            preg_match($regexForParsingRuntime, $custom_docker_run_options, $runtime_matches);
+            $value = $runtime_matches[1] ?? null;
+            if ($value && ! empty(trim($value))) {
+                $options[$option][] = $value;
+                $options[$option] = array_unique($options[$option]);
+            }
+        }
+        if ($option === '--pids-limit') {
+            // Match --pids-limit=value or --pids-limit value (e.g., --pids-limit=256, --pids-limit 1024)
+            $regexForParsingPidsLimit = '/--pids-limit(?:=|\s+)([^\s]+)/';
+            preg_match($regexForParsingPidsLimit, $custom_docker_run_options, $pids_limit_matches);
+            $value = $pids_limit_matches[1] ?? null;
             if ($value && ! empty(trim($value))) {
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
@@ -1098,7 +1120,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size' || $option === '--hostname') {
+        } elseif ($option === '--shm-size' || $option === '--hostname' || $option === '--runtime' || $option === '--pids-limit') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
             }

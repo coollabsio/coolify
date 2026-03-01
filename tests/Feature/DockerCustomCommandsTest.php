@@ -198,3 +198,31 @@ test('ConvertEntrypointSingleQuotedWithDoubleQuotesInside', function () {
         'entrypoint' => 'python -c "print(\"hi\")"',
     ]);
 });
+
+test('RuntimeWithEquals', function () {
+    $input = '--runtime=runsc';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'runtime' => 'runsc',
+    ]);
+});
+
+test('RuntimeWithoutEquals', function () {
+    $input = '--runtime runsc';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'runtime' => 'runsc',
+    ]);
+});
+
+test('PidsLimitWithEquals', function () {
+    $input = '--pids-limit=1024';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe(['pids_limit' => '1024']);
+});
+
+test('PidsLimitWithoutEquals', function () {
+    $input = '--pids-limit 256';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe(['pids_limit' => '256']);
+});
