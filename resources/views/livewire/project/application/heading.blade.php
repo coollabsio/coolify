@@ -29,6 +29,23 @@
                     </a>
                 @endcan
             @endif
+            @if ($application->build_pack === 'dockercompose' && $application->databases->filter(fn($db) => $db->isBackupSolutionAvailable())->count() > 0)
+                <x-dropdown>
+                    <x-slot:title>
+                        <span class="{{ request()->routeIs('project.application.database.backups') ? 'dark:text-white' : '' }}">
+                            Backups
+                        </span>
+                    </x-slot:title>
+                    @foreach ($application->databases as $database)
+                        @if ($database->isBackupSolutionAvailable())
+                            <a class="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-coolgray-100 dark:hover:bg-coolgray-300"
+                                href="{{ route('project.application.database.backups', array_merge($parameters, ['database_uuid' => $database->uuid])) }}">
+                                {{ $database->name }}
+                            </a>
+                        @endif
+                    @endforeach
+                </x-dropdown>
+            @endif
             <x-applications.links :application="$application" />
         </nav>
         <div class="flex flex-wrap gap-2 items-center">

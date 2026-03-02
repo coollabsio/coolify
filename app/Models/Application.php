@@ -136,6 +136,11 @@ class Application extends BaseModel
                 'additional_networks',
             ]);
         });
+        static::deleting(function ($application) {
+            $application->databases()->each(function ($database) {
+                $database->delete();
+            });
+        });
         static::saving(function ($application) {
             $payload = [];
             if ($application->isDirty('fqdn')) {
@@ -842,6 +847,11 @@ class Application extends BaseModel
         }
 
         return null;
+    }
+
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function environment_variables()

@@ -93,7 +93,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                $this->server = $this->database->server();
                 $this->s3 = $this->backup->s3;
             } else {
                 $this->database = data_get($this->backup, 'database');
@@ -121,11 +121,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                if ($this->database->application_id) {
+                    $parentUuid = $this->database->application->uuid;
+                    $parentName = str($this->database->application->name)->slug();
+                } else {
+                    $parentUuid = $this->database->service->uuid;
+                    $parentName = str($this->database->service->name)->slug();
+                }
                 if (str($databaseType)->contains('postgres')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = "{$this->database->name}-$parentUuid";
+                    $this->directory_name = $parentName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -155,8 +160,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = "{$this->database->name}-$parentUuid";
+                    $this->directory_name = $parentName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -178,8 +183,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('MYSQL_DATABASE not found');
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = "{$this->database->name}-$parentUuid";
+                    $this->directory_name = $parentName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -216,8 +221,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = "{$this->database->name}-$parentUuid";
+                    $this->directory_name = $parentName.'-'.$this->container_name;
 
                     // Try to extract MongoDB credentials from environment variables
                     try {

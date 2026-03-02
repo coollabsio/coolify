@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
@@ -27,7 +28,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +40,12 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +58,23 @@ class ServiceDatabase extends BaseModel
         });
     }
 
-    public function restart()
+    public function restart(): void
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $parentUuid = $this->application ? $this->application->uuid : $this->service->uuid;
+        $container_id = $this->name.'-'.$parentUuid;
+        remote_process(["docker restart {$container_id}"], $this->server());
+    }
+
+    /**
+     * Resolve the server this database container runs on.
+     */
+    public function server(): ?Server
+    {
+        if ($this->application_id) {
+            return data_get($this->application, 'destination.server');
+        }
+
+        return data_get($this->service, 'destination.server');
     }
 
     public function isRunning()
@@ -111,11 +133,15 @@ class ServiceDatabase extends BaseModel
         return "standalone-$finalImage";
     }
 
-    public function getServiceDatabaseUrl()
+    public function getServiceDatabaseUrl(): string
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->server();
+        if (! $server) {
+            return '';
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +150,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
+        if ($this->application_id) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
         return data_get($this, 'service.environment.project.team');
     }
 
-    public function workdir()
+    public function workdir(): string
     {
+        if ($this->application_id) {
+            return base_configuration_dir().'/applications/'.$this->application->uuid;
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
-    public function service()
+    public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

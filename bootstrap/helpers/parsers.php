@@ -681,6 +681,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage($image, $service);
+
+        // Track detected database containers for backup support
+        if ($isDatabase && ! $isPullRequest) {
+            $savedDatabase = ServiceDatabase::firstOrCreate([
+                'name' => $serviceName,
+                'application_id' => $resource->id,
+            ]);
+            if ($savedDatabase->image !== $image->value()) {
+                $savedDatabase->image = $image->value();
+                $savedDatabase->save();
+            }
+        }
+
         $volumesParsed = collect([]);
 
         $baseName = generateApplicationContainerName(
