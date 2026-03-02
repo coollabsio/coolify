@@ -308,7 +308,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
-                        $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
+                        $this->backup_file = "/pg-backup-$database-".Carbon::now()->timestamp.'.dmp';
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
                         }
@@ -523,28 +523,102 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands[] = 'mkdir -p '.$this->backup_dir;
-            $backupCommand = 'docker exec';
-            if ($this->postgres_password) {
-                $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
-            }
+
+            // dump_all remains pg_dumpall for API/file compatibility.
             if ($this->backup->dump_all) {
+                $backupCommand = 'docker exec';
+                if ($this->postgres_password) {
+                    $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
+                }
                 $backupCommand .= " $this->container_name pg_dumpall --username {$this->database->postgres_user} | gzip > $this->backup_location";
-            } else {
-                // Validate and escape database name to prevent command injection
-                validateShellSafePath($database, 'database name');
-                $escapedDatabase = escapeshellarg($database);
-                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $escapedDatabase > $this->backup_location";
+                $commands[] = $backupCommand;
+                $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                $this->backup_output = trim($this->backup_output);
+                if ($this->backup_output === '') {
+                    $this->backup_output = null;
+                }
+
+                return;
             }
 
-            $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
+            // Prefer pgBackRest (incremental) when available in the container.
+            // Fallback to pg_dump to preserve behavior on images without pgBackRest.
+            if ($this->backup_with_pgbackrest($database)) {
+                return;
             }
+
+            $this->backup_with_pg_dump($database, $commands);
         } catch (\Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
+        }
+    }
+
+    private function backup_with_pgbackrest(string $database): bool
+    {
+        validateShellSafePath($database, 'database name');
+        $stanza = 'coolify-'.str($this->container_name)->slug('-')->value();
+        validateShellSafePath($stanza, 'pgbackrest stanza');
+
+        // PostgreSQL 18+ images use /var/lib/postgresql by default.
+        $pg1Path = str($this->database->image)->contains('postgres:18') ? '/var/lib/postgresql' : '/var/lib/postgresql/data';
+        $repoPath = '/var/lib/pgbackrest';
+
+        $checkCommand = "docker exec {$this->container_name} sh -lc 'command -v pgbackrest >/dev/null 2>&1'";
+
+        try {
+            instant_remote_process([$checkCommand], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        $commands = [];
+        $commands[] = "docker exec {$this->container_name} sh -lc 'mkdir -p {$repoPath}'";
+
+        $pgBackrestBase = "pgbackrest --stanza={$stanza} --repo1-path={$repoPath} --pg1-path={$pg1Path} --pg1-user={$this->database->postgres_user}";
+        if ($this->postgres_password) {
+            $commands[] = "docker exec -e PGPASSWORD=\"{$this->postgres_password}\" {$this->container_name} sh -lc '{$pgBackrestBase} --log-level-console=warn stanza-create || true'";
+            $commands[] = "docker exec -e PGPASSWORD=\"{$this->postgres_password}\" {$this->container_name} sh -lc '{$pgBackrestBase} --type=incr --log-level-console=info backup || {$pgBackrestBase} --type=full --log-level-console=info backup'";
+            $commands[] = "docker exec -e PGPASSWORD=\"{$this->postgres_password}\" {$this->container_name} sh -lc '{$pgBackrestBase} --output=json info > /tmp/pgbackrest-info-{$stanza}.json'";
+        } else {
+            $commands[] = "docker exec {$this->container_name} sh -lc '{$pgBackrestBase} --log-level-console=warn stanza-create || true'";
+            $commands[] = "docker exec {$this->container_name} sh -lc '{$pgBackrestBase} --type=incr --log-level-console=info backup || {$pgBackrestBase} --type=full --log-level-console=info backup'";
+            $commands[] = "docker exec {$this->container_name} sh -lc '{$pgBackrestBase} --output=json info > /tmp/pgbackrest-info-{$stanza}.json'";
+        }
+
+        // Keep existing backup API contract: produce a downloadable file at backup_location.
+        $commands[] = "docker cp {$this->container_name}:/tmp/pgbackrest-info-{$stanza}.json {$this->backup_location}";
+        $commands[] = "docker exec {$this->container_name} rm -f /tmp/pgbackrest-info-{$stanza}.json";
+
+        try {
+            $output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $output = trim((string) $output);
+            $this->backup_output = $output === '' ? null : $output;
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->add_to_error_output('pgBackRest failed, falling back to pg_dump: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    private function backup_with_pg_dump(string $database, array $commands): void
+    {
+        validateShellSafePath($database, 'database name');
+        $escapedDatabase = escapeshellarg($database);
+
+        $backupCommand = 'docker exec';
+        if ($this->postgres_password) {
+            $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
+        }
+        $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $escapedDatabase > $this->backup_location";
+
+        $commands[] = $backupCommand;
+        $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+        $this->backup_output = trim((string) $this->backup_output);
+        if ($this->backup_output === '') {
+            $this->backup_output = null;
         }
     }
 
