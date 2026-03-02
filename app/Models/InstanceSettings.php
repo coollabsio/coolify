@@ -31,6 +31,8 @@ class InstanceSettings extends Model
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_oauth_registration_enabled' => 'boolean',
+        'force_oauth_login' => 'boolean',
     ];
 
     protected static function booted(): void
