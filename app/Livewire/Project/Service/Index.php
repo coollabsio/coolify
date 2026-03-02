@@ -53,6 +53,8 @@ class Index extends Component
 
     public ?int $publicPort = null;
 
+    public ?int $publicProxyTimeout = null;
+
     public bool $isPublic = false;
 
     public bool $isLogDrainEnabled = false;
@@ -158,6 +160,7 @@ class Index extends Component
             $this->serviceDatabase->image = $this->image;
             $this->serviceDatabase->exclude_from_status = $this->excludeFromStatus;
             $this->serviceDatabase->public_port = $this->publicPort;
+            $this->serviceDatabase->public_proxy_timeout = $this->publicProxyTimeout;
             $this->serviceDatabase->is_public = $this->isPublic;
             $this->serviceDatabase->is_log_drain_enabled = $this->isLogDrainEnabled;
         } else {
@@ -166,6 +169,7 @@ class Index extends Component
             $this->image = $this->serviceDatabase->image;
             $this->excludeFromStatus = $this->serviceDatabase->exclude_from_status ?? false;
             $this->publicPort = $this->serviceDatabase->public_port;
+            $this->publicProxyTimeout = $this->serviceDatabase->public_proxy_timeout;
             $this->isPublic = $this->serviceDatabase->is_public ?? false;
             $this->isLogDrainEnabled = $this->serviceDatabase->is_log_drain_enabled ?? false;
         }
