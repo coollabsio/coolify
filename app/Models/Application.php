@@ -895,6 +895,11 @@ class Application extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
+    public function serviceDatabases(): HasMany
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function private_key()
     {
         return $this->belongsTo(PrivateKey::class);

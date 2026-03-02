@@ -2418,6 +2418,24 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // Create or update ServiceDatabase records for Application-owned compose databases
+            if ($isDatabase && $pull_request_id === 0) {
+                $existingServiceDb = ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (! $existingServiceDb) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($existingServiceDb->image !== $image) {
+                    $existingServiceDb->image = $image;
+                    $existingServiceDb->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -2795,6 +2813,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             return $service;
         });
+        // Prune ServiceDatabase records for this Application that are no longer in the compose file
+        if ($pull_request_id === 0) {
+            $activeServiceNames = $services->keys()->toArray();
+            ServiceDatabase::where('application_id', $resource->id)
+                ->whereNotIn('name', $activeServiceNames)
+                ->get()
+                ->each->delete();
+        }
+
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
                 $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
