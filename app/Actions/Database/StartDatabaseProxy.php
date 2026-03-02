@@ -66,6 +66,11 @@ class StartDatabaseProxy
     stream {
        server {
             listen $database->public_port;
+            # Keep TCP connections open for long-running downloads/queries.
+            # Without this, some environments can see connections dropped around ~10 minutes.
+            # Nginx stream proxy timeouts are independent from Postgres query timeouts.
+            proxy_connect_timeout 60s;
+            proxy_timeout 12h;
             proxy_pass $containerName:$internalPort;
        }
     }
