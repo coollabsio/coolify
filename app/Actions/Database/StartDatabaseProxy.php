@@ -20,6 +20,27 @@ class StartDatabaseProxy
 
     public string $jobQueue = 'high';
 
+    public static function generateNginxStreamConfig(int $publicPort, string $containerName, int $internalPort): string
+    {
+        return <<<EOF
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log;
+
+    events {
+        worker_connections  1024;
+    }
+    stream {
+       server {
+            listen {$publicPort};
+            proxy_pass {$containerName}:{$internalPort};
+            proxy_timeout 0;
+       }
+    }
+    EOF;
+    }
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
@@ -54,22 +75,7 @@ class StartDatabaseProxy
         if (isDev()) {
             $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
-        $nginxconf = <<<EOF
-    user  nginx;
-    worker_processes  auto;
-
-    error_log  /var/log/nginx/error.log;
-
-    events {
-        worker_connections  1024;
-    }
-    stream {
-       server {
-            listen $database->public_port;
-            proxy_pass $containerName:$internalPort;
-       }
-    }
-    EOF;
+        $nginxconf = self::generateNginxStreamConfig($database->public_port, $containerName, $internalPort);
         $docker_compose = [
             'services' => [
                 $proxyContainerName => [
