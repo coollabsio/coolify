@@ -1562,6 +1562,18 @@ class Service extends BaseModel
             }
         }
 
+        // Inject server-level environment variables (lowest precedence — service vars override these)
+        $server = $this->server;
+        if ($server) {
+            $envs->push('COOLIFY_SERVER_UUID='.$server->uuid);
+            $envs->push('COOLIFY_SERVER_IP='.$server->ip);
+            $envs->push('COOLIFY_SERVER_NAME='.$server->name);
+
+            foreach ($server->environment_variables ?? collect() as $serverEnv) {
+                $envs->push("{$serverEnv->key}={$serverEnv->real_value}");
+            }
+        }
+
         $envs_from_coolify = $this->environment_variables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {

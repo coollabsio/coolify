@@ -1181,6 +1181,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
         });
+
+        // Inject server-level environment variables (lowest precedence — app vars override these)
+        $server = data_get($this->application, 'destination.server');
+        if ($server) {
+            $envs->push('COOLIFY_SERVER_UUID='.$server->uuid);
+            $envs->push('COOLIFY_SERVER_IP='.$server->ip);
+            $envs->push('COOLIFY_SERVER_NAME='.$server->name);
+
+            foreach ($server->environment_variables ?? collect() as $serverEnv) {
+                $envs->push($serverEnv->key.'='.$serverEnv->real_value);
+            }
+        }
+
         if ($this->pull_request_id === 0) {
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
