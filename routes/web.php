@@ -47,6 +47,7 @@ use App\Livewire\Server\CloudflareTunnel;
 use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
+use App\Livewire\Server\EnvironmentVariables as ServerEnvironmentVariables;
 use App\Livewire\Server\DockerCleanup;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
@@ -256,6 +257,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/environment-variables', ServerEnvironmentVariables::class)->name('server.environment-variables');
         Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
         Route::get('/sentinel', ServerSentinel::class)->name('server.sentinel');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
