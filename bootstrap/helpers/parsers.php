@@ -1317,15 +1317,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // Preserve user-defined env_file entries from the compose file, but do NOT auto-inject .env
+        // The .env file in the compose directory is used for Docker Compose YAML variable interpolation only.
+        // Runtime environment variables are passed via the per-service 'environment' section above.
+        // Auto-injecting .env as env_file leaks ALL environment variables into EVERY container,
+        // which is a security issue (e.g., POSTGRES_PASSWORD visible in the app container).
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->reject(fn ($f) => $f === '.env')
+                ->unique()
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -2416,15 +2422,19 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // Preserve user-defined env_file entries from the compose file, but do NOT auto-inject .env
+        // The .env file is used for Docker Compose YAML variable interpolation only.
+        // Runtime environment variables are passed via the per-service 'environment' section above.
         $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        if (! is_null($existingEnvFiles)) {
+            $envFiles = collect(is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles])
+                ->reject(fn ($f) => $f === '.env')
+                ->unique()
+                ->values();
+            if ($envFiles->isNotEmpty()) {
+                $payload['env_file'] = $envFiles;
+            }
+        }
 
         $parsedServices->put($serviceName, $payload);
     }
