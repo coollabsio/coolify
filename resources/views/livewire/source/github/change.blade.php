@@ -1,231 +1,30 @@
 <div>
     @if (data_get($github_app, 'app_id'))
-        <form wire:submit='submit'>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1>GitHub App</h1>
-                <div class="flex gap-2">
-                    @if (data_get($github_app, 'installation_id'))
-                        <x-forms.button canGate="update" :canResource="$github_app" type="submit">Save</x-forms.button>
-                    @endif
-                    @can('delete', $github_app)
-                        @if ($applications->count() > 0)
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @else
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name"
-                                confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @endif
-                    @endcan
-                </div>
-            </div>
-            <div class="subtitle">Your Private GitHub App for private repositories.</div>
-            @if (!data_get($github_app, 'installation_id'))
-                <div class="mb-10 rounded-sm alert-error">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>You must complete this step before you can use this source!</span>
-                </div>
-                <a class="items-center justify-center coolbox" href="{{ getInstallationPath($github_app) }}">
-                    Install Repositories on GitHub
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <h1>GitHub App</h1>
+        </div>
+        <div class="subtitle ">{{ data_get($github_app, 'name') }}</div>
+        <div class="navbar-main mb-5">
+            <nav class="flex items-center gap-4 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
+                <a class="{{ request()->routeIs('source.github.show') ? 'dark:text-white' : '' }}"
+                    href="{{ route('source.github.show', ['github_app_uuid' => data_get($github_app, 'uuid')]) }}"
+                    {{ wireNavigate() }}>
+                    General
                 </a>
-            @else
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2 w-full">
-                            <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App Name" />
-                            <x-forms.button canGate="update" :canResource="$github_app" wire:click.prevent="updateGithubAppName">
-                                Sync Name
-                            </x-forms.button>
-                            @can('update', $github_app)
-                                <a href="{{ $this->getGithubAppNameUpdatePath() }}">
-                                    <x-forms.button
-                                        class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline">
-                                        Rename
-                                        <x-external-link />
-                                    </x-forms.button>
-                                </a>
-                                <a href="{{ getInstallationPath($github_app) }}" class="w-fit">
-                                    <x-forms.button
-                                        class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline whitespace-nowrap">
-                                        Update Repositories
-                                        <x-external-link />
-                                    </x-forms.button>
-                                </a>
-                            @endcan
-                        </div>
-                    </div>
-                    <x-forms.input canGate="update" :canResource="$github_app" id="organization" label="Organization"
-                        placeholder="If empty, personal user will be used" />
-                    @if (!isCloud())
-                        <div class="w-48">
-                            <x-forms.checkbox canGate="update" :canResource="$github_app" label="System Wide?"
-                                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                                instantSave id="isSystemWide" />
-                        </div>
-                        @if ($isSystemWide)
-                            <x-callout type="warning" title="Not Recommended">
-                                System-wide GitHub Apps are shared across all teams on this Coolify instance. This means any team can use this GitHub App to deploy applications from your repositories. For better security and isolation, it's recommended to create team-specific GitHub Apps instead.
-                            </x-callout>
-                        @endif
-                    @endif
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl" label="HTML Url" />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="apiUrl" label="API Url" />
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="customUser" label="User"
-                            required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="customPort"
-                            label="Port" required />
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
-                            label="App Id" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                            id="installationId" label="Installation Id" required />
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="clientId" label="Client Id"
-                            type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
-                            label="Client Secret" type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
-                            label="Webhook Secret" type="password" required />
-                    </div>
-                    <div class="flex gap-2">
-                        <x-forms.select canGate="update" :canResource="$github_app" id="privateKeyId"
-                            label="Private Key" required>
-                            @if (blank($github_app->private_key_id))
-                                <option value="0" selected>Select a private key</option>
-                            @endif
-                            @foreach ($privateKeys as $privateKey)
-                                <option value="{{ $privateKey->id }}">{{ $privateKey->name }}</option>
-                            @endforeach
-                        </x-forms.select>
-                    </div>
-                    <div class="flex flex-col sm:flex-row items-start sm:items-end gap-2">
-                        <h2 class="pt-4">Permissions</h2>
-                        @can('view', $github_app)
-                            <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                            <a href="{{ getPermissionsPath($github_app) }}">
-                                <x-forms.button>
-                                    Update
-                                    <x-external-link />
-                                </x-forms.button>
-                            </a>
-                        @endcan
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <x-forms.input id="contents" helper="read - mandatory." label="Content" readonly
-                            placeholder="N/A" />
-                        <x-forms.input id="metadata" helper="read - mandatory." label="Metadata" readonly
-                            placeholder="N/A" />
-                        {{-- <x-forms.input id="administration"
-                            helper="read:write access needed to setup servers as GitHub Runner." label="Administration"
-                            readonly placeholder="N/A" /> --}}
-                        <x-forms.input id="pullRequests"
-                            helper="write access needed to use deployment status update in previews."
-                            label="Pull Request" readonly placeholder="N/A" />
-                        <x-forms.input id="organizationSelfHostedRunners"
-                            helper="write access needed to use GitHub Actions self-hosted runners."
-                            label="Runners" readonly placeholder="N/A" />
-                    </div>
-                    <h3 class="pt-4">Webhook Events</h3>
-                    @if ($webhookEvents)
-                        <div class="flex flex-wrap gap-2">
-                            @foreach ($webhookEvents as $event)
-                                <span class="px-2 py-1 text-xs font-mono rounded dark:bg-coolgray-200 bg-neutral-200">{{ $event }}</span>
-                            @endforeach
-                        </div>
-                        @php
-                            $missingEvents = $github_app->missingWebhookEvents();
-                        @endphp
-                        @if (!empty($missingEvents))
-                            <div class="text-xs text-warning">
-                                Missing required events (will be auto-enabled on Refetch): {{ implode(', ', $missingEvents) }}
-                            </div>
-                        @endif
-                    @else
-                        <div class="text-xs opacity-70">
-                            No webhook event data yet. Click Refetch above to fetch current events.
-                        </div>
-                    @endif
-                </div>
-            @endif
-        </form>
-        @if (data_get($github_app, 'installation_id'))
-            <div class="w-full pt-10">
-                <div class="h-full">
-                    <div class="flex flex-col">
-                        <div class="flex gap-2">
-                            <h2>Resources</h2>
-                        </div>
-                        <div class="pb-4 title">Here you can find all resources that are using this source.</div>
-                    </div>
-                    @if ($applications->isEmpty())
-                        <div class="py-4 text-sm opacity-70">
-                            No resources are currently using this GitHub App.
-                        </div>
-                    @else
-                        <div class="flex flex-col">
-                            <div class="flex flex-col">
-                                <div class="overflow-x-auto">
-                                    <div class="inline-block min-w-full">
-                                        <div class="overflow-hidden">
-                                            <table class="min-w-full">
-                                                <thead>
-                                                    <tr>
-                                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                            Project
-                                                        </th>
-                                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                            Environment</th>
-                                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
-                                                        </th>
-                                                        <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="divide-y">
-                                                    @foreach ($applications->sortBy('name',SORT_NATURAL) as $resource)
-                                                        <tr>
-                                                            <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                                {{ data_get($resource->project(), 'name') }}
-                                                            </td>
-                                                            <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                                {{ data_get($resource, 'environment.name') }}
-                                                            </td>
-                                                            <td class="px-5 py-4 text-sm whitespace-nowrap"><a
-                                                                    class=""
-                                                                    {{ wireNavigate() }}
-                                                                    href="{{ $resource->link() }}">{{ $resource->name }}
-                                                                    <x-internal-link /></a>
-                                                            </td>
-                                                            <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                                {{ str($resource->type())->headline() }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        @endif
+                <a class="{{ request()->routeIs('source.github.permissions-events') ? 'dark:text-white' : '' }}"
+                    href="{{ route('source.github.permissions-events', ['github_app_uuid' => data_get($github_app, 'uuid')]) }}"
+                    {{ wireNavigate() }}>
+                    Permissions & Events
+                </a>
+                <a class="{{ request()->routeIs('source.github.resources') ? 'dark:text-white' : '' }}"
+                    href="{{ route('source.github.resources', ['github_app_uuid' => data_get($github_app, 'uuid')]) }}"
+                    {{ wireNavigate() }}>
+                    Resources
+                </a>
+            </nav>
+        </div>
+        <livewire:source.github.tabs.general :github-app-uuid="data_get($github_app, 'uuid')"
+            :key="'source-github-tab-general-'.data_get($github_app, 'uuid')" />
     @else
         <div class="flex flex-col sm:flex-row sm:items-center gap-2 pb-4">
             <h1>GitHub App</h1>
