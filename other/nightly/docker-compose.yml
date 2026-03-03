@@ -17,6 +17,21 @@ services:
         restart: always
         networks:
             - coolify
+
+    pgbackrest:
+        image: pogryzov/pgbackrest:2
+        container_name: coolify-pgbackrest
+        restart: always
+        networks:
+            - coolify
+        volumes:
+            - coolify-db:/var/lib/postgresql/data
+            - ./pgbackrest-repo:/var/lib/pgbackrest
+        environment:
+            - PGBACKREST_REPO1_PATH=/var/lib/pgbackrest
+            - PGBACKREST_REPO1_RETENTION_FULL=2
+            - PGBACKREST_REPO1_RETENTION_DIFF=6
+            - PGBACKREST_STANZA=main
     redis:
         image: redis:alpine
         container_name: coolify-redis
@@ -35,3 +50,6 @@ networks:
         name: coolify
         driver: bridge
         external: false
+
+volumes:
+    pgbackrest-repo:
