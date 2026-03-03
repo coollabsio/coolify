@@ -94,7 +94,7 @@ it('auto-fixes missing events by patching github api', function () {
 
 it('does not patch when no events are missing', function () {
     $app = setupGithubAppWithKey([
-        'webhook_events' => ['push', 'installation'],
+        'webhook_events' => ['push'],
     ]);
 
     expect($app->missingWebhookEvents())->toBe([]);
