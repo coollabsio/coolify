@@ -140,6 +140,26 @@
                             helper="write access needed to use GitHub Actions self-hosted runners."
                             label="Runners" readonly placeholder="N/A" />
                     </div>
+                    <h3 class="pt-4">Webhook Events</h3>
+                    @if ($webhookEvents)
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($webhookEvents as $event)
+                                <span class="px-2 py-1 text-xs font-mono rounded dark:bg-coolgray-200 bg-neutral-200">{{ $event }}</span>
+                            @endforeach
+                        </div>
+                        @php
+                            $missingEvents = $github_app->missingWebhookEvents();
+                        @endphp
+                        @if (!empty($missingEvents))
+                            <div class="text-xs text-warning">
+                                Missing required events (will be auto-enabled on Refetch): {{ implode(', ', $missingEvents) }}
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-xs opacity-70">
+                            No webhook event data yet. Click Refetch above to fetch current events.
+                        </div>
+                    @endif
                 </div>
             @endif
         </form>
@@ -323,6 +343,7 @@
                     }
                     if (administration) {
                         default_permissions.administration = 'write';
+                        default_events.push('workflow_job');
                     }
 
                     const data = {

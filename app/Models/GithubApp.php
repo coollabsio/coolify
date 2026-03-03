@@ -15,6 +15,8 @@ class GithubApp extends BaseModel
         'is_system_wide' => 'boolean',
         'type' => 'string',
         'runner_group_id' => 'integer',
+        'runner_group_name' => 'string',
+        'webhook_events' => 'array',
     ];
 
     protected $hidden = [
@@ -92,6 +94,28 @@ class GithubApp extends BaseModel
     public function runnerConfigs()
     {
         return $this->hasMany(GithubRunnerConfig::class);
+    }
+
+    public function requiredWebhookEvents(): array
+    {
+        $events = ['push'];
+
+        if ($this->pull_requests === 'write') {
+            $events[] = 'pull_request';
+        }
+
+        if ($this->runnerConfigs()->exists()) {
+            $events[] = 'workflow_job';
+        }
+
+        return $events;
+    }
+
+    public function missingWebhookEvents(): array
+    {
+        $current = $this->webhook_events ?? [];
+
+        return array_values(array_diff($this->requiredWebhookEvents(), $current));
     }
 
     public function type(): Attribute

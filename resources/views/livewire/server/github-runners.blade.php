@@ -118,6 +118,12 @@
                     </div>
 
                     <div class="flex gap-4">
+                        <x-forms.input canGate="update" :canResource="$server" id="runnerGroupName"
+                            label="Runner Group Name (optional)"
+                            helper="If set, Coolify will enforce this GitHub organization runner group name during sync." />
+                    </div>
+
+                    <div class="flex gap-4">
                         <x-forms.input canGate="update" :canResource="$server" id="labels"
                             label="Labels (comma-separated)" required
                             helper="Labels for routing workflow jobs to this server. Workflows use runs-on to match these labels." />
@@ -176,76 +182,8 @@
                 </div>
             @endif
 
-            {{-- Executions --}}
             @if ($this->config)
-                <div class="mt-8" wire:poll.10s>
-                    <h3 class="mb-4">Recent Executions</h3>
-                    @if ($this->recentExecutions->isEmpty())
-                        <div class="text-sm text-neutral-500">No runner executions yet. When a workflow job matches this server's labels, it will appear here.</div>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead>
-                                    <tr class="text-left border-b border-neutral-700">
-                                        <th class="pb-2 pr-4">Runner</th>
-                                        <th class="pb-2 pr-4">Workflow</th>
-                                        <th class="pb-2 pr-4">Repository</th>
-                                        <th class="pb-2 pr-4">Status</th>
-                                        <th class="pb-2 pr-4">Duration</th>
-                                        <th class="pb-2 pr-4">Started</th>
-                                        <th class="pb-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($this->recentExecutions as $execution)
-                                        <tr class="border-b border-neutral-800">
-                                            <td class="py-2 pr-4 font-mono text-xs">{{ $execution->runner_name }}</td>
-                                            <td class="py-2 pr-4">{{ $execution->workflow_name ?? '-' }}</td>
-                                            <td class="py-2 pr-4">{{ $execution->repository_full_name ?? '-' }}</td>
-                                            <td class="py-2 pr-4">
-                                                @switch($execution->status->value)
-                                                    @case('queued')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-warning/20 text-warning">Queued</span>
-                                                        @break
-                                                    @case('provisioning')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400">Provisioning</span>
-                                                        @break
-                                                    @case('running')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-success/20 text-success">Running</span>
-                                                        @break
-                                                    @case('completed')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-neutral-500/20 text-neutral-400">Completed</span>
-                                                        @break
-                                                    @case('failed')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-error/20 text-error">Failed</span>
-                                                        @break
-                                                    @case('timed_out')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-orange-500/20 text-orange-400">Timed Out</span>
-                                                        @break
-                                                    @case('cleaning')
-                                                        <span class="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400">Cleaning</span>
-                                                        @break
-                                                @endswitch
-                                            </td>
-                                            <td class="py-2 pr-4">{{ $execution->duration() ?? '-' }}</td>
-                                            <td class="py-2 pr-4">{{ $execution->started_at?->diffForHumans() ?? $execution->created_at->diffForHumans() }}</td>
-                                            <td class="py-2">
-                                                @if ($execution->isActive())
-                                                    <x-forms.button wire:click="cancelExecution({{ $execution->id }})"
-                                                        wire:confirm="Cancel this runner? This will kill the process, remove the runner directory, and deregister from GitHub."
-                                                        canGate="update" :canResource="$server"
-                                                        class="!py-0.5 !px-2 !text-xs">
-                                                        Cancel
-                                                    </x-forms.button>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
+                <livewire:server.github-runner-executions :server="$server" />
             @endif
         </div>
     </div>

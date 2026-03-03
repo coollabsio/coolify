@@ -46,13 +46,41 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
             $this->github_app->administration = data_get($permissions, 'administration');
             $this->github_app->organization_self_hosted_runners = data_get($permissions, 'organization_self_hosted_runners');
+            $this->github_app->webhook_events = data_get($response, 'events', []);
 
             $this->github_app->save();
+
+            $this->autoFixMissingEvents($github_access_token);
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
         } catch (\Throwable $e) {
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
             throw $e;
+        }
+    }
+
+    private function autoFixMissingEvents(string $github_access_token): void
+    {
+        $missing = $this->github_app->missingWebhookEvents();
+
+        if (empty($missing)) {
+            return;
+        }
+
+        $updatedEvents = array_values(array_unique(
+            array_merge($this->github_app->webhook_events ?? [], $missing)
+        ));
+
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer $github_access_token",
+            'Accept' => 'application/vnd.github+json',
+        ])->patch("{$this->github_app->api_url}/app", [
+            'events' => $updatedEvents,
+        ]);
+
+        if ($response->successful()) {
+            $this->github_app->webhook_events = data_get($response->json(), 'events', $updatedEvents);
+            $this->github_app->save();
         }
     }
 }

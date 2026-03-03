@@ -6,9 +6,9 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\Server;
-use App\Models\ServerSetting;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -26,11 +26,10 @@ function makeRunnerSetup(array $configOverrides = []): array
     ]);
     $server = Server::factory()->create(['private_key_id' => $privateKeyId, 'team_id' => $team->id]);
 
-    // Create functional server settings so isFunctional() returns true
-    ServerSetting::updateOrCreate(
-        ['server_id' => $server->id],
-        ['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false],
-    );
+    // Make server functional — Server::created() auto-creates settings with is_reachable=false.
+    // force_disabled must be explicitly set because it's not cast to boolean on ServerSetting.
+    $server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $server->refresh();
 
     $githubApp = GithubApp::create([
         'name' => 'test-app',
@@ -67,6 +66,7 @@ function makeJob(GithubApp $githubApp, array $overrides = []): ProvisionGithubRu
         ], $overrides['payload'] ?? []),
         organizationLogin: 'test-org',
         repositoryId: 0,
+        repositoryFullName: $overrides['repositoryFullName'] ?? null,
         capacityWaitStartedAt: $overrides['capacityWaitStartedAt'] ?? null,
     );
 }
@@ -224,6 +224,24 @@ it('still re-dispatches when wait time is within the custom timeout', function (
     Queue::assertPushed(ProvisionGithubRunnerJob::class, fn ($j) => $j->workflowJobPayload['id'] === 44002);
 });
 
+it('counts cleaning executions as active capacity', function () {
+    ['config' => $config, 'server' => $server] = makeRunnerSetup(['max_runners' => 1]);
+
+    GithubRunnerExecution::create([
+        'server_id' => $server->id,
+        'github_runner_config_id' => $config->id,
+        'status' => GithubRunnerStatus::Cleaning,
+        'runner_name' => 'coolify-cleaning',
+        'runner_dir' => '/opt/github-runners/coolify-cleaning',
+        'workflow_job_id' => 41001,
+        'pid' => 12345,
+        'started_at' => now()->subMinutes(1),
+    ]);
+
+    expect($config->fresh()->activeRunnerCount())->toBe(1)
+        ->and($config->fresh()->hasCapacity())->toBeFalse();
+});
+
 it('does not re-dispatch when the job has already been provisioned (idempotency)', function () {
     Queue::fake();
     ['githubApp' => $githubApp, 'config' => $config, 'server' => $server] = makeRunnerSetup();
@@ -244,5 +262,68 @@ it('does not re-dispatch when the job has already been provisioned (idempotency)
 
     // Should exit early — no new jobs dispatched, existing execution count unchanged
     expect(GithubRunnerExecution::where('workflow_job_id', 33001)->count())->toBe(1);
+    Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+});
+
+it('does not re-dispatch when github reports the workflow job as cancelled', function () {
+    Queue::fake();
+    Http::fake([
+        'https://api.github.com/repos/test-org/test-repo/actions/jobs/21002' => Http::response([
+            'status' => 'completed',
+            'conclusion' => 'cancelled',
+        ], 200),
+    ]);
+
+    ['githubApp' => $githubApp, 'config' => $config, 'server' => $server] = makeRunnerSetup(['max_runners' => 1]);
+    $githubApp->update(['is_public' => true]);
+
+    GithubRunnerExecution::create([
+        'server_id' => $server->id,
+        'github_runner_config_id' => $config->id,
+        'status' => GithubRunnerStatus::Running,
+        'runner_name' => 'coolify-existing',
+        'runner_dir' => '/opt/github-runners/coolify-existing',
+        'workflow_job_id' => 21001,
+        'pid' => 12345,
+        'started_at' => now()->subMinutes(2),
+    ]);
+
+    $job = makeJob($githubApp, [
+        'payload' => ['id' => 21002, 'labels' => ['self-hosted', 'coolify'], 'workflow_name' => 'CI'],
+        'repositoryFullName' => 'test-org/test-repo',
+    ]);
+    $job->handle();
+
+    expect(GithubRunnerExecution::where('workflow_job_id', 21002)->exists())->toBeFalse();
+    Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+});
+
+it('does not re-dispatch when github reports the workflow job as missing', function () {
+    Queue::fake();
+    Http::fake([
+        'https://api.github.com/repos/test-org/test-repo/actions/jobs/20002' => Http::response([], 404),
+    ]);
+
+    ['githubApp' => $githubApp, 'config' => $config, 'server' => $server] = makeRunnerSetup(['max_runners' => 1]);
+    $githubApp->update(['is_public' => true]);
+
+    GithubRunnerExecution::create([
+        'server_id' => $server->id,
+        'github_runner_config_id' => $config->id,
+        'status' => GithubRunnerStatus::Running,
+        'runner_name' => 'coolify-existing',
+        'runner_dir' => '/opt/github-runners/coolify-existing',
+        'workflow_job_id' => 20001,
+        'pid' => 12345,
+        'started_at' => now()->subMinutes(2),
+    ]);
+
+    $job = makeJob($githubApp, [
+        'payload' => ['id' => 20002, 'labels' => ['self-hosted', 'coolify'], 'workflow_name' => 'CI'],
+        'repositoryFullName' => 'test-org/test-repo',
+    ]);
+    $job->handle();
+
+    expect(GithubRunnerExecution::where('workflow_job_id', 20002)->exists())->toBeFalse();
     Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
 });

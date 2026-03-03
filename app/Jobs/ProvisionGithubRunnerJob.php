@@ -33,6 +33,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
         public array $workflowJobPayload,
         public string $organizationLogin,
         public int $repositoryId = 0,
+        public ?string $repositoryFullName = null,
         public ?string $capacityWaitStartedAt = null,
     ) {
         $this->onQueue('high');
@@ -40,7 +41,11 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        $workflowJobId = data_get($this->workflowJobPayload, 'id');
+        $workflowJobId = (int) data_get($this->workflowJobPayload, 'id');
+
+        if ($workflowJobId <= 0) {
+            return;
+        }
 
         // Idempotency: skip if already provisioning for this job
         if (GithubRunnerExecution::where('workflow_job_id', $workflowJobId)->exists()) {
@@ -49,6 +54,10 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
         $githubApp = GithubApp::find($this->githubAppId);
         if (! $githubApp) {
+            return;
+        }
+
+        if (! $this->shouldContinueProvisioning($githubApp, $workflowJobId)) {
             return;
         }
 
@@ -75,8 +84,15 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ? \Carbon\Carbon::parse($this->capacityWaitStartedAt)
                 : now();
 
-            if (now()->diffInMinutes($waitStartedAt) >= $timeoutMinutes) {
+            $waitedMinutes = $waitStartedAt->diffInMinutes(now(), absolute: true);
+
+            if ($waitedMinutes >= $timeoutMinutes) {
                 // Gave up waiting — log and drop so GitHub eventually cancels the job
+                ray("[provision] Gave up waiting for capacity after {$waitedMinutes}m", [
+                    'workflow_job_id' => $workflowJobId,
+                    'labels' => $requestedLabels,
+                    'timeout_minutes' => $timeoutMinutes,
+                ]);
                 logger()->warning('ProvisionGithubRunnerJob: gave up waiting for capacity', [
                     'workflow_job_id' => $workflowJobId,
                     'labels' => $requestedLabels,
@@ -86,12 +102,21 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $firstConfig = $matchingConfigs->first();
+            ray("[provision] At capacity for workflow_job_id {$workflowJobId} — retrying in 15s", [
+                'active' => $firstConfig->activeRunnerCount(),
+                'max' => $firstConfig->max_runners,
+                'waited_minutes' => $waitedMinutes,
+                'timeout_minutes' => $timeoutMinutes,
+            ]);
+
             // Dispatch a new job in 15 seconds carrying the wait start timestamp
             static::dispatch(
                 githubAppId: $this->githubAppId,
                 workflowJobPayload: $this->workflowJobPayload,
                 organizationLogin: $this->organizationLogin,
                 repositoryId: $this->repositoryId,
+                repositoryFullName: $this->repositoryFullNameOrNull(),
                 capacityWaitStartedAt: $this->capacityWaitStartedAt ?? now()->toIso8601String(),
             )->delay(15);
 
@@ -108,9 +133,10 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             'runner_name' => $runnerName,
             'runner_dir' => $runnerDir,
             'workflow_job_id' => $workflowJobId,
+            'workflow_job_html_url' => data_get($this->workflowJobPayload, 'html_url'),
             'workflow_name' => data_get($this->workflowJobPayload, 'workflow_name'),
             'repository_full_name' => data_get($this->workflowJobPayload, 'repository.full_name',
-                data_get($this->workflowJobPayload, 'head_repository.full_name')
+                data_get($this->workflowJobPayload, 'head_repository.full_name', $this->repositoryFullNameOrNull())
             ),
         ]);
 
@@ -168,21 +194,32 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
     {
         $token = generateGithubInstallationToken($githubApp);
         $apiUrl = $githubApp->api_url ?? 'https://api.github.com';
+        $groupName = $this->resolveRunnerGroupName($githubApp);
 
         if ($githubApp->runner_group_id) {
-            // Ensure existing group allows public repos
-            Http::withHeaders([
+            // Keep existing group settings and name in sync with Coolify.
+            $response = Http::withHeaders([
                 'Authorization' => "Bearer {$token}",
                 'Accept' => 'application/vnd.github+json',
                 'X-GitHub-Api-Version' => '2022-11-28',
             ])->patch("{$apiUrl}/orgs/{$githubApp->organization}/actions/runner-groups/{$githubApp->runner_group_id}", [
+                'name' => $groupName,
                 'allows_public_repositories' => true,
             ]);
 
-            return $githubApp->runner_group_id;
-        }
+            if ($response->successful()) {
+                return $githubApp->runner_group_id;
+            }
 
-        $groupName = 'Coolify-'.((string) new Cuid2(7));
+            if ($response->status() !== 404) {
+                throw new \RuntimeException(
+                    'Failed to sync runner group: '.data_get($response->json(), 'message', $response->body())
+                );
+            }
+
+            $githubApp->update(['runner_group_id' => null]);
+            $githubApp->refresh();
+        }
 
         $response = Http::withHeaders([
             'Authorization' => "Bearer {$token}",
@@ -201,9 +238,24 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $runnerGroupId = (int) data_get($response->json(), 'id');
-        $githubApp->update(['runner_group_id' => $runnerGroupId]);
+        $githubApp->update([
+            'runner_group_id' => $runnerGroupId,
+            'runner_group_name' => $groupName,
+        ]);
 
         return $runnerGroupId;
+    }
+
+    private function resolveRunnerGroupName(GithubApp $githubApp): string
+    {
+        $groupName = trim((string) $githubApp->runner_group_name);
+
+        if ($groupName === '') {
+            $groupName = 'Coolify-'.((string) new Cuid2(7));
+            $githubApp->update(['runner_group_name' => $groupName]);
+        }
+
+        return preg_replace('/\s+/', ' ', $groupName) ?? $groupName;
     }
 
     private function ensureRepositoryInRunnerGroup(GithubApp $githubApp, int $runnerGroupId): void
@@ -286,6 +338,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             "if [ ! -f {$cacheDir}/{$tarball} ]; then curl -sL https://github.com/actions/runner/releases/download/v{$version}/{$tarball} -o {$cacheDir}/{$tarball}; fi",
             "if [ ! -d {$templateDir} ]; then mkdir -p {$templateDir} && tar xzf {$cacheDir}/{$tarball} -C {$templateDir} && chown -R {$user}:{$user} {$templateDir}; fi",
             "cp -r {$templateDir}/. {$runnerDir}",
+            "touch {$cacheDir}/{$tarball} {$templateDir}",
             "chown -R {$user}:{$user} {$runnerDir}",
         ], $server);
 
@@ -332,5 +385,61 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         return '2.321.0';
+    }
+
+    private function repositoryFullNameOrNull(): ?string
+    {
+        // Backward compatibility: older serialized jobs may not have this promoted property initialized.
+        return isset($this->repositoryFullName) ? $this->repositoryFullName : null;
+    }
+
+    private function shouldContinueProvisioning(GithubApp $githubApp, int $workflowJobId): bool
+    {
+        $repositoryFullName = $this->repositoryFullNameOrNull()
+            ?? data_get($this->workflowJobPayload, 'repository.full_name')
+            ?? data_get($this->workflowJobPayload, 'head_repository.full_name');
+
+        if (! is_string($repositoryFullName) || trim($repositoryFullName) === '') {
+            return true;
+        }
+
+        try {
+            $apiUrl = $githubApp->api_url ?? 'https://api.github.com';
+            $headers = [
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+            ];
+            if (! $githubApp->is_public) {
+                $token = generateGithubInstallationToken($githubApp);
+                $headers['Authorization'] = "Bearer {$token}";
+            }
+
+            $response = Http::withHeaders($headers)
+                ->get("{$apiUrl}/repos/{$repositoryFullName}/actions/jobs/{$workflowJobId}");
+
+            if ($response->status() === 404) {
+                ray("[provision] workflow_job_id {$workflowJobId} no longer exists — skipping provisioning");
+
+                return false;
+            }
+
+            if (! $response->successful()) {
+                return true;
+            }
+
+            $status = data_get($response->json(), 'status');
+            $conclusion = data_get($response->json(), 'conclusion');
+            $isDone = $status === 'completed' || $conclusion === 'cancelled';
+
+            if ($isDone) {
+                ray("[provision] workflow_job_id {$workflowJobId} is {$status} ({$conclusion}) — skipping provisioning");
+
+                return false;
+            }
+        } catch (\Throwable) {
+            return true;
+        }
+
+        return true;
     }
 }

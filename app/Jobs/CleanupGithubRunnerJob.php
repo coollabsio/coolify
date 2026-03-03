@@ -33,23 +33,43 @@ class CleanupGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        ray("[cleanup] Starting cleanup for workflow_job_id {$this->workflowJobId}");
+
         $execution = GithubRunnerExecution::where('workflow_job_id', $this->workflowJobId)
             ->with('config.githubApp')
             ->first();
 
         if (! $execution) {
+            ray("[cleanup] No execution found for workflow_job_id {$this->workflowJobId} — skipping");
+
             return;
         }
 
         // Already cleaned up
         if (in_array($execution->status, [GithubRunnerStatus::Completed, GithubRunnerStatus::Failed])) {
+            ray("[cleanup] Execution {$execution->id} already in {$execution->status->value} — skipping");
+
             return;
         }
 
+        ray("[cleanup] Execution {$execution->id} transitioning from {$execution->status->value} → cleaning");
         $execution->update(['status' => GithubRunnerStatus::Cleaning]);
 
         try {
             $server = $execution->server;
+
+            if (! $server || ! $server->isFunctional()) {
+                ray("[cleanup] Server not functional for execution {$execution->id}; marking failed to release capacity");
+                $this->deregisterFromGithub($execution);
+
+                $execution->update([
+                    'status' => GithubRunnerStatus::Failed,
+                    'error_message' => 'Cleanup skipped: server is not functional.',
+                    'completed_at' => now(),
+                ]);
+
+                return;
+            }
 
             if ($execution->pid) {
                 instant_remote_process([
@@ -69,13 +89,33 @@ class CleanupGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 'status' => GithubRunnerStatus::Completed,
                 'completed_at' => now(),
             ]);
+
+            ray("[cleanup] Execution {$execution->id} completed successfully");
         } catch (\Throwable $e) {
+            ray("[cleanup] Execution {$execution->id} cleanup failed: {$e->getMessage()}");
             $execution->update([
                 'status' => GithubRunnerStatus::Failed,
                 'error_message' => 'Cleanup failed: '.$e->getMessage(),
                 'completed_at' => now(),
             ]);
         }
+    }
+
+    public function failed(?\Throwable $exception): void
+    {
+        GithubRunnerExecution::query()
+            ->where('workflow_job_id', $this->workflowJobId)
+            ->whereIn('status', [
+                GithubRunnerStatus::Queued,
+                GithubRunnerStatus::Provisioning,
+                GithubRunnerStatus::Running,
+                GithubRunnerStatus::Cleaning,
+            ])
+            ->update([
+                'status' => GithubRunnerStatus::Failed,
+                'error_message' => 'Cleanup failed: '.($exception?->getMessage() ?? 'unknown error'),
+                'completed_at' => now(),
+            ]);
     }
 
     private function deregisterFromGithub(GithubRunnerExecution $execution): void

@@ -32,10 +32,10 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
-            Log::warning('ServerStorageCheckJob timed out', [
-                'server_id' => $this->server->id,
-                'server_name' => $this->server->name,
-            ]);
+            // Log::warning('ServerStorageCheckJob timed out', [
+            //     'server_id' => $this->server->id,
+            //     'server_name' => $this->server->name,
+            // ]);
 
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();

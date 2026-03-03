@@ -10,8 +10,10 @@ use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class GithubRunners extends Component
 {
@@ -22,6 +24,9 @@ class GithubRunners extends Component
     public array $parameters = [];
 
     public ?int $selectedGithubAppId = null;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $runnerGroupName = null;
 
     #[Validate(['required', 'string', 'min:1'])]
     public string $labels = 'self-hosted,coolify';
@@ -52,6 +57,8 @@ class GithubRunners extends Component
     public bool $repositoriesLoading = false;
 
     public bool $skipNextSelectedAppReload = false;
+
+    public ?string $originalRunnerGroupName = null;
 
     public function mount(string $server_uuid): void
     {
@@ -87,15 +94,6 @@ class GithubRunners extends Component
     }
 
     #[Computed]
-    public function recentExecutions()
-    {
-        return GithubRunnerExecution::where('server_id', $this->server->id)
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
-    }
-
-    #[Computed]
     public function selectedApp(): ?GithubApp
     {
         if (! $this->selectedGithubAppId) {
@@ -116,6 +114,8 @@ class GithubRunners extends Component
         $config = $this->server->githubRunnerConfig;
         if ($config) {
             $this->selectedGithubAppId = $config->github_app_id;
+            $this->runnerGroupName = $config->githubApp?->runner_group_name;
+            $this->originalRunnerGroupName = $this->normalizeRunnerGroupName($this->runnerGroupName);
             $this->skipNextSelectedAppReload = true;
             $this->labels = implode(',', $config->labels ?? []);
             $this->maxRunners = $config->max_runners;
@@ -144,6 +144,8 @@ class GithubRunners extends Component
             return;
         }
 
+        $this->runnerGroupName = $this->selectedApp?->runner_group_name;
+        $this->originalRunnerGroupName = $this->normalizeRunnerGroupName($this->runnerGroupName);
         $this->repositoriesLoaded = true;
         $this->loadAccessibleRepositories();
     }
@@ -199,6 +201,27 @@ class GithubRunners extends Component
                 throw new \Exception('Please select a GitHub App.');
             }
 
+            $runnerGroupName = $this->normalizeRunnerGroupName($this->runnerGroupName);
+            if ($runnerGroupName === null) {
+                $runnerGroupName = $this->generateDefaultRunnerGroupName();
+                $this->runnerGroupName = $runnerGroupName;
+            }
+            $runnerGroupNameIsDirty = $runnerGroupName !== $this->originalRunnerGroupName;
+
+            if ($runnerGroupNameIsDirty) {
+                GithubApp::query()
+                    ->whereKey($this->selectedGithubAppId)
+                    ->update(['runner_group_name' => $runnerGroupName]);
+                $this->runnerGroupName = $runnerGroupName;
+
+                $selectedGithubApp = GithubApp::query()->find($this->selectedGithubAppId);
+                if ($selectedGithubApp) {
+                    $this->syncRunnerGroupNameToGithub($selectedGithubApp);
+                }
+            }
+
+            $this->originalRunnerGroupName = $runnerGroupName;
+
             $labelsArray = array_map('trim', explode(',', $this->labels));
             $labelsArray = array_values(array_filter($labelsArray));
 
@@ -240,6 +263,90 @@ class GithubRunners extends Component
         }
     }
 
+    private function normalizeRunnerGroupName(?string $runnerGroupName): ?string
+    {
+        if (! is_string($runnerGroupName)) {
+            return null;
+        }
+
+        $trimmedName = trim($runnerGroupName);
+
+        if ($trimmedName === '') {
+            return null;
+        }
+
+        return preg_replace('/\s+/', ' ', $trimmedName) ?? $trimmedName;
+    }
+
+    private function generateDefaultRunnerGroupName(): string
+    {
+        return 'Coolify-'.((string) new Cuid2(7));
+    }
+
+    private function syncRunnerGroupNameToGithub(GithubApp $githubApp): void
+    {
+        $desiredRunnerGroupName = $this->normalizeRunnerGroupName($githubApp->runner_group_name);
+
+        if ($desiredRunnerGroupName === null) {
+            return;
+        }
+
+        if (! $githubApp->installation_id || ! $githubApp->organization) {
+            return;
+        }
+
+        $token = generateGithubInstallationToken($githubApp);
+        $apiUrl = $githubApp->api_url ?? 'https://api.github.com';
+        $headers = [
+            'Authorization' => "Bearer {$token}",
+            'Accept' => 'application/vnd.github+json',
+            'X-GitHub-Api-Version' => '2022-11-28',
+        ];
+
+        if ($githubApp->runner_group_id) {
+            $patchResponse = Http::withHeaders($headers)->patch(
+                "{$apiUrl}/orgs/{$githubApp->organization}/actions/runner-groups/{$githubApp->runner_group_id}",
+                [
+                    'name' => $desiredRunnerGroupName,
+                    'allows_public_repositories' => true,
+                ]
+            );
+
+            if ($patchResponse->successful()) {
+                return;
+            }
+
+            if ($patchResponse->status() !== 404) {
+                throw new \RuntimeException(
+                    'Failed to sync runner group: '.data_get($patchResponse->json(), 'message', $patchResponse->body())
+                );
+            }
+
+            $githubApp->update(['runner_group_id' => null]);
+            $githubApp->refresh();
+        }
+
+        $createResponse = Http::withHeaders($headers)->post(
+            "{$apiUrl}/orgs/{$githubApp->organization}/actions/runner-groups",
+            [
+                'name' => $desiredRunnerGroupName,
+                'visibility' => 'selected',
+                'allows_public_repositories' => true,
+            ]
+        );
+
+        if (! $createResponse->successful()) {
+            throw new \RuntimeException(
+                'Failed to create runner group: '.data_get($createResponse->json(), 'message', $createResponse->body())
+            );
+        }
+
+        $githubApp->update([
+            'runner_group_id' => (int) data_get($createResponse->json(), 'id'),
+            'runner_group_name' => $desiredRunnerGroupName,
+        ]);
+    }
+
     public function toggleEnabled()
     {
         try {
@@ -279,6 +386,7 @@ class GithubRunners extends Component
         }
     }
 
+    #[On('cancel-github-runner-execution')]
     public function cancelExecution(int $executionId)
     {
         try {

@@ -108,10 +108,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
-            Log::warning('ServerConnectionCheckJob timed out', [
-                'server_id' => $this->server->id,
-                'server_name' => $this->server->name,
-            ]);
+            // Log::warning('ServerConnectionCheckJob timed out', [
+            //     'server_id' => $this->server->id,
+            //     'server_name' => $this->server->name,
+            // ]);
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,

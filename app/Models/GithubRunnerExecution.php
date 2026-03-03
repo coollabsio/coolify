@@ -46,4 +46,19 @@ class GithubRunnerExecution extends BaseModel
 
         return $this->started_at->diffForHumans($end, true);
     }
+
+    public function workflowJobUrl(): ?string
+    {
+        $directUrl = trim((string) $this->workflow_job_html_url);
+        if ($directUrl !== '') {
+            return $directUrl;
+        }
+
+        $repositoryFullName = trim((string) $this->repository_full_name);
+        if ($repositoryFullName === '' || ! $this->workflow_job_id) {
+            return null;
+        }
+
+        return "https://github.com/{$repositoryFullName}/actions?query=".urlencode((string) $this->workflow_job_id);
+    }
 }

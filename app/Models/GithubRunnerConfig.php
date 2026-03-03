@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GithubRunnerStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,7 +46,12 @@ class GithubRunnerConfig extends BaseModel
     public function activeRunnerCount(): int
     {
         return $this->executions()
-            ->whereIn('status', ['queued', 'provisioning', 'running', 'cleaning'])
+            ->whereIn('status', [
+                GithubRunnerStatus::Queued->value,
+                GithubRunnerStatus::Provisioning->value,
+                GithubRunnerStatus::Running->value,
+                GithubRunnerStatus::Cleaning->value,
+            ])
             ->count();
     }
 

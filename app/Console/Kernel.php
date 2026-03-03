@@ -5,6 +5,7 @@ namespace App\Console;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckTraefikVersionJob;
+use App\Jobs\CleanupGithubRunnerArtifactsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleGithubRunnersJob;
@@ -57,6 +58,7 @@ class Kernel extends ConsoleKernel
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
             $this->scheduleInstance->job(new CleanupStaleGithubRunnersJob)->everyFiveMinutes()->onOneServer();
+            $this->scheduleInstance->job(new CleanupGithubRunnerArtifactsJob)->dailyAt('02:00')->onOneServer();
 
         } else {
             // Instance Jobs
@@ -89,6 +91,7 @@ class Kernel extends ConsoleKernel
 
             // Cleanup stale GitHub Actions runners
             $this->scheduleInstance->job(new CleanupStaleGithubRunnersJob)->everyFiveMinutes()->onOneServer();
+            $this->scheduleInstance->job(new CleanupGithubRunnerArtifactsJob)->dailyAt('02:00')->onOneServer();
         }
     }
 

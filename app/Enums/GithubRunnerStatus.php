@@ -14,6 +14,6 @@ enum GithubRunnerStatus: string
 
     public function isActive(): bool
     {
-        return in_array($this, [self::Queued, self::Provisioning, self::Running, self::Cleaning]);
+        return in_array($this, [self::Queued, self::Provisioning, self::Running, self::Cleaning], true);
     }
 }

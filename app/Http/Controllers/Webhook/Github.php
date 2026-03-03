@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Webhook;
 
+use App\Enums\GithubRunnerStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
@@ -9,6 +10,7 @@ use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Jobs\ProvisionGithubRunnerJob;
 use App\Models\Application;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
 use Exception;
 use Illuminate\Http\Request;
@@ -229,6 +231,14 @@ class Github extends Controller
             if ($x_github_event === 'workflow_job') {
                 $action = data_get($payload, 'action');
                 $workflowJob = data_get($payload, 'workflow_job');
+                $workflowJobId = (int) data_get($workflowJob, 'id', 0);
+
+                ray("[webhook] workflow_job.{$action} received", [
+                    'workflow_job_id' => $workflowJobId,
+                    'runner_name' => data_get($workflowJob, 'runner_name'),
+                    'workflow_name' => data_get($workflowJob, 'workflow_name'),
+                    'conclusion' => data_get($workflowJob, 'conclusion'),
+                ]);
 
                 if ($action === 'queued' && $workflowJob) {
                     ProvisionGithubRunnerJob::dispatch(
@@ -236,14 +246,32 @@ class Github extends Controller
                         workflowJobPayload: collect($workflowJob)->toArray(),
                         organizationLogin: data_get($payload, 'organization.login', ''),
                         repositoryId: (int) data_get($payload, 'repository.id', 0),
+                        repositoryFullName: data_get($payload, 'repository.full_name'),
                     );
 
                     return response('Runner provisioning queued.');
                 }
 
+                if ($action === 'in_progress' && $workflowJobId > 0) {
+                    $execution = GithubRunnerExecution::query()
+                        ->where('workflow_job_id', $workflowJobId)
+                        ->whereIn('status', [GithubRunnerStatus::Queued, GithubRunnerStatus::Provisioning])
+                        ->first();
+
+                    if ($execution) {
+                        $execution->update([
+                            'status' => GithubRunnerStatus::Running,
+                            'started_at' => $execution->started_at ?? now(),
+                            'runner_name' => data_get($workflowJob, 'runner_name') ?: $execution->runner_name,
+                        ]);
+                    }
+
+                    return response('Runner marked running.');
+                }
+
                 if ($action === 'completed' && $workflowJob) {
                     CleanupGithubRunnerJob::dispatch(
-                        workflowJobId: (int) data_get($workflowJob, 'id'),
+                        workflowJobId: $workflowJobId,
                     );
 
                     return response('Runner cleanup queued.');
