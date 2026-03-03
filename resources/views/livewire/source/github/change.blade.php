@@ -136,6 +136,9 @@
                         <x-forms.input id="pullRequests"
                             helper="write access needed to use deployment status update in previews."
                             label="Pull Request" readonly placeholder="N/A" />
+                        <x-forms.input id="organizationSelfHostedRunners"
+                            helper="write access needed to use GitHub Actions self-hosted runners."
+                            label="Runners" readonly placeholder="N/A" />
                     </div>
                 </div>
             @endif

@@ -31,6 +31,9 @@
         <a class="sub-menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
             href="{{ route('server.docker-cleanup', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Docker Cleanup</span>
         </a>
+        <a class="sub-menu-item {{ $activeMenu === 'github-runners' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
+            href="{{ route('server.github-runners', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">GitHub Runners</span>
+        </a>
         <a class="sub-menu-item {{ $activeMenu === 'destinations' ? 'menu-item-active' : '' }}" {{ wireNavigate() }}
             href="{{ route('server.destinations', ['server_uuid' => $server->uuid]) }}"><span class="menu-item-label">Destinations</span>
         </a>

@@ -45,6 +45,7 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->metadata = data_get($permissions, 'metadata');
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
             $this->github_app->administration = data_get($permissions, 'administration');
+            $this->github_app->organization_self_hosted_runners = data_get($permissions, 'organization_self_hosted_runners');
 
             $this->github_app->save();
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');

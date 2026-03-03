@@ -977,6 +977,16 @@ $schema://$host {
         return $standalone_docker->concat($swarm_docker);
     }
 
+    public function githubRunnerConfig()
+    {
+        return $this->hasOne(GithubRunnerConfig::class);
+    }
+
+    public function githubRunnerExecutions()
+    {
+        return $this->hasMany(GithubRunnerExecution::class);
+    }
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);

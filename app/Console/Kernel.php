@@ -7,6 +7,7 @@ use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
+use App\Jobs\CleanupStaleGithubRunnersJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
@@ -55,6 +56,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
+            $this->scheduleInstance->job(new CleanupStaleGithubRunnersJob)->everyFiveMinutes()->onOneServer();
 
         } else {
             // Instance Jobs
@@ -84,6 +86,9 @@ class Kernel extends ConsoleKernel
 
             // Cleanup orphaned PR preview containers daily
             $this->scheduleInstance->job(new CleanupOrphanedPreviewContainersJob)->daily()->onOneServer();
+
+            // Cleanup stale GitHub Actions runners
+            $this->scheduleInstance->job(new CleanupStaleGithubRunnersJob)->everyFiveMinutes()->onOneServer();
         }
     }
 

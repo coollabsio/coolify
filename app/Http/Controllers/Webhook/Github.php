@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
+use App\Jobs\ProvisionGithubRunnerJob;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
@@ -223,6 +225,31 @@ class Github extends Controller
                 }
 
                 return response('cool');
+            }
+            if ($x_github_event === 'workflow_job') {
+                $action = data_get($payload, 'action');
+                $workflowJob = data_get($payload, 'workflow_job');
+
+                if ($action === 'queued' && $workflowJob) {
+                    ProvisionGithubRunnerJob::dispatch(
+                        githubAppId: $github_app->id,
+                        workflowJobPayload: collect($workflowJob)->toArray(),
+                        organizationLogin: data_get($payload, 'organization.login', ''),
+                        repositoryId: (int) data_get($payload, 'repository.id', 0),
+                    );
+
+                    return response('Runner provisioning queued.');
+                }
+
+                if ($action === 'completed' && $workflowJob) {
+                    CleanupGithubRunnerJob::dispatch(
+                        workflowJobId: (int) data_get($workflowJob, 'id'),
+                    );
+
+                    return response('Runner cleanup queued.');
+                }
+
+                return response('workflow_job event received.');
             }
             if ($x_github_event === 'push') {
                 $id = data_get($payload, 'repository.id');

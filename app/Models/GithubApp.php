@@ -14,6 +14,7 @@ class GithubApp extends BaseModel
         'is_public' => 'boolean',
         'is_system_wide' => 'boolean',
         'type' => 'string',
+        'runner_group_id' => 'integer',
     ];
 
     protected $hidden = [
@@ -86,6 +87,11 @@ class GithubApp extends BaseModel
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function runnerConfigs()
+    {
+        return $this->hasMany(GithubRunnerConfig::class);
     }
 
     public function type(): Attribute

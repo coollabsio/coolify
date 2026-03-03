@@ -130,6 +130,10 @@ function getPermissionsPath(GithubApp $source)
     $github = GithubApp::where('uuid', $source->uuid)->first();
     $name = str(Str::kebab($github->name));
 
+    if (str($github->organization)->isNotEmpty()) {
+        return "$github->html_url/organizations/$github->organization/settings/apps/$name/permissions";
+    }
+
     return "$github->html_url/settings/apps/$name/permissions";
 }
 

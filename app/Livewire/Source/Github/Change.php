@@ -67,6 +67,8 @@ class Change extends Component
 
     public ?string $pullRequests = null;
 
+    public ?string $organizationSelfHostedRunners = null;
+
     public $applications;
 
     public $privateKeys;
@@ -87,6 +89,7 @@ class Change extends Component
         'contents' => 'nullable|string',
         'metadata' => 'nullable|string',
         'pullRequests' => 'nullable|string',
+        'organizationSelfHostedRunners' => 'nullable|string',
         'privateKeyId' => 'nullable|int',
     ];
 
@@ -122,6 +125,7 @@ class Change extends Component
             $this->github_app->contents = $this->contents;
             $this->github_app->metadata = $this->metadata;
             $this->github_app->pull_requests = $this->pullRequests;
+            $this->github_app->organization_self_hosted_runners = $this->organizationSelfHostedRunners;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->github_app->name;
@@ -140,6 +144,7 @@ class Change extends Component
             $this->contents = $this->github_app->contents;
             $this->metadata = $this->github_app->metadata;
             $this->pullRequests = $this->github_app->pull_requests;
+            $this->organizationSelfHostedRunners = $this->github_app->organization_self_hosted_runners;
         }
     }
 
@@ -175,6 +180,7 @@ class Change extends Component
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->syncData(false);
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
