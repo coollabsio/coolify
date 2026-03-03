@@ -33,6 +33,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
         public array $workflowJobPayload,
         public string $organizationLogin,
         public int $repositoryId = 0,
+        public ?string $capacityWaitStartedAt = null,
     ) {
         $this->onQueue('high');
     }
@@ -53,10 +54,46 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
         $requestedLabels = data_get($this->workflowJobPayload, 'labels', []);
 
-        // Find a matching server with capacity
-        $config = $this->findMatchingConfig($githubApp, $requestedLabels);
+        // Step 1: find configs that match labels (ignoring capacity)
+        $matchingConfigs = $this->findMatchingConfigsIgnoringCapacity($githubApp, $requestedLabels);
+
+        if ($matchingConfigs->isEmpty()) {
+            // No configured server handles these labels at all — nothing to do
+            return;
+        }
+
+        // Step 2: filter to configs that have capacity
+        $config = $matchingConfigs
+            ->filter(fn ($c) => $c->hasCapacity())
+            ->sortBy(fn ($c) => $c->activeRunnerCount())
+            ->first();
+
         if (! $config) {
-            ray('No matching GitHub runner config found for labels: '.implode(', ', $requestedLabels));
+            // All matching configs are at capacity — wait and retry
+            $timeoutMinutes = $matchingConfigs->first()->capacity_wait_timeout;
+            $waitStartedAt = $this->capacityWaitStartedAt
+                ? \Carbon\Carbon::parse($this->capacityWaitStartedAt)
+                : now();
+
+            if (now()->diffInMinutes($waitStartedAt) >= $timeoutMinutes) {
+                // Gave up waiting — log and drop so GitHub eventually cancels the job
+                logger()->warning('ProvisionGithubRunnerJob: gave up waiting for capacity', [
+                    'workflow_job_id' => $workflowJobId,
+                    'labels' => $requestedLabels,
+                    'timeout_minutes' => $timeoutMinutes,
+                ]);
+
+                return;
+            }
+
+            // Dispatch a new job in 15 seconds carrying the wait start timestamp
+            static::dispatch(
+                githubAppId: $this->githubAppId,
+                workflowJobPayload: $this->workflowJobPayload,
+                organizationLogin: $this->organizationLogin,
+                repositoryId: $this->repositoryId,
+                capacityWaitStartedAt: $this->capacityWaitStartedAt ?? now()->toIso8601String(),
+            )->delay(15);
 
             return;
         }
@@ -114,7 +151,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function findMatchingConfig(GithubApp $githubApp, array $requestedLabels): ?GithubRunnerConfig
+    private function findMatchingConfigsIgnoringCapacity(GithubApp $githubApp, array $requestedLabels): \Illuminate\Support\Collection
     {
         return GithubRunnerConfig::query()
             ->where('github_app_id', $githubApp->id)
@@ -124,9 +161,7 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             ->get()
             ->filter(fn ($config) => $config->matchesLabels($requestedLabels))
             ->filter(fn ($config) => $config->server->isFunctional())
-            ->filter(fn ($config) => $config->hasCapacity())
-            ->sortBy(fn ($config) => $config->activeRunnerCount())
-            ->first();
+            ->values();
     }
 
     private function ensureRunnerGroup(GithubApp $githubApp): int
@@ -244,11 +279,13 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
             "mkdir -p {$runnerDir}",
         ], $server);
 
-        // Download runner binary if not cached
+        // Download runner binary if not cached, then populate runner dir from pre-extracted template
         $tarball = "actions-runner-linux-{$arch}-{$version}.tar.gz";
+        $templateDir = "{$baseDir}/.templates/runner-{$arch}-{$version}";
         instant_remote_process([
             "if [ ! -f {$cacheDir}/{$tarball} ]; then curl -sL https://github.com/actions/runner/releases/download/v{$version}/{$tarball} -o {$cacheDir}/{$tarball}; fi",
-            "tar xzf {$cacheDir}/{$tarball} -C {$runnerDir}",
+            "if [ ! -d {$templateDir} ]; then mkdir -p {$templateDir} && tar xzf {$cacheDir}/{$tarball} -C {$templateDir} && chown -R {$user}:{$user} {$templateDir}; fi",
+            "cp -r {$templateDir}/. {$runnerDir}",
             "chown -R {$user}:{$user} {$runnerDir}",
         ], $server);
 

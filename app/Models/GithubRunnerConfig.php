@@ -16,6 +16,7 @@ class GithubRunnerConfig extends BaseModel
             'labels' => 'array',
             'is_enabled' => 'boolean',
             'max_runners' => 'integer',
+            'capacity_wait_timeout' => 'integer',
         ];
     }
 

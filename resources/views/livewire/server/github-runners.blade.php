@@ -1,4 +1,4 @@
-<div>
+<div wire:init="initializeRepositories">
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > GitHub Runners | Coolify
     </x-slot>
@@ -41,8 +41,44 @@
                             </button>
                             <a href="{{ getInstallationPath($this->selectedApp) }}" target="_blank"
                                 class="text-xs text-warning hover:underline">
-                                Manage Repository Access →
+                                Manage Accessible Repositories →
                             </a>
+                        </div>
+                    </div>
+
+                    <div x-data="{
+                        open: false,
+                        search: '',
+                        get repos() {
+                            return $wire.accessibleRepositories ?? [];
+                        },
+                        get filtered() {
+                            if (!this.search) return this.repos;
+                            const q = this.search.toLowerCase();
+                            return this.repos.filter(r => r.toLowerCase().includes(q));
+                        }
+                    }" @click.outside="open = false" class="relative mt-1">
+                        <div @click="open = !open"
+                            class="flex items-center gap-2 w-full input cursor-pointer">
+                            <input type="text" x-model="search" @click.stop @focus="open = true"
+                                @keydown.escape="open = false"
+                                placeholder="{{ $repositoriesLoading || ! $repositoriesLoaded ? 'Loading repositories...' : count($accessibleRepositories).' '.Str::plural('repository', count($accessibleRepositories)).' accessible — type to search...' }}"
+                                class="flex-1 text-sm border-0 outline-none bg-transparent px-2 py-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 text-white" />
+                            <svg class="w-4 h-4 shrink-0 mr-2.5 duration-200 ease-out text-neutral-500"
+                                :class="{ 'rotate-180': open }" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div x-show="open" x-transition
+                            class="absolute z-50 w-full mt-1 bg-coolgray-100 border border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
+                            <template x-if="filtered.length === 0">
+                                <div class="px-3 py-2 text-sm text-neutral-400">No matching repositories</div>
+                            </template>
+                            <template x-for="repo in filtered" :key="repo">
+                                <div class="px-3 py-2 text-sm font-mono text-neutral-300" x-text="repo"></div>
+                            </template>
                         </div>
                     </div>
 
@@ -50,45 +86,12 @@
                         <x-callout type="error" title="Could Not Load Repositories">
                             {{ $repositoryError }}
                         </x-callout>
-                    @elseif (count($accessibleRepositories) === 0)
+                    @elseif ($repositoriesLoaded && count($accessibleRepositories) === 0)
                         <x-callout type="warning" title="No Repositories Loaded">
                             <p>No repositories are accessible yet, or the GitHub App is set to "All repositories" (all org repos are covered automatically).</p>
-                            <p class="mt-1">If you expect specific repositories to appear, <a href="{{ getInstallationPath($this->selectedApp) }}" target="_blank" class="underline">manage repository access</a> in your GitHub App settings.</p>
+                            <p class="mt-1">If you expect specific repositories to appear, <a href="{{ getInstallationPath($this->selectedApp) }}" target="_blank" class="underline">manage accessible repositories</a> in your GitHub App settings.</p>
                         </x-callout>
-                    @else
-                        <div x-data="{
-                            open: false,
-                            search: '',
-                            repos: @js($accessibleRepositories),
-                            get filtered() {
-                                if (!this.search) return this.repos;
-                                const q = this.search.toLowerCase();
-                                return this.repos.filter(r => r.toLowerCase().includes(q));
-                            }
-                        }" @click.outside="open = false" class="relative mt-1">
-                            <div @click="open = !open"
-                                class="flex items-center gap-2 w-full input cursor-pointer">
-                                <input type="text" x-model="search" @click.stop @focus="open = true"
-                                    @keydown.escape="open = false"
-                                    placeholder="{{ count($accessibleRepositories) }} {{ Str::plural('repository', count($accessibleRepositories)) }} accessible — type to search..."
-                                    class="flex-1 text-sm border-0 outline-none bg-transparent px-2 py-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 text-white" />
-                                <svg class="w-4 h-4 shrink-0 text-neutral-400 transition-transform" :class="{ 'rotate-180': open }" fill="none"
-                                    stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </div>
-                            <div x-show="open" x-transition
-                                class="absolute z-50 w-full mt-1 bg-coolgray-100 border border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
-                                <template x-if="filtered.length === 0">
-                                    <div class="px-3 py-2 text-sm text-neutral-400">No matching repositories</div>
-                                </template>
-                                <template x-for="repo in filtered" :key="repo">
-                                    <div class="px-3 py-2 text-sm font-mono text-neutral-300" x-text="repo"></div>
-                                </template>
-                            </div>
-                        </div>
                     @endif
-                    <span wire:loading wire:target="loadAccessibleRepositories" class="text-xs text-neutral-400 mt-1 inline-block">Loading...</span>
                 </div>
             @endif
 
@@ -120,16 +123,22 @@
                             helper="Labels for routing workflow jobs to this server. Workflows use runs-on to match these labels." />
                     </div>
 
-                    <div class="flex gap-4">
+                    <div class="flex gap-2">
                         <x-forms.input canGate="update" :canResource="$server" id="maxRunners" type="number"
                             label="Max Concurrent Runners" required
                             helper="Maximum number of runners that can run simultaneously on this server." />
+                        <x-forms.input canGate="update" :canResource="$server" id="capacityWaitTimeout" type="number"
+                            label="Capacity Wait Timeout (minutes)" required
+                            helper="How long queued jobs wait for a runner slot to become available before giving up. Default: 60 minutes (1 hour)." />
+                    </div>
+
+                    <div class="flex gap-4">
                         <x-forms.input canGate="update" :canResource="$server" id="runnerUser"
                             label="Runner User" required
                             helper="Linux user to run the runner process as. Will be created if it doesn't exist." />
                     </div>
 
-                    <div class="flex gap-4">
+                    <div class="flex gap-2">
                         <x-forms.input canGate="update" :canResource="$server" id="runnerBaseDir"
                             label="Base Directory" required
                             helper="Directory on the server where runner binaries and working directories will be stored." />
@@ -141,9 +150,6 @@
                     <div class="flex items-center gap-2 mt-2">
                         <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
                         @if ($this->config)
-                            <x-forms.button wire:click="preinstallBinary" canGate="update" :canResource="$server">
-                                Pre-install Binary
-                            </x-forms.button>
                             <x-modal-confirmation title="Delete Runner Configuration?" buttonTitle="Delete Configuration"
                                 submitAction="deleteConfig"
                                 :actions="['This will remove the runner configuration from this server.', 'Active runners will not be affected until they complete.']"

@@ -29,6 +29,9 @@ class GithubRunners extends Component
     #[Validate(['required', 'integer', 'min:1', 'max:32'])]
     public int $maxRunners = 4;
 
+    #[Validate(['required', 'integer', 'min:1', 'max:1440'])]
+    public int $capacityWaitTimeout = 60;
+
     #[Validate(['required', 'string', 'min:1'])]
     public string $runnerUser = 'runner';
 
@@ -43,6 +46,12 @@ class GithubRunners extends Component
     public array $accessibleRepositories = [];
 
     public ?string $repositoryError = null;
+
+    public bool $repositoriesLoaded = false;
+
+    public bool $repositoriesLoading = false;
+
+    public bool $skipNextSelectedAppReload = false;
 
     public function mount(string $server_uuid): void
     {
@@ -107,29 +116,50 @@ class GithubRunners extends Component
         $config = $this->server->githubRunnerConfig;
         if ($config) {
             $this->selectedGithubAppId = $config->github_app_id;
+            $this->skipNextSelectedAppReload = true;
             $this->labels = implode(',', $config->labels ?? []);
             $this->maxRunners = $config->max_runners;
+            $this->capacityWaitTimeout = $config->capacity_wait_timeout;
             $this->runnerUser = $config->runner_user;
             $this->runnerBaseDir = $config->runner_base_dir;
             $this->runnerVersion = $config->runner_version;
             $this->isEnabled = $config->is_enabled;
-            $this->loadAccessibleRepositories();
         }
+    }
+
+    public function initializeRepositories(): void
+    {
+        if ($this->repositoriesLoaded) {
+            return;
+        }
+
+        $this->loadAccessibleRepositories();
     }
 
     public function updatedSelectedGithubAppId(): void
     {
+        if ($this->skipNextSelectedAppReload) {
+            $this->skipNextSelectedAppReload = false;
+
+            return;
+        }
+
+        $this->repositoriesLoaded = true;
         $this->loadAccessibleRepositories();
     }
 
     public function loadAccessibleRepositories(): void
     {
+        $this->repositoriesLoading = true;
+        $this->repositoriesLoaded = true;
         $this->accessibleRepositories = [];
         $this->repositoryError = null;
 
         $app = $this->selectedApp;
 
         if (! $app || ! $app->installation_id) {
+            $this->repositoriesLoading = false;
+
             return;
         }
 
@@ -154,6 +184,8 @@ class GithubRunners extends Component
             $this->accessibleRepositories = $allRepos;
         } catch (\Throwable $e) {
             $this->repositoryError = 'Could not load repositories: '.$e->getMessage();
+        } finally {
+            $this->repositoriesLoading = false;
         }
     }
 
@@ -181,6 +213,7 @@ class GithubRunners extends Component
                     'github_app_id' => $this->selectedGithubAppId,
                     'labels' => $labelsArray,
                     'max_runners' => $this->maxRunners,
+                    'capacity_wait_timeout' => $this->capacityWaitTimeout,
                     'runner_user' => $this->runnerUser,
                     'runner_base_dir' => $this->runnerBaseDir,
                     'runner_version' => $this->runnerVersion ?: null,
@@ -192,6 +225,7 @@ class GithubRunners extends Component
                     'github_app_id' => $this->selectedGithubAppId,
                     'labels' => $labelsArray,
                     'max_runners' => $this->maxRunners,
+                    'capacity_wait_timeout' => $this->capacityWaitTimeout,
                     'runner_user' => $this->runnerUser,
                     'runner_base_dir' => $this->runnerBaseDir,
                     'runner_version' => $this->runnerVersion ?: null,
@@ -240,38 +274,6 @@ class GithubRunners extends Component
             $this->server->refresh();
             $this->loadConfig();
             $this->dispatch('success', 'GitHub Runner configuration deleted.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function preinstallBinary()
-    {
-        try {
-            $this->authorize('update', $this->server);
-            $config = $this->server->githubRunnerConfig;
-            if (! $config) {
-                throw new \Exception('Save configuration first.');
-            }
-
-            $baseDir = $config->runner_base_dir;
-            $cacheDir = "{$baseDir}/.cache";
-            $user = $config->runner_user;
-            $version = $config->runner_version ?? '2.321.0';
-
-            // Detect architecture from server
-            $uname = trim(instant_remote_process(['uname -m'], $this->server));
-            $arch = $uname === 'aarch64' ? 'arm64' : 'x64';
-            $tarball = "actions-runner-linux-{$arch}-{$version}.tar.gz";
-
-            instant_remote_process([
-                "id -u {$user} &>/dev/null || useradd -m -s /bin/bash {$user}",
-                "usermod -aG docker {$user}",
-                "mkdir -p {$cacheDir}",
-                "if [ ! -f {$cacheDir}/{$tarball} ]; then curl -sL https://github.com/actions/runner/releases/download/v{$version}/{$tarball} -o {$cacheDir}/{$tarball}; fi",
-            ], $this->server);
-
-            $this->dispatch('success', 'Runner binary pre-installed on server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
