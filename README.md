@@ -96,6 +96,7 @@ Thank you so much!
 * [Tigris](https://www.tigrisdata.com?ref=coolify.io) - Modern developer data platform
 * [Tolgee](https://tolgee.io?ref=coolify.io) - The open source localization platform
 * [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
+* [VPSDime](https://vpsdime.com?ref=coolify.io) - Affordable high-performance VPS hosting solutions
 
 
 ### Small Sponsors
