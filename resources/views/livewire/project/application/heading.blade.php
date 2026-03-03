@@ -27,6 +27,10 @@
                         href="{{ route('project.application.command', $parameters) }}">
                         Terminal
                     </a>
+                    <a class="{{ request()->routeIs('project.application.files') ? 'dark:text-white' : '' }}"
+                        href="{{ route('project.application.files', $parameters) }}">
+                        Files
+                    </a>
                 @endcan
             @endif
             <x-applications.links :application="$application" />

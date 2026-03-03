@@ -26,7 +26,10 @@ services:
     volumes:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
+    networks:
+      - coolify
   postgres:
+    image: postgres:15-alpine
     pull_policy: always
     ports:
       - "${FORWARD_DB_PORT:-5432}:5432"
@@ -44,7 +47,10 @@ services:
       timeout: 2s
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
+    networks:
+      - coolify
   redis:
+    image: redis:7-alpine
     pull_policy: always
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"
@@ -57,6 +63,8 @@ services:
       timeout: 2s
     volumes:
       - dev_redis_data:/data
+    networks:
+      - coolify
   soketi:
     image: coolify-realtime:dev
     pull_policy: never
