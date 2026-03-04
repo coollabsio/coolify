@@ -612,3 +612,67 @@ YAML;
         ->and($payload)->toContain('http://10.8.0.24:9050')
         ->and($payload)->not->toContain('minecraft.example.com');
 });
+
+it('returns warning when remote tunnel ip overlaps with an edge docker subnet', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            if (str_contains(implode("\n", $commands), 'docker network inspect')) {
+                return "10.8.0.0/24\n172.18.0.0/16\n";
+            }
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->exists = true;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 20;
+    $deploymentServer->ip = '10.8.0.40';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $service = new Service;
+    $service->uuid = 'service-overlap-warning';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "9060:3000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://overlap.example.com:3000';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $warnings = $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and(collect($warnings)->contains(fn (string $warning) => str_contains($warning, 'overlaps edge Docker network subnet 10.8.0.0/24')));
+
+    $writeCall = collect($manager->calls)->first(
+        fn (array $call) => str_contains(implode("\n", $call['commands']), 'base64 -d | tee')
+    );
+    expect($writeCall)->not->toBeNull();
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $writeCall['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`overlap.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.40:9060');
+});

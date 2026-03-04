@@ -79,6 +79,10 @@ class EdgeProxyRemoteRouteService
 
         $routes = [];
         $warnings = [];
+        $networkOverlapWarning = $this->detectDockerNetworkOverlapWarning($service, $edgeProxyServer, $tunnelHost);
+        if (! is_null($networkOverlapWarning)) {
+            $warnings[] = $networkOverlapWarning;
+        }
 
         foreach ($applications as $application) {
             $domains = collect(explode(',', (string) $application->fqdn))
@@ -428,6 +432,88 @@ class EdgeProxyRemoteRouteService
         }
 
         return $protocol;
+    }
+
+    private function detectDockerNetworkOverlapWarning(Service $service, Server $edgeProxyServer, string $tunnelHost): ?string
+    {
+        // Only run this for persisted server models (normal runtime) to avoid noisy checks in synthetic test stubs.
+        if (! $edgeProxyServer->exists) {
+            return null;
+        }
+
+        $normalizedTunnelHost = trim($tunnelHost, '[]');
+        if (! filter_var($normalizedTunnelHost, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return null;
+        }
+
+        foreach ($this->resolveEdgeDockerSubnets($edgeProxyServer) as $subnet) {
+            if ($this->ipv4InCidr($normalizedTunnelHost, $subnet)) {
+                return sprintf(
+                    'Edge proxy route warning for service %s: remote host %s overlaps edge Docker network subnet %s. This can break VPN/WireGuard routing. Configure Docker default-address-pools to a non-overlapping range (for example base 172.20.0.0/16 with size 24) and recreate overlapping networks.',
+                    $service->uuid,
+                    $normalizedTunnelHost,
+                    $subnet
+                );
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveEdgeDockerSubnets(Server $edgeProxyServer): array
+    {
+        try {
+            $subnetsOutput = $this->runRemoteCommands($edgeProxyServer, [
+                "docker network inspect \$(docker network ls -q) --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' 2>/dev/null | sort -u || true",
+            ], false);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (! is_string($subnetsOutput) || trim($subnetsOutput) === '') {
+            return [];
+        }
+
+        return collect(preg_split('/\R+/', $subnetsOutput) ?: [])
+            ->map(fn (string $line) => trim($line))
+            ->filter(fn (string $line) => preg_match('/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/', $line) === 1)
+            ->values()
+            ->all();
+    }
+
+    private function ipv4InCidr(string $ip, string $cidr): bool
+    {
+        [$networkIp, $prefixLength] = array_pad(explode('/', $cidr, 2), 2, null);
+        if (! is_string($networkIp) || ! is_string($prefixLength)) {
+            return false;
+        }
+
+        if (! filter_var($networkIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return false;
+        }
+
+        if (! preg_match('/^\d+$/', $prefixLength)) {
+            return false;
+        }
+
+        $prefixLength = (int) $prefixLength;
+        if ($prefixLength < 0 || $prefixLength > 32) {
+            return false;
+        }
+
+        $ipLong = ip2long($ip);
+        $networkLong = ip2long($networkIp);
+        if ($ipLong === false || $networkLong === false) {
+            return false;
+        }
+
+        if ($prefixLength === 0) {
+            return true;
+        }
+
+        $mask = -1 << (32 - $prefixLength);
+
+        return ($ipLong & $mask) === ($networkLong & $mask);
     }
 
     private function parseDomainUrl(string $domain): ?Url
