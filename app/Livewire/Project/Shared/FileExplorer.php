@@ -501,7 +501,7 @@ class FileExplorer extends Component
                     $fullPath = '/'.$name;
                 }
 
-                $files[] = [
+                $fileData = [
                     'name' => $name,
                     'path' => $fullPath,
                     'is_directory' => $isDirectory,
@@ -509,6 +509,19 @@ class FileExplorer extends Component
                     'permissions' => $permissions,
                     'date' => $date,
                 ];
+
+                // Add download URL for files (not directories)
+                if (!$isDirectory && !empty($fullPath)) {
+                    try {
+                        $fileData['download_url'] = $this->getDownloadUrl($fullPath);
+                    } catch (\Throwable $e) {
+                        $fileData['download_url'] = '#';
+                    }
+                } else {
+                    $fileData['download_url'] = '#';
+                }
+
+                $files[] = $fileData;
             }
         }
 
