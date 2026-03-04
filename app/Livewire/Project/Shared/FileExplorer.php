@@ -1193,28 +1193,52 @@ class FileExplorer extends Component
             $isCompressed = str_ends_with(strtolower($this->importDatabaseFile), '.gz') || 
                            str_ends_with(strtolower($this->importDatabaseFile), '.zip');
 
-            $importCommand = "docker exec {$escapedContainer} sh -c '";
-            if ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.gz')) {
-                $importCommand .= "gunzip -c {$escapedPath} | ";
-            } elseif ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.zip')) {
-                $importCommand .= "unzip -p {$escapedPath} | ";
-            } else {
-                $importCommand .= "cat {$escapedPath} | ";
+            // Build the import command using environment variables properly
+            // Escape password and database name for shell
+            $escapedPassword = str_replace("'", "'\\''", $rootPassword);
+            $escapedDatabaseName = ! empty($database) ? str_replace("'", "'\\''", $database) : '';
+            
+            // Build command parts
+            $commandParts = [];
+            
+            // Set environment variables (using single quotes to avoid expansion issues)
+            $commandParts[] = "export {$passwordVar}='{$escapedPassword}'";
+            if (! empty($database)) {
+                $commandParts[] = "export {$databaseVar}='{$escapedDatabaseName}'";
             }
             
-            if (! empty($database)) {
-                $importCommand .= "{$dbCommand} -u root -p\${$passwordVar} \${$databaseVar}";
+            // Build the pipe command
+            if ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.gz')) {
+                $commandParts[] = "gunzip -c {$escapedPath}";
+            } elseif ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.zip')) {
+                $commandParts[] = "unzip -p {$escapedPath}";
             } else {
-                $importCommand .= "{$dbCommand} -u root -p\${$passwordVar}";
+                $commandParts[] = "cat {$escapedPath}";
             }
-            $importCommand .= "'";
+            
+            // Build mysql/mariadb command with password
+            // Use --password= format instead of -p to avoid issues with variable expansion
+            if (! empty($database)) {
+                $commandParts[] = "{$dbCommand} -u root --password=\${$passwordVar} \${$databaseVar}";
+            } else {
+                $commandParts[] = "{$dbCommand} -u root --password=\${$passwordVar}";
+            }
+            
+            // Join with pipes and wrap in sh -c
+            $fullCommand = implode(' | ', $commandParts);
+            $importCommand = "docker exec {$escapedContainer} sh -c ".escapeshellarg($fullCommand);
 
             if ($server->isNonRoot()) {
                 $importCommand = "sudo {$importCommand}";
             }
 
-            // Execute import
+            // Execute import and capture both stdout and stderr
             $output = instant_remote_process([$importCommand], $server, false);
+            
+            // Check if command failed (output might contain error messages)
+            if ($output === false || (is_string($output) && str_contains(strtolower($output), 'error'))) {
+                throw new \Exception('Import command failed: '.($output ?: 'Unknown error'));
+            }
 
             $this->importDatabaseFile = null;
             $this->showImportDatabaseDialog = false;
@@ -1269,6 +1293,84 @@ class FileExplorer extends Component
         $this->showImportDatabaseDialog = false;
         $this->importDatabaseFile = null;
         $this->importDatabaseContainer = null;
+    }
+
+    public function getDatabaseContainers()
+    {
+        $databaseContainers = [];
+        
+        foreach ($this->containers as $container) {
+            $containerName = data_get($container, 'container.Names', '');
+            $server = data_get($container, 'server');
+            
+            $isDb = false;
+            
+            // Check by container name
+            if (str_contains(strtolower($containerName), 'mysql') || str_contains(strtolower($containerName), 'mariadb')) {
+                $isDb = true;
+            }
+            
+            // Check by container image
+            if (! $isDb && $server) {
+                try {
+                    $escapedContainer = escapeshellarg($containerName);
+                    $command = "docker inspect {$escapedContainer} --format='{{.Config.Image}}'";
+                    if ($server->isNonRoot()) {
+                        $command = "sudo {$command}";
+                    }
+                    $image = trim(instant_remote_process([$command], $server, false) ?? '');
+                    if (str_contains(strtolower($image), 'mysql') || str_contains(strtolower($image), 'mariadb')) {
+                        $isDb = true;
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore error, continue checking
+                }
+            }
+            
+            // Check by environment variables
+            if (! $isDb && $server) {
+                try {
+                    $escapedContainer = escapeshellarg($containerName);
+                    $command = "docker exec {$escapedContainer} env";
+                    if ($server->isNonRoot()) {
+                        $command = "sudo {$command}";
+                    }
+                    $envOutput = instant_remote_process([$command], $server, false) ?? '';
+                    if (str_contains($envOutput, 'MYSQL_ROOT_PASSWORD') || str_contains($envOutput, 'MARIADB_ROOT_PASSWORD') ||
+                        str_contains($envOutput, 'WORDPRESS_DB_HOST=mysql') || str_contains($envOutput, 'WORDPRESS_DB_HOST=mariadb')) {
+                        $isDb = true;
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore error
+                }
+            }
+            
+            // Check for mysql/mariadb commands availability
+            if (! $isDb && $server) {
+                try {
+                    $escapedContainer = escapeshellarg($containerName);
+                    $command = "docker exec {$escapedContainer} sh -c 'command -v mysql || command -v mariadb'";
+                    if ($server->isNonRoot()) {
+                        $command = "sudo {$command}";
+                    }
+                    $cmdOutput = trim(instant_remote_process([$command], $server, false) ?? '');
+                    if (! empty($cmdOutput)) {
+                        $isDb = true;
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore error
+                }
+            }
+            
+            if ($isDb) {
+                $databaseContainers[] = [
+                    'name' => $containerName,
+                    'server' => $server->name ?? 'Unknown',
+                ];
+            }
+        }
+        
+        return $databaseContainers;
     }
 
     public function hideCompressDialog()
