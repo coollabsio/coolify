@@ -273,31 +273,90 @@ class FileExplorer extends Component
             }
         }
 
-        // If still not found, check environment variables for MySQL/MariaDB indicators
+        // Check environment variables for MySQL/MariaDB indicators (including WordPress DB connections)
         if (! $this->isMySQLOrMariaDB) {
             try {
                 $escapedContainer = escapeshellarg($containerName);
-                $command = "docker exec {$escapedContainer} env 2>/dev/null | grep -iE '(MYSQL|MARIADB)' || echo ''";
+                $command = "docker exec {$escapedContainer} env 2>/dev/null";
                 if ($server->isNonRoot()) {
                     $command = "sudo {$command}";
                 }
                 $envOutput = instant_remote_process([$command], $server, false) ?? '';
-                $this->isMySQLOrMariaDB = ! empty(trim($envOutput));
+                
+                // Check for MySQL/MariaDB environment variables
+                if (str_contains($envOutput, 'MYSQL_ROOT_PASSWORD') || 
+                    str_contains($envOutput, 'MARIADB_ROOT_PASSWORD') ||
+                    str_contains($envOutput, 'MYSQL_DATABASE') ||
+                    str_contains($envOutput, 'MARIADB_DATABASE') ||
+                    str_contains($envOutput, 'WORDPRESS_DB_HOST=mysql') ||
+                    str_contains($envOutput, 'WORDPRESS_DB_HOST=mariadb') ||
+                    str_contains($envOutput, 'WORDPRESS_DB_HOST=localhost') ||
+                    str_contains($envOutput, 'WORDPRESS_DB_HOST=127.0.0.1')) {
+                    $this->isMySQLOrMariaDB = true;
+                }
             } catch (\Throwable $e) {
                 // Continue to next check
             }
         }
 
-        // If still not found, check if mysql or mariadb commands are available in the container
+        // Check if mysql or mariadb commands are available in the container (for embedded databases)
         if (! $this->isMySQLOrMariaDB) {
             try {
                 $escapedContainer = escapeshellarg($containerName);
-                $command = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 || command -v mariadb >/dev/null 2>&1 && echo found || echo notfound'";
+                $command = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 && echo mysql || command -v mariadb >/dev/null 2>&1 && echo mariadb || echo notfound'";
                 if ($server->isNonRoot()) {
                     $command = "sudo {$command}";
                 }
                 $output = trim(instant_remote_process([$command], $server, false) ?? '');
-                $this->isMySQLOrMariaDB = $output === 'found';
+                $this->isMySQLOrMariaDB = ($output === 'mysql' || $output === 'mariadb');
+            } catch (\Throwable $e) {
+                // Continue to next check
+            }
+        }
+
+        // Check if MySQL/MariaDB process is running inside the container (for embedded databases like WordPress)
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} sh -c 'ps aux | grep -E \"(mysqld|mariadbd)\" | grep -v grep || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $output = trim(instant_remote_process([$command], $server, false) ?? '');
+                $this->isMySQLOrMariaDB = ($output !== 'notfound' && ! empty($output));
+            } catch (\Throwable $e) {
+                // Continue to next check
+            }
+        }
+
+        // Check if MySQL socket or data directory exists (for embedded databases)
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} sh -c 'test -d /var/lib/mysql || test -d /var/lib/mariadb || test -S /var/run/mysqld/mysqld.sock || test -S /run/mysqld/mysqld.sock && echo found || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $output = trim(instant_remote_process([$command], $server, false) ?? '');
+                $this->isMySQLOrMariaDB = ($output === 'found');
+            } catch (\Throwable $e) {
+                // Continue to next check
+            }
+        }
+
+        // Check if WordPress wp-config.php references MySQL/MariaDB
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} sh -c 'test -f /var/www/html/wp-config.php && grep -iE \"(DB_HOST|DB_NAME|DB_USER|DB_PASSWORD)\" /var/www/html/wp-config.php 2>/dev/null | head -1 || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $output = trim(instant_remote_process([$command], $server, false) ?? '');
+                // If wp-config.php exists and has DB settings, likely has MySQL/MariaDB
+                if ($output !== 'notfound' && ! empty($output)) {
+                    $this->isMySQLOrMariaDB = true;
+                }
             } catch (\Throwable $e) {
                 // Continue to next check
             }
@@ -1121,6 +1180,12 @@ class FileExplorer extends Component
 
     public function openImportDatabaseDialog()
     {
+        // Ensure we have the latest container list
+        $this->loadContainers();
+        $this->checkForDatabaseContainers();
+        if ($this->selected_container !== 'default') {
+            $this->checkDatabaseType();
+        }
         $this->showImportDatabaseDialog = true;
     }
 
