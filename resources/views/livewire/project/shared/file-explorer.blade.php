@@ -220,18 +220,18 @@
                                     <tbody>
                                         @foreach ($files as $file)
                                             @php
-                                                $filePath = isset($file['path']) && is_string($file['path']) && !empty($file['path']) ? $file['path'] : null;
-                                                $isSelected = false;
-                                                if ($filePath !== null) {
-                                                    $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                // Ensure file path exists and is valid
+                                                if (!isset($file['path']) || !is_string($file['path']) || empty(trim($file['path']))) {
+                                                    continue;
                                                 }
+                                                $filePath = trim($file['path']);
+                                                $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                // Escape filePath for use in HTML attributes
+                                                $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
                                             @endphp
-                                            @if ($filePath === null)
-                                                @continue
-                                            @endif
                                             <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ $isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                                 <td class="p-2">
-                                                    <input type="checkbox" wire:change="toggleFileSelection('{{ $filePath }}')" {{ $isSelected ? 'checked' : '' }} class="cursor-pointer">
+                                                    <input type="checkbox" wire:change="toggleFileSelection('{{ $filePathEscaped }}')" {{ $isSelected ? 'checked' : '' }} class="cursor-pointer">
                                                 </td>
                                                 <td class="p-2">
                                                     <div class="flex items-center gap-2">
@@ -239,14 +239,14 @@
                                                             <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                                                             </svg>
-                                                            <button wire:click="navigateTo('{{ $filePath }}')" class="text-coollabs hover:underline font-medium">
+                                                            <button wire:click="navigateTo('{{ $filePathEscaped }}')" class="text-coollabs hover:underline font-medium">
                                                                 {{ $file['name'] }}
                                                             </button>
                                                         @else
                                                             <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                                             </svg>
-                                                            <button wire:click="openFile('{{ $filePath }}')" class="text-coollabs hover:underline">
+                                                            <button wire:click="openFile('{{ $filePathEscaped }}')" class="text-coollabs hover:underline">
                                                                 {{ $file['name'] }}
                                                             </button>
                                                         @endif
@@ -263,7 +263,7 @@
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                                 </svg>
                                                             </a>
-                                                            <x-forms.button wire:click="compressFile('{{ $filePath }}')" class="!text-xs !px-2 !py-1" title="Compress">
+                                                            <x-forms.button wire:click="compressFile('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Compress">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                                                 </svg>
@@ -285,18 +285,18 @@
                                                                         str_ends_with($fileName, '.xz');
                                                         @endphp
                                                         @if ($isArchive)
-                                                            <x-forms.button wire:click="decompressFile('{{ $filePath }}')" class="!text-xs !px-2 !py-1" title="Decompress">
+                                                            <x-forms.button wire:click="decompressFile('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Decompress">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                                 </svg>
                                                             </x-forms.button>
                                                         @endif
-                                                        <x-forms.button wire:click="openMoveDialog('{{ $filePath }}')" class="!text-xs !px-2 !py-1" title="Move">
+                                                        <x-forms.button wire:click="openMoveDialog('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Move">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                                                             </svg>
                                                         </x-forms.button>
-                                                        <x-modal-confirmation title="Delete File?" buttonTitle="Delete" submitAction="deleteFile('{{ $filePath }}')" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm">
+                                                        <x-modal-confirmation title="Delete File?" buttonTitle="Delete" submitAction="deleteFile('{{ $filePathEscaped }}')" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm">
                                                             <x-slot:button-title>
                                                                 <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
