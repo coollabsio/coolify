@@ -73,6 +73,12 @@
                             </x-forms.button>
                         @endif
                         @if ($selected_container !== 'default')
+                            <x-forms.button wire:click="openDatabasePanel" class="bg-green-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                </svg>
+                                Database Panel
+                            </x-forms.button>
                             <x-forms.button wire:click="openImportDatabaseDialog" class="bg-purple-600">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
@@ -411,6 +417,164 @@
                 <x-forms.button wire:click="compressSelectedFiles" class="bg-green-600">Compress</x-forms.button>
                 <x-forms.button wire:click="hideCompressDialog" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
+        </x-modal>
+    @endif
+
+    <!-- Database Panel Modal -->
+    @if ($showDatabasePanel)
+        <x-modal wire:model="showDatabasePanel" max-width="7xl">
+            <x-slot:title>
+                <div class="flex items-center justify-between">
+                    <span>Database Panel</span>
+                    <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
+                </div>
+            </x-slot:title>
+            <x-slot:content>
+                <div class="flex flex-col gap-4 h-[70vh]">
+                    <!-- Databases List -->
+                    <div class="border rounded-lg p-4 bg-white dark:bg-coolgray-800">
+                        <h3 class="text-lg font-semibold mb-3">Databases</h3>
+                        @if (empty($databases))
+                            <div class="text-center py-8 text-gray-500">
+                                <p wire:loading.remove>No databases found or loading...</p>
+                                <p wire:loading>Loading databases...</p>
+                            </div>
+                        @else
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                @foreach ($databases as $database)
+                                    <button
+                                        wire:click="selectDatabase('{{ $database }}')"
+                                        class="p-3 border rounded hover:bg-coollabs-100 dark:hover:bg-coolgray-700 text-left transition-colors {{ $selectedDatabase === $database ? 'bg-coollabs-200 dark:bg-coolgray-600 border-coollabs' : '' }}"
+                                    >
+                                        <div class="font-medium">{{ $database }}</div>
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Tables List -->
+                    @if (!empty($selectedDatabase))
+                        <div class="border rounded-lg p-4 bg-white dark:bg-coolgray-800">
+                            <h3 class="text-lg font-semibold mb-3">
+                                Tables in <span class="text-coollabs">{{ $selectedDatabase }}</span>
+                            </h3>
+                            @if (empty($tables))
+                                <div class="text-center py-4 text-gray-500">
+                                    <p wire:loading.remove>No tables found or loading...</p>
+                                    <p wire:loading>Loading tables...</p>
+                                </div>
+                            @else
+                                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                    @foreach ($tables as $table)
+                                        <button
+                                            wire:click="selectTable('{{ $table }}')"
+                                            class="p-2 border rounded hover:bg-coollabs-100 dark:hover:bg-coolgray-700 text-left transition-colors {{ $selectedTable === $table ? 'bg-coollabs-200 dark:bg-coolgray-600 border-coollabs' : '' }}"
+                                        >
+                                            <div class="text-sm font-medium">{{ $table }}</div>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- Table Structure and Data -->
+                    @if (!empty($selectedTable))
+                        <div class="flex-1 overflow-auto border rounded-lg p-4 bg-white dark:bg-coolgray-800">
+                            <h3 class="text-lg font-semibold mb-3">
+                                Table: <span class="text-coollabs">{{ $selectedTable }}</span>
+                            </h3>
+
+                            <!-- Structure Tab -->
+                            <div class="mb-4">
+                                <h4 class="font-semibold mb-2">Structure</h4>
+                                @if (empty($tableStructure))
+                                    <p class="text-gray-500">Loading structure...</p>
+                                @else
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr class="bg-gray-100 dark:bg-coolgray-700">
+                                                    <th class="border p-2 text-left">Field</th>
+                                                    <th class="border p-2 text-left">Type</th>
+                                                    <th class="border p-2 text-left">Null</th>
+                                                    <th class="border p-2 text-left">Key</th>
+                                                    <th class="border p-2 text-left">Default</th>
+                                                    <th class="border p-2 text-left">Extra</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($tableStructure as $column)
+                                                    <tr class="hover:bg-gray-50 dark:hover:bg-coolgray-700">
+                                                        <td class="border p-2 font-medium">{{ $column['field'] }}</td>
+                                                        <td class="border p-2">{{ $column['type'] }}</td>
+                                                        <td class="border p-2">{{ $column['null'] }}</td>
+                                                        <td class="border p-2">{{ $column['key'] }}</td>
+                                                        <td class="border p-2">{{ $column['default'] ?? 'NULL' }}</td>
+                                                        <td class="border p-2">{{ $column['extra'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Data Tab -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="font-semibold">Data</h4>
+                                    <div class="flex items-center gap-2">
+                                        <x-forms.button wire:click="previousPage" :disabled="$currentPage <= 1" class="bg-gray-600 text-xs py-1 px-2">
+                                            Previous
+                                        </x-forms.button>
+                                        <span class="text-sm">Page {{ $currentPage }}</span>
+                                        <x-forms.button wire:click="nextPage" class="bg-gray-600 text-xs py-1 px-2">
+                                            Next
+                                        </x-forms.button>
+                                    </div>
+                                </div>
+                                @if (empty($tableData))
+                                    <p class="text-gray-500">Loading data...</p>
+                                @elseif (count($tableData) === 0)
+                                    <p class="text-gray-500">No data found in this table.</p>
+                                @else
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr class="bg-gray-100 dark:bg-coolgray-700">
+                                                    @if (!empty($tableData))
+                                                        @foreach (array_keys($tableData[0]) as $header)
+                                                            <th class="border p-2 text-left">{{ $header }}</th>
+                                                        @endforeach
+                                                    @endif
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($tableData as $row)
+                                                    <tr class="hover:bg-gray-50 dark:hover:bg-coolgray-700">
+                                                        @foreach ($row as $value)
+                                                            <td class="border p-2">
+                                                                <div class="max-w-xs truncate" title="{{ $value }}">
+                                                                    {{ $value ?? 'NULL' }}
+                                                                </div>
+                                                            </td>
+                                                        @endforeach
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">
+                                        Showing {{ count($tableData) }} rows (Page {{ $currentPage }})
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </x-slot:content>
         </x-modal>
     @endif
 </div>

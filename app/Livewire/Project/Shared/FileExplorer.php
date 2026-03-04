@@ -70,6 +70,24 @@ class FileExplorer extends Component
 
     public bool $hasMySQLOrMariaDBContainer = false;
 
+    public bool $showDatabasePanel = false;
+
+    public array $databases = [];
+
+    public ?string $selectedDatabase = null;
+
+    public array $tables = [];
+
+    public ?string $selectedTable = null;
+
+    public array $tableStructure = [];
+
+    public array $tableData = [];
+
+    public int $currentPage = 1;
+
+    public int $perPage = 50;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -83,6 +101,22 @@ class FileExplorer extends Component
         $this->showMoveDialog = false;
         $this->showCompressDialog = false;
         $this->showImportDatabaseDialog = false;
+        $this->showDatabasePanel = false;
+        $this->databases = [];
+        $this->selectedDatabase = null;
+        $this->tables = [];
+        $this->selectedTable = null;
+        $this->tableStructure = [];
+        $this->tableData = [];
+        $this->currentPage = 1;
+        $this->showDatabasePanel = false;
+        $this->databases = [];
+        $this->selectedDatabase = null;
+        $this->tables = [];
+        $this->selectedTable = null;
+        $this->tableStructure = [];
+        $this->tableData = [];
+        $this->currentPage = 1;
 
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
@@ -1569,6 +1603,402 @@ class FileExplorer extends Component
         return route('project.file.download', [
             'token' => $token,
         ]);
+    }
+
+    public function openDatabasePanel()
+    {
+        if ($this->selected_container === 'default') {
+            $this->dispatch('error', 'Please select a container first.');
+
+            return;
+        }
+
+        // Ensure we have the latest container list and check database type
+        $this->loadContainers();
+        $this->checkForDatabaseContainers();
+        $this->checkDatabaseType();
+        
+        // Verify that the selected container or any available container is MySQL/MariaDB
+        $databaseContainers = $this->getDatabaseContainers();
+        if (! $this->isMySQLOrMariaDB && ! $this->hasMySQLOrMariaDBContainer && count($databaseContainers) === 0) {
+            $this->dispatch('error', 'No MySQL or MariaDB container detected. Please make sure you have selected a container with MySQL/MariaDB installed.');
+
+            return;
+        }
+
+        $this->showDatabasePanel = true;
+        $this->loadDatabases();
+    }
+
+    public function closeDatabasePanel()
+    {
+        $this->showDatabasePanel = false;
+        $this->selectedDatabase = null;
+        $this->tables = [];
+        $this->selectedTable = null;
+        $this->tableStructure = [];
+        $this->tableData = [];
+        $this->currentPage = 1;
+    }
+
+    public function loadDatabases()
+    {
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+
+            // Get database credentials
+            $escapedContainer = escapeshellarg($containerName);
+            $command = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+            $envOutput = instant_remote_process([$command], $server, false) ?? '';
+
+            // Determine database command (mysql or mariadb)
+            $dbCommand = 'mysql';
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 && echo mysql || command -v mariadb >/dev/null 2>&1 && echo mariadb || echo notfound'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $dbCmdOutput = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            if ($dbCmdOutput === 'mariadb') {
+                $dbCommand = 'mariadb';
+            }
+
+            // Get root password from environment
+            $passwordVar = 'MYSQL_ROOT_PASSWORD';
+            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
+                $passwordVar = 'MARIADB_ROOT_PASSWORD';
+            }
+
+            // Build command to list databases
+            $listCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\${$passwordVar} && {$dbCommand} -u root --password=\${$passwordVar} -e \"SHOW DATABASES;\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $listCommand = "sudo {$listCommand}";
+            }
+
+            $output = instant_remote_process([$listCommand], $server, false);
+
+            if ($output === false || str_contains(strtolower($output), 'error') || str_contains(strtolower($output), 'access denied')) {
+                throw new \Exception('Failed to connect to database: '.($output ?: 'Unknown error'));
+            }
+
+            // Parse database list (skip header line and system databases)
+            $lines = explode("\n", trim($output));
+            $databases = [];
+            $skipDatabases = ['information_schema', 'performance_schema', 'mysql', 'sys'];
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || in_array(strtolower($line), $skipDatabases)) {
+                    continue;
+                }
+                // Skip header line
+                if (strtolower($line) === 'database') {
+                    continue;
+                }
+                $databases[] = $line;
+            }
+
+            $this->databases = $databases;
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to load databases: '.$e->getMessage());
+            $this->databases = [];
+        }
+    }
+
+    public function selectDatabase(string $database)
+    {
+        $this->selectedDatabase = $database;
+        $this->selectedTable = null;
+        $this->tableStructure = [];
+        $this->tableData = [];
+        $this->currentPage = 1;
+        $this->loadTables();
+    }
+
+    public function loadTables()
+    {
+        if (empty($this->selectedDatabase)) {
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+
+            // Get database credentials
+            $escapedContainer = escapeshellarg($containerName);
+            $command = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+            $envOutput = instant_remote_process([$command], $server, false) ?? '';
+
+            // Determine database command
+            $dbCommand = 'mysql';
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 && echo mysql || command -v mariadb >/dev/null 2>&1 && echo mariadb || echo notfound'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $dbCmdOutput = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            if ($dbCmdOutput === 'mariadb') {
+                $dbCommand = 'mariadb';
+            }
+
+            // Get root password
+            $passwordVar = 'MYSQL_ROOT_PASSWORD';
+            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
+                $passwordVar = 'MARIADB_ROOT_PASSWORD';
+            }
+
+            $escapedDatabase = escapeshellarg($this->selectedDatabase);
+
+            // List tables
+            $listCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\${$passwordVar} && {$dbCommand} -u root --password=\${$passwordVar} {$escapedDatabase} -e \"SHOW TABLES;\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $listCommand = "sudo {$listCommand}";
+            }
+
+            $output = instant_remote_process([$listCommand], $server, false);
+
+            if ($output === false || str_contains(strtolower($output), 'error')) {
+                throw new \Exception('Failed to load tables: '.($output ?: 'Unknown error'));
+            }
+
+            // Parse table list
+            $lines = explode("\n", trim($output));
+            $tables = [];
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) {
+                    continue;
+                }
+                // Skip header line (usually "Tables_in_<database>")
+                if (stripos($line, 'tables_in_') === 0) {
+                    continue;
+                }
+                $tables[] = $line;
+            }
+
+            $this->tables = $tables;
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to load tables: '.$e->getMessage());
+            $this->tables = [];
+        }
+    }
+
+    public function selectTable(string $table)
+    {
+        $this->selectedTable = $table;
+        $this->currentPage = 1;
+        $this->loadTableStructure();
+        $this->loadTableData();
+    }
+
+    public function loadTableStructure()
+    {
+        if (empty($this->selectedDatabase) || empty($this->selectedTable)) {
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+
+            // Get database credentials
+            $escapedContainer = escapeshellarg($containerName);
+            $command = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+            $envOutput = instant_remote_process([$command], $server, false) ?? '';
+
+            // Determine database command
+            $dbCommand = 'mysql';
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 && echo mysql || command -v mariadb >/dev/null 2>&1 && echo mariadb || echo notfound'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $dbCmdOutput = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            if ($dbCmdOutput === 'mariadb') {
+                $dbCommand = 'mariadb';
+            }
+
+            // Get root password
+            $passwordVar = 'MYSQL_ROOT_PASSWORD';
+            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
+                $passwordVar = 'MARIADB_ROOT_PASSWORD';
+            }
+
+            $escapedDatabase = escapeshellarg($this->selectedDatabase);
+            $escapedTable = escapeshellarg($this->selectedTable);
+
+            // Get table structure
+            $structureCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\${$passwordVar} && {$dbCommand} -u root --password=\${$passwordVar} {$escapedDatabase} -e \"DESCRIBE {$escapedTable};\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $structureCommand = "sudo {$structureCommand}";
+            }
+
+            $output = instant_remote_process([$structureCommand], $server, false);
+
+            if ($output === false || str_contains(strtolower($output), 'error')) {
+                $this->tableStructure = [];
+
+                return;
+            }
+
+            // Parse structure (Field, Type, Null, Key, Default, Extra)
+            $lines = explode("\n", trim($output));
+            $structure = [];
+
+            foreach ($lines as $line) {
+                $parts = preg_split('/\s+/', trim($line), 6);
+                if (count($parts) >= 2) {
+                    $structure[] = [
+                        'field' => $parts[0] ?? '',
+                        'type' => $parts[1] ?? '',
+                        'null' => $parts[2] ?? '',
+                        'key' => $parts[3] ?? '',
+                        'default' => $parts[4] ?? '',
+                        'extra' => $parts[5] ?? '',
+                    ];
+                }
+            }
+
+            $this->tableStructure = $structure;
+        } catch (\Throwable $e) {
+            $this->tableStructure = [];
+        }
+    }
+
+    public function loadTableData()
+    {
+        if (empty($this->selectedDatabase) || empty($this->selectedTable)) {
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+
+            // Get database credentials
+            $escapedContainer = escapeshellarg($containerName);
+            $command = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+            $envOutput = instant_remote_process([$command], $server, false) ?? '';
+
+            // Determine database command
+            $dbCommand = 'mysql';
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 && echo mysql || command -v mariadb >/dev/null 2>&1 && echo mariadb || echo notfound'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $dbCmdOutput = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            if ($dbCmdOutput === 'mariadb') {
+                $dbCommand = 'mariadb';
+            }
+
+            // Get root password
+            $passwordVar = 'MYSQL_ROOT_PASSWORD';
+            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
+                $passwordVar = 'MARIADB_ROOT_PASSWORD';
+            }
+
+            $escapedDatabase = escapeshellarg($this->selectedDatabase);
+            $escapedTable = escapeshellarg($this->selectedTable);
+
+            // Get table data with limit - use tab-separated format for better parsing
+            $offset = ($this->currentPage - 1) * $this->perPage;
+            $dataCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\${$passwordVar} && {$dbCommand} -u root --password=\${$passwordVar} {$escapedDatabase} -e \"SELECT * FROM {$escapedTable} LIMIT {$this->perPage} OFFSET {$offset};\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $dataCommand = "sudo {$dataCommand}";
+            }
+
+            $output = instant_remote_process([$dataCommand], $server, false);
+
+            if ($output === false || str_contains(strtolower($output), 'error')) {
+                $this->tableData = [];
+
+                return;
+            }
+
+            // Parse table data (tab-separated values)
+            $lines = explode("\n", trim($output));
+            $data = [];
+            $headers = null;
+
+            foreach ($lines as $index => $line) {
+                $line = trim($line);
+                if (empty($line)) {
+                    continue;
+                }
+                
+                // Split by tab, but handle cases where tabs might be escaped or missing
+                $values = preg_split('/\t+/', $line);
+                
+                if ($index === 0) {
+                    // First line should be headers
+                    $headers = array_map('trim', $values);
+                    continue;
+                }
+                
+                // Match data rows to headers
+                if ($headers && count($values) > 0) {
+                    $row = [];
+                    foreach ($headers as $i => $header) {
+                        $row[$header] = $values[$i] ?? null;
+                    }
+                    $data[] = $row;
+                }
+            }
+
+            $this->tableData = $data;
+        } catch (\Throwable $e) {
+            $this->tableData = [];
+        }
+    }
+
+    public function nextPage()
+    {
+        $this->currentPage++;
+        $this->loadTableData();
+    }
+
+    public function previousPage()
+    {
+        if ($this->currentPage > 1) {
+            $this->currentPage--;
+            $this->loadTableData();
+        }
     }
 
     public function render()
