@@ -323,7 +323,7 @@
                     @if ($selectedFile)
                         @php
                             try {
-                                $fileLanguage = $this->getFileLanguage($selectedFile);
+                                $fileLanguage = !empty($selectedFile) ? $this->getFileLanguage($selectedFile) : 'plaintext';
                             } catch (\Throwable $e) {
                                 $fileLanguage = 'plaintext';
                             }
@@ -806,7 +806,7 @@
                                     <script>
                                         document.addEventListener('livewire:init', () => {
                                             Livewire.hook('morph.updated', ({ el, component }) => {
-                                                if (component.name === 'project.shared.file-explorer' && @js($selectedTable)) {
+                                                if (component.name === 'project.shared.file-explorer' && @js($selectedTable ?? null)) {
                                                     initTableData();
                                                 }
                                             });
@@ -816,7 +816,7 @@
                                             const container = document.getElementById('tableDataContainer');
                                             if (!container) return;
                                             
-                                            const tableData = @js($tableData);
+                                            const tableData = @js($tableData ?? []);
                                             if (!tableData || tableData.length === 0) return;
                                             
                                             // Create table with better styling

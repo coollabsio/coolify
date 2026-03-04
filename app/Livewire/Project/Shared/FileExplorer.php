@@ -562,8 +562,12 @@ class FileExplorer extends Component
         $this->loadFiles();
     }
 
-    public function getFileLanguage(string $path): string
+    public function getFileLanguage(?string $path): string
     {
+        if (empty($path)) {
+            return 'plaintext';
+        }
+
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $filename = strtolower(basename($path));
 
