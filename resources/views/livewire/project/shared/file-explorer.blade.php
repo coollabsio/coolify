@@ -239,14 +239,17 @@
                                                 $filePathEscaped = '';
                                                 $isSelected = false;
                                                 
-                                                if (isset($file['path']) && is_string($file['path']) && !empty(trim($file['path']))) {
-                                                    $filePath = trim($file['path']);
-                                                    $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
-                                                    // Escape filePath for use in HTML attributes
-                                                    $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
+                                                if (isset($file['path']) && is_string($file['path'])) {
+                                                    $trimmedPath = trim($file['path']);
+                                                    if (!empty($trimmedPath)) {
+                                                        $filePath = $trimmedPath;
+                                                        $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                        // Escape filePath for use in HTML attributes
+                                                        $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
+                                                    }
                                                 }
                                             @endphp
-                                            @if ($filePath === null)
+                                            @if (empty($filePath) || empty($filePathEscaped))
                                                 @continue
                                             @endif
                                             <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ $isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
