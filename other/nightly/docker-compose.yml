@@ -1,37 +1,69 @@
 services:
-    coolify:
-        container_name: coolify
-        restart: always
-        working_dir: /var/www/html
-        extra_hosts:
-            - 'host.docker.internal:host-gateway'
-        networks:
-            - coolify
-        depends_on:
-            - postgres
-            - redis
-            - soketi
-    postgres:
-        image: postgres:15-alpine
-        container_name: coolify-db
-        restart: always
-        networks:
-            - coolify
-    redis:
-        image: redis:alpine
-        container_name: coolify-redis
-        restart: always
-        networks:
-            - coolify
-    soketi:
-        container_name: coolify-realtime
-        extra_hosts:
-            - 'host.docker.internal:host-gateway'
-        restart: always
-        networks:
-            - coolify
+  coolify:
+    container_name: coolify
+    restart: always
+    working_dir: /var/www/html
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    image: coollabsio/coolify:nightly
+    networks:
+      - coolify
+    depends_on:
+      - postgres
+      - redis
+      - soketi
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: coolify-db
+    restart: always
+    networks:
+      - coolify
+    volumes:
+      - coolify-db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    container_name: coolify-redis
+    restart: always
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-password}
+    networks:
+      - coolify
+    volumes:
+      - coolify-redis:/data
+
+  soketi:
+    container_name: coolify-realtime
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: always
+    image: coollabsio/coolify-realtime:nightly
+    networks:
+      - coolify
+    depends_on:
+      - postgres
+
+  pgbackrest:
+    image: pgbackrest/pgbackrest:latest
+    container_name: coolify-pgbackrest
+    restart: always
+    networks:
+      - coolify
+    volumes:
+      - coolify-db:/var/lib/postgresql/data:ro
+      - ./backups:/backups
+    environment:
+      - PGBACKREST_REPO1_PATH=/backups
+      - PGBACKREST_STANZA=coolify
+    depends_on:
+      - postgres
+
 networks:
-    coolify:
-        name: coolify
-        driver: bridge
-        external: false
+  coolify:
+    name: coolify
+    driver: bridge
+    external: false
+
+volumes:
+  coolify-db:
+  coolify-redis:

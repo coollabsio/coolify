@@ -84,6 +84,20 @@ volumes:
   coolify-redis:
     name: coolify-redis
 
+  pgbackrest:
+    image: pgbackrest/pgbackrest:latest
+    container_name: coolify-pgbackrest
+    restart: always
+    volumes:
+      - coolify-db:/var/lib/postgresql/data:ro
+      - /data/coolify/backups:/backups
+    environment:
+      - PGBACKREST_REPO1_PATH=/backups
+      - PGBACKREST_STANZA=coolify
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 networks:
   coolify:
     external: true
