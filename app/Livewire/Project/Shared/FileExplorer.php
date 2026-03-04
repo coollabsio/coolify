@@ -766,6 +766,23 @@ class FileExplorer extends Component
         }
     }
 
+    public function getSelectedServerId(): ?int
+    {
+        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+        if (is_null($container)) {
+            return null;
+        }
+        $server = data_get($container, 'server');
+
+        return $server?->id;
+    }
+
+    public function onChunkedUploadComplete()
+    {
+        $this->dispatch('success', 'File uploaded successfully.');
+        $this->loadFiles();
+    }
+
     public function updatedUploadFile()
     {
         // This method is automatically called by Livewire when uploadFile changes

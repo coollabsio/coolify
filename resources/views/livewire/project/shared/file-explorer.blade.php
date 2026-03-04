@@ -52,37 +52,109 @@
                              x-data="{ 
                                  uploading: false, 
                                  progress: 0,
-                                 fileName: ''
-                             }"
-                             x-on:livewire-upload-progress.window="
-                                 progress = $event.detail.progress;
-                                 uploading = true;
-                             "
-                             x-on:livewire-upload-finish.window="
-                                 progress = 100;
-                                 setTimeout(() => {
-                                     uploading = false;
-                                     progress = 0;
-                                     fileName = '';
-                                     document.getElementById('uploadFileInput').value = '';
-                                 }, 1500);
-                             "
-                             x-on:livewire-upload-error.window="
-                                 uploading = false;
-                                 progress = 0;
-                                 fileName = '';
-                             ">
+                                 fileName: '',
+                                 errorMsg: '',
+                                 successMsg: '',
+                                 async uploadChunked(file) {
+                                     const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
+                                     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                                     const uploadId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                                     const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
+                                     
+                                     this.uploading = true;
+                                     this.progress = 0;
+                                     this.fileName = file.name;
+                                     this.errorMsg = '';
+                                     this.successMsg = '';
+                                     
+                                     try {
+                                         // Send each chunk
+                                         for (let i = 0; i < totalChunks; i++) {
+                                             const start = i * CHUNK_SIZE;
+                                             const end = Math.min(start + CHUNK_SIZE, file.size);
+                                             const chunk = file.slice(start, end);
+                                             
+                                             const formData = new FormData();
+                                             formData.append('chunk', chunk, file.name);
+                                             formData.append('uploadId', uploadId);
+                                             formData.append('chunkIndex', i);
+                                             formData.append('totalChunks', totalChunks);
+                                             formData.append('fileName', file.name);
+                                             
+                                             const resp = await fetch('/file-explorer/upload-chunk', {
+                                                 method: 'POST',
+                                                 headers: { 'X-CSRF-TOKEN': csrfToken },
+                                                 body: formData
+                                             });
+                                             
+                                             if (!resp.ok) {
+                                                 const err = await resp.json().catch(() => ({}));
+                                                 throw new Error(err.message || 'Chunk ' + i + ' failed');
+                                             }
+                                             
+                                             this.progress = Math.round(((i + 1) / totalChunks) * 90); // 0-90% for chunks
+                                         }
+                                         
+                                         // Finalize: assemble + docker cp
+                                         this.progress = 92;
+                                         const serverId = @js($this->getSelectedServerId());
+                                         const containerName = @js($selected_container);
+                                         const currentPath = @js($currentPath);
+                                         
+                                         const finalResp = await fetch('/file-explorer/finalize-upload', {
+                                             method: 'POST',
+                                             headers: { 
+                                                 'X-CSRF-TOKEN': csrfToken,
+                                                 'Content-Type': 'application/json',
+                                                 'Accept': 'application/json'
+                                             },
+                                             body: JSON.stringify({
+                                                 uploadId: uploadId,
+                                                 totalChunks: totalChunks,
+                                                 fileName: file.name,
+                                                 containerName: containerName,
+                                                 serverId: serverId,
+                                                 destinationPath: currentPath
+                                             })
+                                         });
+                                         
+                                         const result = await finalResp.json();
+                                         
+                                         if (!finalResp.ok || !result.success) {
+                                             throw new Error(result.message || 'Finalize failed');
+                                         }
+                                         
+                                         this.progress = 100;
+                                         this.successMsg = 'File uploaded!';
+                                         
+                                         // Refresh file list via Livewire
+                                         $wire.onChunkedUploadComplete();
+                                         
+                                         setTimeout(() => {
+                                             this.uploading = false;
+                                             this.progress = 0;
+                                             this.fileName = '';
+                                             this.successMsg = '';
+                                             document.getElementById('uploadFileInput').value = '';
+                                         }, 2000);
+                                         
+                                     } catch (err) {
+                                         this.errorMsg = err.message;
+                                         this.uploading = false;
+                                         this.progress = 0;
+                                         this.fileName = '';
+                                         $wire.dispatch('error', 'Upload failed: ' + err.message);
+                                         document.getElementById('uploadFileInput').value = '';
+                                     }
+                                 }
+                             }">
                             <input type="file" 
                                    id="uploadFileInput" 
-                                   wire:model="uploadFile" 
                                    class="hidden" 
-                                   wire:loading.attr="disabled"
                                    accept="*"
                                    x-on:change="
                                        if ($event.target.files.length > 0) {
-                                           fileName = $event.target.files[0].name;
-                                           uploading = true;
-                                           progress = 0;
+                                           uploadChunked($event.target.files[0]);
                                        }
                                    ">
                             <x-forms.button type="button" 
@@ -98,18 +170,20 @@
                             <!-- Progress Bar -->
                             <div x-show="uploading" 
                                  x-cloak
-                                 class="absolute top-full left-0 right-0 mt-2 w-full min-w-[200px] bg-white dark:bg-coolgray-800 rounded-lg shadow-lg border border-coolgray-300 dark:border-coolgray-600 p-3 z-50">
+                                 class="absolute top-full left-0 right-0 mt-2 w-full min-w-[250px] bg-white dark:bg-coolgray-800 rounded-lg shadow-lg border border-coolgray-300 dark:border-coolgray-600 p-3 z-50">
                                 <div class="flex items-center gap-2 mb-2">
                                     <svg class="w-4 h-4 text-coollabs animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                     </svg>
-                                    <span class="text-sm font-medium dark:text-white" x-text="fileName || 'Uploading...'"></span>
+                                    <span class="text-sm font-medium dark:text-white truncate max-w-[150px]" x-text="fileName || 'Uploading...'"></span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400 ml-auto" x-text="Math.round(progress) + '%'"></span>
                                 </div>
                                 <div class="w-full bg-coolgray-200 dark:bg-coolgray-700 rounded-full h-2 overflow-hidden">
                                     <div class="bg-coollabs h-2 rounded-full transition-all duration-300 ease-out" 
                                          :style="'width: ' + progress + '%'"></div>
                                 </div>
+                                <div x-show="successMsg" class="text-xs text-green-500 mt-1" x-text="successMsg"></div>
+                                <div x-show="errorMsg" class="text-xs text-red-500 mt-1" x-text="errorMsg"></div>
                             </div>
                             
                             @if ($selected_container === 'default')

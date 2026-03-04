@@ -309,6 +309,8 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
+    Route::post('/file-explorer/upload-chunk', [\App\Http\Controllers\FileChunkUploadController::class, 'uploadChunk'])->name('file-explorer.upload-chunk')->middleware('can.access.terminal');
+    Route::post('/file-explorer/finalize-upload', [\App\Http\Controllers\FileChunkUploadController::class, 'finalizeUpload'])->name('file-explorer.finalize-upload')->middleware('can.access.terminal');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $user = auth()->user();
