@@ -5,33 +5,6 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Server Side Rendering
-    |--------------------------------------------------------------------------
-    |
-    | These options configures if and how Inertia uses Server Side Rendering
-    | to pre-render the initial visits made to your application's pages.
-    |
-    | You can specify a custom SSR bundle path, or omit it to let Inertia
-    | try and automatically detect it for you.
-    |
-    | Do note that enabling these options will NOT automatically make SSR work,
-    | as a separate rendering service needs to be available. To learn more,
-    | please visit https://inertiajs.com/server-side-rendering
-    |
-    */
-
-    'ssr' => [
-        'enabled' => (bool) env('INERTIA_SSR_ENABLED', true),
-
-        'url' => env('INERTIA_SSR_URL', 'http://127.0.0.1:13714'),
-
-        'ensure_bundle_exists' => (bool) env('INERTIA_SSR_ENSURE_BUNDLE_EXISTS', true),
-
-        // 'bundle' => base_path('bootstrap/ssr/ssr.mjs'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Pages
     |--------------------------------------------------------------------------
     |
@@ -44,22 +17,18 @@ return [
     |
     */
 
-    'ensure_pages_exist' => false,
+    'ensure_pages_exist' => true,
 
     'page_paths' => [
-        resource_path('js/Pages'),
+        resource_path('js/pages'),
     ],
 
     'page_extensions' => [
-        'js',
-        'jsx',
         'svelte',
         'ts',
-        'tsx',
-        'vue',
     ],
 
-    'use_script_element_for_initial_page' => (bool) env('INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE', false),
+    'use_script_element_for_initial_page' => (bool) env('INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -81,20 +50,16 @@ return [
         'ensure_pages_exist' => true,
 
         'page_paths' => [
-            resource_path('js/Pages'),
+            resource_path('js/pages'),
         ],
 
         'page_extensions' => [
-            'js',
-            'jsx',
             'svelte',
             'ts',
-            'tsx',
-            'vue',
         ],
     ],
 
     'history' => [
-        'encrypt' => (bool) env('INERTIA_ENCRYPT_HISTORY', false),
+        'encrypt' => (bool) env('INERTIA_ENCRYPT_HISTORY', true),
     ],
 ];
