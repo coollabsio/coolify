@@ -55,31 +55,22 @@
                                  fileName: ''
                              }"
                              x-on:livewire-upload-progress.window="
-                                 console.log('Upload progress:', $event.detail);
-                                 if ($event.detail.targetName === 'uploadFile') {
-                                     progress = $event.detail.progress;
-                                     uploading = true;
-                                 }
+                                 progress = $event.detail.progress;
+                                 uploading = true;
                              "
                              x-on:livewire-upload-finish.window="
-                                 console.log('Upload finish:', $event.detail);
-                                 if ($event.detail.targetName === 'uploadFile') {
-                                     progress = 100;
-                                     setTimeout(() => {
-                                         uploading = false;
-                                         progress = 0;
-                                         fileName = '';
-                                         document.getElementById('uploadFileInput').value = '';
-                                     }, 1500);
-                                 }
-                             "
-                             x-on:livewire-upload-error.window="
-                                 console.log('Upload error:', $event.detail);
-                                 if ($event.detail.targetName === 'uploadFile') {
+                                 progress = 100;
+                                 setTimeout(() => {
                                      uploading = false;
                                      progress = 0;
                                      fileName = '';
-                                 }
+                                     document.getElementById('uploadFileInput').value = '';
+                                 }, 1500);
+                             "
+                             x-on:livewire-upload-error.window="
+                                 uploading = false;
+                                 progress = 0;
+                                 fileName = '';
                              ">
                             <input type="file" 
                                    id="uploadFileInput" 
