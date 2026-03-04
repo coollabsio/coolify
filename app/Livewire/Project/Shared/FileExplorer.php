@@ -1688,10 +1688,8 @@ class FileExplorer extends Component
             };
 
             // Use Adminer proxy route that handles the connection securely
-            $this->adminerUrl = route($routeName, array_merge($this->parameters, [
-                'container' => $containerName,
-                'server_id' => $server->id,
-            ]));
+            // Pass container and server_id as query parameters
+            $this->adminerUrl = route($routeName, $this->parameters).'?container='.urlencode($containerName).'&server_id='.$server->id;
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to generate database connection URL: '.$e->getMessage());
         }
