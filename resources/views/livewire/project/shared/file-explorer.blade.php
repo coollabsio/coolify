@@ -97,9 +97,9 @@
                                          
                                          // Finalize: assemble + docker cp
                                          this.progress = 92;
-                                         const serverId = @js($this->getSelectedServerId());
-                                         const containerName = @js($selected_container);
-                                         const currentPath = @js($currentPath);
+                                         const serverId = await $wire.getSelectedServerId();
+                                         const containerName = $wire.selected_container;
+                                         const currentPath = $wire.currentPath;
                                          
                                          const finalResp = await fetch('/file-explorer/finalize-upload', {
                                              method: 'POST',
@@ -126,6 +126,7 @@
                                          
                                          this.progress = 100;
                                          this.successMsg = 'File uploaded!';
+                                         alert('Upload completed! Saved in: ' + currentPath);
                                          
                                          // Refresh file list via Livewire
                                          $wire.onChunkedUploadComplete();
