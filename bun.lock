@@ -3,15 +3,13 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "dependencies": {
-        "@inertiajs/svelte": "^2.3.15",
-        "@sveltejs/vite-plugin-svelte": "^7.0.0",
-        "svelte": "^5.53.7",
-      },
       "devDependencies": {
+        "@inertiajs/svelte": "^2.3.17",
+        "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "@tailwindcss/vite": "^4.2.1",
         "concurrently": "^9.2.1",
         "laravel-vite-plugin": "^2.1.0",
+        "svelte": "^5.53.7",
         "tailwindcss": "^4.2.1",
         "vite": "^8.0.0-beta.16",
       },
