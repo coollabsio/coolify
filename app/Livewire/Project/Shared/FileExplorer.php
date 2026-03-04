@@ -72,6 +72,12 @@ class FileExplorer extends Component
         $this->containers = collect();
         $this->servers = collect();
         $this->files = [];
+        $this->selectedFiles = [];
+        $this->isMySQLOrMariaDB = false;
+        $this->showCreateFolder = false;
+        $this->showMoveDialog = false;
+        $this->showCompressDialog = false;
+        $this->showImportDatabaseDialog = false;
 
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
@@ -108,9 +114,13 @@ class FileExplorer extends Component
         $this->servers = $this->servers->sortByDesc(fn ($server) => $server->isTerminalEnabled());
 
         if ($this->containers->count() === 1) {
-            $this->selected_container = data_get($this->containers->first(), 'container.Names');
-            $this->checkDatabaseType();
-            $this->loadFiles();
+            try {
+                $this->selected_container = data_get($this->containers->first(), 'container.Names');
+                $this->checkDatabaseType();
+                $this->loadFiles();
+            } catch (\Throwable $e) {
+                // Silently fail on mount, user can manually select container
+            }
         }
     }
 
@@ -270,6 +280,7 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to load files: '.$e->getMessage());
             $this->files = [];
+            $this->isLoading = false;
         } finally {
             $this->isLoading = false;
         }
@@ -1082,13 +1093,13 @@ class FileExplorer extends Component
         $this->newFolderName = null;
     }
 
-    public function showMoveDialog(string $path)
+    public function openMoveDialog(string $path)
     {
         $this->moveSource = $path;
         $this->showMoveDialog = true;
     }
 
-    public function hideMoveDialog()
+    public function closeMoveDialog()
     {
         $this->showMoveDialog = false;
         $this->moveSource = null;
