@@ -1,6 +1,6 @@
 {
     "$schema": "https://www.schemastore.org/tsconfig.json",
-    "files": ["vite.config.ts", "svelte.config.ts"],
+    "files": ["vite.config.ts", "svelte.config.ts", "prettier.config.ts"],
     "include": ["resources/js/**/*.ts", "resources/js/**/*.svelte"],
 
     "compilerOptions": {

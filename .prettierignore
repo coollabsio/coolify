@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.testing
+!.env.example
+!.env.local.example
+!.env.production.example
+
+node_modules
+vendor
+
+composer.lock
+bun.lock
+
+.DS_Store
+
+public/build/**
