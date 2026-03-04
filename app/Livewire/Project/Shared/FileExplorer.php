@@ -60,6 +60,12 @@ class FileExplorer extends Component
 
     public bool $overwriteExisting = false;
 
+    public bool $showImportDatabaseDialog = false;
+
+    public ?string $importDatabaseFile = null;
+
+    public bool $isMySQLOrMariaDB = false;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -103,6 +109,7 @@ class FileExplorer extends Component
 
         if ($this->containers->count() === 1) {
             $this->selected_container = data_get($this->containers->first(), 'container.Names');
+            $this->checkDatabaseType();
             $this->loadFiles();
         }
     }
@@ -171,7 +178,48 @@ class FileExplorer extends Component
     {
         if ($this->selected_container !== 'default') {
             $this->currentPath = '/';
+            $this->checkDatabaseType();
             $this->loadFiles();
+        }
+    }
+
+    public function checkDatabaseType()
+    {
+        if ($this->selected_container === 'default') {
+            $this->isMySQLOrMariaDB = false;
+
+            return;
+        }
+
+        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+        if (is_null($container)) {
+            $this->isMySQLOrMariaDB = false;
+
+            return;
+        }
+
+        $containerName = data_get($container, 'container.Names', '');
+        
+        // Check if container name contains mysql or mariadb
+        $this->isMySQLOrMariaDB = str_contains(strtolower($containerName), 'mysql') || 
+                                   str_contains(strtolower($containerName), 'mariadb');
+
+        // If not found by name, try to check container image
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $server = data_get($container, 'server');
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker inspect {$escapedContainer} --format='{{.Config.Image}}'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $image = trim(instant_remote_process([$command], $server, false) ?? '');
+                $this->isMySQLOrMariaDB = str_contains(strtolower($image), 'mysql') || 
+                                         str_contains(strtolower($image), 'mariadb');
+            } catch (\Throwable $e) {
+                // Silently fail, assume not MySQL/MariaDB
+                $this->isMySQLOrMariaDB = false;
+            }
         }
     }
 
@@ -918,6 +966,180 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to move file: '.$e->getMessage());
         }
+    }
+
+    public function openImportDatabaseDialog()
+    {
+        $this->showImportDatabaseDialog = true;
+    }
+
+    public function importDatabase()
+    {
+        if (empty($this->importDatabaseFile)) {
+            $this->dispatch('error', 'Please select a database file to import.');
+
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+                $this->showImportDatabaseDialog = false;
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedPath = escapeshellarg($this->importDatabaseFile);
+
+            // Get environment variables to determine database type and credentials
+            $envCommand = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $envCommand = "sudo {$envCommand}";
+            }
+            $envOutput = instant_remote_process([$envCommand], $server, false) ?? '';
+            $envVars = [];
+            foreach (explode("\n", $envOutput) as $line) {
+                if (str_contains($line, '=')) {
+                    [$key, $value] = explode('=', $line, 2);
+                    $envVars[$key] = $value;
+                }
+            }
+
+            // Determine database type and build import command
+            $isMariaDB = isset($envVars['MARIADB_ROOT_PASSWORD']) || isset($envVars['MARIADB_DATABASE']);
+            $isMySQL = isset($envVars['MYSQL_ROOT_PASSWORD']) || isset($envVars['MYSQL_DATABASE']);
+
+            if (! $isMariaDB && ! $isMySQL) {
+                $this->dispatch('error', 'Could not determine database type. Make sure this is a MySQL or MariaDB container.');
+                $this->showImportDatabaseDialog = false;
+
+                return;
+            }
+
+            $rootPassword = $isMariaDB ? ($envVars['MARIADB_ROOT_PASSWORD'] ?? '') : ($envVars['MYSQL_ROOT_PASSWORD'] ?? '');
+            $database = $isMariaDB ? ($envVars['MARIADB_DATABASE'] ?? '') : ($envVars['MYSQL_DATABASE'] ?? '');
+
+            if (empty($rootPassword)) {
+                $this->dispatch('error', 'Root password not found in container environment variables.');
+                $this->showImportDatabaseDialog = false;
+
+                return;
+            }
+
+            // Build import command
+            $dbCommand = $isMariaDB ? 'mariadb' : 'mysql';
+            $passwordVar = $isMariaDB ? 'MARIADB_ROOT_PASSWORD' : 'MYSQL_ROOT_PASSWORD';
+            $databaseVar = $isMariaDB ? 'MARIADB_DATABASE' : 'MYSQL_DATABASE';
+
+            // Check if file is compressed
+            $isCompressed = str_ends_with(strtolower($this->importDatabaseFile), '.gz') || 
+                           str_ends_with(strtolower($this->importDatabaseFile), '.zip');
+
+            $importCommand = "docker exec {$escapedContainer} sh -c '";
+            if ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.gz')) {
+                $importCommand .= "gunzip -c {$escapedPath} | ";
+            } elseif ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.zip')) {
+                $importCommand .= "unzip -p {$escapedPath} | ";
+            } else {
+                $importCommand .= "cat {$escapedPath} | ";
+            }
+            
+            if (! empty($database)) {
+                $importCommand .= "{$dbCommand} -u root -p\${$passwordVar} \${$databaseVar}";
+            } else {
+                $importCommand .= "{$dbCommand} -u root -p\${$passwordVar}";
+            }
+            $importCommand .= "'";
+
+            if ($server->isNonRoot()) {
+                $importCommand = "sudo {$importCommand}";
+            }
+
+            // Execute import
+            $output = instant_remote_process([$importCommand], $server, false);
+
+            $this->importDatabaseFile = null;
+            $this->showImportDatabaseDialog = false;
+            $this->dispatch('success', 'Database imported successfully.');
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to import database: '.$e->getMessage());
+            $this->showImportDatabaseDialog = false;
+        }
+    }
+
+    public function openQuickEdit(string $filename)
+    {
+        // First check if file is in current directory (from files list)
+        $fileInCurrentDir = collect($this->files)->firstWhere('name', $filename);
+        if ($fileInCurrentDir) {
+            $this->openFile($fileInCurrentDir['path']);
+
+            return;
+        }
+
+        // Common paths for wp-config.php and .env
+        $commonPaths = [
+            '/var/www/html/'.$filename,
+            '/app/'.$filename,
+            '/var/www/'.$filename,
+            '/'.$filename,
+        ];
+
+        // Also check current directory
+        if ($this->currentPath !== '/') {
+            $commonPaths[] = rtrim($this->currentPath, '/').'/'.$filename;
+        } else {
+            $commonPaths[] = '/'.$filename;
+        }
+
+        // Additional WordPress-specific paths
+        if ($filename === 'wp-config.php') {
+            $commonPaths[] = '/var/www/html/wp-config.php';
+            $commonPaths[] = '/app/wp-config.php';
+            $commonPaths[] = '/wordpress/wp-config.php';
+        }
+
+        // Additional .env paths
+        if ($filename === '.env') {
+            $commonPaths[] = '/var/www/html/.env';
+            $commonPaths[] = '/app/.env';
+            $commonPaths[] = '/.env';
+        }
+
+        foreach ($commonPaths as $path) {
+            try {
+                $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+                if (is_null($container)) {
+                    continue;
+                }
+
+                $server = data_get($container, 'server');
+                $containerName = data_get($container, 'container.Names');
+                $escapedContainer = escapeshellarg($containerName);
+                $escapedPath = escapeshellarg($path);
+
+                // Check if file exists (including hidden files)
+                $checkCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedPath} && echo exists || echo not_exists'";
+                if ($server->isNonRoot()) {
+                    $checkCommand = "sudo {$checkCommand}";
+                }
+                $exists = trim(instant_remote_process([$checkCommand], $server, false) ?? '') === 'exists';
+
+                if ($exists) {
+                    $this->openFile($path);
+
+                    return;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        $this->dispatch('error', "File {$filename} not found in common locations. Make sure you're in the correct directory or the file exists.");
     }
 
     public function getDownloadUrl(string $path): string

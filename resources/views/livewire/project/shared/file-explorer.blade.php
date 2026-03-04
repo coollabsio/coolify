@@ -72,6 +72,26 @@
                                 Select All
                             </x-forms.button>
                         @endif
+                        @if ($isMySQLOrMariaDB)
+                            <x-forms.button wire:click="openImportDatabaseDialog" class="bg-purple-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                </svg>
+                                Import Database
+                            </x-forms.button>
+                        @endif
+                        <x-forms.button wire:click="openQuickEdit('wp-config.php')" class="bg-blue-600" title="Quick Edit wp-config.php">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            wp-config.php
+                        </x-forms.button>
+                        <x-forms.button wire:click="openQuickEdit('.env')" class="bg-blue-600" title="Quick Edit .env">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            .env
+                        </x-forms.button>
                     </div>
 
                     <!-- Breadcrumb Navigation -->
@@ -269,6 +289,48 @@
             <x-slot:footer>
                 <x-forms.button wire:click="moveFile('{{ $moveSource }}', $moveDestination)" class="bg-coollabs">Move</x-forms.button>
                 <x-forms.button wire:click="$set('showMoveDialog', false); $set('moveSource', null); $set('moveDestination', null)" class="bg-gray-600">Cancel</x-forms.button>
+            </x-slot:footer>
+        </x-modal>
+    @endif
+
+    <!-- Import Database Dialog -->
+    @if ($showImportDatabaseDialog)
+        <x-modal wire:model="showImportDatabaseDialog">
+            <x-slot:title>Import Database</x-slot:title>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Select a SQL file (.sql, .sql.gz, .sql.zip) from the current directory to import into the database.
+                    </p>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Database File</label>
+                        <select wire:model="importDatabaseFile" class="w-full p-2 border rounded bg-white dark:bg-coolgray-800">
+                            <option value="">Select a file...</option>
+                            @foreach ($files as $file)
+                                @if (!$file['is_directory'])
+                                    @php
+                                        $fileName = strtolower($file['name']);
+                                        $isSQLFile = str_ends_with($fileName, '.sql') || 
+                                                    str_ends_with($fileName, '.sql.gz') || 
+                                                    str_ends_with($fileName, '.sql.zip');
+                                    @endphp
+                                    @if ($isSQLFile)
+                                        <option value="{{ $file['path'] }}">{{ $file['name'] }}</option>
+                                    @endif
+                                @endif
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3">
+                        <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                            <strong>Warning:</strong> This will import the selected SQL file into the database. Make sure you have a backup before proceeding.
+                        </p>
+                    </div>
+                </div>
+            </x-slot:content>
+            <x-slot:footer>
+                <x-forms.button wire:click="importDatabase" class="bg-purple-600">Import</x-forms.button>
+                <x-forms.button wire:click="$set('showImportDatabaseDialog', false); $set('importDatabaseFile', null)" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
