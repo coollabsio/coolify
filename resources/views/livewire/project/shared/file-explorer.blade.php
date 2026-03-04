@@ -54,14 +54,14 @@
                                  progress: 0,
                                  fileName: ''
                              }"
-                             @livewire:upload-progress.window="
+                             x-on:livewire-upload-progress.window="
                                  console.log('Upload progress:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
                                      progress = $event.detail.progress;
                                      uploading = true;
                                  }
                              "
-                             @livewire:upload-finish.window="
+                             x-on:livewire-upload-finish.window="
                                  console.log('Upload finish:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
                                      progress = 100;
@@ -73,7 +73,7 @@
                                      }, 1500);
                                  }
                              "
-                             @livewire:upload-error.window="
+                             x-on:livewire-upload-error.window="
                                  console.log('Upload error:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
                                      uploading = false;
