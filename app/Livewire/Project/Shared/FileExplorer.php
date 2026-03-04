@@ -1071,6 +1071,63 @@ class FileExplorer extends Component
         }
     }
 
+    public function showCreateFolderDialog()
+    {
+        $this->showCreateFolder = true;
+    }
+
+    public function hideCreateFolderDialog()
+    {
+        $this->showCreateFolder = false;
+        $this->newFolderName = null;
+    }
+
+    public function showMoveDialog(string $path)
+    {
+        $this->moveSource = $path;
+        $this->showMoveDialog = true;
+    }
+
+    public function hideMoveDialog()
+    {
+        $this->showMoveDialog = false;
+        $this->moveSource = null;
+        $this->moveDestination = null;
+    }
+
+    public function startEditing()
+    {
+        $this->isEditing = true;
+    }
+
+    public function cancelEditing()
+    {
+        $this->isEditing = false;
+        if ($this->selectedFile) {
+            $this->loadFileContent($this->selectedFile);
+        }
+    }
+
+    public function closeFile()
+    {
+        $this->selectedFile = null;
+        $this->fileContent = null;
+        $this->isEditing = false;
+    }
+
+    public function hideImportDatabaseDialog()
+    {
+        $this->showImportDatabaseDialog = false;
+        $this->importDatabaseFile = null;
+    }
+
+    public function hideCompressDialog()
+    {
+        $this->showCompressDialog = false;
+        $this->compressArchiveName = null;
+        $this->overwriteExisting = false;
+    }
+
     public function openQuickEdit(string $filename)
     {
         // First check if file is in current directory (from files list)

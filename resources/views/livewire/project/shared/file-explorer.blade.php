@@ -42,7 +42,7 @@
                 @if ($selected_container !== 'default')
                     <!-- Toolbar -->
                     <div class="flex flex-wrap gap-2 items-center">
-                        <x-forms.button wire:click="$set('showCreateFolder', true)" class="bg-coollabs">
+                        <x-forms.button wire:click="showCreateFolderDialog" class="bg-coollabs">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
@@ -202,7 +202,7 @@
                                                                 </svg>
                                                             </x-forms.button>
                                                         @endif
-                                                        <x-forms.button wire:click="$set('moveSource', '{{ $file['path'] }}'); $set('showMoveDialog', true)" class="!text-xs !px-2 !py-1" title="Move">
+                                                        <x-forms.button wire:click="showMoveDialog('{{ $file['path'] }}')" class="!text-xs !px-2 !py-1" title="Move">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                                                             </svg>
@@ -231,18 +231,18 @@
                                 <h3 class="text-lg font-semibold">{{ basename($selectedFile) }}</h3>
                                 <div class="flex gap-2">
                                     @if (!$isEditing)
-                                        <x-forms.button wire:click="$set('isEditing', true)" class="bg-coollabs">
+                                        <x-forms.button wire:click="startEditing" class="bg-coollabs">
                                             Edit
                                         </x-forms.button>
                                     @else
                                         <x-forms.button wire:click="saveFile" class="bg-green-600">
                                             Save
                                         </x-forms.button>
-                                        <x-forms.button wire:click="$set('isEditing', false); loadFileContent('{{ $selectedFile }}')" class="bg-gray-600">
+                                        <x-forms.button wire:click="cancelEditing" class="bg-gray-600">
                                             Cancel
                                         </x-forms.button>
                                     @endif
-                                    <x-forms.button wire:click="$set('selectedFile', null); $set('fileContent', null); $set('isEditing', false)" class="bg-gray-600">
+                                    <x-forms.button wire:click="closeFile" class="bg-gray-600">
                                         Close
                                     </x-forms.button>
                                 </div>
@@ -268,7 +268,7 @@
             </x-slot:content>
             <x-slot:footer>
                 <x-forms.button wire:click="createFolder" class="bg-coollabs">Create</x-forms.button>
-                <x-forms.button wire:click="$set('showCreateFolder', false); $set('newFolderName', null)" class="bg-gray-600">Cancel</x-forms.button>
+                <x-forms.button wire:click="hideCreateFolderDialog" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
@@ -288,7 +288,7 @@
             </x-slot:content>
             <x-slot:footer>
                 <x-forms.button wire:click="moveFile('{{ $moveSource }}', $moveDestination)" class="bg-coollabs">Move</x-forms.button>
-                <x-forms.button wire:click="$set('showMoveDialog', false); $set('moveSource', null); $set('moveDestination', null)" class="bg-gray-600">Cancel</x-forms.button>
+                <x-forms.button wire:click="hideMoveDialog" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
@@ -330,7 +330,7 @@
             </x-slot:content>
             <x-slot:footer>
                 <x-forms.button wire:click="importDatabase" class="bg-purple-600">Import</x-forms.button>
-                <x-forms.button wire:click="$set('showImportDatabaseDialog', false); $set('importDatabaseFile', null)" class="bg-gray-600">Cancel</x-forms.button>
+                <x-forms.button wire:click="hideImportDatabaseDialog" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
@@ -369,7 +369,7 @@
             </x-slot:content>
             <x-slot:footer>
                 <x-forms.button wire:click="compressSelectedFiles" class="bg-green-600">Compress</x-forms.button>
-                <x-forms.button wire:click="$set('showCompressDialog', false); $set('compressArchiveName', null); $set('overwriteExisting', false)" class="bg-gray-600">Cancel</x-forms.button>
+                <x-forms.button wire:click="hideCompressDialog" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
