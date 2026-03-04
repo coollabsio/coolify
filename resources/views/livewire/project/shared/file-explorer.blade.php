@@ -205,7 +205,10 @@
                                     <thead>
                                         <tr class="border-b border-coolgray-300 dark:border-coolgray-600">
                                             <th class="text-left p-2 w-12">
-                                                <input type="checkbox" wire:change="selectAll" class="cursor-pointer" title="Select All" {{ count($selectedFiles) === count($files) ? 'checked' : '' }}>
+                                                @php
+                                                    $allSelected = isset($selectedFiles) && is_array($selectedFiles) && count($selectedFiles) === count($files);
+                                                @endphp
+                                                <input type="checkbox" wire:change="selectAll" class="cursor-pointer" title="Select All" {{ $allSelected ? 'checked' : '' }}>
                                             </th>
                                             <th class="text-left p-2">Name</th>
                                             <th class="text-left p-2">Size</th>
@@ -218,13 +221,17 @@
                                         @foreach ($files as $file)
                                             @php
                                                 $filePath = isset($file['path']) && is_string($file['path']) && !empty($file['path']) ? $file['path'] : null;
+                                                $isSelected = false;
+                                                if ($filePath !== null) {
+                                                    $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                }
                                             @endphp
                                             @if ($filePath === null)
                                                 @continue
                                             @endif
-                                            <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ in_array($filePath, $selectedFiles) ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
+                                            <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ $isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                                 <td class="p-2">
-                                                    <input type="checkbox" wire:change="toggleFileSelection('{{ $filePath }}')" {{ in_array($filePath, $selectedFiles) ? 'checked' : '' }} class="cursor-pointer">
+                                                    <input type="checkbox" wire:change="toggleFileSelection('{{ $filePath }}')" {{ $isSelected ? 'checked' : '' }} class="cursor-pointer">
                                                 </td>
                                                 <td class="p-2">
                                                     <div class="flex items-center gap-2">
