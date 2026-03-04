@@ -424,7 +424,7 @@
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
-                <x-forms.button wire:click="moveFile('{{ $moveSource ?? '' }}', '{{ $moveDestination ?? '' }}')" 
+                <x-forms.button wire:click="moveFile" 
                                  class="bg-coollabs" 
                                  wire:loading.attr="disabled"
                                  :disabled="empty($moveSource) || empty($moveDestination)">Move</x-forms.button>
