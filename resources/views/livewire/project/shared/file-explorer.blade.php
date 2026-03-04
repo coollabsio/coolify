@@ -178,19 +178,23 @@
                         @php
                             $pathParts = array_filter(explode('/', $currentPath ?? '/'));
                             $currentPathParts = [];
+                            $breadcrumbPaths = [];
                             foreach ($pathParts as $part) {
                                 if (!empty($part)) {
                                     $currentPathParts[] = $part;
-                                    $path = '/' . implode('/', $currentPathParts);
-                        @endphp
-                                    <span>/</span>
-                                    <button wire:click="navigateTo('{{ $path }}')" class="text-coollabs hover:underline">
-                                        {{ $part }}
-                                    </button>
-                        @php
+                                    $breadcrumbPaths[] = [
+                                        'part' => $part,
+                                        'path' => '/' . implode('/', $currentPathParts)
+                                    ];
                                 }
                             }
                         @endphp
+                        @foreach ($breadcrumbPaths as $breadcrumb)
+                            <span>/</span>
+                            <button wire:click="navigateTo('{{ $breadcrumb['path'] }}')" class="text-coollabs hover:underline">
+                                {{ $breadcrumb['part'] }}
+                            </button>
+                        @endforeach
                     </div>
 
                     <!-- File List -->
@@ -554,21 +558,29 @@
                             Compressing <strong>{{ count($selectedFiles) }}</strong> item(s):
                         </p>
                         <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto mb-4">
-                            @foreach (array_slice($selectedFiles ?? [], 0, 10) as $selectedPath)
-                                @php
-                                    $fileName = !empty($selectedPath) ? basename($selectedPath) : '';
-                                    if (!empty($selectedPath) && isset($files) && is_array($files)) {
+                            @php
+                                $filesToShow = [];
+                                $selectedFilesSlice = array_slice($selectedFiles ?? [], 0, 10);
+                                foreach ($selectedFilesSlice as $selectedPath) {
+                                    if (empty($selectedPath)) {
+                                        continue;
+                                    }
+                                    $fileName = basename($selectedPath);
+                                    if (isset($files) && is_array($files)) {
                                         foreach ($files as $f) {
                                             if (isset($f['path']) && $f['path'] === $selectedPath) {
-                                                $fileName = $f['name'] ?? (!empty($selectedPath) ? basename($selectedPath) : '');
+                                                $fileName = $f['name'] ?? basename($selectedPath);
                                                 break;
                                             }
                                         }
                                     }
-                                @endphp
-                                @if (!empty($fileName))
-                                    <li>{{ $fileName }}</li>
-                                @endif
+                                    if (!empty($fileName)) {
+                                        $filesToShow[] = $fileName;
+                                    }
+                                }
+                            @endphp
+                            @foreach ($filesToShow as $fileName)
+                                <li>{{ $fileName }}</li>
                             @endforeach
                             @if (count($selectedFiles) > 10)
                                 <li class="text-gray-500">... and {{ count($selectedFiles) - 10 }} more</li>
