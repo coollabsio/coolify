@@ -309,7 +309,11 @@
                     <!-- File Editor Modal -->
                     @if ($selectedFile)
                         @php
-                            $fileLanguage = $this->getFileLanguage($selectedFile);
+                            try {
+                                $fileLanguage = $this->getFileLanguage($selectedFile);
+                            } catch (\Throwable $e) {
+                                $fileLanguage = 'plaintext';
+                            }
                         @endphp
                         <template x-teleport="body">
                             <div x-data="{ editorOpen: true }" 
@@ -452,7 +456,11 @@
                         Select a SQL file (.sql, .sql.gz, .sql.zip) from the current directory to import into the database.
                     </p>
                     @php
-                        $databaseContainers = $this->getDatabaseContainers();
+                        try {
+                            $databaseContainers = $this->getDatabaseContainers();
+                        } catch (\Throwable $e) {
+                            $databaseContainers = [];
+                        }
                     @endphp
                     @if (count($databaseContainers) > 1)
                         <div>
@@ -533,9 +541,15 @@
                         <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto mb-4">
                             @foreach (array_slice($selectedFiles, 0, 10) as $selectedPath)
                                 @php
-                                    $file = collect($files)->firstWhere('path', $selectedPath);
+                                    $fileName = basename($selectedPath);
+                                    foreach ($files as $f) {
+                                        if (isset($f['path']) && $f['path'] === $selectedPath) {
+                                            $fileName = $f['name'] ?? basename($selectedPath);
+                                            break;
+                                        }
+                                    }
                                 @endphp
-                                <li>{{ $file['name'] ?? basename($selectedPath) }}</li>
+                                <li>{{ $fileName }}</li>
                             @endforeach
                             @if (count($selectedFiles) > 10)
                                 <li class="text-gray-500">... and {{ count($selectedFiles) - 10 }} more</li>
@@ -774,7 +788,7 @@
                                     </div>
                                     <div class="flex items-center justify-between mt-3 text-xs text-gray-500 dark:text-gray-400">
                                         <span>Showing {{ count($tableData) }} row(s) on page {{ $currentPage }}</span>
-                                        <span>{{ $this->perPage }} rows per page</span>
+                                        <span>{{ $perPage }} rows per page</span>
                                     </div>
                                     <script>
                                         document.addEventListener('livewire:init', () => {
