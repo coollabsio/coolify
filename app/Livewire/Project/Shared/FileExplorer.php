@@ -1627,7 +1627,74 @@ class FileExplorer extends Component
         }
 
         $this->showDatabasePanel = true;
-        $this->loadDatabases();
+        $this->generateAdminerUrl();
+    }
+
+    public ?string $adminerUrl = null;
+
+    public function generateAdminerUrl()
+    {
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+
+            // Get database credentials
+            $escapedContainer = escapeshellarg($containerName);
+            $command = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+            $envOutput = instant_remote_process([$command], $server, false) ?? '';
+
+            // Get root password
+            $passwordVar = 'MYSQL_ROOT_PASSWORD';
+            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
+                $passwordVar = 'MARIADB_ROOT_PASSWORD';
+            }
+
+            // Extract password from environment
+            preg_match('/'.$passwordVar.'=([^\n]+)/', $envOutput, $matches);
+            $password = $matches[1] ?? '';
+
+            // Get database name if available
+            preg_match('/MYSQL_DATABASE=([^\n]+)/', $envOutput, $dbMatches);
+            $database = $dbMatches[1] ?? '';
+
+            // Determine if it's MariaDB or MySQL
+            $isMariaDB = str_contains($envOutput, 'MARIADB_ROOT_PASSWORD') || 
+                        str_contains(strtolower($containerName), 'mariadb');
+
+            // Build Adminer URL with connection parameters
+            // Adminer accepts: server, username, password, database, driver
+            $params = http_build_query([
+                'server' => 'localhost',
+                'username' => 'root',
+                'password' => $password,
+                'database' => $database,
+                'driver' => $isMariaDB ? 'mariadb' : 'mysql',
+            ]);
+
+            // Determine route name based on type
+            $routeName = match ($this->type) {
+                'application' => 'project.application.adminer',
+                'database' => 'project.database.adminer',
+                'service' => 'project.service.adminer',
+                default => 'project.database.adminer',
+            };
+
+            // Use Adminer proxy route that handles the connection securely
+            $this->adminerUrl = route($routeName, array_merge($this->parameters, [
+                'container' => $containerName,
+                'server_id' => $server->id,
+            ]));
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to generate database connection URL: '.$e->getMessage());
+        }
     }
 
     public function closeDatabasePanel()

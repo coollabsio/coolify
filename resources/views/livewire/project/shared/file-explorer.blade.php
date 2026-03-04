@@ -424,35 +424,81 @@
     <div x-data="{ modalOpen: @entangle('showDatabasePanel') }"
         x-show="modalOpen"
         x-cloak
+        x-transition
         @keydown.escape.window="modalOpen = false; $wire.closeDatabasePanel()"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         style="display: none;">
         <div @click.away="modalOpen = false; $wire.closeDatabasePanel()"
-            class="relative w-full max-w-7xl max-h-[90vh] bg-white dark:bg-coolgray-800 rounded-lg shadow-xl flex flex-col overflow-hidden">
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-7xl max-h-[90vh] bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
             <!-- Header -->
-            <div class="flex items-center justify-between p-6 border-b border-coolgray-300 dark:border-coolgray-600">
-                <h2 class="text-xl font-semibold">Database Panel</h2>
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                    </svg>
+                    <h2 class="text-xl font-bold dark:text-white">Database Panel</h2>
+                    @if ($selectedDatabase)
+                        <span class="text-sm text-gray-500 dark:text-gray-400">› {{ $selectedDatabase }}</span>
+                    @endif
+                    @if ($selectedTable)
+                        <span class="text-sm text-gray-500 dark:text-gray-400">› {{ $selectedTable }}</span>
+                    @endif
+                </div>
                 <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
             </div>
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6">
-                <div class="flex flex-col gap-4 h-[70vh]">
+            <div class="flex-1 overflow-hidden flex flex-col">
+                @if ($adminerUrl)
+                    <iframe src="{{ $adminerUrl }}" class="w-full h-full border-0" style="min-height: 600px;"></iframe>
+                @else
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="flex flex-col gap-6">
                     <!-- Databases List -->
-                    <div class="border rounded-lg p-4 bg-white dark:bg-coolgray-800">
-                        <h3 class="text-lg font-semibold mb-3">Databases</h3>
+                    <div class="box-without-bg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold dark:text-white flex items-center gap-2">
+                                <svg class="w-5 h-5 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                </svg>
+                                Databases
+                            </h3>
+                            @if (!empty($databases))
+                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ count($databases) }} database(s)</span>
+                            @endif
+                        </div>
                         @if (empty($databases))
-                            <div class="text-center py-8 text-gray-500">
-                                <p wire:loading.remove>No databases found or loading...</p>
-                                <p wire:loading>Loading databases...</p>
+                            <div class="text-center py-12">
+                                <x-loading wire:loading text="Loading databases..." />
+                                <p wire:loading.remove class="text-gray-500 dark:text-gray-400">No databases found.</p>
                             </div>
                         @else
-                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 @foreach ($databases as $database)
                                     <button
                                         wire:click="selectDatabase('{{ $database }}')"
-                                        class="p-3 border rounded hover:bg-coollabs-100 dark:hover:bg-coolgray-700 text-left transition-colors {{ $selectedDatabase === $database ? 'bg-coollabs-200 dark:bg-coolgray-600 border-coollabs' : '' }}"
+                                        class="coolbox p-4 text-left transition-all hover:scale-[1.02] {{ $selectedDatabase === $database ? 'ring-2 ring-coollabs bg-coollabs-50 dark:bg-coollabs-900/20' : '' }}"
                                     >
-                                        <div class="font-medium">{{ $database }}</div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-coollabs-100 dark:bg-coollabs-900 flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-semibold dark:text-white truncate">{{ $database }}</div>
+                                            </div>
+                                            @if ($selectedDatabase === $database)
+                                                <svg class="w-5 h-5 text-coollabs flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                </svg>
+                                            @endif
+                                        </div>
                                     </button>
                                 @endforeach
                             </div>
@@ -461,23 +507,31 @@
 
                     <!-- Tables List -->
                     @if (!empty($selectedDatabase))
-                        <div class="border rounded-lg p-4 bg-white dark:bg-coolgray-800">
-                            <h3 class="text-lg font-semibold mb-3">
-                                Tables in <span class="text-coollabs">{{ $selectedDatabase }}</span>
-                            </h3>
+                        <div class="box-without-bg">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold dark:text-white flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Tables in <span class="text-coollabs">{{ $selectedDatabase }}</span>
+                                </h3>
+                                @if (!empty($tables))
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ count($tables) }} table(s)</span>
+                                @endif
+                            </div>
                             @if (empty($tables))
-                                <div class="text-center py-4 text-gray-500">
-                                    <p wire:loading.remove>No tables found or loading...</p>
-                                    <p wire:loading>Loading tables...</p>
+                                <div class="text-center py-8">
+                                    <x-loading wire:loading text="Loading tables..." />
+                                    <p wire:loading.remove class="text-gray-500 dark:text-gray-400">No tables found.</p>
                                 </div>
                             @else
                                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                     @foreach ($tables as $table)
                                         <button
                                             wire:click="selectTable('{{ $table }}')"
-                                            class="p-2 border rounded hover:bg-coollabs-100 dark:hover:bg-coolgray-700 text-left transition-colors {{ $selectedTable === $table ? 'bg-coollabs-200 dark:bg-coolgray-600 border-coollabs' : '' }}"
+                                            class="p-3 border border-coolgray-300 dark:border-coolgray-600 rounded-lg hover:bg-coolgray-50 dark:hover:bg-coolgray-800 text-left transition-all {{ $selectedTable === $table ? 'bg-coollabs-50 dark:bg-coollabs-900/20 border-coollabs ring-1 ring-coollabs' : '' }}"
                                         >
-                                            <div class="text-sm font-medium">{{ $table }}</div>
+                                            <div class="text-sm font-medium dark:text-white truncate">{{ $table }}</div>
                                         </button>
                                     @endforeach
                                 </div>
@@ -487,38 +541,57 @@
 
                     <!-- Table Structure and Data -->
                     @if (!empty($selectedTable))
-                        <div class="flex-1 overflow-auto border rounded-lg p-4 bg-white dark:bg-coolgray-800">
-                            <h3 class="text-lg font-semibold mb-3">
-                                Table: <span class="text-coollabs">{{ $selectedTable }}</span>
-                            </h3>
+                        <div class="box-without-bg">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold dark:text-white flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Table: <span class="text-coollabs">{{ $selectedTable }}</span>
+                                </h3>
+                            </div>
+
+                            <!-- Tabs -->
+                            <div class="flex gap-2 mb-4 border-b border-coolgray-300 dark:border-coolgray-600">
+                                <button class="px-4 py-2 text-sm font-medium border-b-2 border-coollabs text-coollabs">Structure</button>
+                                <button class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">Data</button>
+                            </div>
 
                             <!-- Structure Tab -->
-                            <div class="mb-4">
-                                <h4 class="font-semibold mb-2">Structure</h4>
+                            <div class="mb-6">
                                 @if (empty($tableStructure))
-                                    <p class="text-gray-500">Loading structure...</p>
+                                    <div class="text-center py-8">
+                                        <x-loading wire:loading text="Loading structure..." />
+                                        <p wire:loading.remove class="text-gray-500 dark:text-gray-400">No structure data available.</p>
+                                    </div>
                                 @else
                                     <div class="overflow-x-auto">
-                                        <table class="w-full text-sm border-collapse">
+                                        <table class="w-full">
                                             <thead>
-                                                <tr class="bg-gray-100 dark:bg-coolgray-700">
-                                                    <th class="border p-2 text-left">Field</th>
-                                                    <th class="border p-2 text-left">Type</th>
-                                                    <th class="border p-2 text-left">Null</th>
-                                                    <th class="border p-2 text-left">Key</th>
-                                                    <th class="border p-2 text-left">Default</th>
-                                                    <th class="border p-2 text-left">Extra</th>
+                                                <tr class="border-b border-coolgray-300 dark:border-coolgray-600">
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Field</th>
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Type</th>
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Null</th>
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Key</th>
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Default</th>
+                                                    <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Extra</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 @foreach ($tableStructure as $column)
-                                                    <tr class="hover:bg-gray-50 dark:hover:bg-coolgray-700">
-                                                        <td class="border p-2 font-medium">{{ $column['field'] }}</td>
-                                                        <td class="border p-2">{{ $column['type'] }}</td>
-                                                        <td class="border p-2">{{ $column['null'] }}</td>
-                                                        <td class="border p-2">{{ $column['key'] }}</td>
-                                                        <td class="border p-2">{{ $column['default'] ?? 'NULL' }}</td>
-                                                        <td class="border p-2">{{ $column['extra'] }}</td>
+                                                    <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800">
+                                                        <td class="p-3 font-medium dark:text-white">{{ $column['field'] }}</td>
+                                                        <td class="p-3 text-sm dark:text-gray-300">{{ $column['type'] }}</td>
+                                                        <td class="p-3 text-sm dark:text-gray-300">{{ $column['null'] }}</td>
+                                                        <td class="p-3 text-sm dark:text-gray-300">
+                                                            @if (!empty($column['key']))
+                                                                <span class="px-2 py-1 text-xs rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">{{ $column['key'] }}</span>
+                                                            @else
+                                                                <span class="text-gray-400">—</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="p-3 text-sm dark:text-gray-300">{{ $column['default'] ?? '<span class="text-gray-400">NULL</span>' }}</td>
+                                                        <td class="p-3 text-sm dark:text-gray-300">{{ $column['extra'] ?: '—' }}</td>
                                                     </tr>
                                                 @endforeach
                                             </tbody>
@@ -529,41 +602,52 @@
 
                             <!-- Data Tab -->
                             <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <h4 class="font-semibold">Data</h4>
+                                <div class="flex items-center justify-between mb-4">
+                                    <h4 class="font-semibold dark:text-white">Data</h4>
                                     <div class="flex items-center gap-2">
-                                        <x-forms.button wire:click="previousPage" :disabled="$currentPage <= 1" class="bg-gray-600 text-xs py-1 px-2">
+                                        <x-forms.button wire:click="previousPage" :disabled="$currentPage <= 1" class="bg-gray-600 text-xs py-1.5 px-3">
+                                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                            </svg>
                                             Previous
                                         </x-forms.button>
-                                        <span class="text-sm">Page {{ $currentPage }}</span>
-                                        <x-forms.button wire:click="nextPage" class="bg-gray-600 text-xs py-1 px-2">
+                                        <span class="text-sm text-gray-500 dark:text-gray-400 px-3">Page {{ $currentPage }}</span>
+                                        <x-forms.button wire:click="nextPage" class="bg-gray-600 text-xs py-1.5 px-3">
                                             Next
+                                            <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
                                         </x-forms.button>
                                     </div>
                                 </div>
                                 @if (empty($tableData))
-                                    <p class="text-gray-500">Loading data...</p>
+                                    <div class="text-center py-8">
+                                        <x-loading wire:loading text="Loading data..." />
+                                        <p wire:loading.remove class="text-gray-500 dark:text-gray-400">No data available.</p>
+                                    </div>
                                 @elseif (count($tableData) === 0)
-                                    <p class="text-gray-500">No data found in this table.</p>
+                                    <div class="text-center py-8">
+                                        <p class="text-gray-500 dark:text-gray-400">No data found in this table.</p>
+                                    </div>
                                 @else
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-sm border-collapse">
+                                    <div class="overflow-x-auto border border-coolgray-300 dark:border-coolgray-600 rounded-lg">
+                                        <table class="w-full">
                                             <thead>
-                                                <tr class="bg-gray-100 dark:bg-coolgray-700">
+                                                <tr class="bg-coolgray-50 dark:bg-coolgray-900 border-b border-coolgray-300 dark:border-coolgray-600">
                                                     @if (!empty($tableData))
                                                         @foreach (array_keys($tableData[0]) as $header)
-                                                            <th class="border p-2 text-left">{{ $header }}</th>
+                                                            <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{{ $header }}</th>
                                                         @endforeach
                                                     @endif
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 @foreach ($tableData as $row)
-                                                    <tr class="hover:bg-gray-50 dark:hover:bg-coolgray-700">
+                                                    <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800">
                                                         @foreach ($row as $value)
-                                                            <td class="border p-2">
+                                                            <td class="p-3 text-sm dark:text-gray-300">
                                                                 <div class="max-w-xs truncate" title="{{ $value }}">
-                                                                    {{ $value ?? 'NULL' }}
+                                                                    {{ $value ?? '<span class="text-gray-400">NULL</span>' }}
                                                                 </div>
                                                             </td>
                                                         @endforeach
@@ -572,9 +656,10 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <p class="text-xs text-gray-500 mt-2">
-                                        Showing {{ count($tableData) }} rows (Page {{ $currentPage }})
-                                    </p>
+                                    <div class="flex items-center justify-between mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                        <span>Showing {{ count($tableData) }} row(s) on page {{ $currentPage }}</span>
+                                        <span>{{ $this->perPage }} rows per page</span>
+                                    </div>
                                 @endif
                             </div>
                         </div>
