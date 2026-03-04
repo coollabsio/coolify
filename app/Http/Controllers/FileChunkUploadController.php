@@ -47,6 +47,10 @@ class FileChunkUploadController extends Controller
      */
     public function finalizeUpload(Request $request)
     {
+        // Prevent PHP from timing out when assembling very large 1GB-30GB files
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
+
         $request->validate([
             'uploadId' => 'required|string|alpha_dash',
             'totalChunks' => 'required|integer|min:1',
