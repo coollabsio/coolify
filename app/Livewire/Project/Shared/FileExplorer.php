@@ -863,7 +863,7 @@ class FileExplorer extends Component
         }
     }
 
-    public function deleteFile(string $path)
+    public function deleteFile(string $path, string $password = '')
     {
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
