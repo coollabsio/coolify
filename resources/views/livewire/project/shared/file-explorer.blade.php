@@ -232,18 +232,21 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach ($files as $file)
+                                        @foreach ($files ?? [] as $file)
                                             @php
                                                 // Ensure file path exists and is valid
                                                 $filePath = null;
                                                 $filePathEscaped = '';
                                                 $isSelected = false;
                                                 
+                                                // Ensure selectedFiles is always an array
+                                                $selectedFilesArray = isset($selectedFiles) && is_array($selectedFiles) ? $selectedFiles : [];
+                                                
                                                 if (isset($file['path']) && is_string($file['path'])) {
                                                     $trimmedPath = trim($file['path']);
                                                     if (!empty($trimmedPath)) {
                                                         $filePath = $trimmedPath;
-                                                        $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                        $isSelected = in_array($filePath, $selectedFilesArray, true);
                                                         // Escape filePath for use in HTML attributes
                                                         $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
                                                     }
