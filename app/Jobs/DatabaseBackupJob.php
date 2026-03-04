@@ -2,6 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Services\PgBackRestBackupService;
+use App\Notifications\BackupFailedNotification;
+use App\Notifications\BackupSucceededNotification;
+use Illuminate\Support\Facades\Notification;
+
+use App\Services\PgBackRestBackupService; // added for pgBackRest backups
+
 use App\Events\BackupCreated;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -28,7 +35,19 @@ use Illuminate\Support\Str;
 use Throwable;
 use Visus\Cuid2\Cuid2;
 
+use App\Contracts\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
+
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
+{
+    /**
+     * Check if pgBackRest is installed and available.
+     */
+    private function pgBackRestAvailable(): bool
+    {
+        $which = shell_exec('which pgbackrest 2>/dev/null');
+        return !empty($which);
+    } implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -80,7 +99,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $this->timeout = $backup->timeout ?? 3600;
     }
 
-    public function handle(): void
+    public function handle()
+{
+    // Prefer pgBackRest for Postgres backups if available
+    if ($this->database->driver === 'postgres' && $this->pgBackRestAvailable()) {
+        try {
+            $service = new PgBackRestBackupService($this->database);
+            $service->backup();
+            Notification::send($this->database->owner, new BackupSucceededNotification($this->database));
+            return;
+        } catch (\Exception $e) {
+            Notification::send($this->database->owner, new BackupFailedNotification($this->database, $e->getMessage()));
+            // fallback to pg_dump below
+        }
+    }
+: void
     {
         try {
             $databasesToBackup = null;
