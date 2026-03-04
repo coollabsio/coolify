@@ -52,6 +52,14 @@ class FileExplorer extends Component
 
     public bool $showMoveDialog = false;
 
+    public array $selectedFiles = [];
+
+    public bool $showCompressDialog = false;
+
+    public ?string $compressArchiveName = null;
+
+    public bool $overwriteExisting = false;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -293,6 +301,7 @@ class FileExplorer extends Component
         $this->selectedFile = null;
         $this->fileContent = null;
         $this->isEditing = false;
+        $this->selectedFiles = [];
         $this->loadFiles();
     }
 
@@ -542,12 +551,70 @@ class FileExplorer extends Component
         }
     }
 
-    public function compressFile(string $path)
+    public function toggleFileSelection(string $path)
     {
+        if (in_array($path, $this->selectedFiles)) {
+            $this->selectedFiles = array_values(array_diff($this->selectedFiles, [$path]));
+        } else {
+            $this->selectedFiles[] = $path;
+        }
+    }
+
+    public function selectAll()
+    {
+        $allSelected = count($this->selectedFiles) === count($this->files);
+        if ($allSelected) {
+            $this->selectedFiles = [];
+        } else {
+            $this->selectedFiles = collect($this->files)->pluck('path')->toArray();
+        }
+    }
+
+    public function deselectAll()
+    {
+        $this->selectedFiles = [];
+    }
+
+    public function openCompressDialog()
+    {
+        if (empty($this->selectedFiles)) {
+            $this->dispatch('error', 'Please select at least one file or folder to compress.');
+
+            return;
+        }
+
+        $this->compressArchiveName = 'archive_'.date('Y-m-d_His').'.zip';
+        $this->showCompressDialog = true;
+    }
+
+    public function compressSelectedFiles()
+    {
+        if (empty($this->selectedFiles)) {
+            $this->dispatch('error', 'Please select at least one file or folder to compress.');
+            $this->showCompressDialog = false;
+
+            return;
+        }
+
+        if (empty($this->compressArchiveName)) {
+            $this->dispatch('error', 'Archive name is required.');
+            $this->showCompressDialog = false;
+
+            return;
+        }
+
+        // Validate archive name
+        if (! preg_match('/^[a-zA-Z0-9._-]+\.(zip|tar|tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|tbz|txz)$/', $this->compressArchiveName)) {
+            $this->dispatch('error', 'Invalid archive name. Use .zip, .tar, .tar.gz, .tar.bz2, or .tar.xz extension.');
+
+            return;
+        }
+
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
+                $this->showCompressDialog = false;
 
                 return;
             }
@@ -555,49 +622,130 @@ class FileExplorer extends Component
             $server = data_get($container, 'server');
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $escapedPath = escapeshellarg($path);
-            $dirPath = dirname($path);
+            $dirPath = $this->currentPath;
             $escapedDir = escapeshellarg($dirPath);
-            $baseName = escapeshellarg(basename($path));
 
-            // Try different compression methods in order of preference
-            // First try zip, then tar.gz, then tar.bz2, then tar.xz
-            $archivePath = $path.'.zip';
+            // Check if archive already exists
+            $archivePath = rtrim($dirPath, '/').'/'.$this->compressArchiveName;
+            if ($dirPath === '/') {
+                $archivePath = '/'.$this->compressArchiveName;
+            }
             $escapedArchive = escapeshellarg($archivePath);
 
+            // Check if file exists
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'test -f {$escapedArchive} && echo exists || echo not_exists'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $exists = trim(instant_remote_process([$checkCommand], $server, false) ?? '') === 'exists';
+
+            if ($exists && ! $this->overwriteExisting) {
+                $this->dispatch('error', 'Archive already exists. Enable "Overwrite existing" to replace it.');
+
+                return;
+            }
+
+            // Prepare file list for compression
+            $fileNames = [];
+            foreach ($this->selectedFiles as $selectedPath) {
+                $file = collect($this->files)->firstWhere('path', $selectedPath);
+                if ($file) {
+                    $fileNames[] = escapeshellarg(basename($selectedPath));
+                }
+            }
+
+            if (empty($fileNames)) {
+                $this->dispatch('error', 'No valid files selected.');
+                $this->showCompressDialog = false;
+
+                return;
+            }
+
+            $filesList = implode(' ', $fileNames);
+
+            // Determine compression format
+            $extension = strtolower(pathinfo($this->compressArchiveName, PATHINFO_EXTENSION));
+            $baseExtension = strtolower(pathinfo(pathinfo($this->compressArchiveName, PATHINFO_FILENAME), PATHINFO_EXTENSION));
+
             $command = "docker exec {$escapedContainer} sh -c 'cd {$escapedDir} && ";
-            $command .= 'if command -v zip >/dev/null 2>&1; then ';
-            $command .= "zip -r {$escapedArchive} {$baseName} 2>&1; ";
-            $command .= 'elif command -v tar >/dev/null 2>&1; then ';
-            $command .= 'if command -v gzip >/dev/null 2>&1; then ';
-            $command .= 'tar -czf '.escapeshellarg($path.'.tar.gz')." {$baseName} 2>&1; ";
-            $command .= 'elif command -v bzip2 >/dev/null 2>&1; then ';
-            $command .= 'tar -cjf '.escapeshellarg($path.'.tar.bz2')." {$baseName} 2>&1; ";
-            $command .= 'elif command -v xz >/dev/null 2>&1; then ';
-            $command .= 'tar -cJf '.escapeshellarg($path.'.tar.xz')." {$baseName} 2>&1; ";
-            $command .= 'else ';
-            $command .= 'tar -cf '.escapeshellarg($path.'.tar')." {$baseName} 2>&1; ";
-            $command .= 'fi; ';
-            $command .= 'else ';
-            $command .= 'echo "No compression tools available (zip, tar)" && exit 1; ';
-            $command .= "fi'";
+
+            if ($extension === 'zip') {
+                $command .= 'if command -v zip >/dev/null 2>&1; then ';
+                if ($this->overwriteExisting && $exists) {
+                    $command .= "rm -f {$escapedArchive} && ";
+                }
+                $command .= "zip -r {$escapedArchive} {$filesList} 2>&1; ";
+                $command .= 'else echo "zip not available" && exit 1; ';
+                $command .= 'fi';
+            } elseif (in_array($extension, ['gz', 'tgz']) || ($extension === 'gz' && str_ends_with($baseExtension, '.tar'))) {
+                $command .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
+                if ($this->overwriteExisting && $exists) {
+                    $command .= "rm -f {$escapedArchive} && ";
+                }
+                $command .= "tar -czf {$escapedArchive} {$filesList} 2>&1; ";
+                $command .= 'else echo "tar/gzip not available" && exit 1; ';
+                $command .= 'fi';
+            } elseif (in_array($extension, ['bz2', 'tbz2', 'tbz']) || ($extension === 'bz2' && str_ends_with($baseExtension, '.tar'))) {
+                $command .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
+                if ($this->overwriteExisting && $exists) {
+                    $command .= "rm -f {$escapedArchive} && ";
+                }
+                $command .= "tar -cjf {$escapedArchive} {$filesList} 2>&1; ";
+                $command .= 'else echo "tar/bzip2 not available" && exit 1; ';
+                $command .= 'fi';
+            } elseif (in_array($extension, ['xz', 'txz']) || ($extension === 'xz' && str_ends_with($baseExtension, '.tar'))) {
+                $command .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
+                if ($this->overwriteExisting && $exists) {
+                    $command .= "rm -f {$escapedArchive} && ";
+                }
+                $command .= "tar -cJf {$escapedArchive} {$filesList} 2>&1; ";
+                $command .= 'else echo "tar/xz not available" && exit 1; ';
+                $command .= 'fi';
+            } elseif ($extension === 'tar') {
+                $command .= 'if command -v tar >/dev/null 2>&1; then ';
+                if ($this->overwriteExisting && $exists) {
+                    $command .= "rm -f {$escapedArchive} && ";
+                }
+                $command .= "tar -cf {$escapedArchive} {$filesList} 2>&1; ";
+                $command .= 'else echo "tar not available" && exit 1; ';
+                $command .= 'fi';
+            } else {
+                $this->dispatch('error', 'Unsupported archive format. Use .zip, .tar, .tar.gz, .tar.bz2, or .tar.xz');
+                $this->showCompressDialog = false;
+
+                return;
+            }
+
+            $command .= "'";
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
 
             $output = instant_remote_process([$command], $server, false);
-            if (str_contains($output ?? '', 'No compression tools available')) {
-                $this->dispatch('error', 'No compression tools available in container. Install zip or tar.');
+            if (str_contains($output ?? '', 'not available')) {
+                $this->dispatch('error', 'Required compression tool not available in container.');
+                $this->showCompressDialog = false;
 
                 return;
             }
 
-            $this->dispatch('success', 'File compressed successfully.');
+            $this->selectedFiles = [];
+            $this->compressArchiveName = null;
+            $this->overwriteExisting = false;
+            $this->showCompressDialog = false;
+            $this->dispatch('success', 'Files compressed successfully.');
             $this->loadFiles();
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to compress file: '.$e->getMessage());
+            $this->dispatch('error', 'Failed to compress files: '.$e->getMessage());
+            $this->showCompressDialog = false;
         }
+    }
+
+    public function compressFile(string $path)
+    {
+        $this->selectedFiles = [$path];
+        $this->openCompressDialog();
     }
 
     public function decompressFile(string $path)

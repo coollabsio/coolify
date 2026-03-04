@@ -57,6 +57,21 @@
                             </x-forms.button>
                             <input type="file" wire:model="uploadFile" class="hidden">
                         </label>
+                        @if (count($selectedFiles) > 0)
+                            <x-forms.button wire:click="openCompressDialog" class="bg-green-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                Compress ({{ count($selectedFiles) }})
+                            </x-forms.button>
+                            <x-forms.button wire:click="deselectAll" class="bg-gray-600">
+                                Clear Selection
+                            </x-forms.button>
+                        @else
+                            <x-forms.button wire:click="selectAll" class="bg-gray-600">
+                                Select All
+                            </x-forms.button>
+                        @endif
                     </div>
 
                     <!-- Breadcrumb Navigation -->
@@ -93,6 +108,9 @@
                                 <table class="w-full">
                                     <thead>
                                         <tr class="border-b border-coolgray-300 dark:border-coolgray-600">
+                                            <th class="text-left p-2 w-12">
+                                                <input type="checkbox" wire:change="selectAll" class="cursor-pointer" title="Select All" {{ count($selectedFiles) === count($files) ? 'checked' : '' }}>
+                                            </th>
                                             <th class="text-left p-2">Name</th>
                                             <th class="text-left p-2">Size</th>
                                             <th class="text-left p-2">Permissions</th>
@@ -102,7 +120,10 @@
                                     </thead>
                                     <tbody>
                                         @foreach ($files as $file)
-                                            <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800">
+                                            <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ in_array($file['path'], $selectedFiles) ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
+                                                <td class="p-2">
+                                                    <input type="checkbox" wire:change="toggleFileSelection('{{ $file['path'] }}')" {{ in_array($file['path'], $selectedFiles) ? 'checked' : '' }} class="cursor-pointer">
+                                                </td>
                                                 <td class="p-2">
                                                     <div class="flex items-center gap-2">
                                                         @if ($file['is_directory'])
@@ -248,6 +269,45 @@
             <x-slot:footer>
                 <x-forms.button wire:click="moveFile('{{ $moveSource }}', $moveDestination)" class="bg-coollabs">Move</x-forms.button>
                 <x-forms.button wire:click="$set('showMoveDialog', false); $set('moveSource', null); $set('moveDestination', null)" class="bg-gray-600">Cancel</x-forms.button>
+            </x-slot:footer>
+        </x-modal>
+    @endif
+
+    <!-- Compress Files Dialog -->
+    @if ($showCompressDialog)
+        <x-modal wire:model="showCompressDialog">
+            <x-slot:title>Compress Files</x-slot:title>
+            <x-slot:content>
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            Compressing <strong>{{ count($selectedFiles) }}</strong> item(s):
+                        </p>
+                        <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto mb-4">
+                            @foreach (array_slice($selectedFiles, 0, 10) as $selectedPath)
+                                @php
+                                    $file = collect($files)->firstWhere('path', $selectedPath);
+                                @endphp
+                                <li>{{ $file['name'] ?? basename($selectedPath) }}</li>
+                            @endforeach
+                            @if (count($selectedFiles) > 10)
+                                <li class="text-gray-500">... and {{ count($selectedFiles) - 10 }} more</li>
+                            @endif
+                        </ul>
+                    </div>
+                    <x-forms.input id="compressArchiveName" label="Archive Name" wire:model="compressArchiveName" placeholder="archive.zip" />
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Supported formats: .zip, .tar, .tar.gz, .tar.bz2, .tar.xz, .tgz, .tbz2, .tbz, .txz
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="overwriteExisting" wire:model="overwriteExisting" class="cursor-pointer">
+                        <label for="overwriteExisting" class="text-sm cursor-pointer">Overwrite existing archive if it exists</label>
+                    </div>
+                </div>
+            </x-slot:content>
+            <x-slot:footer>
+                <x-forms.button wire:click="compressSelectedFiles" class="bg-green-600">Compress</x-forms.button>
+                <x-forms.button wire:click="$set('showCompressDialog', false); $set('compressArchiveName', null); $set('overwriteExisting', false)" class="bg-gray-600">Cancel</x-forms.button>
             </x-slot:footer>
         </x-modal>
     @endif
