@@ -420,11 +420,14 @@
                         <label class="block text-sm font-medium mb-1 dark:text-white">Source</label>
                         <input type="text" value="{{ $moveSource }}" class="w-full p-2 border rounded bg-coolgray-50 dark:bg-coolgray-800" readonly>
                     </div>
-                    <x-forms.input id="moveDestination" label="Destination Path" wire:model="moveDestination" placeholder="/path/to/destination" />
+                    <x-forms.input id="moveDestination" label="Destination Path" wire:model.live="moveDestination" placeholder="/path/to/destination" />
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
-                <x-forms.button wire:click="moveFile('{{ $moveSource }}', '{{ $moveDestination ?? '' }}')" class="bg-coollabs">Move</x-forms.button>
+                <x-forms.button wire:click="moveFile('{{ $moveSource ?? '' }}', '{{ $moveDestination ?? '' }}')" 
+                                 class="bg-coollabs" 
+                                 wire:loading.attr="disabled"
+                                 :disabled="empty($moveSource) || empty($moveDestination)">Move</x-forms.button>
                 <x-forms.button wire:click="closeMoveDialog" class="bg-gray-600">Cancel</x-forms.button>
             </div>
         </div>

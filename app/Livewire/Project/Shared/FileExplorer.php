@@ -1234,8 +1234,18 @@ class FileExplorer extends Component
         }
     }
 
-    public function moveFile(string $sourcePath, string $destinationPath)
+    public function moveFile(?string $sourcePath = null, ?string $destinationPath = null)
     {
+        // Use properties if parameters are not provided
+        $sourcePath = $sourcePath ?? $this->moveSource;
+        $destinationPath = $destinationPath ?? $this->moveDestination;
+
+        if (empty($sourcePath) || empty($destinationPath)) {
+            $this->dispatch('error', 'Source and destination paths are required.');
+
+            return;
+        }
+
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
