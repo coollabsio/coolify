@@ -756,33 +756,74 @@ class FileExplorer extends Component
             return;
         }
 
-        try {
-            $this->validate([
-                'uploadFile' => 'required|file|max:102400', // Max 100MB
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            $this->dispatch('error', 'File validation failed: '.$e->getMessage());
+        // Check if it's actually a file upload
+        if (! is_object($this->uploadFile) || ! method_exists($this->uploadFile, 'getClientOriginalName')) {
+            $this->dispatch('error', 'Invalid file upload.');
             $this->uploadFile = null;
 
             return;
         }
 
         try {
+            $this->validate([
+                'uploadFile' => 'required|file|max:102400', // Max 100MB
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = $e->errors();
+            $errorMessage = collect($errors)->flatten()->first() ?? 'File validation failed';
+            $this->dispatch('error', $errorMessage);
+            $this->uploadFile = null;
+
+            return;
+        }
+
+        try {
+            if ($this->selected_container === 'default') {
+                $this->dispatch('error', 'Please select a container first.');
+                $this->uploadFile = null;
+
+                return;
+            }
+
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
-                $this->dispatch('error', 'Container not found.');
+                $this->dispatch('error', 'Container not found. Please select a valid container.');
 
                 return;
             }
 
             $server = data_get($container, 'server');
+            if (is_null($server)) {
+                $this->dispatch('error', 'Server information not found for this container.');
+                $this->uploadFile = null;
+
+                return;
+            }
+
             $containerName = data_get($container, 'container.Names');
+            if (empty($containerName)) {
+                $this->dispatch('error', 'Container name not found.');
+                $this->uploadFile = null;
+
+                return;
+            }
+
             $escapedContainer = escapeshellarg($containerName);
 
             // Save uploaded file temporarily
             $filename = $this->uploadFile->getClientOriginalName();
+            
+            // Ensure temp directory exists
+            if (! Storage::disk('local')->exists('temp')) {
+                Storage::disk('local')->makeDirectory('temp');
+            }
+            
             $tmpPath = $this->uploadFile->storeAs('temp', uniqid().'_'.$filename, 'local');
             $fullTmpPath = Storage::disk('local')->path($tmpPath);
+
+            if (! file_exists($fullTmpPath)) {
+                throw new \Exception('Failed to save uploaded file temporarily.');
+            }
 
             // Copy to server
             $serverTmpPath = '/tmp/'.basename($tmpPath);
@@ -813,6 +854,10 @@ class FileExplorer extends Component
             $this->dispatch('success', 'File uploaded successfully.');
             $this->loadFiles();
         } catch (\Throwable $e) {
+            \Log::error('File upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             $this->dispatch('error', 'Failed to upload file: '.$e->getMessage());
             $this->uploadFile = null;
         }

@@ -48,16 +48,18 @@
                             </svg>
                             New Folder
                         </x-forms.button>
-                        <div class="relative inline-block">
+                        <div class="relative inline-block" x-data="{ uploading: false }">
                             <input type="file" 
                                    id="uploadFileInput" 
                                    wire:model="uploadFile" 
                                    class="hidden" 
                                    wire:loading.attr="disabled"
-                                   accept="*">
+                                   accept="*"
+                                   x-on:change="uploading = true; $wire.uploadFile = $event.target.files[0]">
                             <x-forms.button type="button" 
                                             class="bg-coollabs" 
-                                            onclick="document.getElementById('uploadFileInput').click()">
+                                            onclick="document.getElementById('uploadFileInput').click()"
+                                            :disabled="$selected_container === 'default'">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                                 </svg>
@@ -66,6 +68,11 @@
                             <div wire:loading wire:target="uploadFile" class="absolute top-full left-0 mt-1 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                 Uploading...
                             </div>
+                            @if ($selected_container === 'default')
+                                <div class="absolute top-full left-0 mt-1 text-xs text-red-500 whitespace-nowrap">
+                                    Select a container first
+                                </div>
+                            @endif
                         </div>
                         @if (count($selectedFiles) > 0)
                             <x-forms.button wire:click="openCompressDialog" class="bg-green-600">
