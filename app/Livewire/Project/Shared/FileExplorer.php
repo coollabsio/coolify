@@ -364,6 +364,58 @@ class FileExplorer extends Component
         $this->loadFiles();
     }
 
+    public function getFileLanguage(string $path): string
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $filename = strtolower(basename($path));
+
+        // Map extensions to Monaco Editor languages
+        $languageMap = [
+            'php' => 'php',
+            'js' => 'javascript',
+            'jsx' => 'javascript',
+            'ts' => 'typescript',
+            'tsx' => 'typescript',
+            'json' => 'json',
+            'css' => 'css',
+            'scss' => 'scss',
+            'sass' => 'sass',
+            'html' => 'html',
+            'xml' => 'xml',
+            'yaml' => 'yaml',
+            'yml' => 'yaml',
+            'md' => 'markdown',
+            'sh' => 'shell',
+            'bash' => 'shell',
+            'py' => 'python',
+            'rb' => 'ruby',
+            'java' => 'java',
+            'cpp' => 'cpp',
+            'c' => 'c',
+            'h' => 'c',
+            'sql' => 'sql',
+            'vue' => 'html',
+            'env' => 'plaintext',
+            'conf' => 'plaintext',
+            'ini' => 'ini',
+            'log' => 'plaintext',
+            'txt' => 'plaintext',
+        ];
+
+        // Special cases for filenames
+        if ($filename === 'dockerfile') {
+            return 'dockerfile';
+        }
+        if ($filename === '.env' || str_ends_with($filename, '.env')) {
+            return 'plaintext';
+        }
+        if ($filename === 'wp-config.php') {
+            return 'php';
+        }
+
+        return $languageMap[$extension] ?? 'plaintext';
+    }
+
     public function openFile(string $path)
     {
         $file = collect($this->files)->firstWhere('path', $path);
@@ -373,16 +425,16 @@ class FileExplorer extends Component
 
         // Check if it's a text file
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $textExtensions = ['txt', 'php', 'env', 'js', 'json', 'css', 'html', 'xml', 'yaml', 'yml', 'md', 'log', 'conf', 'ini', 'sh', 'bash', 'py', 'rb', 'java', 'cpp', 'c', 'h', 'sql', 'vue', 'ts', 'tsx', 'jsx'];
+        $textExtensions = ['txt', 'php', 'env', 'js', 'json', 'css', 'html', 'xml', 'yaml', 'yml', 'md', 'log', 'conf', 'ini', 'sh', 'bash', 'py', 'rb', 'java', 'cpp', 'c', 'h', 'sql', 'vue', 'ts', 'tsx', 'jsx', 'dockerfile'];
 
-        if (! in_array($extension, $textExtensions)) {
+        if (! in_array($extension, $textExtensions) && ! in_array(strtolower(basename($path)), ['dockerfile', '.env', 'wp-config.php'])) {
             $this->dispatch('error', 'This file type cannot be edited. Only text files are supported.');
 
             return;
         }
 
         $this->selectedFile = $path;
-        $this->isEditing = false;
+        $this->isEditing = true; // Start in edit mode directly
         $this->loadFileContent($path);
     }
 
@@ -1104,11 +1156,6 @@ class FileExplorer extends Component
         $this->showMoveDialog = false;
         $this->moveSource = null;
         $this->moveDestination = null;
-    }
-
-    public function startEditing()
-    {
-        $this->isEditing = true;
     }
 
     public function cancelEditing()

@@ -224,35 +224,58 @@
                         @endif
                     </div>
 
-                    <!-- File Editor -->
+                    <!-- File Editor Modal -->
                     @if ($selectedFile)
-                        <div class="box-without-bg">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold">{{ basename($selectedFile) }}</h3>
-                                <div class="flex gap-2">
-                                    @if (!$isEditing)
-                                        <x-forms.button wire:click="startEditing" class="bg-coollabs">
-                                            Edit
-                                        </x-forms.button>
-                                    @else
-                                        <x-forms.button wire:click="saveFile" class="bg-green-600">
-                                            Save
-                                        </x-forms.button>
-                                        <x-forms.button wire:click="cancelEditing" class="bg-gray-600">
-                                            Cancel
-                                        </x-forms.button>
-                                    @endif
-                                    <x-forms.button wire:click="closeFile" class="bg-gray-600">
-                                        Close
-                                    </x-forms.button>
+                        <template x-teleport="body">
+                            <div x-data="{ editorOpen: true }" 
+                                x-show="editorOpen"
+                                x-cloak
+                                class="fixed top-0 left-0 z-[99999] flex flex-col w-screen h-screen bg-coolgray-50 dark:bg-coolgray-900"
+                                style="z-index: 99999;">
+                                <!-- Backdrop -->
+                                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" wire:click="closeFile"></div>
+                                
+                                <!-- Modal Content -->
+                                <div class="relative z-10 flex flex-col w-full h-full bg-white dark:bg-coolgray-800 shadow-2xl">
+                                    <!-- Header -->
+                                    <div class="flex items-center justify-between px-6 py-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-white dark:bg-coolgray-800 shrink-0">
+                                        <div class="flex items-center gap-3">
+                                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold">{{ basename($selectedFile) }}</h3>
+                                            <span class="px-2 py-1 text-xs font-mono text-gray-500 dark:text-gray-400 bg-coolgray-100 dark:bg-coolgray-700 rounded">
+                                                {{ $this->getFileLanguage($selectedFile) }}
+                                            </span>
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ $selectedFile }}</span>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <x-forms.button wire:click="saveFile" class="bg-green-600 hover:bg-green-700">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                                Save
+                                            </x-forms.button>
+                                            <x-forms.button wire:click="closeFile" class="bg-gray-600 hover:bg-gray-700">
+                                                Close
+                                            </x-forms.button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Editor Container -->
+                                    <div class="flex-1 overflow-hidden" style="height: calc(100vh - 80px); min-height: 0;">
+                                        <div wire:key="file-editor-{{ md5($selectedFile) }}" class="w-full h-full">
+                                            <x-forms.textarea 
+                                                id="fileContent" 
+                                                useMonacoEditor
+                                                monacoEditorLanguage="{{ $this->getFileLanguage($selectedFile) }}"
+                                                wire:model="fileContent"
+                                                :readonly="false" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            @if ($isEditing)
-                                <textarea wire:model="fileContent" class="w-full h-96 p-4 font-mono text-sm border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800"></textarea>
-                            @else
-                                <pre class="w-full h-96 p-4 overflow-auto font-mono text-sm border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800 whitespace-pre-wrap">{{ $fileContent }}</pre>
-                            @endif
-                        </div>
+                        </template>
                     @endif
                 @endif
             </div>
