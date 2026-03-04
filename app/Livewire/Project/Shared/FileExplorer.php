@@ -956,6 +956,71 @@ class FileExplorer extends Component
         $this->selectedFiles = [];
     }
 
+    public function extractSelectedFiles()
+    {
+        if (count($this->selectedFiles) !== 1) {
+            $this->dispatch('error', 'Please select exactly one file to extract.');
+
+            return;
+        }
+
+        $filePath = $this->selectedFiles[0];
+        
+        if (! preg_match('/\.(zip|tar|tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|tbz|txz|gz)$/i', $filePath)) {
+            $this->dispatch('error', 'Please select a supported compressed file (.zip, .tar.gz, etc.)');
+
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            if (is_null($server)) {
+                $this->dispatch('error', 'Server not found.');
+
+                return;
+            }
+
+            $containerName = data_get($container, 'container.Names');
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedFilePath = escapeshellarg($filePath);
+            $dir = escapeshellarg(dirname($filePath));
+
+            $command = "docker exec {$escapedContainer} sh -c 'cd {$dir} && ";
+            if (str_ends_with(strtolower($filePath), '.zip')) {
+                $command .= "unzip -o {$escapedFilePath}'";
+            } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
+                $command .= "tar -xzf {$escapedFilePath}'";
+            } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
+                $command .= "tar -xjf {$escapedFilePath}'";
+            } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
+                $command .= "tar -xJf {$escapedFilePath}'";
+            } elseif (str_ends_with(strtolower($filePath), '.tar')) {
+                $command .= "tar -xf {$escapedFilePath}'";
+            } elseif (str_ends_with(strtolower($filePath), '.gz')) {
+                $command .= "gzip -d -k {$escapedFilePath}'";
+            }
+
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            instant_remote_process([$command], $server);
+
+            $this->dispatch('success', 'File extracted successfully.');
+            $this->selectedFiles = [];
+            $this->loadFiles();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: ' . $e->getMessage());
+        }
+    }
+
     public function openCompressDialog()
     {
         if (empty($this->selectedFiles)) {

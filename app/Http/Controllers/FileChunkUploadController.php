@@ -89,18 +89,19 @@ class FileChunkUploadController extends Controller
 
             for ($i = 0; $i < $totalChunks; $i++) {
                 $chunkPath = "{$chunkDir}/chunk_{$i}";
-                $chunkFile = fopen($chunkPath, 'rb');
-                if (! $chunkFile) {
+                $chunkData = file_get_contents($chunkPath);
+                
+                if ($chunkData === false) {
                     fclose($outFile);
-
                     return response()->json(['success' => false, 'message' => "Failed to read chunk {$i}"], 500);
                 }
-                while (! feof($chunkFile)) {
-                    fwrite($outFile, fread($chunkFile, 8192));
-                }
-                fclose($chunkFile);
+                fwrite($outFile, $chunkData);
             }
             fclose($outFile);
+
+            if (filesize($assembledPath) === 0) {
+                return response()->json(['success' => false, 'message' => 'Assembled file is empty.'], 500);
+            }
 
             // SCP assembled file to server /tmp
             $serverTmpPath = '/tmp/'.basename($assembledPath);
