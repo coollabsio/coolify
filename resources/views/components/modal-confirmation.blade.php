@@ -44,8 +44,19 @@
     if (!empty($checkboxes) && is_array($checkboxes)) {
         foreach ($checkboxes as $checkbox) {
             $id = $checkbox['id'] ?? null;
-            if ($id !== null && isset($this->$id) && $this->$id) {
-                $selectedActions[] = $id;
+            if ($id !== null) {
+                try {
+                    // Use property_exists and direct property access to avoid closure issues
+                    if (property_exists($this, $id)) {
+                        $value = $this->{$id};
+                        if ($value === true) {
+                            $selectedActions[] = $id;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Silently skip if property doesn't exist or can't be accessed
+                    continue;
+                }
             }
         }
     }

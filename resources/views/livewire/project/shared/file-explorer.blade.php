@@ -221,14 +221,20 @@
                                         @foreach ($files as $file)
                                             @php
                                                 // Ensure file path exists and is valid
-                                                if (!isset($file['path']) || !is_string($file['path']) || empty(trim($file['path']))) {
-                                                    continue;
+                                                $filePath = null;
+                                                $filePathEscaped = '';
+                                                $isSelected = false;
+                                                
+                                                if (isset($file['path']) && is_string($file['path']) && !empty(trim($file['path']))) {
+                                                    $filePath = trim($file['path']);
+                                                    $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
+                                                    // Escape filePath for use in HTML attributes
+                                                    $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
                                                 }
-                                                $filePath = trim($file['path']);
-                                                $isSelected = isset($selectedFiles) && is_array($selectedFiles) && in_array($filePath, $selectedFiles);
-                                                // Escape filePath for use in HTML attributes
-                                                $filePathEscaped = htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8');
                                             @endphp
+                                            @if ($filePath === null)
+                                                @continue
+                                            @endif
                                             <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ $isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                                 <td class="p-2">
                                                     <input type="checkbox" wire:change="toggleFileSelection('{{ $filePathEscaped }}')" {{ $isSelected ? 'checked' : '' }} class="cursor-pointer">
