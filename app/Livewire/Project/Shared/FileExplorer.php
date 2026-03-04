@@ -457,8 +457,8 @@ class FileExplorer extends Component
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->currentPath);
 
-            // List files and directories with detailed info
-            $command = "docker exec {$escapedContainer} sh -c 'ls -lah {$escapedPath} 2>/dev/null | tail -n +2'";
+            // List files and directories with detailed info (using -la to get exact bytes instead of -lah to prevent 1B parsing errors on large files)
+            $command = "docker exec {$escapedContainer} sh -c 'ls -la {$escapedPath} 2>/dev/null | tail -n +2'";
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
