@@ -58,6 +58,10 @@ class FileExplorer extends Component
 
     public ?string $compressArchiveName = null;
 
+    public bool $showExtractDialog = false;
+
+    public ?string $extractArchiveName = null;
+
     public bool $overwriteExisting = false;
 
     public bool $showImportDatabaseDialog = false;
@@ -972,10 +976,33 @@ class FileExplorer extends Component
             return;
         }
 
+        $this->extractArchiveName = basename($filePath);
+        $this->showExtractDialog = true;
+    }
+
+    public function executeExtraction()
+    {
+        if (count($this->selectedFiles) !== 1) {
+            $this->dispatch('error', 'Please select exactly one file to extract.');
+            $this->showExtractDialog = false;
+
+            return;
+        }
+
+        $filePath = $this->selectedFiles[0];
+        
+        if (! preg_match('/\.(zip|tar|tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|tbz|txz|gz)$/i', $filePath)) {
+            $this->dispatch('error', 'Please select a supported compressed file (.zip, .tar.gz, etc.)');
+            $this->showExtractDialog = false;
+
+            return;
+        }
+
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
+                $this->showExtractDialog = false;
 
                 return;
             }
@@ -983,6 +1010,7 @@ class FileExplorer extends Component
             $server = data_get($container, 'server');
             if (is_null($server)) {
                 $this->dispatch('error', 'Server not found.');
+                $this->showExtractDialog = false;
 
                 return;
             }
@@ -1015,9 +1043,11 @@ class FileExplorer extends Component
 
             $this->dispatch('success', 'File extracted successfully.');
             $this->selectedFiles = [];
+            $this->showExtractDialog = false;
             $this->loadFiles();
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: ' . $e->getMessage());
+            $this->showExtractDialog = false;
         }
     }
 

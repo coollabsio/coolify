@@ -10,12 +10,11 @@ class FileChunkUploadController extends Controller
 {
     /**
      * Receive a single chunk of a file upload.
-     * Chunks are stored in storage/app/temp/chunks/{uploadId}/
      */
     public function uploadChunk(Request $request)
     {
         $request->validate([
-            'chunk' => 'required|file|max:20480', // 20MB max per chunk
+            'chunk' => 'required|file',
             'uploadId' => 'required|string|alpha_dash',
             'chunkIndex' => 'required|integer|min:0',
             'totalChunks' => 'required|integer|min:1',
@@ -24,17 +23,18 @@ class FileChunkUploadController extends Controller
 
         $uploadId = $request->input('uploadId');
         $chunkIndex = $request->input('chunkIndex');
-        $chunkDir = "temp/chunks/{$uploadId}";
+        $chunkDir = storage_path("app/temp/chunks/{$uploadId}");
 
-        // Ensure chunk directory exists
-        if (! Storage::disk('local')->exists($chunkDir)) {
-            Storage::disk('local')->makeDirectory($chunkDir);
+        if (! file_exists($chunkDir)) {
+            @mkdir($chunkDir, 0755, true);
         }
 
-        // Store the chunk
         $chunk = $request->file('chunk');
-        $chunkPath = "{$chunkDir}/chunk_{$chunkIndex}";
-        $chunk->storeAs($chunkDir, "chunk_{$chunkIndex}", 'local');
+        $chunkSize = $chunk->getSize();
+        
+        \Log::info("Chunk {$chunkIndex} for {$uploadId} received. Size: {$chunkSize} bytes.");
+        
+        $chunk->move($chunkDir, "chunk_{$chunkIndex}");
 
         return response()->json([
             'success' => true,
@@ -63,11 +63,10 @@ class FileChunkUploadController extends Controller
         $serverId = $request->input('serverId');
         $destinationPath = $request->input('destinationPath');
 
-        $chunkDir = Storage::disk('local')->path("temp/chunks/{$uploadId}");
-        $assembledPath = Storage::disk('local')->path("temp/{$uploadId}_{$fileName}");
+        $chunkDir = storage_path("app/temp/chunks/{$uploadId}");
+        $assembledPath = storage_path("app/temp/{$uploadId}_{$fileName}");
 
         try {
-            // Verify server access
             $server = Server::find($serverId);
             if (! $server || ! $server->isFunctional()) {
                 return response()->json(['success' => false, 'message' => 'Server not found or not accessible.'], 404);
@@ -81,26 +80,35 @@ class FileChunkUploadController extends Controller
                 }
             }
 
-            // Assemble chunks into final file
+            // Assemble chunks into final file using streams
             $outFile = fopen($assembledPath, 'wb');
             if (! $outFile) {
                 return response()->json(['success' => false, 'message' => 'Failed to create assembled file.'], 500);
             }
 
+            $totalSize = 0;
             for ($i = 0; $i < $totalChunks; $i++) {
                 $chunkPath = "{$chunkDir}/chunk_{$i}";
-                $chunkData = file_get_contents($chunkPath);
-                
-                if ($chunkData === false) {
-                    fclose($outFile);
-                    return response()->json(['success' => false, 'message' => "Failed to read chunk {$i}"], 500);
+                $chunkFile = fopen($chunkPath, 'rb');
+                while (! feof($chunkFile)) {
+                    $buffer = fread($chunkFile, 1048576); // 1MB chunks
+                    if ($buffer !== false && $buffer !== '') {
+                        $totalSize += strlen($buffer);
+                        fwrite($outFile, $buffer);
+                    }
                 }
-                fwrite($outFile, $chunkData);
+                fclose($chunkFile);
+                @unlink($chunkPath); // Free up disk space immediately
             }
             fclose($outFile);
+            @rmdir($chunkDir);
 
-            if (filesize($assembledPath) === 0) {
-                return response()->json(['success' => false, 'message' => 'Assembled file is empty.'], 500);
+            $actualSize = filesize($assembledPath);
+            \Log::info("Assembled file {$fileName} size calculated: {$totalSize}, actual on disk: {$actualSize}");
+
+            if ($actualSize === 0) {
+                @unlink($assembledPath);
+                return response()->json(['success' => false, 'message' => "Assembled file is empty (computed {$totalSize} bytes from chunks)."], 500);
             }
 
             // SCP assembled file to server /tmp
@@ -124,8 +132,8 @@ class FileChunkUploadController extends Controller
             }
             instant_remote_process([$cleanCmd], $server, false);
 
-            // Clean up local chunks and assembled file
-            $this->cleanupUpload($uploadId, $assembledPath);
+            // Clean up local assembled file
+            @unlink($assembledPath);
 
             return response()->json([
                 'success' => true,
@@ -133,24 +141,8 @@ class FileChunkUploadController extends Controller
                 'path' => $fullDestPath,
             ]);
         } catch (\Throwable $e) {
-            // Clean up on error
-            $this->cleanupUpload($uploadId, $assembledPath);
-
+            @unlink($assembledPath);
             return response()->json(['success' => false, 'message' => 'Upload failed: '.$e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Clean up temporary chunk files and assembled file.
-     */
-    private function cleanupUpload(string $uploadId, string $assembledPath): void
-    {
-        // Delete chunk directory
-        Storage::disk('local')->deleteDirectory("temp/chunks/{$uploadId}");
-
-        // Delete assembled file
-        if (file_exists($assembledPath)) {
-            unlink($assembledPath);
         }
     }
 }
