@@ -54,23 +54,31 @@
                                  progress: 0,
                                  fileName: ''
                              }"
-                             x-on:livewire:upload-progress.window="
+                             @livewire:upload-progress.window="
+                                 console.log('Upload progress:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
                                      progress = $event.detail.progress;
                                      uploading = true;
                                  }
                              "
-                             x-on:livewire:upload-finish.window="
+                             @livewire:upload-finish.window="
+                                 console.log('Upload finish:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
-                                     uploading = false;
-                                     progress = 0;
-                                     setTimeout(() => { progress = 0; }, 1000);
+                                     progress = 100;
+                                     setTimeout(() => {
+                                         uploading = false;
+                                         progress = 0;
+                                         fileName = '';
+                                         document.getElementById('uploadFileInput').value = '';
+                                     }, 1500);
                                  }
                              "
-                             x-on:livewire:upload-error.window="
+                             @livewire:upload-error.window="
+                                 console.log('Upload error:', $event.detail);
                                  if ($event.detail.targetName === 'uploadFile') {
                                      uploading = false;
                                      progress = 0;
+                                     fileName = '';
                                  }
                              ">
                             <input type="file" 
@@ -416,7 +424,7 @@
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
-                <x-forms.button wire:click="moveFile('{{ $moveSource }}', $moveDestination)" class="bg-coollabs">Move</x-forms.button>
+                <x-forms.button wire:click="moveFile('{{ $moveSource }}', '{{ $moveDestination ?? '' }}')" class="bg-coollabs">Move</x-forms.button>
                 <x-forms.button wire:click="closeMoveDialog" class="bg-gray-600">Cancel</x-forms.button>
             </div>
         </div>
