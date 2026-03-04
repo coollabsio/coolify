@@ -1630,6 +1630,10 @@ class FileExplorer extends Component
 
     public function getDownloadUrl(string $path): string
     {
+        if (empty($path)) {
+            return '#';
+        }
+
         $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
         if (is_null($container)) {
             return '#';

@@ -244,8 +244,8 @@
                                                 <td class="p-2 text-sm text-gray-600 dark:text-gray-400">{{ $file['date'] }}</td>
                                                 <td class="p-2">
                                                     <div class="flex items-center justify-end gap-1">
-                                                        @if (!$file['is_directory'])
-                                                            <a href="{{ $this->getDownloadUrl($file['path']) }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
+                                                        @if (!$file['is_directory'] && !empty(data_get($file, 'path')))
+                                                            <a href="{{ $this->getDownloadUrl(data_get($file, 'path', '')) }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                                 </svg>
