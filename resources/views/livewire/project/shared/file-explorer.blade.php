@@ -72,7 +72,7 @@
                                 Select All
                             </x-forms.button>
                         @endif
-                        @if ($isMySQLOrMariaDB)
+                        @if ($isMySQLOrMariaDB || $hasMySQLOrMariaDBContainer)
                             <x-forms.button wire:click="openImportDatabaseDialog" class="bg-purple-600">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
@@ -325,6 +325,23 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                         Select a SQL file (.sql, .sql.gz, .sql.zip) from the current directory to import into the database.
                     </p>
+                    @php
+                        $databaseContainers = $this->getDatabaseContainers();
+                    @endphp
+                    @if (count($databaseContainers) > 1)
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Database Container</label>
+                            <select wire:model="importDatabaseContainer" class="w-full p-2 border rounded bg-white dark:bg-coolgray-800">
+                                <option value="">Use current container ({{ $selected_container }})</option>
+                                @foreach ($databaseContainers as $dbContainer)
+                                    <option value="{{ $dbContainer['name'] }}">{{ $dbContainer['server'] }} -> {{ $dbContainer['name'] }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Select the MySQL/MariaDB container to import into. If not selected, will use the current container.
+                            </p>
+                        </div>
+                    @endif
                     <div>
                         <label class="block text-sm font-medium mb-2">Database File</label>
                         <select wire:model="importDatabaseFile" class="w-full p-2 border rounded bg-white dark:bg-coolgray-800">

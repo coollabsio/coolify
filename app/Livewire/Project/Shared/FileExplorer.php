@@ -64,7 +64,11 @@ class FileExplorer extends Component
 
     public ?string $importDatabaseFile = null;
 
+    public ?string $importDatabaseContainer = null;
+
     public bool $isMySQLOrMariaDB = false;
+
+    public bool $hasMySQLOrMariaDBContainer = false;
 
     public function mount()
     {
@@ -74,6 +78,7 @@ class FileExplorer extends Component
         $this->files = [];
         $this->selectedFiles = [];
         $this->isMySQLOrMariaDB = false;
+        $this->hasMySQLOrMariaDBContainer = false;
         $this->showCreateFolder = false;
         $this->showMoveDialog = false;
         $this->showCompressDialog = false;
@@ -112,6 +117,9 @@ class FileExplorer extends Component
         }
 
         $this->servers = $this->servers->sortByDesc(fn ($server) => $server->isTerminalEnabled());
+
+        // Check if any container in the service is MySQL/MariaDB
+        $this->checkForDatabaseContainers();
 
         if ($this->containers->count() === 1) {
             try {
@@ -193,6 +201,40 @@ class FileExplorer extends Component
         }
     }
 
+    public function checkForDatabaseContainers()
+    {
+        $this->hasMySQLOrMariaDBContainer = false;
+
+        foreach ($this->containers as $container) {
+            $containerName = data_get($container, 'container.Names', '');
+            
+            // Check by name
+            if (str_contains(strtolower($containerName), 'mysql') || 
+                str_contains(strtolower($containerName), 'mariadb')) {
+                $this->hasMySQLOrMariaDBContainer = true;
+                return;
+            }
+
+            // Check by image
+            try {
+                $server = data_get($container, 'server');
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker inspect {$escapedContainer} --format='{{.Config.Image}}'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $image = trim(instant_remote_process([$command], $server, false) ?? '');
+                if (str_contains(strtolower($image), 'mysql') || 
+                    str_contains(strtolower($image), 'mariadb')) {
+                    $this->hasMySQLOrMariaDBContainer = true;
+                    return;
+                }
+            } catch (\Throwable $e) {
+                // Continue checking other containers
+            }
+        }
+    }
+
     public function checkDatabaseType()
     {
         if ($this->selected_container === 'default') {
@@ -209,6 +251,7 @@ class FileExplorer extends Component
         }
 
         $containerName = data_get($container, 'container.Names', '');
+        $server = data_get($container, 'server');
         
         // Check if container name contains mysql or mariadb
         $this->isMySQLOrMariaDB = str_contains(strtolower($containerName), 'mysql') || 
@@ -217,7 +260,6 @@ class FileExplorer extends Component
         // If not found by name, try to check container image
         if (! $this->isMySQLOrMariaDB) {
             try {
-                $server = data_get($container, 'server');
                 $escapedContainer = escapeshellarg($containerName);
                 $command = "docker inspect {$escapedContainer} --format='{{.Config.Image}}'";
                 if ($server->isNonRoot()) {
@@ -227,8 +269,54 @@ class FileExplorer extends Component
                 $this->isMySQLOrMariaDB = str_contains(strtolower($image), 'mysql') || 
                                          str_contains(strtolower($image), 'mariadb');
             } catch (\Throwable $e) {
-                // Silently fail, assume not MySQL/MariaDB
-                $this->isMySQLOrMariaDB = false;
+                // Continue to next check
+            }
+        }
+
+        // If still not found, check environment variables for MySQL/MariaDB indicators
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} env 2>/dev/null | grep -iE '(MYSQL|MARIADB)' || echo ''";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $envOutput = instant_remote_process([$command], $server, false) ?? '';
+                $this->isMySQLOrMariaDB = ! empty(trim($envOutput));
+            } catch (\Throwable $e) {
+                // Continue to next check
+            }
+        }
+
+        // If still not found, check if mysql or mariadb commands are available in the container
+        if (! $this->isMySQLOrMariaDB) {
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} sh -c 'command -v mysql >/dev/null 2>&1 || command -v mariadb >/dev/null 2>&1 && echo found || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                $output = trim(instant_remote_process([$command], $server, false) ?? '');
+                $this->isMySQLOrMariaDB = $output === 'found';
+            } catch (\Throwable $e) {
+                // Continue to next check
+            }
+        }
+
+        // If still not found and it's a service, check if there are database containers in the same service
+        if (! $this->isMySQLOrMariaDB && $this->type === 'service') {
+            try {
+                // Check all containers in the service for MySQL/MariaDB
+                foreach ($this->containers as $serviceContainer) {
+                    $serviceContainerName = data_get($serviceContainer, 'container.Names', '');
+                    if (str_contains(strtolower($serviceContainerName), 'mysql') || 
+                        str_contains(strtolower($serviceContainerName), 'mariadb')) {
+                        $this->isMySQLOrMariaDB = true;
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Silently fail
             }
         }
     }
@@ -1045,7 +1133,10 @@ class FileExplorer extends Component
         }
 
         try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            // Use selected database container or fallback to current container
+            $targetContainerName = $this->importDatabaseContainer ?? $this->selected_container;
+            
+            $container = collect($this->containers)->firstWhere('container.Names', $targetContainerName);
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
                 $this->showImportDatabaseDialog = false;
@@ -1177,6 +1268,7 @@ class FileExplorer extends Component
     {
         $this->showImportDatabaseDialog = false;
         $this->importDatabaseFile = null;
+        $this->importDatabaseContainer = null;
     }
 
     public function hideCompressDialog()
