@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Project\Database;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class AdminerController extends Controller
 {

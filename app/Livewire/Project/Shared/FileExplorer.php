@@ -1637,47 +1637,19 @@ class FileExplorer extends Component
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
+                $this->adminerUrl = null;
+
                 return;
             }
 
             $server = data_get($container, 'server');
             $containerName = data_get($container, 'container.Names');
 
-            // Get database credentials
-            $escapedContainer = escapeshellarg($containerName);
-            $command = "docker exec {$escapedContainer} env";
-            if ($server->isNonRoot()) {
-                $command = "sudo {$command}";
+            if (is_null($server)) {
+                $this->adminerUrl = null;
+
+                return;
             }
-            $envOutput = instant_remote_process([$command], $server, false) ?? '';
-
-            // Get root password
-            $passwordVar = 'MYSQL_ROOT_PASSWORD';
-            if (str_contains($envOutput, 'MARIADB_ROOT_PASSWORD')) {
-                $passwordVar = 'MARIADB_ROOT_PASSWORD';
-            }
-
-            // Extract password from environment
-            preg_match('/'.$passwordVar.'=([^\n]+)/', $envOutput, $matches);
-            $password = $matches[1] ?? '';
-
-            // Get database name if available
-            preg_match('/MYSQL_DATABASE=([^\n]+)/', $envOutput, $dbMatches);
-            $database = $dbMatches[1] ?? '';
-
-            // Determine if it's MariaDB or MySQL
-            $isMariaDB = str_contains($envOutput, 'MARIADB_ROOT_PASSWORD') || 
-                        str_contains(strtolower($containerName), 'mariadb');
-
-            // Build Adminer URL with connection parameters
-            // Adminer accepts: server, username, password, database, driver
-            $params = http_build_query([
-                'server' => 'localhost',
-                'username' => 'root',
-                'password' => $password,
-                'database' => $database,
-                'driver' => $isMariaDB ? 'mariadb' : 'mysql',
-            ]);
 
             // Determine route name based on type
             $routeName = match ($this->type) {
@@ -1687,10 +1659,41 @@ class FileExplorer extends Component
                 default => 'project.database.adminer',
             };
 
+            // Build route parameters array
+            $routeParams = [];
+            if (isset($this->parameters['project_uuid'])) {
+                $routeParams['project_uuid'] = $this->parameters['project_uuid'];
+            }
+            if (isset($this->parameters['environment_uuid'])) {
+                $routeParams['environment_uuid'] = $this->parameters['environment_uuid'];
+            }
+            if (isset($this->parameters['application_uuid'])) {
+                $routeParams['application_uuid'] = $this->parameters['application_uuid'];
+            }
+            if (isset($this->parameters['database_uuid'])) {
+                $routeParams['database_uuid'] = $this->parameters['database_uuid'];
+            }
+            if (isset($this->parameters['service_uuid'])) {
+                $routeParams['service_uuid'] = $this->parameters['service_uuid'];
+            }
+
             // Use Adminer proxy route that handles the connection securely
             // Pass container and server_id as query parameters
-            $this->adminerUrl = route($routeName, $this->parameters).'?container='.urlencode($containerName).'&server_id='.$server->id;
+            try {
+                $this->adminerUrl = route($routeName, $routeParams).'?container='.urlencode($containerName).'&server_id='.$server->id;
+            } catch (\Exception $e) {
+                // Fallback: use direct URL construction if route doesn't exist
+                $baseUrl = url('/');
+                $path = match ($this->type) {
+                    'application' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/application/{$routeParams['application_uuid']}/adminer",
+                    'database' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/database/{$routeParams['database_uuid']}/adminer",
+                    'service' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/service/{$routeParams['service_uuid']}/adminer",
+                    default => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/database/{$routeParams['database_uuid']}/adminer",
+                };
+                $this->adminerUrl = $baseUrl.$path.'?container='.urlencode($containerName).'&server_id='.$server->id;
+            }
         } catch (\Throwable $e) {
+            $this->adminerUrl = null;
             $this->dispatch('error', 'Failed to generate database connection URL: '.$e->getMessage());
         }
     }
