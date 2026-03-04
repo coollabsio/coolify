@@ -217,9 +217,11 @@
                                     <tbody>
                                         @foreach ($files as $file)
                                             @php
-                                                $filePath = data_get($file, 'path', '');
-                                                $downloadUrl = !empty($filePath) && !$file['is_directory'] ? $this->getDownloadUrl($filePath) : '#';
+                                                $filePath = isset($file['path']) && is_string($file['path']) && !empty($file['path']) ? $file['path'] : null;
                                             @endphp
+                                            @if ($filePath === null)
+                                                @continue
+                                            @endif
                                             <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ in_array($filePath, $selectedFiles) ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                                 <td class="p-2">
                                                     <input type="checkbox" wire:change="toggleFileSelection('{{ $filePath }}')" {{ in_array($filePath, $selectedFiles) ? 'checked' : '' }} class="cursor-pointer">
@@ -248,7 +250,17 @@
                                                 <td class="p-2 text-sm text-gray-600 dark:text-gray-400">{{ $file['date'] }}</td>
                                                 <td class="p-2">
                                                     <div class="flex items-center justify-end gap-1">
-                                                        @if (!$file['is_directory'] && !empty($filePath))
+                                                        @if (!$file['is_directory'])
+                                                            @php
+                                                                $downloadUrl = '#';
+                                                                if (!empty($filePath) && is_string($filePath)) {
+                                                                    try {
+                                                                        $downloadUrl = $this->getDownloadUrl($filePath);
+                                                                    } catch (\Throwable $e) {
+                                                                        $downloadUrl = '#';
+                                                                    }
+                                                                }
+                                                            @endphp
                                                             <a href="{{ $downloadUrl }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
