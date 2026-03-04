@@ -421,15 +421,21 @@
     @endif
 
     <!-- Database Panel Modal -->
-    @if ($showDatabasePanel)
-        <x-modal wire:model="showDatabasePanel" max-width="7xl">
-            <x-slot:title>
-                <div class="flex items-center justify-between">
-                    <span>Database Panel</span>
-                    <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
-                </div>
-            </x-slot:title>
-            <x-slot:content>
+    <div x-data="{ modalOpen: @entangle('showDatabasePanel') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.closeDatabasePanel()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.closeDatabasePanel()"
+            class="relative w-full max-w-7xl max-h-[90vh] bg-white dark:bg-coolgray-800 rounded-lg shadow-xl flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="flex items-center justify-between p-6 border-b border-coolgray-300 dark:border-coolgray-600">
+                <h2 class="text-xl font-semibold">Database Panel</h2>
+                <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
+            </div>
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6">
                 <div class="flex flex-col gap-4 h-[70vh]">
                     <!-- Databases List -->
                     <div class="border rounded-lg p-4 bg-white dark:bg-coolgray-800">
@@ -574,7 +580,7 @@
                         </div>
                     @endif
                 </div>
-            </x-slot:content>
-        </x-modal>
-    @endif
+            </div>
+        </div>
+    </div>
 </div>
