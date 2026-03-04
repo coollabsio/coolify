@@ -48,14 +48,44 @@
                             </svg>
                             New Folder
                         </x-forms.button>
-                        <div class="relative inline-block" x-data="{ uploading: false }">
+                        <div class="relative inline-block" 
+                             x-data="{ 
+                                 uploading: false, 
+                                 progress: 0,
+                                 fileName: ''
+                             }"
+                             x-on:livewire:upload-progress.window="
+                                 if ($event.detail.targetName === 'uploadFile') {
+                                     progress = $event.detail.progress;
+                                     uploading = true;
+                                 }
+                             "
+                             x-on:livewire:upload-finish.window="
+                                 if ($event.detail.targetName === 'uploadFile') {
+                                     uploading = false;
+                                     progress = 0;
+                                     setTimeout(() => { progress = 0; }, 1000);
+                                 }
+                             "
+                             x-on:livewire:upload-error.window="
+                                 if ($event.detail.targetName === 'uploadFile') {
+                                     uploading = false;
+                                     progress = 0;
+                                 }
+                             ">
                             <input type="file" 
                                    id="uploadFileInput" 
                                    wire:model="uploadFile" 
                                    class="hidden" 
                                    wire:loading.attr="disabled"
                                    accept="*"
-                                   x-on:change="uploading = true; $wire.uploadFile = $event.target.files[0]">
+                                   x-on:change="
+                                       if ($event.target.files.length > 0) {
+                                           fileName = $event.target.files[0].name;
+                                           uploading = true;
+                                           progress = 0;
+                                       }
+                                   ">
                             <x-forms.button type="button" 
                                             class="bg-coollabs" 
                                             onclick="document.getElementById('uploadFileInput').click()"
@@ -65,9 +95,24 @@
                                 </svg>
                                 Upload File
                             </x-forms.button>
-                            <div wire:loading wire:target="uploadFile" class="absolute top-full left-0 mt-1 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                Uploading...
+                            
+                            <!-- Progress Bar -->
+                            <div x-show="uploading" 
+                                 x-cloak
+                                 class="absolute top-full left-0 right-0 mt-2 w-full min-w-[200px] bg-white dark:bg-coolgray-800 rounded-lg shadow-lg border border-coolgray-300 dark:border-coolgray-600 p-3 z-50">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <svg class="w-4 h-4 text-coollabs animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium dark:text-white" x-text="fileName || 'Uploading...'"></span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-auto" x-text="Math.round(progress) + '%'"></span>
+                                </div>
+                                <div class="w-full bg-coolgray-200 dark:bg-coolgray-700 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-coollabs h-2 rounded-full transition-all duration-300 ease-out" 
+                                         :style="'width: ' + progress + '%'"></div>
+                                </div>
                             </div>
+                            
                             @if ($selected_container === 'default')
                                 <div class="absolute top-full left-0 mt-1 text-xs text-red-500 whitespace-nowrap">
                                     Select a container first
