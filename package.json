@@ -2,15 +2,23 @@
     "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
+    "dependencies": {
+        "@sveltejs/vite-plugin-svelte": "^7.0.0",
+        "svelte": "^5.53.7"
+    },
     "devDependencies": {
         "@tailwindcss/vite": "^4.2.1",
         "concurrently": "^9.2.1",
         "laravel-vite-plugin": "^2.1.0",
         "tailwindcss": "^4.2.1",
-        "vite": "^7.3.1"
+        "vite": "^8.0.0-beta.16"
+    },
+    "overrides": {
+        "vite": "8.0.0-beta.16"
     },
     "scripts": {
+        "dev": "vite",
         "build": "vite build",
-        "dev": "vite"
+        "preview": "vite preview"
     }
 }
