@@ -218,6 +218,7 @@
                                         @foreach ($files as $file)
                                             @php
                                                 $filePath = data_get($file, 'path', '');
+                                                $downloadUrl = !empty($filePath) && !$file['is_directory'] ? $this->getDownloadUrl($filePath) : '#';
                                             @endphp
                                             <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800 {{ in_array($filePath, $selectedFiles) ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                                 <td class="p-2">
@@ -248,7 +249,7 @@
                                                 <td class="p-2">
                                                     <div class="flex items-center justify-end gap-1">
                                                         @if (!$file['is_directory'] && !empty($filePath))
-                                                            <a href="{{ $this->getDownloadUrl($filePath) }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
+                                                            <a href="{{ $downloadUrl }}" target="_blank" class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-white bg-coollabs rounded hover:bg-coollabs-600" title="Download">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                                 </svg>
@@ -305,6 +306,9 @@
 
                     <!-- File Editor Modal -->
                     @if ($selectedFile)
+                        @php
+                            $fileLanguage = $this->getFileLanguage($selectedFile);
+                        @endphp
                         <template x-teleport="body">
                             <div x-data="{ editorOpen: true }" 
                                 x-show="editorOpen"
@@ -324,7 +328,7 @@
                                             </svg>
                                             <h3 class="text-lg font-semibold">{{ basename($selectedFile) }}</h3>
                                             <span class="px-2 py-1 text-xs font-mono text-gray-500 dark:text-gray-400 bg-coolgray-100 dark:bg-coolgray-700 rounded">
-                                                {{ $this->getFileLanguage($selectedFile) }}
+                                                {{ $fileLanguage }}
                                             </span>
                                             <span class="text-sm text-gray-500 dark:text-gray-400">{{ $selectedFile }}</span>
                                         </div>
@@ -347,7 +351,7 @@
                                             <x-forms.textarea 
                                                 id="fileContent" 
                                                 useMonacoEditor
-                                                monacoEditorLanguage="{{ $this->getFileLanguage($selectedFile) }}"
+                                                monacoEditorLanguage="{{ $fileLanguage }}"
                                                 wire:model="fileContent"
                                                 :readonly="false" />
                                         </div>
