@@ -323,12 +323,12 @@
                                                             </svg>
                                                         </x-forms.button>
                                                         <x-modal-confirmation title="Delete File?" buttonTitle="Delete" submitAction="deleteFile('{{ $filePathEscaped }}')" :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Delete" step2ButtonText="Confirm">
-                                                            <x-slot:button-title>
-                                                                <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                                </svg>
-                                                            </x-slot:button-title>
-                                                        </x-modal-confirmation>
+                                            <x-slot:content>
+                                                <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </x-slot:content>
+                                        </x-modal-confirmation>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -480,10 +480,29 @@
     </div>
 
     <!-- Import Database Dialog -->
-    @if ($showImportDatabaseDialog)
-        <x-modal wire:model="showImportDatabaseDialog">
-            <x-slot:title>Import Database</x-slot:title>
-            <x-slot:content>
+    <div x-data="{ modalOpen: @entangle('showImportDatabaseDialog') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.hideImportDatabaseDialog()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.hideImportDatabaseDialog()"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-lg bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <h2 class="text-xl font-bold dark:text-white">Import Database</h2>
+                <button @click="modalOpen = false; $wire.hideImportDatabaseDialog()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
                 <div class="flex flex-col gap-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                         Select a SQL file (.sql, .sql.gz, .sql.zip) from the current directory to import into the database.
@@ -534,13 +553,13 @@
                         </p>
                     </div>
                 </div>
-            </x-slot:content>
-            <x-slot:footer>
+            </div>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <x-forms.button wire:click="importDatabase" class="bg-purple-600">Import</x-forms.button>
                 <x-forms.button wire:click="hideImportDatabaseDialog" class="bg-gray-600">Cancel</x-forms.button>
-            </x-slot:footer>
-        </x-modal>
-    @endif
+            </div>
+        </div>
+    </div>
 
     <!-- Compress Files Dialog -->
     <div x-data="{ modalOpen: @entangle('showCompressDialog') }"
