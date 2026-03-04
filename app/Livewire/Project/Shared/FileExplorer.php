@@ -1627,76 +1627,9 @@ class FileExplorer extends Component
         }
 
         $this->showDatabasePanel = true;
-        $this->generateAdminerUrl();
+        $this->loadDatabases();
     }
 
-    public ?string $adminerUrl = null;
-
-    public function generateAdminerUrl()
-    {
-        try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
-                $this->adminerUrl = null;
-
-                return;
-            }
-
-            $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
-
-            if (is_null($server)) {
-                $this->adminerUrl = null;
-
-                return;
-            }
-
-            // Determine route name based on type
-            $routeName = match ($this->type) {
-                'application' => 'project.application.adminer',
-                'database' => 'project.database.adminer',
-                'service' => 'project.service.adminer',
-                default => 'project.database.adminer',
-            };
-
-            // Build route parameters array
-            $routeParams = [];
-            if (isset($this->parameters['project_uuid'])) {
-                $routeParams['project_uuid'] = $this->parameters['project_uuid'];
-            }
-            if (isset($this->parameters['environment_uuid'])) {
-                $routeParams['environment_uuid'] = $this->parameters['environment_uuid'];
-            }
-            if (isset($this->parameters['application_uuid'])) {
-                $routeParams['application_uuid'] = $this->parameters['application_uuid'];
-            }
-            if (isset($this->parameters['database_uuid'])) {
-                $routeParams['database_uuid'] = $this->parameters['database_uuid'];
-            }
-            if (isset($this->parameters['service_uuid'])) {
-                $routeParams['service_uuid'] = $this->parameters['service_uuid'];
-            }
-
-            // Use Adminer proxy route that handles the connection securely
-            // Pass container and server_id as query parameters
-            try {
-                $this->adminerUrl = route($routeName, $routeParams).'?container='.urlencode($containerName).'&server_id='.$server->id;
-            } catch (\Exception $e) {
-                // Fallback: use direct URL construction if route doesn't exist
-                $baseUrl = url('/');
-                $path = match ($this->type) {
-                    'application' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/application/{$routeParams['application_uuid']}/adminer",
-                    'database' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/database/{$routeParams['database_uuid']}/adminer",
-                    'service' => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/service/{$routeParams['service_uuid']}/adminer",
-                    default => "/project/{$routeParams['project_uuid']}/environment/{$routeParams['environment_uuid']}/database/{$routeParams['database_uuid']}/adminer",
-                };
-                $this->adminerUrl = $baseUrl.$path.'?container='.urlencode($containerName).'&server_id='.$server->id;
-            }
-        } catch (\Throwable $e) {
-            $this->adminerUrl = null;
-            $this->dispatch('error', 'Failed to generate database connection URL: '.$e->getMessage());
-        }
-    }
 
     public function closeDatabasePanel()
     {

@@ -453,12 +453,8 @@
                 <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
             </div>
             <!-- Content -->
-            <div class="flex-1 overflow-hidden flex flex-col">
-                @if ($adminerUrl)
-                    <iframe src="{{ $adminerUrl }}" class="w-full h-full border-0" style="min-height: 600px;"></iframe>
-                @else
-                    <div class="flex-1 overflow-y-auto p-6">
-                        <div class="flex flex-col gap-6">
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="flex flex-col gap-6">
                     <!-- Databases List -->
                     <div class="box-without-bg">
                         <div class="flex items-center justify-between mb-4">
@@ -664,9 +660,7 @@
                             </div>
                         </div>
                     @endif
-                        </div>
-                    </div>
-                @endif
+                </div>
             </div>
         </div>
     </div>

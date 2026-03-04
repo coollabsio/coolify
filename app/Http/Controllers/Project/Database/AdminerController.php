@@ -10,14 +10,18 @@ class AdminerController extends Controller
 {
     public function index(Request $request)
     {
-        $container = $request->get('container');
-        $serverId = $request->get('server_id');
+        $container = $request->query('container');
+        $serverId = $request->query('server_id');
 
         if (! $container || ! $serverId) {
-            abort(404, 'Container or server not specified');
+            abort(404, 'Container or server not specified. Container: '.($container ?? 'null').', Server ID: '.($serverId ?? 'null'));
         }
 
-        $server = Server::findOrFail($serverId);
+        try {
+            $server = Server::findOrFail($serverId);
+        } catch (\Exception $e) {
+            abort(404, 'Server not found: '.$e->getMessage());
+        }
 
         // Download Adminer if not exists
         $adminerPath = storage_path('app/adminer.php');
