@@ -23,11 +23,18 @@ class AdminerController extends Controller
             abort(404, 'Server not found: '.$e->getMessage());
         }
 
-        // Download Adminer if not exists
-        $adminerPath = storage_path('app/adminer.php');
+        // Download Adminer if not exists (store in public directory for easier access)
+        $adminerPath = public_path('adminer.php');
         if (! file_exists($adminerPath)) {
-            $adminerContent = file_get_contents('https://www.adminer.org/latest.php');
-            file_put_contents($adminerPath, $adminerContent);
+            try {
+                $adminerContent = @file_get_contents('https://www.adminer.org/latest.php');
+                if ($adminerContent === false) {
+                    abort(500, 'Failed to download Adminer. Please check your internet connection.');
+                }
+                file_put_contents($adminerPath, $adminerContent);
+            } catch (\Exception $e) {
+                abort(500, 'Failed to download Adminer: '.$e->getMessage());
+            }
         }
 
         // Get database credentials from container

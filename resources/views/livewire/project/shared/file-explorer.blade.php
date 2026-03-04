@@ -289,38 +289,76 @@
     @endif
 
     <!-- Create Folder Modal -->
-    @if ($showCreateFolder)
-        <x-modal wire:model="showCreateFolder">
-            <x-slot:title>Create New Folder</x-slot:title>
-            <x-slot:content>
+    <div x-data="{ modalOpen: @entangle('showCreateFolder') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.hideCreateFolderDialog()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.hideCreateFolderDialog()"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-md bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <h2 class="text-xl font-bold dark:text-white">Create New Folder</h2>
+                <button @click="modalOpen = false; $wire.hideCreateFolderDialog()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
                 <x-forms.input id="newFolderName" label="Folder Name" wire:model="newFolderName" placeholder="Enter folder name" />
-            </x-slot:content>
-            <x-slot:footer>
+            </div>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <x-forms.button wire:click="createFolder" class="bg-coollabs">Create</x-forms.button>
                 <x-forms.button wire:click="hideCreateFolderDialog" class="bg-gray-600">Cancel</x-forms.button>
-            </x-slot:footer>
-        </x-modal>
-    @endif
+            </div>
+        </div>
+    </div>
 
     <!-- Move File Dialog -->
-    @if ($showMoveDialog)
-        <x-modal wire:model="showMoveDialog">
-            <x-slot:title>Move File</x-slot:title>
-            <x-slot:content>
+    <div x-data="{ modalOpen: @entangle('showMoveDialog') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.closeMoveDialog()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.closeMoveDialog()"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-md bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <h2 class="text-xl font-bold dark:text-white">Move File</h2>
+                <button @click="modalOpen = false; $wire.closeMoveDialog()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
                 <div class="flex flex-col gap-4">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Source</label>
+                        <label class="block text-sm font-medium mb-1 dark:text-white">Source</label>
                         <input type="text" value="{{ $moveSource }}" class="w-full p-2 border rounded bg-coolgray-50 dark:bg-coolgray-800" readonly>
                     </div>
                     <x-forms.input id="moveDestination" label="Destination Path" wire:model="moveDestination" placeholder="/path/to/destination" />
                 </div>
-            </x-slot:content>
-            <x-slot:footer>
+            </div>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <x-forms.button wire:click="moveFile('{{ $moveSource }}', $moveDestination)" class="bg-coollabs">Move</x-forms.button>
                 <x-forms.button wire:click="closeMoveDialog" class="bg-gray-600">Cancel</x-forms.button>
-            </x-slot:footer>
-        </x-modal>
-    @endif
+            </div>
+        </div>
+    </div>
 
     <!-- Import Database Dialog -->
     @if ($showImportDatabaseDialog)
@@ -382,10 +420,29 @@
     @endif
 
     <!-- Compress Files Dialog -->
-    @if ($showCompressDialog)
-        <x-modal wire:model="showCompressDialog">
-            <x-slot:title>Compress Files</x-slot:title>
-            <x-slot:content>
+    <div x-data="{ modalOpen: @entangle('showCompressDialog') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.hideCompressDialog()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.hideCompressDialog()"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-lg bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <h2 class="text-xl font-bold dark:text-white">Compress Files</h2>
+                <button @click="modalOpen = false; $wire.hideCompressDialog()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto">
                 <div class="flex flex-col gap-4">
                     <div>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
@@ -409,16 +466,16 @@
                     </p>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="overwriteExisting" wire:model="overwriteExisting" class="cursor-pointer">
-                        <label for="overwriteExisting" class="text-sm cursor-pointer">Overwrite existing archive if it exists</label>
+                        <label for="overwriteExisting" class="text-sm cursor-pointer dark:text-gray-300">Overwrite existing archive if it exists</label>
                     </div>
                 </div>
-            </x-slot:content>
-            <x-slot:footer>
+            </div>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <x-forms.button wire:click="compressSelectedFiles" class="bg-green-600">Compress</x-forms.button>
                 <x-forms.button wire:click="hideCompressDialog" class="bg-gray-600">Cancel</x-forms.button>
-            </x-slot:footer>
-        </x-modal>
-    @endif
+            </div>
+        </div>
+    </div>
 
     <!-- Database Panel Modal -->
     <div x-data="{ modalOpen: @entangle('showDatabasePanel') }"
@@ -453,8 +510,12 @@
                 <x-forms.button wire:click="closeDatabasePanel" class="bg-gray-600">Close</x-forms.button>
             </div>
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6">
-                <div class="flex flex-col gap-6">
+            <div class="flex-1 overflow-hidden flex flex-col">
+                @if ($adminerUrl)
+                    <iframe src="{{ $adminerUrl }}" class="w-full h-full border-0" style="min-height: 600px;" allow="clipboard-read; clipboard-write"></iframe>
+                @else
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="flex flex-col gap-6">
                     <!-- Databases List -->
                     <div class="box-without-bg">
                         <div class="flex items-center justify-between mb-4">
@@ -627,40 +688,63 @@
                                     </div>
                                 @else
                                     <div class="overflow-x-auto border border-coolgray-300 dark:border-coolgray-600 rounded-lg">
-                                        <table class="w-full">
-                                            <thead>
-                                                <tr class="bg-coolgray-50 dark:bg-coolgray-900 border-b border-coolgray-300 dark:border-coolgray-600">
-                                                    @if (!empty($tableData))
-                                                        @foreach (array_keys($tableData[0]) as $header)
-                                                            <th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{{ $header }}</th>
-                                                        @endforeach
-                                                    @endif
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach ($tableData as $row)
-                                                    <tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800">
-                                                        @foreach ($row as $value)
-                                                            <td class="p-3 text-sm dark:text-gray-300">
-                                                                <div class="max-w-xs truncate" title="{{ $value }}">
-                                                                    {{ $value ?? '<span class="text-gray-400">NULL</span>' }}
-                                                                </div>
-                                                            </td>
-                                                        @endforeach
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                        <div id="tableDataContainer" wire:ignore></div>
                                     </div>
                                     <div class="flex items-center justify-between mt-3 text-xs text-gray-500 dark:text-gray-400">
                                         <span>Showing {{ count($tableData) }} row(s) on page {{ $currentPage }}</span>
                                         <span>{{ $this->perPage }} rows per page</span>
                                     </div>
+                                    <script>
+                                        document.addEventListener('livewire:init', () => {
+                                            Livewire.hook('morph.updated', ({ el, component }) => {
+                                                if (component.name === 'project.shared.file-explorer' && @js($selectedTable)) {
+                                                    initTableData();
+                                                }
+                                            });
+                                        });
+                                        
+                                        function initTableData() {
+                                            const container = document.getElementById('tableDataContainer');
+                                            if (!container) return;
+                                            
+                                            const tableData = @js($tableData);
+                                            if (!tableData || tableData.length === 0) return;
+                                            
+                                            // Create table with better styling
+                                            let html = '<table class="w-full">';
+                                            html += '<thead><tr class="bg-coolgray-50 dark:bg-coolgray-900 border-b border-coolgray-300 dark:border-coolgray-600">';
+                                            Object.keys(tableData[0]).forEach(header => {
+                                                html += `<th class="text-left p-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400 sticky top-0 bg-coolgray-50 dark:bg-coolgray-900 z-10">${header}</th>`;
+                                            });
+                                            html += '</tr></thead><tbody>';
+                                            
+                                            tableData.forEach(row => {
+                                                html += '<tr class="border-b border-coolgray-200 dark:border-coolgray-700 hover:bg-coolgray-50 dark:hover:bg-coolgray-800">';
+                                                Object.values(row).forEach(value => {
+                                                    const displayValue = value ?? '<span class="text-gray-400">NULL</span>';
+                                                    html += `<td class="p-3 text-sm dark:text-gray-300"><div class="max-w-xs truncate" title="${value}">${displayValue}</div></td>`;
+                                                });
+                                                html += '</tr>';
+                                            });
+                                            html += '</tbody></table>';
+                                            
+                                            container.innerHTML = html;
+                                        }
+                                        
+                                        // Initialize on page load
+                                        if (document.readyState === 'loading') {
+                                            document.addEventListener('DOMContentLoaded', initTableData);
+                                        } else {
+                                            initTableData();
+                                        }
+                                    </script>
                                 @endif
                             </div>
                         </div>
                     @endif
                 </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
