@@ -245,9 +245,9 @@ class FileExplorer extends Component
 
         foreach ($this->containers as $container) {
             $containerName = data_get($container, 'container.Names', '');
-            
+
             // Check by name
-            if (str_contains(strtolower($containerName), 'mysql') || 
+            if (str_contains(strtolower($containerName), 'mysql') ||
                 str_contains(strtolower($containerName), 'mariadb')) {
                 $this->hasMySQLOrMariaDBContainer = true;
                 return;
@@ -262,7 +262,7 @@ class FileExplorer extends Component
                     $command = "sudo {$command}";
                 }
                 $image = trim(instant_remote_process([$command], $server, false) ?? '');
-                if (str_contains(strtolower($image), 'mysql') || 
+                if (str_contains(strtolower($image), 'mysql') ||
                     str_contains(strtolower($image), 'mariadb')) {
                     $this->hasMySQLOrMariaDBContainer = true;
                     return;
@@ -290,9 +290,9 @@ class FileExplorer extends Component
 
         $containerName = data_get($container, 'container.Names', '');
         $server = data_get($container, 'server');
-        
+
         // Check if container name contains mysql or mariadb
-        $this->isMySQLOrMariaDB = str_contains(strtolower($containerName), 'mysql') || 
+        $this->isMySQLOrMariaDB = str_contains(strtolower($containerName), 'mysql') ||
                                    str_contains(strtolower($containerName), 'mariadb');
 
         // If not found by name, try to check container image
@@ -304,7 +304,7 @@ class FileExplorer extends Component
                     $command = "sudo {$command}";
                 }
                 $image = trim(instant_remote_process([$command], $server, false) ?? '');
-                $this->isMySQLOrMariaDB = str_contains(strtolower($image), 'mysql') || 
+                $this->isMySQLOrMariaDB = str_contains(strtolower($image), 'mysql') ||
                                          str_contains(strtolower($image), 'mariadb');
             } catch (\Throwable $e) {
                 // Continue to next check
@@ -320,9 +320,9 @@ class FileExplorer extends Component
                     $command = "sudo {$command}";
                 }
                 $envOutput = instant_remote_process([$command], $server, false) ?? '';
-                
+
                 // Check for MySQL/MariaDB environment variables
-                if (str_contains($envOutput, 'MYSQL_ROOT_PASSWORD') || 
+                if (str_contains($envOutput, 'MYSQL_ROOT_PASSWORD') ||
                     str_contains($envOutput, 'MARIADB_ROOT_PASSWORD') ||
                     str_contains($envOutput, 'MYSQL_DATABASE') ||
                     str_contains($envOutput, 'MARIADB_DATABASE') ||
@@ -406,7 +406,7 @@ class FileExplorer extends Component
                 // Check all containers in the service for MySQL/MariaDB
                 foreach ($this->containers as $serviceContainer) {
                     $serviceContainerName = data_get($serviceContainer, 'container.Names', '');
-                    if (str_contains(strtolower($serviceContainerName), 'mysql') || 
+                    if (str_contains(strtolower($serviceContainerName), 'mysql') ||
                         str_contains(strtolower($serviceContainerName), 'mariadb')) {
                         $this->isMySQLOrMariaDB = true;
                         break;
@@ -812,12 +812,12 @@ class FileExplorer extends Component
 
             // Save uploaded file temporarily
             $filename = $this->uploadFile->getClientOriginalName();
-            
+
             // Ensure temp directory exists
             if (! Storage::disk('local')->exists('temp')) {
                 Storage::disk('local')->makeDirectory('temp');
             }
-            
+
             $tmpPath = $this->uploadFile->storeAs('temp', uniqid().'_'.$filename, 'local');
             $fullTmpPath = Storage::disk('local')->path($tmpPath);
 
@@ -1289,7 +1289,7 @@ class FileExplorer extends Component
         $this->loadContainers();
         $this->checkForDatabaseContainers();
         $this->checkDatabaseType();
-        
+
         // Verify that the selected container or any available container is MySQL/MariaDB
         $databaseContainers = $this->getDatabaseContainers();
         if (! $this->isMySQLOrMariaDB && ! $this->hasMySQLOrMariaDBContainer && count($databaseContainers) === 0) {
@@ -1312,7 +1312,7 @@ class FileExplorer extends Component
         try {
             // Use selected database container or fallback to current container
             $targetContainerName = $this->importDatabaseContainer ?? $this->selected_container;
-            
+
             $container = collect($this->containers)->firstWhere('container.Names', $targetContainerName);
             if (is_null($container)) {
                 $this->dispatch('error', 'Container not found.');
@@ -1367,23 +1367,23 @@ class FileExplorer extends Component
             $databaseVar = $isMariaDB ? 'MARIADB_DATABASE' : 'MYSQL_DATABASE';
 
             // Check if file is compressed
-            $isCompressed = str_ends_with(strtolower($this->importDatabaseFile), '.gz') || 
+            $isCompressed = str_ends_with(strtolower($this->importDatabaseFile), '.gz') ||
                            str_ends_with(strtolower($this->importDatabaseFile), '.zip');
 
             // Build the import command using environment variables properly
             // Escape password and database name for shell
             $escapedPassword = str_replace("'", "'\\''", $rootPassword);
             $escapedDatabaseName = ! empty($database) ? str_replace("'", "'\\''", $database) : '';
-            
+
             // Build command parts
             $commandParts = [];
-            
+
             // Set environment variables (using single quotes to avoid expansion issues)
             $commandParts[] = "export {$passwordVar}='{$escapedPassword}'";
             if (! empty($database)) {
                 $commandParts[] = "export {$databaseVar}='{$escapedDatabaseName}'";
             }
-            
+
             // Build the pipe command
             if ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.gz')) {
                 $commandParts[] = "gunzip -c {$escapedPath}";
@@ -1392,7 +1392,7 @@ class FileExplorer extends Component
             } else {
                 $commandParts[] = "cat {$escapedPath}";
             }
-            
+
             // Build mysql/mariadb command with password
             // Use --password= format instead of -p to avoid issues with variable expansion
             if (! empty($database)) {
@@ -1400,7 +1400,7 @@ class FileExplorer extends Component
             } else {
                 $commandParts[] = "{$dbCommand} -u root --password=\${$passwordVar}";
             }
-            
+
             // Join with pipes and wrap in sh -c
             $fullCommand = implode(' | ', $commandParts);
             $importCommand = "docker exec {$escapedContainer} sh -c ".escapeshellarg($fullCommand);
@@ -1411,7 +1411,7 @@ class FileExplorer extends Component
 
             // Execute import and capture both stdout and stderr
             $output = instant_remote_process([$importCommand], $server, false);
-            
+
             // Check if command failed (output might contain error messages)
             if ($output === false || (is_string($output) && str_contains(strtolower($output), 'error'))) {
                 throw new \Exception('Import command failed: '.($output ?: 'Unknown error'));
@@ -1475,18 +1475,18 @@ class FileExplorer extends Component
     public function getDatabaseContainers()
     {
         $databaseContainers = [];
-        
+
         foreach ($this->containers as $container) {
             $containerName = data_get($container, 'container.Names', '');
             $server = data_get($container, 'server');
-            
+
             $isDb = false;
-            
+
             // Check by container name
             if (str_contains(strtolower($containerName), 'mysql') || str_contains(strtolower($containerName), 'mariadb')) {
                 $isDb = true;
             }
-            
+
             // Check by container image
             if (! $isDb && $server) {
                 try {
@@ -1503,7 +1503,7 @@ class FileExplorer extends Component
                     // Ignore error, continue checking
                 }
             }
-            
+
             // Check by environment variables
             if (! $isDb && $server) {
                 try {
@@ -1521,7 +1521,7 @@ class FileExplorer extends Component
                     // Ignore error
                 }
             }
-            
+
             // Check for mysql/mariadb commands availability
             if (! $isDb && $server) {
                 try {
@@ -1538,7 +1538,7 @@ class FileExplorer extends Component
                     // Ignore error
                 }
             }
-            
+
             if ($isDb) {
                 $databaseContainers[] = [
                     'name' => $containerName,
@@ -1546,7 +1546,7 @@ class FileExplorer extends Component
                 ];
             }
         }
-        
+
         return $databaseContainers;
     }
 
@@ -1678,7 +1678,7 @@ class FileExplorer extends Component
         $this->loadContainers();
         $this->checkForDatabaseContainers();
         $this->checkDatabaseType();
-        
+
         // Verify that the selected container or any available container is MySQL/MariaDB
         $databaseContainers = $this->getDatabaseContainers();
         if (! $this->isMySQLOrMariaDB && ! $this->hasMySQLOrMariaDBContainer && count($databaseContainers) === 0) {
@@ -2092,16 +2092,16 @@ class FileExplorer extends Component
                 if (empty($line)) {
                     continue;
                 }
-                
+
                 // Split by tab, but handle cases where tabs might be escaped or missing
                 $values = preg_split('/\t+/', $line);
-                
+
                 if ($index === 0) {
                     // First line should be headers
                     $headers = array_map('trim', $values);
                     continue;
                 }
-                
+
                 // Match data rows to headers
                 if ($headers && count($values) > 0) {
                     $row = [];

@@ -39,6 +39,10 @@
     }
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
+    // Calculate selectedActions in PHP to avoid closure issues in @js()
+    $selectedActions = collect($checkboxes)->pluck('id')->filter(function ($id) {
+        return isset($this->$id) && $this->$id;
+    })->values()->all();
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -60,7 +64,7 @@
     submitAction: @js($submitAction),
     dispatchAction: @js($dispatchAction),
     passwordError: '',
-    selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
+    selectedActions: @js($selectedActions),
     dispatchEvent: @js($dispatchEvent),
     dispatchEventType: @js($dispatchEventType),
     dispatchEventMessage: @js($dispatchEventMessage),
@@ -71,7 +75,19 @@
         this.deleteText = '';
         this.password = '';
         this.userConfirmationText = '';
-        this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
+        // Recalculate selectedActions from current Livewire component state
+        const checkboxes = @js($checkboxes);
+        if (checkboxes && checkboxes.length > 0) {
+            this.selectedActions = checkboxes.filter(checkbox => {
+                try {
+                    return $wire.get(checkbox.id) === true;
+                } catch (e) {
+                    return false;
+                }
+            }).map(checkbox => checkbox.id);
+        } else {
+            this.selectedActions = [];
+        }
         $wire.$refresh();
     },
     step1ButtonText: @js($step1ButtonText),
