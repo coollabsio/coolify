@@ -197,7 +197,11 @@ class FileExplorer extends Component
         if ($this->selected_container !== 'default') {
             $this->currentPath = '/';
             $this->checkDatabaseType();
+            $this->checkForDatabaseContainers();
             $this->loadFiles();
+        } else {
+            $this->isMySQLOrMariaDB = false;
+            $this->hasMySQLOrMariaDBContainer = false;
         }
     }
 
@@ -1180,12 +1184,25 @@ class FileExplorer extends Component
 
     public function openImportDatabaseDialog()
     {
-        // Ensure we have the latest container list
+        if ($this->selected_container === 'default') {
+            $this->dispatch('error', 'Please select a container first.');
+
+            return;
+        }
+
+        // Ensure we have the latest container list and check database type
         $this->loadContainers();
         $this->checkForDatabaseContainers();
-        if ($this->selected_container !== 'default') {
-            $this->checkDatabaseType();
+        $this->checkDatabaseType();
+        
+        // Verify that the selected container or any available container is MySQL/MariaDB
+        $databaseContainers = $this->getDatabaseContainers();
+        if (! $this->isMySQLOrMariaDB && ! $this->hasMySQLOrMariaDBContainer && count($databaseContainers) === 0) {
+            $this->dispatch('error', 'No MySQL or MariaDB container detected. Please make sure you have selected a container with MySQL/MariaDB installed.');
+
+            return;
         }
+
         $this->showImportDatabaseDialog = true;
     }
 
