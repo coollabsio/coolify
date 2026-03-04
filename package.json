@@ -1,23 +1,27 @@
 {
-    "$schema": "https://www.schemastore.org/package.json",
-    "private": true,
-    "type": "module",
-    "devDependencies": {
-        "@inertiajs/svelte": "^2.3.17",
-        "@sveltejs/vite-plugin-svelte": "^7.0.0",
-        "svelte": "^5.53.7",
-        "@tailwindcss/vite": "^4.2.1",
-        "concurrently": "^9.2.1",
-        "laravel-vite-plugin": "^2.1.0",
-        "tailwindcss": "^4.2.1",
-        "vite": "^8.0.0-beta.16"
-    },
-    "overrides": {
-        "vite": "8.0.0-beta.16"
-    },
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview"
-    }
+	"$schema": "https://www.schemastore.org/package.json",
+	"private": true,
+	"type": "module",
+	"devDependencies": {
+		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+		"@inertiajs/svelte": "^2.3.17",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@tailwindcss/vite": "^4.2.1",
+		"concurrently": "^9.2.1",
+		"laravel-vite-plugin": "^2.1.0",
+		"prettier": "3.8.1",
+		"prettier-plugin-svelte": "^3.5.1",
+		"prettier-plugin-tailwindcss": "^0.7.2",
+		"svelte": "^5.53.7",
+		"tailwindcss": "^4.2.1",
+		"vite": "^8.0.0-beta.16"
+	},
+	"overrides": {
+		"vite": "8.0.0-beta.16"
+	},
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview"
+	}
 }
