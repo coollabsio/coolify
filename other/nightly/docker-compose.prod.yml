@@ -32,6 +32,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbackrest:
+        condition: service_healthy
       redis:
         condition: service_healthy
       soketi:
@@ -39,6 +41,25 @@ services:
   postgres:
     volumes:
       - coolify-db:/var/lib/postgresql/data
+
+  pgbackrest:
+    image: pgbackrest/pgbackrest:latest
+    container_name: coolify-pgbackrest
+    restart: always
+    volumes:
+      - coolify-db:/var/lib/postgresql/data
+      - /data/coolify/backups:/backups
+    environment:
+      - PGBACKREST_REPO1_PATH=/backups
+      - PGBACKREST_PG1_PATH=/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pgbackrest", "--stanza=repo1", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
