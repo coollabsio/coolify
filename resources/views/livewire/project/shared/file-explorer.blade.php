@@ -17,7 +17,7 @@
 
     @if ($type === 'application' || $type === 'database' || $type === 'service')
         <h2 class="pb-4">File Explorer</h2>
-        @if (count($containers) === 0)
+        @if (!isset($containers) || $containers->isEmpty())
             <div>No containers are running or terminal access is disabled on this server.</div>
         @else
             <div class="flex flex-col gap-4">
@@ -127,7 +127,7 @@
                                 </div>
                             @endif
                         </div>
-                        @if (count($selectedFiles) > 0)
+                        @if (isset($selectedFiles) && is_array($selectedFiles) && count($selectedFiles) > 0)
                             <x-forms.button wire:click="openCompressDialog" class="bg-green-600">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
@@ -176,17 +176,22 @@
                             /
                         </button>
                         @php
-                            $pathParts = array_filter(explode('/', $currentPath ?? '/'));
+                            $currentPathSafe = $currentPath ?? '/';
+                            $exploded = explode('/', $currentPathSafe);
+                            $pathParts = [];
+                            foreach ($exploded as $part) {
+                                if (!empty($part) && $part !== '/') {
+                                    $pathParts[] = $part;
+                                }
+                            }
                             $currentPathParts = [];
                             $breadcrumbPaths = [];
                             foreach ($pathParts as $part) {
-                                if (!empty($part)) {
-                                    $currentPathParts[] = $part;
-                                    $breadcrumbPaths[] = [
-                                        'part' => $part,
-                                        'path' => '/' . implode('/', $currentPathParts)
-                                    ];
-                                }
+                                $currentPathParts[] = $part;
+                                $breadcrumbPaths[] = [
+                                    'part' => $part,
+                                    'path' => '/' . implode('/', $currentPathParts)
+                                ];
                             }
                         @endphp
                         @foreach ($breadcrumbPaths as $breadcrumb)
@@ -203,7 +208,7 @@
                             <div class="flex items-center justify-center p-8">
                                 <x-loading text="Loading files..." />
                             </div>
-                        @elseif (count($files) === 0)
+                        @elseif (!isset($files) || !is_array($files) || count($files) === 0)
                             <div class="p-8 text-center text-gray-500">No files found in this directory.</div>
                         @else
                             <div class="overflow-x-auto">
@@ -212,7 +217,10 @@
                                         <tr class="border-b border-coolgray-300 dark:border-coolgray-600">
                                             <th class="text-left p-2 w-12">
                                                 @php
-                                                    $allSelected = isset($selectedFiles) && is_array($selectedFiles) && count($selectedFiles) === count($files);
+                                                    $allSelected = false;
+                                                    if (isset($selectedFiles) && is_array($selectedFiles) && isset($files) && is_array($files)) {
+                                                        $allSelected = count($selectedFiles) === count($files);
+                                                    }
                                                 @endphp
                                                 <input type="checkbox" wire:change="selectAll" class="cursor-pointer" title="Select All" {{ $allSelected ? 'checked' : '' }}>
                                             </th>
@@ -582,7 +590,7 @@
                             @foreach ($filesToShow as $fileName)
                                 <li>{{ $fileName }}</li>
                             @endforeach
-                            @if (count($selectedFiles) > 10)
+                            @if (isset($selectedFiles) && is_array($selectedFiles) && count($selectedFiles) > 10)
                                 <li class="text-gray-500">... and {{ count($selectedFiles) - 10 }} more</li>
                             @endif
                         </ul>
