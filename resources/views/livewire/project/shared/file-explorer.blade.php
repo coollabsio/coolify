@@ -176,17 +176,19 @@
                             /
                         </button>
                         @php
-                            $pathParts = array_filter(explode('/', $currentPath));
+                            $pathParts = array_filter(explode('/', $currentPath ?? '/'));
                             $currentPathParts = [];
                             foreach ($pathParts as $part) {
-                                $currentPathParts[] = $part;
-                                $path = '/' . implode('/', $currentPathParts);
+                                if (!empty($part)) {
+                                    $currentPathParts[] = $part;
+                                    $path = '/' . implode('/', $currentPathParts);
                         @endphp
-                            <span>/</span>
-                            <button wire:click="navigateTo('{{ $path }}')" class="text-coollabs hover:underline">
-                                {{ $part }}
-                            </button>
+                                    <span>/</span>
+                                    <button wire:click="navigateTo('{{ $path }}')" class="text-coollabs hover:underline">
+                                        {{ $part }}
+                                    </button>
                         @php
+                                }
                             }
                         @endphp
                     </div>
@@ -345,7 +347,7 @@
                                             <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                             </svg>
-                                            <h3 class="text-lg font-semibold">{{ basename($selectedFile) }}</h3>
+                                            <h3 class="text-lg font-semibold">{{ !empty($selectedFile) ? basename($selectedFile) : '' }}</h3>
                                             <span class="px-2 py-1 text-xs font-mono text-gray-500 dark:text-gray-400 bg-coolgray-100 dark:bg-coolgray-700 rounded">
                                                 {{ $fileLanguage }}
                                             </span>
@@ -552,17 +554,21 @@
                             Compressing <strong>{{ count($selectedFiles) }}</strong> item(s):
                         </p>
                         <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 max-h-32 overflow-y-auto mb-4">
-                            @foreach (array_slice($selectedFiles, 0, 10) as $selectedPath)
+                            @foreach (array_slice($selectedFiles ?? [], 0, 10) as $selectedPath)
                                 @php
-                                    $fileName = basename($selectedPath);
-                                    foreach ($files as $f) {
-                                        if (isset($f['path']) && $f['path'] === $selectedPath) {
-                                            $fileName = $f['name'] ?? basename($selectedPath);
-                                            break;
+                                    $fileName = !empty($selectedPath) ? basename($selectedPath) : '';
+                                    if (!empty($selectedPath) && isset($files) && is_array($files)) {
+                                        foreach ($files as $f) {
+                                            if (isset($f['path']) && $f['path'] === $selectedPath) {
+                                                $fileName = $f['name'] ?? (!empty($selectedPath) ? basename($selectedPath) : '');
+                                                break;
+                                            }
                                         }
                                     }
                                 @endphp
-                                <li>{{ $fileName }}</li>
+                                @if (!empty($fileName))
+                                    <li>{{ $fileName }}</li>
+                                @endif
                             @endforeach
                             @if (count($selectedFiles) > 10)
                                 <li class="text-gray-500">... and {{ count($selectedFiles) - 10 }} more</li>
