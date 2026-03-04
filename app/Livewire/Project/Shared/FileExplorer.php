@@ -751,12 +751,18 @@ class FileExplorer extends Component
 
     public function updatedUploadFile()
     {
-        $this->validate([
-            'uploadFile' => 'required|file|max:102400', // Max 100MB
-        ]);
-
+        // This method is automatically called by Livewire when uploadFile changes
         if (! $this->uploadFile) {
-            $this->dispatch('error', 'Please select a file to upload.');
+            return;
+        }
+
+        try {
+            $this->validate([
+                'uploadFile' => 'required|file|max:102400', // Max 100MB
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->dispatch('error', 'File validation failed: '.$e->getMessage());
+            $this->uploadFile = null;
 
             return;
         }
