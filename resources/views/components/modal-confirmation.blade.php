@@ -40,9 +40,15 @@
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
     // Calculate selectedActions in PHP to avoid closure issues in @js()
-    $selectedActions = collect($checkboxes)->pluck('id')->filter(function ($id) {
-        return isset($this->$id) && $this->$id;
-    })->values()->all();
+    $selectedActions = [];
+    if (!empty($checkboxes) && is_array($checkboxes)) {
+        foreach ($checkboxes as $checkbox) {
+            $id = $checkbox['id'] ?? null;
+            if ($id !== null && isset($this->$id) && $this->$id) {
+                $selectedActions[] = $id;
+            }
+        }
+    }
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
