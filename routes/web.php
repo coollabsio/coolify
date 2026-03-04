@@ -397,7 +397,7 @@ Route::middleware(['auth'])->group(function () {
             $resourceType = data_get($decrypted, 'resource_type');
             $resourceUuid = data_get($decrypted, 'resource_uuid');
 
-            if (! $container || ! $path || ! $serverId || ! $resourceType || ! $resourceUuid) {
+            if (is_null($container) || is_null($path) || is_null($serverId) || is_null($resourceType) || is_null($resourceUuid)) {
                 return response()->json(['message' => 'Invalid download token.'], 400);
             }
 

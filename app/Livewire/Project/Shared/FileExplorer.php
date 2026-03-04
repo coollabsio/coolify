@@ -912,7 +912,7 @@ class FileExplorer extends Component
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($path);
 
-            $command = "docker exec {$escapedContainer} sh -c 'rm -rf {$escapedPath}'";
+            $command = "docker exec {$escapedContainer} rm -rf {$escapedPath}";
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
