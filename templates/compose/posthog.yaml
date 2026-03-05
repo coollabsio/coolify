@@ -9,7 +9,6 @@
 services:
   db:
     image: postgres:15.12-alpine
-    restart: on-failure
     environment:
       - POSTGRES_USER=posthog
       - POSTGRES_DB=posthog
@@ -25,7 +24,6 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    restart: on-failure
     command: redis-server --maxmemory-policy allkeys-lru --maxmemory 500mb
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
@@ -37,7 +35,6 @@ services:
 
   zookeeper:
     image: zookeeper:3.7.0
-    restart: on-failure
     volumes:
       - posthog-zookeeper-data:/data
       - posthog-zookeeper-datalog:/datalog
@@ -45,7 +42,6 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.12.5.44
-    restart: on-failure
     depends_on:
       kafka:
         condition: service_started
@@ -1100,7 +1096,6 @@ services:
 
   kafka:
     image: docker.redpanda.com/redpandadata/redpanda:v25.1.9
-    restart: on-failure
     command:
       - redpanda
       - start
@@ -1153,7 +1148,6 @@ services:
 
   objectstorage:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    restart: on-failure
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
@@ -1164,7 +1158,6 @@ services:
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.03
-    restart: on-failure
     entrypoint:
       - /bin/sh
       - '-c'
@@ -1194,7 +1187,6 @@ services:
 
   temporal:
     image: temporalio/auto-setup:1.20.0
-    restart: on-failure
     environment:
       - DB=postgresql
       - DB_PORT=5432
@@ -1227,7 +1219,6 @@ services:
 
   temporal-admin-tools:
     image: temporalio/admin-tools:1.20.0
-    restart: on-failure
     environment:
       - TEMPORAL_CLI_ADDRESS=temporal:7233
     depends_on:
@@ -1235,7 +1226,6 @@ services:
 
   temporal-ui:
     image: temporalio/ui:2.31.2
-    restart: on-failure
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
@@ -1252,7 +1242,6 @@ services:
       - /bin/bash
       - '-c'
       - './bin/migrate && ./bin/docker-server'
-    restart: on-failure
     environment:
       - OTEL_SDK_DISABLED=true
       - DISABLE_SECURE_SSL_REDIRECT=true
@@ -1310,7 +1299,6 @@ services:
   worker:
     image: posthog/posthog:latest
     command: ./bin/docker-worker-celery --with-scheduler
-    restart: on-failure
     environment:
       - OTEL_SDK_DISABLED=true
       - DISABLE_SECURE_SSL_REDIRECT=true
@@ -1360,7 +1348,6 @@ services:
   plugins:
     image: posthog/posthog-node:latest
     command: node nodejs/dist/index.js
-    restart: always
     environment:
       - DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
       - PERSONS_DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
@@ -1416,7 +1403,6 @@ services:
   temporal-django-worker:
     image: posthog/posthog:latest
     command: ./bin/temporal-django-worker
-    restart: on-failure
     environment:
       - OTEL_SDK_DISABLED=true
       - DISABLE_SECURE_SSL_REDIRECT=true
@@ -1519,7 +1505,6 @@ services:
 
   capture:
     image: ghcr.io/posthog/posthog/capture:master
-    restart: on-failure
     environment:
       - ADDRESS=0.0.0.0:3000
       - KAFKA_TOPIC=events_plugin_ingestion
@@ -1535,7 +1520,6 @@ services:
 
   replay-capture:
     image: ghcr.io/posthog/posthog/capture:master
-    restart: on-failure
     environment:
       - ADDRESS=0.0.0.0:3000
       - KAFKA_TOPIC=session_recording_snapshot_item_events
@@ -1550,9 +1534,13 @@ services:
 
   livestream:
     image: ghcr.io/posthog/posthog/livestream:master
-    restart: on-failure
     environment:
       - LIVESTREAM_JWT_SECRET=${SERVICE_BASE64_64_SECRETKEY}
+      - LIVESTREAM_MMDB_PATH=/share/GeoLite2-City.mmdb
+      - LIVESTREAM_KAFKA_BROKERS=kafka:9092
+      - LIVESTREAM_KAFKA_TOPIC=events_plugin_ingestion
+      - LIVESTREAM_KAFKA_GROUP_ID=livestream
+      - LIVESTREAM_REDIS_ADDRESS=redis:6379
     depends_on:
       geoip-init:
         condition: service_completed_successfully
@@ -1562,7 +1550,7 @@ services:
       - posthog-share:/share
       - type: bind
         source: ./livestream/configs.yml
-        target: /configs/configs.yml
+        target: /code/configs/configs.yml
         read_only: true
         content: |
           debug: false
@@ -1580,7 +1568,6 @@ services:
 
   feature-flags:
     image: ghcr.io/posthog/posthog/feature-flags:master
-    restart: on-failure
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3001/_readiness']
       interval: 5s
@@ -1610,7 +1597,6 @@ services:
 
   property-defs-rs:
     image: ghcr.io/posthog/posthog/property-defs-rs:master
-    restart: on-failure
     environment:
       - DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
       - KAFKA_HOSTS=kafka:9092
@@ -1625,7 +1611,6 @@ services:
 
   cyclotron-janitor:
     image: ghcr.io/posthog/posthog/cyclotron-janitor:master
-    restart: on-failure
     environment:
       - DATABASE_URL=postgres://posthog:${SERVICE_PASSWORD_POSTGRES}@db:5432/posthog
       - KAFKA_HOSTS=kafka:9092
@@ -1652,7 +1637,6 @@ services:
 
   cymbal:
     image: ghcr.io/posthog/posthog/cymbal:master
-    restart: on-failure
     environment:
       - KAFKA_HOSTS=kafka:9092
       - KAFKA_CONSUMER_GROUP=cymbal
@@ -1687,13 +1671,14 @@ services:
   proxy:
     image: caddy:2-alpine
     command: caddy run -c /etc/caddy/Caddyfile
-    restart: always
     environment:
       - SERVICE_URL_PROXY_8000
     depends_on:
       - web
       - capture
       - livestream
+    ports:
+      - '8000'
     volumes:
       - type: bind
         source: ./caddy/Caddyfile
@@ -1750,16 +1735,3 @@ services:
       - posthog-caddy-data:/data
       - posthog-caddy-config:/config
 
-volumes:
-  posthog-postgres-data:
-  posthog-redis-data:
-  posthog-clickhouse-data:
-  posthog-zookeeper-data:
-  posthog-zookeeper-datalog:
-  posthog-zookeeper-logs:
-  posthog-kafka-data:
-  posthog-objectstorage:
-  posthog-seaweedfs:
-  posthog-share:
-  posthog-caddy-data:
-  posthog-caddy-config:
