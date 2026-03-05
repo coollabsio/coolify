@@ -81,6 +81,46 @@
                             </div>
                         @endif
                     </div>
+
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mt-6">
+                        <h3 class="text-lg font-semibold dark:text-white mb-4">WordPress Table Prefix</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Gestiona el prefijo de las tablas de WordPress. El prefijo se detecta automáticamente desde wp-config.php o desde las tablas de la base de datos.
+                        </p>
+
+                        @foreach ($wordpressContainers as $container)
+                            @php
+                                $prefixData = $wpPrefixes[$container['id']] ?? ['container_name' => $container['name'], 'prefix' => 'wp_'];
+                                $currentPrefix = $prefixData['prefix'] ?? 'wp_';
+                            @endphp
+                            <div class="mb-4 p-4 border border-coolgray-300 dark:border-coolgray-600 rounded">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div>
+                                        <span class="font-medium dark:text-white">{{ $container['name'] }}</span>
+                                        <span class="text-xs text-gray-500 ml-2">({{ $container['status'] }})</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2" x-data="{ prefix: '{{ $currentPrefix }}' }">
+                                    <label for="prefix_{{ $container['id'] }}" class="text-sm font-medium dark:text-white">Prefijo:</label>
+                                    <input type="text" 
+                                        id="prefix_{{ $container['id'] }}" 
+                                        x-model="prefix"
+                                        class="input w-32"
+                                        pattern="[a-zA-Z0-9_]+"
+                                        placeholder="wp_">
+                                    <x-forms.button 
+                                        x-on:click="$wire.updateWpPrefix({{ $container['id'] }}, prefix)"
+                                        class="bg-coollabs"
+                                        :disabled="!str($container['status'])->contains('running')">
+                                        Actualizar
+                                    </x-forms.button>
+                                </div>
+                                @if (!str($container['status'])->contains('running'))
+                                    <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">El contenedor debe estar en ejecución para actualizar el prefijo.</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
                 @endif
             </div>
         </div>

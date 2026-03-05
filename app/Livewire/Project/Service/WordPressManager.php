@@ -27,6 +27,8 @@ class WordPressManager extends Component
 
     public string $output = '';
 
+    public array $wpPrefixes = [];
+
     public function mount()
     {
         try {
@@ -35,6 +37,7 @@ class WordPressManager extends Component
             $this->authorize('view', $this->service);
             $this->applications = $this->service->applications->sort();
             $this->detectWordPressContainers();
+            $this->detectWpPrefixes();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -201,6 +204,186 @@ class WordPressManager extends Component
             $this->output .= "Permissions fixed successfully.\n";
         } catch (\Throwable $e) {
             $this->output .= "Warning: Could not fix permissions: ".$e->getMessage()."\n";
+        }
+    }
+
+    public function detectWpPrefixes()
+    {
+        $this->wpPrefixes = [];
+        
+        foreach ($this->wordpressContainers as $container) {
+            $application = $container['application'] ?? $this->applications->find($container['id']);
+            if (! $application || ! str($application->status)->contains('running')) {
+                continue;
+            }
+
+            try {
+                $server = $application->service->server;
+                $containerName = $container['container_name'];
+                $prefix = $this->detectWpPrefix($server, $containerName);
+                
+                $this->wpPrefixes[$container['id']] = [
+                    'container_name' => $container['name'],
+                    'prefix' => $prefix ?? 'wp_',
+                ];
+            } catch (\Throwable $e) {
+                $this->wpPrefixes[$container['id']] = [
+                    'container_name' => $container['name'],
+                    'prefix' => 'wp_',
+                ];
+            }
+        }
+    }
+
+    public function detectWpPrefix($server, string $containerName): ?string
+    {
+        try {
+            $escapedContainer = escapeshellarg($containerName);
+            
+            // Try to get prefix from wp-config.php
+            $configCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && grep -E \"\\\$table_prefix\" wp-config.php 2>/dev/null | head -1 || echo notfound'";
+            if ($server->isNonRoot()) {
+                $configCommand = "sudo {$configCommand}";
+            }
+            $configOutput = trim(instant_remote_process([$configCommand], $server, false) ?? '');
+            
+            if ($configOutput !== 'notfound' && ! empty($configOutput)) {
+                // Extract prefix from line like: $table_prefix = 'wp_';
+                if (preg_match("/['\"]([^'\"]+)['\"]/", $configOutput, $matches)) {
+                    return $matches[1];
+                }
+            }
+
+            // Try to detect from database tables
+            $prefix = $this->detectPrefixFromDatabase($server, $containerName);
+            if ($prefix) {
+                return $prefix;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function detectPrefixFromDatabase($server, string $containerName): ?string
+    {
+        try {
+            $escapedContainer = escapeshellarg($containerName);
+            
+            // Get environment variables to determine database type and credentials
+            $envCommand = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $envCommand = "sudo {$envCommand}";
+            }
+            $envOutput = instant_remote_process([$envCommand], $server, false) ?? '';
+            $envVars = [];
+            foreach (explode("\n", $envOutput) as $line) {
+                if (str_contains($line, '=')) {
+                    [$key, $value] = explode('=', $line, 2);
+                    $envVars[$key] = $value;
+                }
+            }
+
+            // Determine database type
+            $isMariaDB = isset($envVars['MARIADB_ROOT_PASSWORD']) || isset($envVars['MARIADB_DATABASE']);
+            $isMySQL = isset($envVars['MYSQL_ROOT_PASSWORD']) || isset($envVars['MYSQL_DATABASE']);
+
+            if (! $isMariaDB && ! $isMySQL) {
+                return null;
+            }
+
+            $rootPassword = $isMariaDB ? ($envVars['MARIADB_ROOT_PASSWORD'] ?? '') : ($envVars['MYSQL_ROOT_PASSWORD'] ?? '');
+            $database = $isMariaDB ? ($envVars['MARIADB_DATABASE'] ?? '') : ($envVars['MYSQL_DATABASE'] ?? '');
+
+            if (empty($rootPassword) || empty($database)) {
+                return null;
+            }
+
+            $dbCommand = $isMariaDB ? 'mariadb' : 'mysql';
+            $passwordVar = $isMariaDB ? 'MARIADB_ROOT_PASSWORD' : 'MYSQL_ROOT_PASSWORD';
+            $escapedPassword = str_replace("'", "'\\''", $rootPassword);
+            $escapedDatabase = escapeshellarg($database);
+
+            // Get list of tables and find WordPress prefix
+            $tablesCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\"{$escapedPassword}\" && {$dbCommand} -u root --password=\${$passwordVar} {$escapedDatabase} -e \"SHOW TABLES;\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $tablesCommand = "sudo {$tablesCommand}";
+            }
+            
+            $tablesOutput = instant_remote_process([$tablesCommand], $server, false);
+            if (empty($tablesOutput)) {
+                return null;
+            }
+
+            // Look for WordPress core tables (posts, users, options, etc.)
+            $wpCoreTables = ['posts', 'users', 'options', 'comments', 'terms', 'postmeta'];
+            $lines = explode("\n", trim($tablesOutput));
+            
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || stripos($line, 'tables_in_') === 0) {
+                    continue;
+                }
+                
+                // Check if this table matches WordPress pattern
+                foreach ($wpCoreTables as $coreTable) {
+                    if (str_ends_with(strtolower($line), $coreTable)) {
+                        // Extract prefix (everything before the core table name)
+                        $prefix = substr($line, 0, -strlen($coreTable));
+                        if (! empty($prefix)) {
+                            return $prefix;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function updateWpPrefix(int $containerId, string $newPrefix)
+    {
+        // Validate prefix format
+        if (empty($newPrefix) || strlen($newPrefix) > 20 || ! preg_match('/^[a-z0-9_]+$/i', $newPrefix)) {
+            $this->dispatch('error', 'El prefijo solo puede contener letras, números y guiones bajos (máximo 20 caracteres).');
+            return;
+        }
+
+        $container = collect($this->wordpressContainers)->firstWhere('id', $containerId);
+        if (! $container) {
+            $this->dispatch('error', 'Container not found.');
+            return;
+        }
+
+        $application = $container['application'] ?? $this->applications->find($containerId);
+        if (! $application || ! str($application->status)->contains('running')) {
+            $this->dispatch('error', 'Container is not running.');
+            return;
+        }
+
+        try {
+            $server = $application->service->server;
+            $containerName = $container['container_name'];
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedPrefix = escapeshellarg($newPrefix);
+
+            // Update wp-config.php
+            $updateCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && sed -i \"s/\\\$table_prefix.*=.*['\\\"][^'\\\"]*['\\\"]/\\\$table_prefix = {$escapedPrefix}/\" wp-config.php 2>&1 || true'";
+            if ($server->isNonRoot()) {
+                $updateCommand = "sudo {$updateCommand}";
+            }
+
+            $output = instant_remote_process([$updateCommand], $server, false);
+            
+            // Refresh prefixes
+            $this->detectWpPrefixes();
+            
+            $this->dispatch('success', "WordPress prefix updated to {$newPrefix}.");
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to update WordPress prefix: '.$e->getMessage());
         }
     }
 

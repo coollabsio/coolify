@@ -1430,9 +1430,104 @@ class FileExplorer extends Component
             $this->importDatabaseFile = null;
             $this->showImportDatabaseDialog = false;
             $this->dispatch('success', 'Database imported successfully.');
+
+            // Try to detect WordPress prefix after import
+            $this->detectWordPressPrefixAfterImport($server, $containerName, $database);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to import database: '.$e->getMessage());
             $this->showImportDatabaseDialog = false;
+        }
+    }
+
+    private function detectWordPressPrefixAfterImport($server, string $containerName, string $database): void
+    {
+        try {
+            // Check if this is a WordPress container
+            $escapedContainer = escapeshellarg($containerName);
+            $checkWpConfig = "docker exec {$escapedContainer} sh -c 'test -f /var/www/html/wp-config.php && echo found || echo notfound'";
+            if ($server->isNonRoot()) {
+                $checkWpConfig = "sudo {$checkWpConfig}";
+            }
+            $wpConfigExists = trim(instant_remote_process([$checkWpConfig], $server, false) ?? '');
+
+            if ($wpConfigExists !== 'found') {
+                return; // Not a WordPress container
+            }
+
+            // Get environment variables
+            $envCommand = "docker exec {$escapedContainer} env";
+            if ($server->isNonRoot()) {
+                $envCommand = "sudo {$envCommand}";
+            }
+            $envOutput = instant_remote_process([$envCommand], $server, false) ?? '';
+            $envVars = [];
+            foreach (explode("\n", $envOutput) as $line) {
+                if (str_contains($line, '=')) {
+                    [$key, $value] = explode('=', $line, 2);
+                    $envVars[$key] = $value;
+                }
+            }
+
+            // Determine database type
+            $isMariaDB = isset($envVars['MARIADB_ROOT_PASSWORD']) || isset($envVars['MARIADB_DATABASE']);
+            $isMySQL = isset($envVars['MYSQL_ROOT_PASSWORD']) || isset($envVars['MYSQL_DATABASE']);
+
+            if (! $isMariaDB && ! $isMySQL) {
+                return;
+            }
+
+            $rootPassword = $isMariaDB ? ($envVars['MARIADB_ROOT_PASSWORD'] ?? '') : ($envVars['MYSQL_ROOT_PASSWORD'] ?? '');
+            if (empty($rootPassword)) {
+                return;
+            }
+
+            $dbCommand = $isMariaDB ? 'mariadb' : 'mysql';
+            $passwordVar = $isMariaDB ? 'MARIADB_ROOT_PASSWORD' : 'MYSQL_ROOT_PASSWORD';
+            $escapedPassword = str_replace("'", "'\\''", $rootPassword);
+            $escapedDatabase = escapeshellarg($database);
+
+            // Get list of tables
+            $tablesCommand = "docker exec {$escapedContainer} sh -c 'export {$passwordVar}=\"{$escapedPassword}\" && {$dbCommand} -u root --password=\${$passwordVar} {$escapedDatabase} -e \"SHOW TABLES;\" 2>&1'";
+            if ($server->isNonRoot()) {
+                $tablesCommand = "sudo {$tablesCommand}";
+            }
+
+            $tablesOutput = instant_remote_process([$tablesCommand], $server, false);
+            if (empty($tablesOutput)) {
+                return;
+            }
+
+            // Look for WordPress core tables to detect prefix
+            $wpCoreTables = ['posts', 'users', 'options', 'comments', 'terms', 'postmeta'];
+            $lines = explode("\n", trim($tablesOutput));
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || stripos($line, 'tables_in_') === 0) {
+                    continue;
+                }
+
+                foreach ($wpCoreTables as $coreTable) {
+                    if (str_ends_with(strtolower($line), $coreTable)) {
+                        $prefix = substr($line, 0, -strlen($coreTable));
+                        if (! empty($prefix)) {
+                            // Update wp-config.php with detected prefix
+                            $escapedPrefix = escapeshellarg($prefix);
+                            $updateCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && sed -i \"s/\\\$table_prefix.*=.*['\\\"][^'\\\"]*['\\\"]/\\\$table_prefix = {$escapedPrefix}/\" wp-config.php 2>&1 || true'";
+                            if ($server->isNonRoot()) {
+                                $updateCommand = "sudo {$updateCommand}";
+                            }
+                            instant_remote_process([$updateCommand], $server, false);
+
+                            $this->dispatch('success', "WordPress prefix detectado automáticamente: {$prefix}");
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently fail - prefix detection is optional
+            \Log::debug('Failed to detect WordPress prefix after import', ['error' => $e->getMessage()]);
         }
     }
 
@@ -1768,6 +1863,27 @@ class FileExplorer extends Component
 
             // Use Adminer proxy route that handles the connection securely
             // Pass container and server_id as query parameters
+            // Ensure all required parameters are present
+            if (empty($routeParams['project_uuid']) || empty($routeParams['environment_uuid'])) {
+                \Log::warning('Missing required parameters for Adminer URL', ['routeParams' => $routeParams, 'type' => $this->type]);
+                $this->adminerUrl = null;
+                return;
+            }
+
+            // Ensure we have the required UUID for the specific type
+            $hasRequiredUuid = match ($this->type) {
+                'application' => !empty($routeParams['application_uuid']),
+                'database' => !empty($routeParams['database_uuid']),
+                'service' => !empty($routeParams['service_uuid']),
+                default => !empty($routeParams['database_uuid']),
+            };
+
+            if (! $hasRequiredUuid) {
+                \Log::warning('Missing type-specific UUID for Adminer URL', ['routeParams' => $routeParams, 'type' => $this->type]);
+                $this->adminerUrl = null;
+                return;
+            }
+
             try {
                 $this->adminerUrl = route($routeName, $routeParams).'?container='.urlencode($containerName).'&server_id='.$server->id;
             } catch (\Exception $e) {
