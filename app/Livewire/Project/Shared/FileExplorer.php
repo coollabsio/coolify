@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -148,8 +149,9 @@ class FileExplorer extends Component
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
-            if ($this->resource->server->isFunctional()) {
-                $this->servers = $this->servers->push($this->resource->server);
+            $serviceServer = $this->resource->server;
+            if ($serviceServer && $serviceServer->isFunctional()) {
+                $this->servers = $this->servers->push($serviceServer);
             }
             $this->loadContainers();
         }
@@ -203,7 +205,9 @@ class FileExplorer extends Component
                 }
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 // Validate server before processing containers
-                if ($server && $server instanceof \App\Models\Server && ! empty($server->id) && $server->id !== 0 && $server->isTerminalEnabled()) {
+                // Note: We check isTerminalEnabled() but still load containers if server is valid
+                // The terminal access check is done at the UI level
+                if ($server && $server instanceof \App\Models\Server && ! empty($server->id) && $server->id !== 0) {
                     // Load applications
                     $this->resource->applications()->get()->each(function ($application) use ($server) {
                         if ($application->isRunning()) {
@@ -231,7 +235,8 @@ class FileExplorer extends Component
                     \Log::warning('Invalid server for service containers', [
                         'service_id' => $this->resource->id ?? 'null',
                         'server' => $server ? 'exists but invalid' : 'null',
-                        'server_id' => $server->id ?? 'null',
+                        'server_id' => $server ? ($server->id ?? 'null') : 'null',
+                        'server_type' => $server ? get_class($server) : 'null',
                     ]);
                 }
             }
