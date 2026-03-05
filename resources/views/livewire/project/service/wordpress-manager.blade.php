@@ -121,6 +121,92 @@
                             </div>
                         @endforeach
                     </div>
+
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mt-6">
+                        <h3 class="text-lg font-semibold dark:text-white mb-4">Configuración PHP (php.ini)</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Gestiona la configuración de PHP para los contenedores WordPress. Los cambios pueden requerir reiniciar el contenedor para aplicarse completamente.
+                        </p>
+
+                        <div class="mb-4">
+                            <label for="php_ini_container" class="block text-sm font-medium dark:text-white mb-2">Seleccionar Contenedor:</label>
+                            <select id="php_ini_container" 
+                                wire:model.live="selectedContainerForPhpIni"
+                                wire:change="loadPhpIniSettings"
+                                class="input w-full max-w-md">
+                                <option value="">-- Selecciona un contenedor --</option>
+                                @foreach ($wordpressContainers as $container)
+                                    <option value="{{ $container['id'] }}" 
+                                        @if (!str($container['status'])->contains('running')) disabled @endif>
+                                        {{ $container['name'] }} 
+                                        @if (!str($container['status'])->contains('running'))
+                                            (No está en ejecución)
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        @if ($selectedContainerForPhpIni && !empty($phpIniSettings))
+                            <div class="space-y-4">
+                                @if ($isLoadingPhpIni)
+                                    <div class="flex items-center justify-center p-8">
+                                        <svg class="animate-spin h-8 w-8 text-coollabs" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando configuración...</span>
+                                    </div>
+                                @else
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" 
+                                        x-data="{ 
+                                            settings: @js($phpIniSettings),
+                                            updateSetting(setting, value) {
+                                                if (!value || value.trim() === '') {
+                                                    return;
+                                                }
+                                                $wire.updatePhpIniSetting(setting, value.trim());
+                                            }
+                                        }">
+                                        @foreach ($phpIniSettings as $setting => $value)
+                                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded">
+                                                <label for="php_setting_{{ $setting }}" class="block text-sm font-medium dark:text-white mb-2">
+                                                    {{ str_replace('_', ' ', ucwords($setting, '_')) }}
+                                                </label>
+                                                <div class="flex items-center gap-2">
+                                                    <input type="text" 
+                                                        id="php_setting_{{ $setting }}"
+                                                        x-model="settings['{{ $setting }}']"
+                                                        @keydown.enter="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
+                                                        class="input flex-1"
+                                                        placeholder="{{ $value }}">
+                                                    <x-forms.button 
+                                                        x-on:click="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
+                                                        class="bg-coollabs whitespace-nowrap">
+                                                        Actualizar
+                                                    </x-forms.button>
+                                                </div>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                    Valor actual: <span class="font-mono">{{ $value }}</span>
+                                                </p>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                                        <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                                            <strong>Nota:</strong> Algunos cambios pueden requerir reiniciar el contenedor para aplicarse completamente. 
+                                            Los valores de memoria y tamaño de archivo generalmente requieren reinicio.
+                                        </p>
+                                    </div>
+                                @endif
+                            </div>
+                        @elseif ($selectedContainerForPhpIni && empty($phpIniSettings) && !$isLoadingPhpIni)
+                            <div class="p-4 text-sm text-gray-600 dark:text-gray-400">
+                                No se pudieron cargar las configuraciones de PHP. Asegúrate de que el contenedor esté en ejecución.
+                            </div>
+                        @endif
+                    </div>
                 @endif
             </div>
         </div>

@@ -29,6 +29,12 @@ class WordPressManager extends Component
 
     public array $wpPrefixes = [];
 
+    public ?int $selectedContainerForPhpIni = null;
+
+    public array $phpIniSettings = [];
+
+    public bool $isLoadingPhpIni = false;
+
     public function mount()
     {
         try {
@@ -384,6 +390,212 @@ class WordPressManager extends Component
             $this->dispatch('success', "WordPress prefix updated to {$newPrefix}.");
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to update WordPress prefix: '.$e->getMessage());
+        }
+    }
+
+    public function loadPhpIniSettings(?int $containerId = null)
+    {
+        if ($containerId === null) {
+            $containerId = $this->selectedContainerForPhpIni;
+        }
+
+        if ($containerId === null) {
+            return;
+        }
+
+        $this->isLoadingPhpIni = true;
+        $this->selectedContainerForPhpIni = $containerId;
+
+        try {
+            $container = collect($this->wordpressContainers)->firstWhere('id', $containerId);
+            if (! $container) {
+                $this->dispatch('error', 'Container not found.');
+                return;
+            }
+
+            $application = $container['application'] ?? $this->applications->find($containerId);
+            if (! $application || ! str($application->status)->contains('running')) {
+                $this->dispatch('error', 'Container is not running.');
+                return;
+            }
+
+            $server = $application->service->server;
+            $containerName = $container['container_name'];
+            $escapedContainer = escapeshellarg($containerName);
+
+            // Get PHP configuration using php -i
+            $phpInfoCommand = "docker exec {$escapedContainer} php -i 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $phpInfoCommand = "sudo {$phpInfoCommand}";
+            }
+
+            $phpInfo = instant_remote_process([$phpInfoCommand], $server, false) ?? '';
+
+            // Extract common PHP settings
+            $settings = [];
+            $settingsToExtract = [
+                'upload_max_filesize',
+                'post_max_size',
+                'max_execution_time',
+                'max_input_time',
+                'memory_limit',
+                'max_input_vars',
+                'max_file_uploads',
+            ];
+
+            foreach ($settingsToExtract as $setting) {
+                // php -i format: "setting_name => value"
+                $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
+                if (preg_match($pattern, $phpInfo, $matches)) {
+                    $value = trim($matches[1]);
+                    // Remove any trailing spaces or special characters
+                    $value = preg_replace('/\s*\(.*?\)\s*$/', '', $value);
+                    $settings[$setting] = trim($value);
+                } else {
+                    // Try using php -r to get specific ini value
+                    $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+                    if ($server->isNonRoot()) {
+                        $getIniCommand = "sudo {$getIniCommand}";
+                    }
+                    $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
+                    $settings[$setting] = ! empty($iniValue) ? $iniValue : 'N/A';
+                }
+            }
+
+            $this->phpIniSettings = $settings;
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Error loading PHP configuration: '.$e->getMessage());
+            $this->phpIniSettings = [];
+        } finally {
+            $this->isLoadingPhpIni = false;
+        }
+    }
+
+    public function updatePhpIniSetting(string $setting, string $value)
+    {
+        if ($this->selectedContainerForPhpIni === null) {
+            $this->dispatch('error', 'No container selected.');
+            return;
+        }
+
+        // Validate setting name
+        $allowedSettings = [
+            'upload_max_filesize',
+            'post_max_size',
+            'max_execution_time',
+            'max_input_time',
+            'memory_limit',
+            'max_input_vars',
+            'max_file_uploads',
+        ];
+
+        if (! in_array($setting, $allowedSettings)) {
+            $this->dispatch('error', 'Invalid setting name.');
+            return;
+        }
+
+        // Validate value format
+        if (empty($value)) {
+            $this->dispatch('error', 'Value cannot be empty.');
+            return;
+        }
+
+        try {
+            $container = collect($this->wordpressContainers)->firstWhere('id', $this->selectedContainerForPhpIni);
+            if (! $container) {
+                $this->dispatch('error', 'Container not found.');
+                return;
+            }
+
+            $application = $container['application'] ?? $this->applications->find($this->selectedContainerForPhpIni);
+            if (! $application || ! str($application->status)->contains('running')) {
+                $this->dispatch('error', 'Container is not running.');
+                return;
+            }
+
+            $server = $application->service->server;
+            $containerName = $container['container_name'];
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedSetting = escapeshellarg($setting);
+            $escapedValue = escapeshellarg($value);
+
+            // Find php.ini location
+            $findPhpIniCommand = "docker exec {$escapedContainer} php -i | grep 'Loaded Configuration File' | awk '{print \$5}'";
+            if ($server->isNonRoot()) {
+                $findPhpIniCommand = "sudo {$findPhpIniCommand}";
+            }
+
+            $phpIniPath = trim(instant_remote_process([$findPhpIniCommand], $server, false) ?? '');
+
+            if (empty($phpIniPath) || $phpIniPath === '(none)') {
+                // Try common locations
+                $commonPaths = [
+                    '/usr/local/etc/php/php.ini',
+                    '/etc/php/8.2/fpm/php.ini',
+                    '/etc/php/8.1/fpm/php.ini',
+                    '/etc/php/8.0/fpm/php.ini',
+                    '/etc/php7/php.ini',
+                    '/etc/php/php.ini',
+                ];
+
+                $phpIniPath = null;
+                foreach ($commonPaths as $path) {
+                    $testCommand = "docker exec {$escapedContainer} test -f {$path} && echo found || echo notfound";
+                    if ($server->isNonRoot()) {
+                        $testCommand = "sudo {$testCommand}";
+                    }
+                    $testResult = trim(instant_remote_process([$testCommand], $server, false) ?? '');
+                    if ($testResult === 'found') {
+                        $phpIniPath = $path;
+                        break;
+                    }
+                }
+
+                if ($phpIniPath === null) {
+                    $this->dispatch('error', 'Could not find php.ini file. You may need to configure PHP settings manually.');
+                    return;
+                }
+            }
+
+            // Update the setting in php.ini using sed
+            $escapedPhpIniPath = escapeshellarg($phpIniPath);
+            
+            // Step 1: Uncomment if commented and update value
+            $uncommentAndUpdateCommand = "docker exec {$escapedContainer} sed -i 's/^[;]*\s*{$escapedSetting}\s*=\s*.*/{$escapedSetting} = {$escapedValue}/' {$escapedPhpIniPath}";
+            if ($server->isNonRoot()) {
+                $uncommentAndUpdateCommand = "sudo {$uncommentAndUpdateCommand}";
+            }
+            instant_remote_process([$uncommentAndUpdateCommand], $server, false);
+
+            // Step 2: Check if setting exists, if not add it
+            $checkCommand = "docker exec {$escapedContainer} grep -q '^{$escapedSetting}\s*=' {$escapedPhpIniPath} 2>/dev/null || echo notfound";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $exists = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            
+            if ($exists === 'notfound') {
+                // Add new setting at the end
+                $appendCommand = "docker exec {$escapedContainer} sh -c 'echo \"{$escapedSetting} = {$escapedValue}\" >> {$escapedPhpIniPath}'";
+                if ($server->isNonRoot()) {
+                    $appendCommand = "sudo {$appendCommand}";
+                }
+                instant_remote_process([$appendCommand], $server, false);
+            }
+
+            // Reload PHP-FPM if available
+            $reloadCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && killall -USR2 php-fpm || which php && echo \"PHP-FPM not found, restart container to apply changes\" || true'";
+            if ($server->isNonRoot()) {
+                $reloadCommand = "sudo {$reloadCommand}";
+            }
+            instant_remote_process([$reloadCommand], $server, false);
+
+            // Reload settings
+            $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
+
+            $this->dispatch('success', "PHP setting {$setting} updated to {$value}. You may need to restart the container for changes to take full effect.");
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Error updating PHP setting: '.$e->getMessage());
         }
     }
 
