@@ -212,11 +212,20 @@ class FileExplorer extends Component
                         ]);
                     }
                 });
-                $this->resource->databases()->get()->each(function ($database) {
-                    // Get server from database's service, not from loop
+                // Load databases with service relationship to avoid N+1 queries
+                $this->resource->databases()->with('service.server')->get()->each(function ($database) {
+                    // Get server from database's service
                     $dbServer = $database->service->server ?? null;
-                    if (! $dbServer) {
-                        return; // Skip if server is not available
+
+                    // Validate server exists and has valid ID
+                    if (! $dbServer || ! ($dbServer instanceof \App\Models\Server) || empty($dbServer->id) || $dbServer->id === 0) {
+                        \Log::warning('Invalid server for database container', [
+                            'database_id' => $database->id,
+                            'database_name' => $database->name,
+                            'service_id' => $database->service_id ?? 'null',
+                            'server' => $dbServer ? 'exists but invalid' : 'null',
+                        ]);
+                        return; // Skip if server is not available or invalid
                     }
 
                     if ($database->isRunning() && $dbServer->isTerminalEnabled()) {
@@ -1835,9 +1844,15 @@ class FileExplorer extends Component
             $server = data_get($container, 'server');
             $containerName = ltrim(data_get($container, 'container.Names'), '/');
 
-            if (is_null($server)) {
+            // Validate server exists and is a valid Server instance
+            if (is_null($server) || ! ($server instanceof \App\Models\Server)) {
+                \Log::warning('Invalid server in container data', [
+                    'container' => $containerName,
+                    'server_type' => gettype($server),
+                    'server' => $server ? 'exists but not Server instance' : 'null',
+                ]);
                 $this->adminerUrl = null;
-
+                $this->dispatch('error', 'Invalid server configuration. Server not found for this container.');
                 return;
             }
 
