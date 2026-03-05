@@ -202,39 +202,38 @@ class FileExplorer extends Component
                     ]);
                 }
             } elseif (data_get($this->parameters, 'service_uuid')) {
-                $this->resource->applications()->get()->each(function ($application) use ($server) {
-                    if ($application->isRunning() && $server->isTerminalEnabled()) {
-                        $this->containers->push([
-                            'server' => $server,
-                            'container' => [
-                                'Names' => data_get($application, 'name').'-'.data_get($this->resource, 'uuid'),
-                            ],
-                        ]);
-                    }
-                });
-                // Load databases - use the service's server (all databases in a service are on the same server)
-                $this->resource->databases()->get()->each(function ($database) use ($server) {
-                    // Use the server from the loop (service's server) instead of trying to get it from database->service->server
-                    // All databases in a service are on the same server as the service
-                    if (! $server || ! ($server instanceof \App\Models\Server) || empty($server->id) || $server->id === 0) {
-                        \Log::warning('Invalid server for database container', [
-                            'database_id' => $database->id,
-                            'database_name' => $database->name,
-                            'service_id' => $this->resource->id ?? 'null',
-                            'server' => $server ? 'exists but invalid' : 'null',
-                        ]);
-                        return; // Skip if server is not available or invalid
-                    }
+                // Validate server before processing containers
+                if ($server && $server instanceof \App\Models\Server && ! empty($server->id) && $server->id !== 0 && $server->isTerminalEnabled()) {
+                    // Load applications
+                    $this->resource->applications()->get()->each(function ($application) use ($server) {
+                        if ($application->isRunning()) {
+                            $this->containers->push([
+                                'server' => $server,
+                                'container' => [
+                                    'Names' => data_get($application, 'name').'-'.data_get($this->resource, 'uuid'),
+                                ],
+                            ]);
+                        }
+                    });
 
-                    if ($database->isRunning() && $server->isTerminalEnabled()) {
-                        $this->containers->push([
-                            'server' => $server,
-                            'container' => [
-                                'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
-                            ],
-                        ]);
-                    }
-                });
+                    // Load databases - use the service's server (all databases in a service are on the same server)
+                    $this->resource->databases()->get()->each(function ($database) use ($server) {
+                        if ($database->isRunning()) {
+                            $this->containers->push([
+                                'server' => $server,
+                                'container' => [
+                                    'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
+                                ],
+                            ]);
+                        }
+                    });
+                } else {
+                    \Log::warning('Invalid server for service containers', [
+                        'service_id' => $this->resource->id ?? 'null',
+                        'server' => $server ? 'exists but invalid' : 'null',
+                        'server_id' => $server->id ?? 'null',
+                    ]);
+                }
             }
         }
 
