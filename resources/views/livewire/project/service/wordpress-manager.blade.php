@@ -3,6 +3,39 @@
         WordPress Manager | Coolify
     </x-slot>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="[]" />
+    
+    <script>
+        // Listen for Livewire events and log to console
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('error', (data) => {
+                const message = Array.isArray(data) ? data[0] : data;
+                console.error('[WordPress Manager Error]', message);
+            });
+            
+            Livewire.on('success', (data) => {
+                const message = Array.isArray(data) ? data[0] : data;
+                console.log('[WordPress Manager Success]', message);
+            });
+            
+            Livewire.on('warning', (data) => {
+                const message = Array.isArray(data) ? data[0] : data;
+                console.warn('[WordPress Manager Warning]', message);
+            });
+        });
+        
+        // Also listen for any PHP INI related events
+        window.addEventListener('php-ini-error', (event) => {
+            console.error('[PHP INI Error]', event.detail);
+        });
+        
+        window.addEventListener('php-ini-success', (event) => {
+            console.log('[PHP INI Success]', event.detail);
+        });
+        
+        window.addEventListener('php-ini-warning', (event) => {
+            console.warn('[PHP INI Warning]', event.detail);
+        });
+    </script>
 
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="sub-menu-wrapper">
