@@ -148,6 +148,11 @@ class AdminerController extends Controller
             $adminerContent .= $autoLoginScript;
         }
 
-        return response($adminerContent)->header('Content-Type', 'text/html; charset=utf-8');
+        // Return response with proper headers to allow iframe embedding
+        return response($adminerContent)
+            ->header('Content-Type', 'text/html; charset=utf-8')
+            ->header('X-Frame-Options', 'SAMEORIGIN') // Allow same-origin iframes
+            ->header('X-Content-Type-Options', 'nosniff')
+            ->header('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
 }
