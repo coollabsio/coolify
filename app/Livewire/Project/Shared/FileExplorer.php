@@ -148,16 +148,10 @@ class FileExplorer extends Component
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
-            // Load service with server relationship to ensure it's loaded
-            $this->resource = Service::with('server')->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
-            $serviceServer = $this->resource->server;
-            // If server ID is 0, try to get it from server_id attribute
-            if ($serviceServer && ($serviceServer->id === 0 || empty($serviceServer->id))) {
-                $serverId = $this->resource->server_id ?? null;
-                if ($serverId && $serverId > 0) {
-                    $serviceServer = \App\Models\Server::find($serverId);
-                }
-            }
+            // Load service with destination and its server relationship
+            $this->resource = Service::with(['destination.server'])->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+            // Get server from destination, not directly from service
+            $serviceServer = data_get($this->resource, 'destination.server');
             if ($serviceServer && $serviceServer->isFunctional()) {
                 $this->servers = $this->servers->push($serviceServer);
             }
@@ -1851,40 +1845,40 @@ class FileExplorer extends Component
                 $this->dispatch('console-log', 'Resource exists, trying to get server:\n'.json_encode($resourceInfo, JSON_PRETTY_PRINT));
 
                 if ($this->type === 'service') {
-                    // Reload server relationship to ensure it's loaded
-                    $this->resource->load('server');
+                    // Reload destination and its server relationship to ensure it's loaded
+                    $this->resource->load(['destination.server']);
 
                     $serviceInfo = [
-                        'has_server' => isset($this->resource->server),
-                        'server_id' => $this->resource->server->id ?? 'null',
-                        'server_id_from_attribute' => $this->resource->server_id ?? 'null',
-                        'server_loaded' => $this->resource->relationLoaded('server'),
+                        'has_destination' => isset($this->resource->destination),
+                        'destination_type' => isset($this->resource->destination) ? get_class($this->resource->destination) : 'null',
+                        'has_server_from_destination' => isset($this->resource->destination->server),
+                        'server_id_from_destination' => data_get($this->resource, 'destination.server.id', 'null'),
+                        'server_id_from_service' => $this->resource->server_id ?? 'null',
                     ];
                     \Log::info('Type is service', $serviceInfo);
                     $this->dispatch('console-log', 'Type is service:\n'.json_encode($serviceInfo, JSON_PRETTY_PRINT));
 
-                    // Get server - prefer server_id attribute if relationship returns invalid server
-                    $serverId = $this->resource->server_id ?? null;
-                    if ($serverId && $serverId > 0) {
-                        $server = \App\Models\Server::find($serverId);
-                        if ($server) {
-                            \Log::info('Got server from server_id attribute', ['server_id' => $server->id]);
-                            $this->dispatch('console-log', '✓ Got server from server_id attribute: ID='.$server->id);
-                        } else {
-                            $this->dispatch('console-log', '✗ Server not found with ID: '.$serverId);
-                        }
-                    } elseif (isset($this->resource->server)) {
-                        $server = $this->resource->server;
-                        // If server ID is 0, it's invalid
-                        if (empty($server->id) || $server->id === 0) {
-                            $this->dispatch('console-log', '✗ Server from relationship has ID=0, which is invalid');
-                            $server = null;
-                        } else {
-                            \Log::info('Got server from service relationship', ['server_id' => $server->id ?? 'null']);
-                            $this->dispatch('console-log', '✓ Got server from service relationship: ID='.($server->id ?? 'null'));
-                        }
+                    // Get server from destination (this is the correct way for services)
+                    $server = data_get($this->resource, 'destination.server');
+                    if ($server && isset($server->id)) {
+                        // Server ID 0 is valid (Coolify host), so we accept it
+                        \Log::info('Got server from service destination', ['server_id' => $server->id]);
+                        $this->dispatch('console-log', '✓ Got server from service destination: ID='.$server->id);
                     } else {
-                        $this->dispatch('console-log', '✗ Service resource has no server property');
+                        // If destination server is null, try to get from selected container
+                        $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+                        if ($container && isset($container['server'])) {
+                            $containerServer = $container['server'];
+                            if ($containerServer && isset($containerServer->id)) {
+                                $server = $containerServer;
+                                \Log::info('Got server from container (fallback)', ['server_id' => $server->id]);
+                                $this->dispatch('console-log', '✓ Got server from container (fallback): ID='.$server->id);
+                            } else {
+                                $this->dispatch('console-log', '✗ Service destination server is null and container server also invalid');
+                            }
+                        } else {
+                            $this->dispatch('console-log', '✗ Service destination has no server');
+                        }
                     }
                 } elseif ($this->type === 'application') {
                     $appInfo = [
@@ -1996,12 +1990,13 @@ class FileExplorer extends Component
                 return;
             }
 
-            if (empty($server->id) || $server->id === 0) {
+            // Server ID 0 is valid (Coolify host), but we need a valid server instance
+            if (!isset($server->id)) {
                 $errorDetails = "Server ID: ".($server->id ?? 'null').", Exists: ".($server->exists ?? 'null');
-                \Log::error('Server ID is invalid', $debugInfo);
+                \Log::error('Server ID is missing', $debugInfo);
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid. Details: '.$errorDetails);
-                $this->dispatch('console-log', 'ERROR: Server ID is invalid - '.json_encode($debugInfo, JSON_PRETTY_PRINT));
+                $this->dispatch('error', 'Invalid server configuration. Server ID is missing. Details: '.$errorDetails);
+                $this->dispatch('console-log', 'ERROR: Server ID is missing - '.json_encode($debugInfo, JSON_PRETTY_PRINT));
                 return;
             }
 
