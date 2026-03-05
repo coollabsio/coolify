@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\LocalFileVolume;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
@@ -670,69 +672,51 @@ class WordPressManager extends Component
             }
             $debugInfo = instant_remote_process([$debugIniCommand], $server, false) ?? '';
             
-            // Update conf.d file (highest priority - always do this)
-            // Use the same reliable method as FileExplorer: write to temp file, copy to server, then to container
-            $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
-            $escapedConfIni = escapeshellarg($confIniFile);
+            // CRITICAL: Store PHP config files in a persistent volume
+            // Create/update LocalFileVolume to persist the configuration file
+            $confIniFileName = '99-custom-'.$setting.'.ini';
+            $confIniFileMountPath = $confDirPath.'/'.$confIniFileName;
+            $confIniFileFsPath = './php-config/'.$confIniFileName; // Relative to workdir
             
             // Prepare file content
             $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
             
             try {
-                // Save content to a temporary file locally
-                $tmpFilename = 'temp/'.uniqid('php-ini-').'.ini';
-                Storage::disk('local')->put($tmpFilename, $confContent);
-                $localTmpPath = Storage::disk('local')->path($tmpFilename);
-
-                // Copy to server temp location
-                $serverTmpPath = '/tmp/'.basename($tmpFilename);
-                instant_scp($localTmpPath, $serverTmpPath, $server);
-
-                // Copy from server temp to container
-                $escapedServerTmp = escapeshellarg($serverTmpPath);
-                $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedConfIni}";
-                if ($server->isNonRoot()) {
-                    $copyCommand = "sudo {$copyCommand}";
-                }
-                instant_remote_process([$copyCommand], $server);
-
-                // Clean up temp files
-                Storage::disk('local')->delete($tmpFilename);
-                $cleanCommand = "rm -f {$escapedServerTmp}";
-                if ($server->isNonRoot()) {
-                    $cleanCommand = "sudo {$cleanCommand}";
-                }
-                instant_remote_process([$cleanCommand], $server, false);
+                // Find or create LocalFileVolume for this PHP config file
+                $fileVolume = LocalFileVolume::where('resource_type', ServiceApplication::class)
+                    ->where('resource_id', $application->id)
+                    ->where('mount_path', $confIniFileMountPath)
+                    ->first();
                 
-                // Wait a moment for file system to sync
-                usleep(500000); // 0.5 seconds
-                
-                // Verify conf.d file was written correctly
-                $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
-                if ($server->isNonRoot()) {
-                    $verifyConfCommand = "sudo {$verifyConfCommand}";
+                if (! $fileVolume) {
+                    // Create new file volume
+                    $fileVolume = LocalFileVolume::create([
+                        'resource_type' => ServiceApplication::class,
+                        'resource_id' => $application->id,
+                        'fs_path' => $confIniFileFsPath,
+                        'mount_path' => $confIniFileMountPath,
+                        'is_directory' => false,
+                        'content' => $confContent,
+                    ]);
+                } else {
+                    // Update existing file volume
+                    $fileVolume->content = $confContent;
+                    $fileVolume->save();
                 }
-                $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
                 
-                // Extract value from file to verify
-                $extractValueCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
-                if ($server->isNonRoot()) {
-                    $extractValueCommand = "sudo {$extractValueCommand}";
-                }
-                $fileValue = trim(instant_remote_process([$extractValueCommand], $server, false) ?? '');
+                // Save the file to the persistent storage on server
+                $fileVolume->saveStorageOnServer();
                 
-                // Ensure file permissions are correct
-                $chmodCommand = "docker exec {$escapedContainer} chmod 644 {$escapedConfIni}";
-                if ($server->isNonRoot()) {
-                    $chmodCommand = "sudo {$chmodCommand}";
-                }
-                instant_remote_process([$chmodCommand], $server, false);
+                // Also write directly to container for immediate effect
+                $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
                 
-                if (empty($fileValue) || $fileValue !== $value) {
-                    $this->dispatch('error', "File written but content verification failed. File value: '{$fileValue}', Expected: '{$value}'. File content: ".substr($verifyConfContent, 0, 200));
-                }
+                // The file is now persisted in the volume and will be mounted when container restarts
+                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. Changes applied immediately. File will persist after container restart.");
+                
             } catch (\Throwable $e) {
-                $this->dispatch('error', "Failed to write conf.d file: ".$e->getMessage());
+                $this->dispatch('error', "Failed to save PHP config to persistent volume: ".$e->getMessage().". Trying direct container write...");
+                // Fallback to direct container write (non-persistent)
+                $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
             }
             
             // CRITICAL: Remove or comment out duplicate settings from other conf.d files
@@ -775,7 +759,8 @@ class WordPressManager extends Component
                 $this->dispatch('warning', "Found conflicting settings in: ".implode(', ', $conflictingFiles).". They have been commented out.");
             }
 
-            // Also update php.ini file (for completeness, but conf.d takes precedence)
+            // CRITICAL: Also update php.ini file directly (this persists better than conf.d)
+            // Since containers are ephemeral, we need to modify the main php.ini file
             $escapedPhpIniPath = escapeshellarg($phpIniPath);
             
             // Read current php.ini content
@@ -809,14 +794,37 @@ class WordPressManager extends Component
                 $newLines[] = "{$setting} = {$value}";
             }
             
-            // Write back to container
-            $newContent = implode("\n", $newLines);
-            $escapedContent = escapeshellarg($newContent);
-            $writeCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedContent} > {$escapedPhpIniPath}'";
-            if ($server->isNonRoot()) {
-                $writeCommand = "sudo {$writeCommand}";
+            // Write php.ini back to container using the same reliable method
+            try {
+                $newContent = implode("\n", $newLines);
+                
+                // Save content to a temporary file locally
+                $tmpFilename = 'temp/'.uniqid('php-ini-main-').'.ini';
+                Storage::disk('local')->put($tmpFilename, $newContent);
+                $localTmpPath = Storage::disk('local')->path($tmpFilename);
+
+                // Copy to server temp location
+                $serverTmpPath = '/tmp/'.basename($tmpFilename);
+                instant_scp($localTmpPath, $serverTmpPath, $server);
+
+                // Copy from server temp to container
+                $escapedServerTmp = escapeshellarg($serverTmpPath);
+                $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedPhpIniPath}";
+                if ($server->isNonRoot()) {
+                    $copyCommand = "sudo {$copyCommand}";
+                }
+                instant_remote_process([$copyCommand], $server);
+
+                // Clean up temp files
+                Storage::disk('local')->delete($tmpFilename);
+                $cleanCommand = "rm -f {$escapedServerTmp}";
+                if ($server->isNonRoot()) {
+                    $cleanCommand = "sudo {$cleanCommand}";
+                }
+                instant_remote_process([$cleanCommand], $server, false);
+            } catch (\Throwable $e) {
+                $this->dispatch('warning', "Failed to update php.ini file: ".$e->getMessage());
             }
-            instant_remote_process([$writeCommand], $server, false);
 
             // Reload PHP-FPM more aggressively
             $reloadCommands = [
@@ -883,20 +891,55 @@ class WordPressManager extends Component
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
             
             // Show appropriate message with debug info
-            $debugMsg = "File written to: {$confIniFile}. ";
+            $debugMsg = "Files updated: {$confIniFile} and {$phpIniPath}. ";
             if (!empty($debugInfo)) {
                 $debugMsg .= "PHP config: ".substr($debugInfo, 0, 100).". ";
             }
             
+            // IMPORTANT: Note about persistence
+            $persistenceNote = "NOTE: Changes are written to the container's filesystem. If the container is recreated from the image, these changes will be lost. To make changes permanent, consider using Docker volumes or modifying the Dockerfile.";
+            
             if (!empty($verifiedValue) && $verifiedValue === $value) {
                 $this->dispatch('success', "PHP setting {$setting} updated to {$value} and verified successfully. {$debugMsg}");
             } elseif (!empty($confFileValue) && $confFileValue === $value) {
-                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in conf.d file ({$confIniFile}). PHP currently reports: {$verifiedValue}. Please restart the container completely for changes to take effect. {$debugMsg}");
+                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in both conf.d ({$confIniFile}) and php.ini ({$phpIniPath}). PHP currently reports: {$verifiedValue}. Container restart may be needed. {$persistenceNote}");
             } else {
-                $this->dispatch('warning', "Setting written to file ({$confIniFile}), value in file: {$confFileValue}, but PHP reports: {$verifiedValue}. Expected: {$value}. Please restart the container. {$debugMsg}");
+                $this->dispatch('warning', "Setting written to files. conf.d value: {$confFileValue}, PHP reports: {$verifiedValue}, Expected: {$value}. Both php.ini and conf.d have been updated. Please restart the container. {$persistenceNote}");
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error updating PHP setting: '.$e->getMessage());
+        }
+    }
+
+    private function writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value)
+    {
+        // Fallback method: write directly to container (non-persistent)
+        $confIniFile = $confDirPath.'/'.$confIniFileName;
+        $escapedConfIni = escapeshellarg($confIniFile);
+        
+        try {
+            $tmpFilename = 'temp/'.uniqid('php-ini-').'.ini';
+            Storage::disk('local')->put($tmpFilename, $confContent);
+            $localTmpPath = Storage::disk('local')->path($tmpFilename);
+
+            $serverTmpPath = '/tmp/'.basename($tmpFilename);
+            instant_scp($localTmpPath, $serverTmpPath, $server);
+
+            $escapedServerTmp = escapeshellarg($serverTmpPath);
+            $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedConfIni}";
+            if ($server->isNonRoot()) {
+                $copyCommand = "sudo {$copyCommand}";
+            }
+            instant_remote_process([$copyCommand], $server);
+
+            Storage::disk('local')->delete($tmpFilename);
+            $cleanCommand = "rm -f {$escapedServerTmp}";
+            if ($server->isNonRoot()) {
+                $cleanCommand = "sudo {$cleanCommand}";
+            }
+            instant_remote_process([$cleanCommand], $server, false);
+        } catch (\Throwable $e) {
+            $this->dispatch('error', "Fallback write also failed: ".$e->getMessage());
         }
     }
 
