@@ -212,10 +212,16 @@ class FileExplorer extends Component
                         ]);
                     }
                 });
-                $this->resource->databases()->get()->each(function ($database) use ($server) {
-                    if ($database->isRunning() && $server->isTerminalEnabled()) {
+                $this->resource->databases()->get()->each(function ($database) {
+                    // Get server from database's service, not from loop
+                    $dbServer = $database->service->server ?? null;
+                    if (! $dbServer) {
+                        return; // Skip if server is not available
+                    }
+
+                    if ($database->isRunning() && $dbServer->isTerminalEnabled()) {
                         $this->containers->push([
-                            'server' => $server,
+                            'server' => $dbServer,
                             'container' => [
                                 'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
