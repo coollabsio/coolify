@@ -52,7 +52,12 @@ class StartDatabaseProxy
         }
 
         if (! $deploymentServer instanceof Server) {
-            throw new \RuntimeException('Cannot start database proxy: deployment server is missing.');
+            $this->logWarning(sprintf(
+                'Database proxy for %s is skipped because deployment server is missing.',
+                $database->uuid
+            ));
+
+            return;
         }
 
         $proxyServer = $deploymentServer;

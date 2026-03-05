@@ -615,7 +615,7 @@ it('stops proxy only once when edge and deployment server are the same', functio
         ->and($action->calls[0]['commands'][0])->toBe('docker rm -f stop-same-edge-db-uuid-proxy');
 });
 
-it('throws clear error when starting database proxy without a deployment server', function () {
+it('skips starting database proxy when deployment server is missing', function () {
     $database = new StandalonePostgresql;
     $database->uuid = 'missing-deployment-server-db-uuid';
     $database->name = 'missing-deployment-server-db';
@@ -627,14 +627,23 @@ it('throws clear error when starting database proxy without a deployment server'
 
     $action = new class extends StartDatabaseProxy
     {
+        public array $warnings = [];
+
         protected function resolveConfigurationDirectory(string $databaseUuid): string
         {
             return "/tmp/database-proxy/{$databaseUuid}";
         }
+
+        protected function logWarning(string $message): void
+        {
+            $this->warnings[] = $message;
+        }
     };
 
-    expect(fn () => $action->handle($database))
-        ->toThrow(\RuntimeException::class, 'deployment server is missing');
+    $action->handle($database);
+
+    expect($action->warnings)->toHaveCount(1)
+        ->and($action->warnings[0])->toContain('deployment server is missing');
 });
 
 it('normalizes remote host with scheme and path before building database upstream target', function () {
