@@ -637,43 +637,115 @@ class WordPressManager extends Component
                 instant_remote_process([$checkFileCommand], $server, false);
             }
 
-            // Update the setting in php.ini using sed
+            // Update the setting in php.ini - read, modify, write approach
             $escapedPhpIniPath = escapeshellarg($phpIniPath);
             
-            // Step 1: Uncomment if commented and update value
-            $uncommentAndUpdateCommand = "docker exec {$escapedContainer} sed -i 's/^[;]*\s*{$escapedSetting}\s*=\s*.*/{$escapedSetting} = {$escapedValue}/' {$escapedPhpIniPath}";
+            // Read current php.ini content
+            $readCommand = "docker exec {$escapedContainer} cat {$escapedPhpIniPath}";
             if ($server->isNonRoot()) {
-                $uncommentAndUpdateCommand = "sudo {$uncommentAndUpdateCommand}";
+                $readCommand = "sudo {$readCommand}";
             }
-            instant_remote_process([$uncommentAndUpdateCommand], $server, false);
-
-            // Step 2: Check if setting exists, if not add it
-            $checkCommand = "docker exec {$escapedContainer} grep -q '^{$escapedSetting}\s*=' {$escapedPhpIniPath} 2>/dev/null || echo notfound";
-            if ($server->isNonRoot()) {
-                $checkCommand = "sudo {$checkCommand}";
-            }
-            $exists = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            $phpIniContent = instant_remote_process([$readCommand], $server, false) ?? '';
             
-            if ($exists === 'notfound') {
-                // Add new setting at the end
-                $appendCommand = "docker exec {$escapedContainer} sh -c 'echo \"{$escapedSetting} = {$escapedValue}\" >> {$escapedPhpIniPath}'";
-                if ($server->isNonRoot()) {
-                    $appendCommand = "sudo {$appendCommand}";
+            // Update the setting in content
+            $lines = explode("\n", $phpIniContent);
+            $found = false;
+            $newLines = [];
+            
+            foreach ($lines as $line) {
+                $trimmedLine = trim($line);
+                // Check if this line contains our setting (commented or not)
+                if (preg_match('/^[;]*\s*'.preg_quote($setting, '/').'\s*=/i', $trimmedLine)) {
+                    // Replace the line
+                    $newLines[] = "{$setting} = {$value}";
+                    $found = true;
+                } else {
+                    $newLines[] = $line;
                 }
-                instant_remote_process([$appendCommand], $server, false);
+            }
+            
+            // If setting not found, add it at the end
+            if (! $found) {
+                $newLines[] = "";
+                $newLines[] = "; {$setting} - Updated by Coolify";
+                $newLines[] = "{$setting} = {$value}";
+            }
+            
+            // Write back to container
+            $newContent = implode("\n", $newLines);
+            $escapedContent = escapeshellarg($newContent);
+            $writeCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedContent} > {$escapedPhpIniPath}'";
+            if ($server->isNonRoot()) {
+                $writeCommand = "sudo {$writeCommand}";
+            }
+            instant_remote_process([$writeCommand], $server, false);
+
+            // Also check and update conf.d directory if it exists (for PHP-FPM)
+            $confDirs = [
+                dirname($phpIniPath).'/conf.d',
+                '/usr/local/etc/php/conf.d',
+                '/etc/php/'.(explode('/', $phpIniPath)[3] ?? '8.2').'/fpm/conf.d',
+                '/etc/php/'.(explode('/', $phpIniPath)[3] ?? '8.2').'/cli/conf.d',
+            ];
+            
+            foreach ($confDirs as $confDir) {
+                $checkDirCommand = "docker exec {$escapedContainer} test -d ".escapeshellarg($confDir)." && echo found || echo notfound";
+                if ($server->isNonRoot()) {
+                    $checkDirCommand = "sudo {$checkDirCommand}";
+                }
+                $dirExists = trim(instant_remote_process([$checkDirCommand], $server, false) ?? '');
+                
+                if ($dirExists === 'found') {
+                    // Create or update a custom ini file in conf.d
+                    $customIniFile = $confDir.'/99-custom-'.$setting.'.ini';
+                    $escapedCustomIni = escapeshellarg($customIniFile);
+                    $customContent = "; Custom {$setting} setting\n{$setting} = {$value}\n";
+                    $escapedCustomContent = escapeshellarg($customContent);
+                    $writeCustomCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedCustomContent} > {$escapedCustomIni}'";
+                    if ($server->isNonRoot()) {
+                        $writeCustomCommand = "sudo {$writeCustomCommand}";
+                    }
+                    instant_remote_process([$writeCustomCommand], $server, false);
+                    break; // Only update one conf.d directory
+                }
             }
 
-            // Reload PHP-FPM if available
-            $reloadCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && killall -USR2 php-fpm || which php && echo \"PHP-FPM not found, restart container to apply changes\" || true'";
-            if ($server->isNonRoot()) {
-                $reloadCommand = "sudo {$reloadCommand}";
+            // Reload PHP-FPM more aggressively
+            $reloadCommands = [
+                // Try to reload PHP-FPM
+                "docker exec {$escapedContainer} sh -c 'pkill -USR2 php-fpm 2>/dev/null || true'",
+                // Try to reload via service
+                "docker exec {$escapedContainer} sh -c 'service php-fpm reload 2>/dev/null || service php8.2-fpm reload 2>/dev/null || service php8.1-fpm reload 2>/dev/null || service php8.0-fpm reload 2>/dev/null || true'",
+                // Try to restart PHP-FPM
+                "docker exec {$escapedContainer} sh -c 'service php-fpm restart 2>/dev/null || service php8.2-fpm restart 2>/dev/null || service php8.1-fpm restart 2>/dev/null || service php8.0-fpm restart 2>/dev/null || true'",
+            ];
+            
+            foreach ($reloadCommands as $reloadCommand) {
+                if ($server->isNonRoot()) {
+                    $reloadCommand = "sudo {$reloadCommand}";
+                }
+                instant_remote_process([$reloadCommand], $server, false);
             }
-            instant_remote_process([$reloadCommand], $server, false);
+            
+            // Verify the change was applied
+            $verifyCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $verifyCommand = "sudo {$verifyCommand}";
+            }
+            $verifiedValue = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
+            
+            if (!empty($verifiedValue) && $verifiedValue !== $value) {
+                $this->dispatch('warning', "Setting updated in php.ini but may require container restart. Current value: {$verifiedValue}, Expected: {$value}");
+            }
 
             // Reload settings
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
 
-            $this->dispatch('success', "PHP setting {$setting} updated to {$value}. You may need to restart the container for changes to take full effect.");
+            if (!empty($verifiedValue) && $verifiedValue === $value) {
+                $this->dispatch('success', "PHP setting {$setting} updated to {$value} and applied successfully.");
+            } else {
+                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in php.ini. Please restart the container for changes to take full effect.");
+            }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error updating PHP setting: '.$e->getMessage());
         }
