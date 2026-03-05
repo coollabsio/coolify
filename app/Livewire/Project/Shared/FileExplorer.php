@@ -1021,23 +1021,24 @@ class FileExplorer extends Component
             $escapedFilePath = escapeshellarg($filePath);
             $dir = escapeshellarg(dirname($filePath));
 
-            $command = "docker exec {$escapedContainer} ";
+            $command = "docker exec {$escapedContainer} sh -c 'cd {$dir} && ";
             if (str_ends_with(strtolower($filePath), '.zip')) {
                 // unzip -q (quiet) -d sets the destination directory
-                $command .= "unzip -q -o {$escapedFilePath} -d {$dir}";
+                $command .= "unzip -q -o " . escapeshellarg(basename($filePath)) . " -d .";
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
                 // tar -C sets the destination directory
-                $command .= "tar -xzf {$escapedFilePath} -C {$dir}";
+                $command .= "tar -xzf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                $command .= "tar -xjf {$escapedFilePath} -C {$dir}";
+                $command .= "tar -xjf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                $command .= "tar -xJf {$escapedFilePath} -C {$dir}";
+                $command .= "tar -xJf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                $command .= "tar -xf {$escapedFilePath} -C {$dir}";
+                $command .= "tar -xf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
                 // gzip replaces the file in place by default, so we just run it
-                $command .= "gzip -d -k {$escapedFilePath}";
+                $command .= "gzip -d -k " . escapeshellarg(basename($filePath));
             }
+            $command .= "'";
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
