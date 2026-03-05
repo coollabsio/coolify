@@ -148,8 +148,16 @@ class FileExplorer extends Component
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
-            $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+            // Load service with server relationship to ensure it's loaded
+            $this->resource = Service::with('server')->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $serviceServer = $this->resource->server;
+            // If server ID is 0, try to get it from server_id attribute
+            if ($serviceServer && ($serviceServer->id === 0 || empty($serviceServer->id))) {
+                $serverId = $this->resource->server_id ?? null;
+                if ($serverId && $serverId > 0) {
+                    $serviceServer = \App\Models\Server::find($serverId);
+                }
+            }
             if ($serviceServer && $serviceServer->isFunctional()) {
                 $this->servers = $this->servers->push($serviceServer);
             }
@@ -1843,16 +1851,38 @@ class FileExplorer extends Component
                 $this->dispatch('console-log', 'Resource exists, trying to get server:\n'.json_encode($resourceInfo, JSON_PRETTY_PRINT));
 
                 if ($this->type === 'service') {
+                    // Reload server relationship to ensure it's loaded
+                    $this->resource->load('server');
+
                     $serviceInfo = [
                         'has_server' => isset($this->resource->server),
                         'server_id' => $this->resource->server->id ?? 'null',
+                        'server_id_from_attribute' => $this->resource->server_id ?? 'null',
+                        'server_loaded' => $this->resource->relationLoaded('server'),
                     ];
                     \Log::info('Type is service', $serviceInfo);
                     $this->dispatch('console-log', 'Type is service:\n'.json_encode($serviceInfo, JSON_PRETTY_PRINT));
-                    if (isset($this->resource->server)) {
+
+                    // Get server - prefer server_id attribute if relationship returns invalid server
+                    $serverId = $this->resource->server_id ?? null;
+                    if ($serverId && $serverId > 0) {
+                        $server = \App\Models\Server::find($serverId);
+                        if ($server) {
+                            \Log::info('Got server from server_id attribute', ['server_id' => $server->id]);
+                            $this->dispatch('console-log', '✓ Got server from server_id attribute: ID='.$server->id);
+                        } else {
+                            $this->dispatch('console-log', '✗ Server not found with ID: '.$serverId);
+                        }
+                    } elseif (isset($this->resource->server)) {
                         $server = $this->resource->server;
-                        \Log::info('Got server from service', ['server_id' => $server->id ?? 'null']);
-                        $this->dispatch('console-log', '✓ Got server from service: ID='.($server->id ?? 'null'));
+                        // If server ID is 0, it's invalid
+                        if (empty($server->id) || $server->id === 0) {
+                            $this->dispatch('console-log', '✗ Server from relationship has ID=0, which is invalid');
+                            $server = null;
+                        } else {
+                            \Log::info('Got server from service relationship', ['server_id' => $server->id ?? 'null']);
+                            $this->dispatch('console-log', '✓ Got server from service relationship: ID='.($server->id ?? 'null'));
+                        }
                     } else {
                         $this->dispatch('console-log', '✗ Service resource has no server property');
                     }
