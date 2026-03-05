@@ -23,8 +23,19 @@ class CanAccessTerminal
         
         // Check if user is admin/owner using isAdminFromSession which is more reliable
         // Also check isInstanceAdmin for root team access
-        if (! $user->isAdminFromSession() && ! $user->isInstanceAdmin()) {
-            abort(403, 'Access to terminal functionality is restricted to team administrators');
+        $isAdminFromSession = $user->isAdminFromSession();
+        $isInstanceAdmin = $user->isInstanceAdmin();
+        
+        // Debug logging (remove in production)
+        \Log::info('CanAccessTerminal middleware check', [
+            'user_id' => $user->id,
+            'isAdminFromSession' => $isAdminFromSession,
+            'isInstanceAdmin' => $isInstanceAdmin,
+            'route' => $request->route()->getName(),
+        ]);
+        
+        if (! $isAdminFromSession && ! $isInstanceAdmin) {
+            abort(403, 'Access to terminal functionality is restricted to team administrators. isAdminFromSession: '.($isAdminFromSession ? 'true' : 'false').', isInstanceAdmin: '.($isInstanceAdmin ? 'true' : 'false'));
         }
 
         return $next($request);

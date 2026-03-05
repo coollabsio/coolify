@@ -39,17 +39,47 @@ class AdminerController extends Controller
 
         // Download Adminer if not exists (store in public directory for easier access)
         $adminerPath = public_path('adminer.php');
-        if (! file_exists($adminerPath)) {
-            try {
-                $adminerContent = @file_get_contents('https://www.adminer.org/latest.php');
-                if ($adminerContent === false) {
-                    abort(500, 'Failed to download Adminer. Please check your internet connection.');
+        $adminerModifiedPath = public_path('adminer_modified.php');
+        
+        // Check if we need to download or modify Adminer
+        $needsModification = !file_exists($adminerModifiedPath) || 
+                            (file_exists($adminerPath) && filemtime($adminerPath) > filemtime($adminerModifiedPath));
+        
+        if ($needsModification) {
+            if (! file_exists($adminerPath)) {
+                try {
+                    $adminerContent = @file_get_contents('https://www.adminer.org/latest.php');
+                    if ($adminerContent === false) {
+                        abort(500, 'Failed to download Adminer. Please check your internet connection.');
+                    }
+                    file_put_contents($adminerPath, $adminerContent);
+                } catch (\Exception $e) {
+                    abort(500, 'Failed to download Adminer: '.$e->getMessage());
                 }
-                file_put_contents($adminerPath, $adminerContent);
-            } catch (\Exception $e) {
-                abort(500, 'Failed to download Adminer: '.$e->getMessage());
             }
+            
+            // Read Adminer and modify it to remove problematic headers
+            $adminerContent = file_get_contents($adminerPath);
+            
+            // Remove or comment out header() calls that set X-Frame-Options and CSP
+            // This is a bit hacky but necessary to allow iframe embedding
+            $adminerContent = preg_replace(
+                '/header\s*\(\s*["\']X-Frame-Options:\s*deny["\']\s*\)\s*;/i',
+                '// header("X-Frame-Options: deny"); // Removed to allow iframe embedding',
+                $adminerContent
+            );
+            $adminerContent = preg_replace(
+                '/header\s*\(\s*["\']Content-Security-Policy:[^"\']*frame-src[^"\']*none[^"\']*["\']\s*\)\s*;/i',
+                '// header("Content-Security-Policy: ..."); // Modified to allow iframe embedding',
+                $adminerContent
+            );
+            
+            // Save modified version
+            file_put_contents($adminerModifiedPath, $adminerContent);
         }
+        
+        // Use modified Adminer file
+        $adminerPath = $adminerModifiedPath;
 
         // Get database credentials from container
         $escapedContainer = escapeshellarg($container);
@@ -102,6 +132,13 @@ class AdminerController extends Controller
             chdir($oldCwd);
             
             $adminerContent = ob_get_clean();
+            
+            // Immediately remove headers that Adminer set before they're sent
+            // This must be done right after ob_get_clean() and before any output
+            @header_remove('X-Frame-Options');
+            @header_remove('Content-Security-Policy');
+            @header_remove('X-Content-Type-Options');
+            @header_remove('X-XSS-Protection');
             
             // If output is empty or looks like PHP code, something went wrong
             if (empty($adminerContent) || (strpos($adminerContent, '<?php') === 0 && strpos($adminerContent, '<!DOCTYPE') === false && strpos($adminerContent, '<html') === false)) {
