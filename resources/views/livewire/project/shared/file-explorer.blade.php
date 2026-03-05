@@ -579,7 +579,7 @@
             <div class="p-6">
                 <div class="flex flex-col gap-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Select a SQL file (.sql, .sql.gz, .sql.zip) from the current directory to import into the database.
+                        Select a SQL file (.sql) from the current directory to import into the database.
                     </p>
                     @php
                         try {
@@ -610,9 +610,9 @@
                                 @if (!$file['is_directory'])
                                     @php
                                         $fileName = strtolower($file['name']);
-                                        $isSQLFile = str_ends_with($fileName, '.sql') || 
-                                                    str_ends_with($fileName, '.sql.gz') || 
-                                                    str_ends_with($fileName, '.sql.zip');
+                                        $isSQLFile = str_ends_with($fileName, '.sql') && 
+                                                    !str_ends_with($fileName, '.sql.gz') && 
+                                                    !str_ends_with($fileName, '.sql.zip');
                                     @endphp
                                     @if ($isSQLFile)
                                         <option value="{{ $file['path'] }}">{{ $file['name'] }}</option>

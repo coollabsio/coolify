@@ -49,8 +49,9 @@ class StartService
 
         $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
         
-        // Setup WordPress automatically after service starts
-        SetupWordPress::dispatch($service)->delay(now()->addSeconds(10));
+        // Setup WordPress automatically after service starts (delay to ensure containers are up)
+        // This runs in background queue, so it won't block the HTTP response
+        SetupWordPress::dispatch($service)->delay(now()->addSeconds(30));
         
         return $activity;
     }

@@ -982,7 +982,10 @@ class FileExplorer extends Component
 
     public function executeExtraction()
     {
-        set_time_limit(0);
+        // Increase PHP execution time for long operations
+        set_time_limit(3600);
+        ini_set('max_execution_time', '3600');
+
         if (count($this->selectedFiles) !== 1) {
             $this->dispatch('error', 'Please select exactly one file to extract.');
             $this->showExtractDialog = false;
@@ -1045,79 +1048,20 @@ class FileExplorer extends Component
                 $command = "sudo {$command}";
             }
 
-            $output = trim(instant_remote_process([$command], $server, false) ?? '');
+            // Use remote_process for long operations to avoid nginx timeout
+            // This executes in background and shows progress in activity monitor
+            $activity = remote_process(
+                [$command],
+                $server,
+                type: ActivityTypes::COMMAND->value,
+                type_uuid: $this->selected_container,
+                callEventOnFinish: 'FileExtractionCompleted'
+            );
 
-            if (str_contains($output, 'TOOL_NOT_FOUND:')) {
-                preg_match('/TOOL_NOT_FOUND:(\w+)/', $output, $matches);
-                $tool = $matches[1] ?? 'required tool';
-
-                // HOST EXTRACTION FALLBACK
-                // Instead of failing or installing packages inside the container (which might be impossible/unsafe),
-                // we copy the file to the host machine, extract it there, and copy the contents back.
-                try {
-                    $tmpBase = '/tmp/coolify_extract_' . uniqid();
-                    $hostArchivePath = $tmpBase . '_archive';
-                    $hostExtractPath = $tmpBase . '_extracted';
-
-                    $containerArchivePath = $filePath;
-                    $containerDestPath = dirname($filePath) === '/' ? '/' : dirname($filePath) . '/';
-
-                    $fallbackCmds = [
-                        "mkdir -p " . escapeshellarg($hostExtractPath),
-                        "docker cp " . escapeshellarg($containerName . ':' . $containerArchivePath) . " " . escapeshellarg($hostArchivePath)
-                    ];
-
-                    if (str_ends_with(strtolower($filePath), '.zip')) {
-                        $fallbackCmds[] = "unzip -q -o " . escapeshellarg($hostArchivePath) . " -d " . escapeshellarg($hostExtractPath);
-                    } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
-                        $fallbackCmds[] = "tar -xzf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
-                    } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                        $fallbackCmds[] = "tar -xjf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
-                    } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                        $fallbackCmds[] = "tar -xJf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
-                    } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                        $fallbackCmds[] = "tar -xf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
-                    } elseif (str_ends_with(strtolower($filePath), '.gz')) {
-                        $extractedName = preg_replace('/\.gz$/i', '', basename($filePath));
-                        $fallbackCmds[] = "gzip -d -k -c " . escapeshellarg($hostArchivePath) . " > " . escapeshellarg($hostExtractPath . '/' . $extractedName);
-                    }
-
-                    $fallbackCmds[] = "docker cp " . escapeshellarg($hostExtractPath . '/.') . " " . escapeshellarg($containerName . ':' . $containerDestPath);
-                    $fallbackCmds[] = "rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
-
-                    $fallbackCommandShell = implode(' && ', $fallbackCmds);
-                    // Add a final cleanup just in case a command fails midway
-                    $fallbackCommandShell .= " ; rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
-
-                    $finalCmd = $server->isNonRoot()
-                        ? "sudo sh -c " . escapeshellarg($fallbackCommandShell)
-                        : "sh -c " . escapeshellarg($fallbackCommandShell);
-
-                    instant_remote_process([$finalCmd], $server);
-
-                    $this->dispatch('success', "File extracted successfully via Host Fallback (Container lacked {$tool}).");
-                    $this->selectedFiles = [];
-                    $this->showExtractDialog = false;
-                    $this->loadFiles();
-                    return;
-                } catch (\Throwable $fbE) {
-                    $this->dispatch('error', "Decompression failed natively and host fallback errored: " . $fbE->getMessage());
-                    $this->showExtractDialog = false;
-                    return;
-                }
-            }
-
-            if (!str_contains($output, 'EXTRACTION_SUCCESS')) {
-                $errorMsg = str_replace('EXTRACTION_SUCCESS', '', $output);
-                $this->dispatch('error', "Extraction failed. Error: " . substr(trim($errorMsg), 0, 200));
-                $this->showExtractDialog = false;
-                return;
-            }
-
-            $this->dispatch('success', 'File extraction completed successfully.');
+            $this->dispatch('success', 'File extraction started. Check the activity monitor for progress.');
             $this->selectedFiles = [];
             $this->showExtractDialog = false;
-            $this->loadFiles();
+            return;
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: ' . $e->getMessage());
             $this->showExtractDialog = false;
@@ -1435,9 +1379,12 @@ class FileExplorer extends Component
             $passwordVar = $isMariaDB ? 'MARIADB_ROOT_PASSWORD' : 'MYSQL_ROOT_PASSWORD';
             $databaseVar = $isMariaDB ? 'MARIADB_DATABASE' : 'MYSQL_DATABASE';
 
-            // Check if file is compressed
-            $isCompressed = str_ends_with(strtolower($this->importDatabaseFile), '.gz') ||
-                           str_ends_with(strtolower($this->importDatabaseFile), '.zip');
+            // Validate file extension - only .sql files allowed
+            if (! str_ends_with(strtolower($this->importDatabaseFile), '.sql')) {
+                $this->dispatch('error', 'Only .sql files are allowed for database import.');
+                $this->showImportDatabaseDialog = false;
+                return;
+            }
 
             // Build the import command using environment variables properly
             // Escape password and database name for shell
@@ -1453,14 +1400,8 @@ class FileExplorer extends Component
                 $commandParts[] = "export {$databaseVar}='{$escapedDatabaseName}'";
             }
 
-            // Build the pipe command
-            if ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.gz')) {
-                $commandParts[] = "gunzip -c {$escapedPath}";
-            } elseif ($isCompressed && str_ends_with(strtolower($this->importDatabaseFile), '.zip')) {
-                $commandParts[] = "unzip -p {$escapedPath}";
-            } else {
-                $commandParts[] = "cat {$escapedPath}";
-            }
+            // Build the pipe command - only .sql files, no compression
+            $commandParts[] = "cat {$escapedPath}";
 
             // Build mysql/mariadb command with password
             // Use --password= format instead of -p to avoid issues with variable expansion

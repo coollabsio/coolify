@@ -14,30 +14,57 @@ class SetupWordPress implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 3;
+
+    /**
+     * The number of seconds the job can run before timing out.
+     */
+    public $timeout = 600;
+
     public Service $service;
 
     public function __construct(Service $service)
     {
         $this->service = $service;
+        $this->onQueue('high');
     }
 
     public function handle(): void
     {
         // Refresh service to get latest data
         $this->service->refresh();
-        
-        // Wait a bit for containers to be fully started
-        sleep(5);
 
         $server = $this->service->server;
         $wordpressApplications = $this->detectWordPressApplications($this->service);
 
         if (empty($wordpressApplications)) {
+            \Log::info('SetupWordPress: No WordPress applications found', [
+                'service_id' => $this->service->id,
+                'service_uuid' => $this->service->uuid,
+            ]);
             return;
         }
 
+        \Log::info('SetupWordPress: Starting setup', [
+            'service_id' => $this->service->id,
+            'service_uuid' => $this->service->uuid,
+            'applications_count' => count($wordpressApplications),
+        ]);
+
         foreach ($wordpressApplications as $application) {
-            $this->setupWordPressContainer($application, $server, $this->service);
+            try {
+                $this->setupWordPressContainer($application, $server, $this->service);
+            } catch (\Throwable $e) {
+                \Log::error('SetupWordPress: Failed to setup container', [
+                    'application_id' => $application->id,
+                    'application_name' => $application->name,
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue with next application
+            }
         }
     }
 
@@ -99,26 +126,41 @@ class SetupWordPress implements ShouldQueue
 
     private function waitForContainerReady($server, string $containerName): void
     {
-        $maxAttempts = 30;
+        $maxAttempts = 60; // Increase attempts but reduce sleep time
         $attempt = 0;
         
         while ($attempt < $maxAttempts) {
-            $escapedContainer = escapeshellarg($containerName);
-            $command = "docker exec {$escapedContainer} sh -c 'test -d /var/www/html && echo ready || echo notready'";
-            if ($server->isNonRoot()) {
-                $command = "sudo {$command}";
+            try {
+                $escapedContainer = escapeshellarg($containerName);
+                $command = "docker exec {$escapedContainer} sh -c 'test -d /var/www/html && echo ready || echo notready' 2>&1";
+                if ($server->isNonRoot()) {
+                    $command = "sudo {$command}";
+                }
+                
+                $output = trim(instant_remote_process([$command], $server, false) ?? '');
+                if ($output === 'ready') {
+                    \Log::info('SetupWordPress: Container ready', ['container' => $containerName]);
+                    return;
+                }
+            } catch (\Throwable $e) {
+                // Container might not exist yet, continue waiting
+                \Log::debug('SetupWordPress: Container not ready yet', [
+                    'container' => $containerName,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
             }
             
-            $output = trim(instant_remote_process([$command], $server, false) ?? '');
-            if ($output === 'ready') {
-                return;
-            }
-            
-            sleep(2);
+            // Reduce sleep time to 1 second for faster response
+            sleep(1);
             $attempt++;
         }
         
-        throw new \RuntimeException("Container {$containerName} did not become ready in time");
+        \Log::warning('SetupWordPress: Container did not become ready in time', [
+            'container' => $containerName,
+            'max_attempts' => $maxAttempts,
+        ]);
+        // Don't throw exception, just log and continue - container might start later
     }
 
     private function installWpCli($server, string $containerName): void
