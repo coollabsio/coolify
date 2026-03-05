@@ -151,7 +151,7 @@ class Import extends Component
 
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
 
-    public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
+    public string $mariadbRestoreCommand = 'mariadb -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
 
     public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
 
@@ -236,7 +236,7 @@ mariadb -u root -p$MARIADB_ROOT_PASSWORD -e "CREATE DATABASE IF NOT EXISTS \`${M
 EOD;
                     $this->restoreCommandText = $this->mariadbRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | mariadb -u root -p$MARIADB_ROOT_PASSWORD ${MARIADB_DATABASE:-default}';
                 } else {
-                    $this->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
+                    $this->mariadbRestoreCommand = 'mariadb -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
                 }
                 break;
             case \App\Models\StandaloneMysql::class:
