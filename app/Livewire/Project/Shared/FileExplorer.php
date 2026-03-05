@@ -458,7 +458,7 @@ class FileExplorer extends Component
             $escapedPath = escapeshellarg($this->currentPath);
 
             // List files and directories with detailed info
-            $command = "docker exec {$escapedContainer} sh -c 'ls -lah {$escapedPath} 2>/dev/null | tail -n +2'";
+            $command = "docker exec {$escapedContainer} sh -c 'ls -la {$escapedPath} 2>/dev/null | tail -n +2'";
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
@@ -982,6 +982,7 @@ class FileExplorer extends Component
 
     public function executeExtraction()
     {
+        set_time_limit(0);
         if (count($this->selectedFiles) !== 1) {
             $this->dispatch('error', 'Please select exactly one file to extract.');
             $this->showExtractDialog = false;
@@ -1233,141 +1234,8 @@ class FileExplorer extends Component
 
     public function decompressFile(string $path)
     {
-        try {
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
-                $this->dispatch('error', 'Container not found.');
-
-                return;
-            }
-
-            $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
-            $escapedContainer = escapeshellarg($containerName);
-            $escapedPath = escapeshellarg($path);
-            $dirPath = dirname($path);
-            $escapedDir = escapeshellarg($dirPath);
-            $fileName = basename($path);
-            $escapedFileName = escapeshellarg($fileName);
-
-            // Detect archive format and decompress accordingly
-            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-            $baseExtension = strtolower(pathinfo($path, PATHINFO_FILENAME));
-            $fullExtension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-
-            // Handle multi-extension files like .tar.gz, .tar.bz2, .tar.xz
-            if (str_ends_with($baseExtension, '.tar')) {
-                $fullExtension = 'tar.'.str_replace('.tar', '', $baseExtension);
-            }
-
-            $command = "docker exec {$escapedContainer} sh -c 'cd {$escapedDir} && ";
-
-            // ZIP files
-            if ($extension === 'zip') {
-                $command .= 'if command -v unzip >/dev/null 2>&1; then ';
-                $command .= "unzip -o {$escapedPath}; ";
-                $command .= 'else echo "unzip not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TAR.GZ or TGZ files
-            elseif ($extension === 'gz' && str_ends_with($baseExtension, '.tar')) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
-                $command .= "tar -xzf {$escapedPath}; ";
-                $command .= 'else echo "tar/gzip not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TAR.BZ2 or TBZ2 files
-            elseif ($extension === 'bz2' && str_ends_with($baseExtension, '.tar')) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
-                $command .= "tar -xjf {$escapedPath}; ";
-                $command .= 'else echo "tar/bzip2 not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TAR.XZ or TXZ files
-            elseif ($extension === 'xz' && str_ends_with($baseExtension, '.tar')) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
-                $command .= "tar -xJf {$escapedPath}; ";
-                $command .= 'else echo "tar/xz not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // Plain TAR files
-            elseif ($extension === 'tar') {
-                $command .= 'if command -v tar >/dev/null 2>&1; then ';
-                $command .= "tar -xf {$escapedPath}; ";
-                $command .= 'else echo "tar not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // GZ files (gzip only, not tar)
-            elseif ($extension === 'gz') {
-                $command .= 'if command -v gunzip >/dev/null 2>&1; then ';
-                $command .= "gunzip -f {$escapedPath}; ";
-                $command .= 'elif command -v gzip >/dev/null 2>&1; then ';
-                $command .= "gzip -df {$escapedPath}; ";
-                $command .= 'else echo "gzip not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // BZ2 files (bzip2 only, not tar)
-            elseif ($extension === 'bz2') {
-                $command .= 'if command -v bunzip2 >/dev/null 2>&1; then ';
-                $command .= "bunzip2 -f {$escapedPath}; ";
-                $command .= 'elif command -v bzip2 >/dev/null 2>&1; then ';
-                $command .= "bzip2 -df {$escapedPath}; ";
-                $command .= 'else echo "bzip2 not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // XZ files (xz only, not tar)
-            elseif ($extension === 'xz') {
-                $command .= 'if command -v unxz >/dev/null 2>&1; then ';
-                $command .= "unxz -f {$escapedPath}; ";
-                $command .= 'elif command -v xz >/dev/null 2>&1; then ';
-                $command .= "xz -df {$escapedPath}; ";
-                $command .= 'else echo "xz not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TGZ files (alternative extension for tar.gz)
-            elseif ($extension === 'tgz') {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
-                $command .= "tar -xzf {$escapedPath}; ";
-                $command .= 'else echo "tar/gzip not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TBZ2 files (alternative extension for tar.bz2)
-            elseif (in_array($extension, ['tbz2', 'tbz'])) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
-                $command .= "tar -xjf {$escapedPath}; ";
-                $command .= 'else echo "tar/bzip2 not available" && exit 1; ';
-                $command .= 'fi';
-            }
-            // TXZ files (alternative extension for tar.xz)
-            elseif ($extension === 'txz') {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
-                $command .= "tar -xJf {$escapedPath}; ";
-                $command .= 'else echo "tar/xz not available" && exit 1; ';
-                $command .= 'fi';
-            } else {
-                $this->dispatch('error', 'Unsupported archive format. Supported: zip, tar, tar.gz, tar.bz2, tar.xz, gz, bz2, xz');
-
-                return;
-            }
-
-            $command .= "'";
-
-            if ($server->isNonRoot()) {
-                $command = "sudo {$command}";
-            }
-
-            $output = instant_remote_process([$command], $server, false);
-            if (str_contains($output ?? '', 'not available')) {
-                $this->dispatch('error', 'Required decompression tool not available in container.');
-
-                return;
-            }
-
-            $this->dispatch('success', 'File decompressed successfully.');
-            $this->loadFiles();
-        } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to decompress file: '.$e->getMessage());
-        }
+        $this->selectedFiles = [$path];
+        $this->extractSelectedFiles();
     }
 
     public function moveFile()

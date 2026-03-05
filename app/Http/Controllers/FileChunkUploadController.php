@@ -123,7 +123,8 @@ class FileChunkUploadController extends Controller
             $escapedContainer = escapeshellarg($containerName);
             $fullDestPath = rtrim($destinationPath, '/').'/'.basename($fileName);
             $escapedDest = escapeshellarg($fullDestPath);
-            $command = "docker cp {$serverTmpPath} {$escapedContainer}:{$escapedDest}";
+            $escapedServerTmp = escapeshellarg($serverTmpPath);
+            $command = "docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedDest}";
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
