@@ -510,6 +510,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             \Log::warning('Failed to mark configuration as changed for deployment '.$this->deployment_uuid.': '.$e->getMessage());
         }
 
+        // Intentionally skip preview deployments here; preview routing has separate lifecycle/hostnames.
         if ($this->pull_request_id === 0) {
             try {
                 $edgeRoutingWarnings = app(EdgeProxyRemoteRouteService::class)

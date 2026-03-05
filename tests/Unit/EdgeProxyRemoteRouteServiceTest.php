@@ -5,6 +5,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Services\EdgeProxyRemoteRouteService;
+use Illuminate\Config\Repository;
 use Illuminate\Container\Container;
 use Psr\Log\NullLogger;
 
@@ -40,6 +41,100 @@ it('generates edge traefik config for a remote domain route', function () {
         ->and(data_get($config, 'http.routers.edge-service-uuid-https-1.entryPoints'))->toBe(['https'])
         ->and(data_get($config, 'http.routers.edge-service-uuid-https-1.tls.certResolver'))->toBe('letsencrypt')
         ->and(data_get($config, 'http.services.edge-service-uuid-svc-1.loadBalancer.servers.0.url'))->toBe('http://10.8.0.15:9010');
+});
+
+it('uses configured traefik entrypoints and cert resolver for remote routes', function () {
+    $container = Container::getInstance();
+    $hadOriginalConfig = $container->bound('config');
+    $originalConfig = $hadOriginalConfig ? $container->make('config') : null;
+
+    $container->instance('config', new Repository([
+        'constants' => [
+            'coolify' => [
+                'proxy' => [
+                    'traefik' => [
+                        'entrypoints' => [
+                            'http' => 'web',
+                            'https' => 'websecure',
+                        ],
+                        'cert_resolver' => 'myresolver',
+                    ],
+                ],
+            ],
+        ],
+    ]));
+
+    try {
+        $service = new EdgeProxyRemoteRouteService;
+        $config = $service->generateTraefikConfig('service-uuid', [[
+            'host' => 'demo.example.com',
+            'path' => '/',
+            'upstream_url' => 'http://10.8.0.15:9010',
+        ]]);
+
+        expect(data_get($config, 'http.routers.edge-service-uuid-http-1.entryPoints'))->toBe(['web'])
+            ->and(data_get($config, 'http.routers.edge-service-uuid-https-1.entryPoints'))->toBe(['websecure'])
+            ->and(data_get($config, 'http.routers.edge-service-uuid-https-1.tls.certResolver'))->toBe('myresolver');
+    } finally {
+        if ($hadOriginalConfig && ! is_null($originalConfig)) {
+            $container->instance('config', $originalConfig);
+        } else {
+            unset($container['config']);
+        }
+    }
+});
+
+it('returns warning when syncing service route without a master domain router', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
+        {
+            return null;
+        }
+    };
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 10;
+
+    $service = new Service;
+    $service->uuid = 'service-no-master-router';
+    $service->setRelation('server', $deploymentServer);
+    $service->setRelation('environment', (object) [
+        'project' => (object) [
+            'team_id' => 42,
+        ],
+    ]);
+
+    $warnings = $manager->syncService($service);
+
+    expect($warnings)->toHaveCount(1)
+        ->and($warnings[0])->toContain('no master domain router is configured for team 42');
+});
+
+it('returns warning when syncing application route without a master domain router', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
+        {
+            return null;
+        }
+    };
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 11;
+
+    $application = new Application;
+    $application->uuid = 'application-no-master-router';
+    $application->setRelation('environment', (object) [
+        'project' => (object) [
+            'team_id' => 52,
+        ],
+    ]);
+
+    $warnings = $manager->syncApplicationOnDeploymentServer($application, $deploymentServer);
+
+    expect($warnings)->toHaveCount(1)
+        ->and($warnings[0])->toContain('no master domain router is configured for team 52');
 });
 
 it('creates, updates, and deletes a stable edge route file per service uuid', function () {
@@ -290,6 +385,65 @@ it('returns actionable warning and does not write route file when application pu
         ->and($warnings[0])->toContain('published host port could not be resolved')
         ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/application-remote-application-missing-port.yaml')
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
+});
+
+it('keeps valid application edge routes when one domain port cannot be resolved and returns warning only for invalid domain', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 33;
+    $deploymentServer->ip = '10.8.0.33';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-partial-routes';
+    $application->build_pack = 'dockercompose';
+    $application->docker_compose_domains = json_encode([
+        'web' => ['domain' => 'https://good-app.example.com:3000,https://bad-app.example.com:9999'],
+    ]);
+    $application->docker_compose_raw = <<<'YAML'
+services:
+  web:
+    ports:
+      - "9060:3000"
+      - "9070:4000"
+YAML;
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and($warnings[0])->toContain('published host port could not be resolved')
+        ->and($manager->calls)->toHaveCount(1);
+
+    $writeCommands = implode("\n", $manager->calls[0]['commands']);
+    expect($writeCommands)->toContain('/tmp/proxy/dynamic/application-remote-application-partial-routes.yaml')
+        ->and($writeCommands)->toContain('tee')
+        ->and($writeCommands)->not->toContain('rm -f');
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`good-app.example.com`)')
+        ->and($payload)->not->toContain('Host(`bad-app.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.33:9060');
 });
 
 it('does not generate edge route file when published port cannot be resolved and returns actionable warning', function () {

@@ -16,6 +16,15 @@ return [
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
         'releases_url' => 'https://cdn.coolify.io/releases.json',
+        'proxy' => [
+            'traefik' => [
+                'entrypoints' => [
+                    'http' => env('TRAEFIK_HTTP_ENTRYPOINT', 'http'),
+                    'https' => env('TRAEFIK_HTTPS_ENTRYPOINT', 'https'),
+                ],
+                'cert_resolver' => env('TRAEFIK_CERT_RESOLVER', 'letsencrypt'),
+            ],
+        ],
     ],
 
     'urls' => [

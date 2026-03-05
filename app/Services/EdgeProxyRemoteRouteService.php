@@ -22,14 +22,21 @@ class EdgeProxyRemoteRouteService
     public function syncService(Service $service): array
     {
         $teamId = $this->extractServiceTeamId($service);
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         $deploymentServer = $this->resolveDeploymentServer($service);
 
         if (! $deploymentServer instanceof Server) {
             return [];
         }
 
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         if (! $edgeProxyServer instanceof Server) {
+            $warning = $this->missingMasterDomainRouterWarning('service', $service->uuid, $teamId);
+            if (! is_null($warning)) {
+                $this->logWarning($warning);
+
+                return [$warning];
+            }
+
             return [];
         }
 
@@ -109,6 +116,20 @@ class EdgeProxyRemoteRouteService
                     continue;
                 }
 
+                if (
+                    $this->hasUnsafeTraefikRuleValue($url->getHost()) ||
+                    $this->hasUnsafeTraefikRuleValue($url->getPath())
+                ) {
+                    $warnings[] = sprintf(
+                        'Edge proxy route skipped for service %s (%s, domain %s): domain contains unsupported characters for Traefik host/path rules.',
+                        $service->uuid,
+                        $application->name,
+                        $domain
+                    );
+
+                    continue;
+                }
+
                 $requestedInternalPort = $url->getPort() ?? $application->getRequiredPort();
                 $publishedPort = $this->resolvePublishedPort($compose, $application->name, $requestedInternalPort, $environmentMap);
 
@@ -162,10 +183,21 @@ class EdgeProxyRemoteRouteService
     public function syncApplication(Application $application): array
     {
         $teamId = $this->extractApplicationTeamId($application);
-        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         $deploymentServer = $this->resolveApplicationDeploymentServer($application);
 
-        if (! $deploymentServer instanceof Server || ! $edgeProxyServer instanceof Server) {
+        if (! $deploymentServer instanceof Server) {
+            return [];
+        }
+
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
+        if (! $edgeProxyServer instanceof Server) {
+            $warning = $this->missingMasterDomainRouterWarning('application', $application->uuid, $teamId);
+            if (! is_null($warning)) {
+                $this->logWarning($warning);
+
+                return [$warning];
+            }
+
             return [];
         }
 
@@ -177,6 +209,13 @@ class EdgeProxyRemoteRouteService
         $teamId = $this->extractApplicationTeamId($application);
         $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         if (! $edgeProxyServer instanceof Server) {
+            $warning = $this->missingMasterDomainRouterWarning('application', $application->uuid, $teamId);
+            if (! is_null($warning)) {
+                $this->logWarning($warning);
+
+                return [$warning];
+            }
+
             return [];
         }
 
@@ -245,6 +284,19 @@ class EdgeProxyRemoteRouteService
             if (! $url instanceof Url) {
                 $warnings[] = sprintf(
                     'Edge proxy route skipped for application %s (domain %s): domain format is invalid. Use a valid hostname/domain with optional scheme, port and path.',
+                    $application->uuid,
+                    $domain
+                );
+
+                continue;
+            }
+
+            if (
+                $this->hasUnsafeTraefikRuleValue($url->getHost()) ||
+                $this->hasUnsafeTraefikRuleValue($url->getPath())
+            ) {
+                $warnings[] = sprintf(
+                    'Edge proxy route skipped for application %s (domain %s): domain contains unsupported characters for Traefik host/path rules.',
                     $application->uuid,
                     $domain
                 );
@@ -366,20 +418,23 @@ class EdgeProxyRemoteRouteService
             $httpsRouterName = "edge-{$serviceKey}-https-{$suffix}";
             $serviceName = "edge-{$serviceKey}-svc-{$suffix}";
             $rule = $this->buildTraefikRule($route['host'], $route['path']);
+            if (is_null($rule)) {
+                continue;
+            }
 
             $config['http']['routers'][$httpRouterName] = [
                 'rule' => $rule,
-                'entryPoints' => ['http'],
+                'entryPoints' => [$this->httpEntryPointName()],
                 'middlewares' => [$redirectMiddlewareName],
                 'service' => $serviceName,
             ];
 
             $config['http']['routers'][$httpsRouterName] = [
                 'rule' => $rule,
-                'entryPoints' => ['https'],
+                'entryPoints' => [$this->httpsEntryPointName()],
                 'service' => $serviceName,
                 'tls' => [
-                    'certResolver' => 'letsencrypt',
+                    'certResolver' => $this->certResolverName(),
                 ],
             ];
 
@@ -456,8 +511,12 @@ class EdgeProxyRemoteRouteService
         ], false);
     }
 
-    private function buildTraefikRule(string $host, ?string $path): string
+    private function buildTraefikRule(string $host, ?string $path): ?string
     {
+        if ($this->hasUnsafeTraefikRuleValue($host) || (! is_null($path) && $this->hasUnsafeTraefikRuleValue($path))) {
+            return null;
+        }
+
         $rule = sprintf('Host(`%s`)', $host);
 
         if (! is_null($path) && $path !== '' && $path !== '/') {
@@ -467,7 +526,7 @@ class EdgeProxyRemoteRouteService
         return $rule;
     }
 
-    private function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
+    protected function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
     {
         if (is_null($teamId)) {
             return null;
@@ -478,6 +537,20 @@ class EdgeProxyRemoteRouteService
             ->whereRelation('settings', 'is_master_domain_router_enabled', true)
             ->orderBy('id')
             ->first();
+    }
+
+    private function missingMasterDomainRouterWarning(string $resourceType, string $resourceUuid, ?int $teamId): ?string
+    {
+        if (is_null($teamId)) {
+            return null;
+        }
+
+        return sprintf(
+            'Edge proxy route skipped for %s %s: no master domain router is configured for team %d. Enable "Master Domain Router" on exactly one team server.',
+            $resourceType,
+            $resourceUuid,
+            $teamId
+        );
     }
 
     private function resolveDeploymentServer(Service $service): ?Server
@@ -1121,6 +1194,38 @@ class EdgeProxyRemoteRouteService
         }
 
         error_log($message);
+    }
+
+    private function httpEntryPointName(): string
+    {
+        return $this->configString('constants.coolify.proxy.traefik.entrypoints.http', 'http');
+    }
+
+    private function httpsEntryPointName(): string
+    {
+        return $this->configString('constants.coolify.proxy.traefik.entrypoints.https', 'https');
+    }
+
+    private function certResolverName(): string
+    {
+        return $this->configString('constants.coolify.proxy.traefik.cert_resolver', 'letsencrypt');
+    }
+
+    private function configString(string $key, string $default): string
+    {
+        $container = Container::getInstance();
+        if (! ($container instanceof Container) || ! $container->bound('config')) {
+            return $default;
+        }
+
+        $value = trim((string) $container->make('config')->get($key, $default));
+
+        return $value !== '' ? $value : $default;
+    }
+
+    private function hasUnsafeTraefikRuleValue(string $value): bool
+    {
+        return str_contains($value, '`') || preg_match('/[\r\n]/', $value) === 1;
     }
 
     private function normalizeRemoteHost(string $rawHost): ?string
