@@ -15,13 +15,14 @@
         </div>
         <div class="w-full">
             <div class="box-without-bg">
-                <h2 class="text-xl font-bold dark:text-white mb-4">WordPress Manager</h2>
+                <h2 class="text-xl font-bold dark:text-white mb-6">WordPress Manager</h2>
                 
                 @if (empty($wordpressContainers))
                     <div class="p-4 text-sm text-neutral-500">
                         No WordPress containers detected in this service.
                     </div>
                 @else
+                    <!-- Detected Containers Section -->
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-2">Detected WordPress Containers:</h3>
                         <ul class="list-disc list-inside space-y-1">
@@ -34,7 +35,8 @@
                         </ul>
                     </div>
 
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
+                    <!-- Sync URLs Section -->
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">Sincronizar URLs</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Reemplaza todas las URLs antiguas por las nuevas en la base de datos y regenera los archivos CSS de Elementor.
@@ -82,7 +84,8 @@
                         @endif
                     </div>
 
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mt-6">
+                    <!-- WordPress Table Prefix Section -->
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">WordPress Table Prefix</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Gestiona el prefijo de las tablas de WordPress. El prefijo se detecta automáticamente desde wp-config.php o desde las tablas de la base de datos.
@@ -122,13 +125,14 @@
                         @endforeach
                     </div>
 
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mt-6">
+                    <!-- PHP Configuration Section -->
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">Configuración PHP (php.ini)</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Gestiona la configuración de PHP para los contenedores WordPress. Los cambios pueden requerir reiniciar el contenedor para aplicarse completamente.
                         </p>
 
-                        <div class="mb-4">
+                        <div class="mb-6">
                             <label for="php_ini_container" class="block text-sm font-medium dark:text-white mb-2">Seleccionar Contenedor:</label>
                             <select id="php_ini_container" 
                                 wire:model.live="selectedContainerForPhpIni"
@@ -158,7 +162,7 @@
                                         <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando configuración...</span>
                                     </div>
                                 @else
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" 
+                                    <div class="space-y-4" 
                                         x-data="{ 
                                             settings: @js($phpIniSettings),
                                             updateSetting(setting, value) {
@@ -169,31 +173,31 @@
                                             }
                                         }">
                                         @foreach ($phpIniSettings as $setting => $value)
-                                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded">
+                                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
                                                 <label for="php_setting_{{ $setting }}" class="block text-sm font-medium dark:text-white mb-2">
                                                     {{ str_replace('_', ' ', ucwords($setting, '_')) }}
                                                 </label>
-                                                <div class="flex items-center gap-2">
+                                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                                                     <input type="text" 
                                                         id="php_setting_{{ $setting }}"
                                                         x-model="settings['{{ $setting }}']"
                                                         @keydown.enter="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="input flex-1"
+                                                        class="input flex-1 w-full sm:w-auto min-w-0"
                                                         placeholder="{{ $value }}">
                                                     <x-forms.button 
                                                         x-on:click="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="bg-coollabs whitespace-nowrap">
+                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto">
                                                         Actualizar
                                                     </x-forms.button>
                                                 </div>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
                                                     Valor actual: <span class="font-mono">{{ $value }}</span>
                                                 </p>
                                             </div>
                                         @endforeach
                                     </div>
 
-                                    <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                                    <div class="mt-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
                                         <p class="text-sm text-yellow-800 dark:text-yellow-200">
                                             <strong>Nota:</strong> Algunos cambios pueden requerir reiniciar el contenedor para aplicarse completamente. 
                                             Los valores de memoria y tamaño de archivo generalmente requieren reinicio.
