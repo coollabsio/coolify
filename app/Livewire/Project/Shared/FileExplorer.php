@@ -1820,126 +1820,158 @@ class FileExplorer extends Component
     public function generateAdminerUrl()
     {
         try {
-            \Log::info('=== generateAdminerUrl START ===', [
+            $startInfo = [
                 'selected_container' => $this->selected_container,
                 'type' => $this->type,
                 'resource_exists' => isset($this->resource),
                 'resource_class' => isset($this->resource) ? get_class($this->resource) : 'null',
                 'containers_count' => $this->containers->count(),
                 'parameters' => $this->parameters,
-            ]);
+            ];
+            \Log::info('=== generateAdminerUrl START ===', $startInfo);
+            $this->dispatch('console-log', '=== generateAdminerUrl START ===\n'.json_encode($startInfo, JSON_PRETTY_PRINT));
 
             // Get server directly from resource - this is the most reliable way
             $server = null;
             if (isset($this->resource)) {
-                \Log::info('Resource exists, trying to get server', [
+                $resourceInfo = [
                     'type' => $this->type,
                     'resource_id' => $this->resource->id ?? 'null',
                     'resource_uuid' => $this->resource->uuid ?? 'null',
-                ]);
+                ];
+                \Log::info('Resource exists, trying to get server', $resourceInfo);
+                $this->dispatch('console-log', 'Resource exists, trying to get server:\n'.json_encode($resourceInfo, JSON_PRETTY_PRINT));
 
                 if ($this->type === 'service') {
-                    \Log::info('Type is service', [
+                    $serviceInfo = [
                         'has_server' => isset($this->resource->server),
                         'server_id' => $this->resource->server->id ?? 'null',
-                    ]);
+                    ];
+                    \Log::info('Type is service', $serviceInfo);
+                    $this->dispatch('console-log', 'Type is service:\n'.json_encode($serviceInfo, JSON_PRETTY_PRINT));
                     if (isset($this->resource->server)) {
                         $server = $this->resource->server;
                         \Log::info('Got server from service', ['server_id' => $server->id ?? 'null']);
+                        $this->dispatch('console-log', '✓ Got server from service: ID='.($server->id ?? 'null'));
+                    } else {
+                        $this->dispatch('console-log', '✗ Service resource has no server property');
                     }
                 } elseif ($this->type === 'application') {
-                    \Log::info('Type is application', [
+                    $appInfo = [
                         'has_destination' => isset($this->resource->destination),
                         'destination_class' => isset($this->resource->destination) ? get_class($this->resource->destination) : 'null',
                         'has_server' => isset($this->resource->destination->server),
-                    ]);
+                    ];
+                    \Log::info('Type is application', $appInfo);
+                    $this->dispatch('console-log', 'Type is application:\n'.json_encode($appInfo, JSON_PRETTY_PRINT));
                     if (isset($this->resource->destination->server)) {
                         $server = $this->resource->destination->server;
                         \Log::info('Got server from application destination', ['server_id' => $server->id ?? 'null']);
+                        $this->dispatch('console-log', '✓ Got server from application destination: ID='.($server->id ?? 'null'));
+                    } else {
+                        $this->dispatch('console-log', '✗ Application destination has no server');
                     }
                 } elseif ($this->type === 'database') {
-                    \Log::info('Type is database', [
+                    $dbInfo = [
                         'has_destination' => isset($this->resource->destination),
                         'destination_class' => isset($this->resource->destination) ? get_class($this->resource->destination) : 'null',
                         'has_server' => isset($this->resource->destination->server),
-                    ]);
+                    ];
+                    \Log::info('Type is database', $dbInfo);
+                    $this->dispatch('console-log', 'Type is database:\n'.json_encode($dbInfo, JSON_PRETTY_PRINT));
                     if (isset($this->resource->destination->server)) {
                         $server = $this->resource->destination->server;
                         \Log::info('Got server from database destination', ['server_id' => $server->id ?? 'null']);
+                        $this->dispatch('console-log', '✓ Got server from database destination: ID='.($server->id ?? 'null'));
+                    } else {
+                        $this->dispatch('console-log', '✗ Database destination has no server');
                     }
                 }
             } else {
-                \Log::warning('Resource is not set!', [
+                $noResourceInfo = [
                     'type' => $this->type,
                     'parameters' => $this->parameters,
-                ]);
+                ];
+                \Log::warning('Resource is not set!', $noResourceInfo);
+                $this->dispatch('console-log', '⚠ Resource is not set!\n'.json_encode($noResourceInfo, JSON_PRETTY_PRINT));
             }
 
             // Fallback: try to get from container if resource doesn't have it
             if (is_null($server)) {
-                \Log::info('Server is null, trying fallback from containers', [
+                $fallbackInfo = [
                     'containers_count' => $this->containers->count(),
                     'selected_container' => $this->selected_container,
-                ]);
+                ];
+                \Log::info('Server is null, trying fallback from containers', $fallbackInfo);
+                $this->dispatch('console-log', 'Server is null, trying fallback from containers:\n'.json_encode($fallbackInfo, JSON_PRETTY_PRINT));
                 $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
                 if ($container) {
-                    \Log::info('Found container in collection', [
+                    $containerInfo = [
                         'container_name' => data_get($container, 'container.Names'),
                         'has_server' => isset($container['server']),
-                    ]);
+                    ];
+                    \Log::info('Found container in collection', $containerInfo);
+                    $this->dispatch('console-log', 'Found container in collection:\n'.json_encode($containerInfo, JSON_PRETTY_PRINT));
                     $server = data_get($container, 'server');
                     if ($server) {
-                        \Log::info('Got server from container', [
+                        $serverInfo = [
                             'server_id' => $server->id ?? 'null',
                             'server_class' => get_class($server),
-                        ]);
+                        ];
+                        \Log::info('Got server from container', $serverInfo);
+                        $this->dispatch('console-log', '✓ Got server from container:\n'.json_encode($serverInfo, JSON_PRETTY_PRINT));
+                    } else {
+                        $this->dispatch('console-log', '✗ Container found but has no server');
                     }
                 } else {
-                    \Log::warning('Container not found in collection', [
+                    $notFoundInfo = [
                         'selected_container' => $this->selected_container,
                         'available_containers' => $this->containers->map(fn($c) => data_get($c, 'container.Names'))->toArray(),
-                    ]);
+                    ];
+                    \Log::warning('Container not found in collection', $notFoundInfo);
+                    $this->dispatch('console-log', '✗ Container not found in collection:\n'.json_encode($notFoundInfo, JSON_PRETTY_PRINT));
                 }
             }
 
             // Validate server
-            \Log::info('Validating server', [
+            $debugInfo = [
                 'server_is_null' => is_null($server),
                 'server_is_instance' => $server instanceof \App\Models\Server,
                 'server_id' => $server ? ($server->id ?? 'null') : 'null',
                 'server_class' => $server ? get_class($server) : 'null',
-            ]);
+                'type' => $this->type,
+                'resource_exists' => isset($this->resource),
+                'containers_count' => $this->containers->count(),
+                'selected_container' => $this->selected_container,
+            ];
+
+            \Log::info('Validating server', $debugInfo);
+            $this->dispatch('console-log', json_encode($debugInfo, JSON_PRETTY_PRINT));
 
             if (is_null($server)) {
-                \Log::error('Server is NULL after all attempts', [
-                    'type' => $this->type,
-                    'resource_exists' => isset($this->resource),
-                    'containers_count' => $this->containers->count(),
-                    'selected_container' => $this->selected_container,
-                ]);
+                $errorDetails = "Type: {$this->type}, Resource exists: ".(isset($this->resource) ? 'yes' : 'no').", Containers: {$this->containers->count()}, Selected: {$this->selected_container}";
+                \Log::error('Server is NULL after all attempts', $debugInfo);
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server not found. Check logs for details.');
+                $this->dispatch('error', 'Invalid server configuration. Server not found. Details: '.$errorDetails);
+                $this->dispatch('console-log', 'ERROR: Server is NULL - '.json_encode($debugInfo, JSON_PRETTY_PRINT));
                 return;
             }
 
             if (! ($server instanceof \App\Models\Server)) {
-                \Log::error('Server is not Server instance', [
-                    'server_type' => gettype($server),
-                    'server_class' => is_object($server) ? get_class($server) : 'not object',
-                    'server_value' => is_object($server) ? json_encode($server->toArray() ?? []) : (string)$server,
-                ]);
+                $errorDetails = "Server type: ".gettype($server).", Class: ".(is_object($server) ? get_class($server) : 'not object');
+                \Log::error('Server is not Server instance', $debugInfo);
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server type is incorrect. Check logs for details.');
+                $this->dispatch('error', 'Invalid server configuration. Server type is incorrect. Details: '.$errorDetails);
+                $this->dispatch('console-log', 'ERROR: Server is not Server instance - '.json_encode($debugInfo, JSON_PRETTY_PRINT));
                 return;
             }
 
             if (empty($server->id) || $server->id === 0) {
-                \Log::error('Server ID is invalid', [
-                    'server_id' => $server->id ?? 'null',
-                    'server_exists' => $server->exists ?? 'null',
-                ]);
+                $errorDetails = "Server ID: ".($server->id ?? 'null').", Exists: ".($server->exists ?? 'null');
+                \Log::error('Server ID is invalid', $debugInfo);
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid. Check logs for details.');
+                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid. Details: '.$errorDetails);
+                $this->dispatch('console-log', 'ERROR: Server ID is invalid - '.json_encode($debugInfo, JSON_PRETTY_PRINT));
                 return;
             }
 

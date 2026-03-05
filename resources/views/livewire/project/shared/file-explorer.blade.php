@@ -1032,3 +1032,11 @@
         </div>
     </div>
 </div>
+
+@script
+<script>
+    Livewire.on('console-log', (data) => {
+        console.log('[FileExplorer Debug]', data);
+    });
+</script>
+@endscript
