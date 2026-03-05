@@ -1819,28 +1819,10 @@ class FileExplorer extends Component
 
     public function generateAdminerUrl()
     {
-        \Log::info('generateAdminerUrl called', ['selected_container' => $this->selected_container]);
         try {
-            // Reload containers to ensure we have the latest data
-            $this->loadContainers();
-
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
-                \Log::warning('Container not found in containers collection', [
-                    'selected_container' => $this->selected_container,
-                    'containers_count' => $this->containers->count(),
-                    'containers' => $this->containers->map(fn($c) => data_get($c, 'container.Names'))->toArray(),
-                ]);
-                $this->adminerUrl = null;
-                $this->dispatch('error', 'Container not found. Please select a container first.');
-                return;
-            }
-
-            $server = data_get($container, 'server');
-            $containerName = ltrim(data_get($container, 'container.Names'), '/');
-
-            // If server is not in container data, try to get it from the service/resource
-            if (is_null($server) && isset($this->resource)) {
+            // Get server directly from resource - this is the most reliable way
+            $server = null;
+            if (isset($this->resource)) {
                 if ($this->type === 'service' && isset($this->resource->server)) {
                     $server = $this->resource->server;
                 } elseif ($this->type === 'application' && isset($this->resource->destination->server)) {
@@ -1850,31 +1832,22 @@ class FileExplorer extends Component
                 }
             }
 
-            // Validate server exists
+            // Fallback: try to get from container if resource doesn't have it
             if (is_null($server)) {
-                \Log::warning('Server is null in container data', [
-                    'container' => $containerName,
-                    'containers_count' => $this->containers->count(),
-                    'selected_container' => $this->selected_container,
-                    'type' => $this->type,
-                    'resource_exists' => isset($this->resource),
-                ]);
+                $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+                if ($container) {
+                    $server = data_get($container, 'server');
+                }
+            }
+
+            // Validate server
+            if (is_null($server) || ! ($server instanceof \App\Models\Server) || empty($server->id) || $server->id === 0) {
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server not found for this container.');
+                $this->dispatch('error', 'Invalid server configuration. Server not found.');
                 return;
             }
 
-            // Validate server is a valid Server instance
-            if (! ($server instanceof \App\Models\Server)) {
-                \Log::warning('Server is not Server instance', [
-                    'container' => $containerName,
-                    'server_type' => gettype($server),
-                    'server_class' => is_object($server) ? get_class($server) : 'not object',
-                ]);
-                $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server type is incorrect.');
-                return;
-            }
+            $containerName = ltrim($this->selected_container, '/');
 
             // Determine route name based on type
             $routeName = match ($this->type) {
@@ -1920,16 +1893,7 @@ class FileExplorer extends Component
             };
 
             if (! $hasRequiredUuid) {
-                \Log::warning('Missing type-specific UUID for Adminer URL', ['routeParams' => $routeParams, 'type' => $this->type]);
                 $this->adminerUrl = null;
-                return;
-            }
-
-            // Ensure server ID is valid
-            if (empty($server->id) || $server->id === 0) {
-                \Log::warning('Invalid server ID for Adminer URL', ['server' => $server, 'container' => $containerName, 'server_id' => $server->id ?? 'null']);
-                $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid.');
                 return;
             }
 
