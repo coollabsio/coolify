@@ -423,13 +423,24 @@ class WordPressManager extends Component
             $containerName = $container['container_name'];
             $escapedContainer = escapeshellarg($containerName);
 
-            // Get PHP configuration using php -i
-            $phpInfoCommand = "docker exec {$escapedContainer} php -i 2>/dev/null";
+            // Get PHP configuration - try PHP-FPM first, then CLI
+            $phpInfo = '';
+            $fpmInfoCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm >/dev/null 2>&1 && php-fpm -i 2>/dev/null || echo notfound'";
             if ($server->isNonRoot()) {
-                $phpInfoCommand = "sudo {$phpInfoCommand}";
+                $fpmInfoCommand = "sudo {$fpmInfoCommand}";
             }
-
-            $phpInfo = instant_remote_process([$phpInfoCommand], $server, false) ?? '';
+            $fpmInfo = instant_remote_process([$fpmInfoCommand], $server, false) ?? '';
+            
+            if (!empty($fpmInfo) && $fpmInfo !== 'notfound') {
+                $phpInfo = $fpmInfo;
+            } else {
+                // Fallback to CLI
+                $phpInfoCommand = "docker exec {$escapedContainer} php -i 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $phpInfoCommand = "sudo {$phpInfoCommand}";
+                }
+                $phpInfo = instant_remote_process([$phpInfoCommand], $server, false) ?? '';
+            }
 
             // Extract common PHP settings
             $settings = [];
@@ -444,29 +455,40 @@ class WordPressManager extends Component
             ];
 
             foreach ($settingsToExtract as $setting) {
-                // Try using php -r to get specific ini value (more reliable)
-                $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
-                if ($server->isNonRoot()) {
-                    $getIniCommand = "sudo {$getIniCommand}";
-                }
-                $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
+                // Try multiple methods to get the value
+                $iniValue = null;
                 
-                if (! empty($iniValue)) {
-                    $settings[$setting] = $iniValue;
-                } else {
-                    // Fallback to php -i parsing
+                // Method 1: Try PHP-FPM directly if available
+                $fpmCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $fpmCommand = "sudo {$fpmCommand}";
+                }
+                $fpmValue = trim(instant_remote_process([$fpmCommand], $server, false) ?? '');
+                if (!empty($fpmValue) && $fpmValue !== 'notfound') {
+                    $iniValue = $fpmValue;
+                }
+                
+                // Method 2: Try php -r (CLI, but more reliable)
+                if (empty($iniValue)) {
+                    $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+                    if ($server->isNonRoot()) {
+                        $getIniCommand = "sudo {$getIniCommand}";
+                    }
+                    $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
+                }
+                
+                // Method 3: Parse from php -i output
+                if (empty($iniValue)) {
                     $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
                     if (preg_match($pattern, $phpInfo, $matches)) {
                         $value = trim($matches[1]);
-                        // Extract only the value part (remove "=> value" if present)
                         $value = preg_replace('/.*?=>\s*/', '', $value);
-                        // Remove any trailing spaces or special characters
                         $value = preg_replace('/\s*\(.*?\)\s*$/', '', $value);
-                        $settings[$setting] = trim($value);
-                    } else {
-                        $settings[$setting] = 'N/A';
+                        $iniValue = trim($value);
                     }
                 }
+                
+                $settings[$setting] = ! empty($iniValue) ? $iniValue : 'N/A';
             }
 
             $this->phpIniSettings = $settings;
@@ -640,6 +662,13 @@ class WordPressManager extends Component
             // PRIORITY: conf.d files override php.ini, so we ALWAYS update conf.d first
             // This ensures the setting takes effect even if php.ini has conflicting values
             
+            // Debug: Show what PHP is actually using
+            $debugIniCommand = "docker exec {$escapedContainer} php -r \"echo 'Loaded: ' . php_ini_loaded_file() . PHP_EOL; echo 'Scanned: ' . php_ini_scanned_files() . PHP_EOL;\" 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $debugIniCommand = "sudo {$debugIniCommand}";
+            }
+            $debugInfo = instant_remote_process([$debugIniCommand], $server, false) ?? '';
+            
             // Update conf.d file (highest priority - always do this)
             $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
             $escapedConfIni = escapeshellarg($confIniFile);
@@ -649,7 +678,58 @@ class WordPressManager extends Component
             if ($server->isNonRoot()) {
                 $writeConfCommand = "sudo {$writeConfCommand}";
             }
-            instant_remote_process([$writeConfCommand], $server, false);
+            $writeResult = instant_remote_process([$writeConfCommand], $server, false);
+            
+            // Verify conf.d file was written correctly
+            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $verifyConfCommand = "sudo {$verifyConfCommand}";
+            }
+            $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
+            
+            if (empty($verifyConfContent) || !str_contains($verifyConfContent, "{$setting} = {$value}")) {
+                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. Please check container permissions. Debug: ".substr($debugInfo, 0, 200));
+                return;
+            }
+            
+            // Also ensure file permissions are correct
+            $chmodCommand = "docker exec {$escapedContainer} chmod 644 {$escapedConfIni}";
+            if ($server->isNonRoot()) {
+                $chmodCommand = "sudo {$chmodCommand}";
+            }
+            instant_remote_process([$chmodCommand], $server, false);
+            
+            // Remove duplicate settings from other conf.d files (our file should have priority due to 99- prefix)
+            // But let's also check and comment out any conflicting settings in other files
+            $listConfFilesCommand = "docker exec {$escapedContainer} find {$confDirPath} -name '*.ini' -type f ! -name '99-custom-{$setting}.ini' 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $listConfFilesCommand = "sudo {$listConfFilesCommand}";
+            }
+            $otherConfFiles = explode("\n", trim(instant_remote_process([$listConfFilesCommand], $server, false) ?? ''));
+            
+            foreach ($otherConfFiles as $otherFile) {
+                $otherFile = trim($otherFile);
+                if (empty($otherFile) || !str_starts_with($otherFile, '/')) {
+                    continue;
+                }
+                
+                // Check if this file has our setting
+                $checkSettingCommand = "docker exec {$escapedContainer} grep -q '^{$setting}\s*=' ".escapeshellarg($otherFile)." 2>/dev/null && echo found || echo notfound";
+                if ($server->isNonRoot()) {
+                    $checkSettingCommand = "sudo {$checkSettingCommand}";
+                }
+                $hasSetting = trim(instant_remote_process([$checkSettingCommand], $server, false) ?? '');
+                
+                if ($hasSetting === 'found') {
+                    // Comment out the setting in this file (our 99- file will override it)
+                    $escapedOtherFile = escapeshellarg($otherFile);
+                    $commentCommand = "docker exec {$escapedContainer} sed -i 's/^\([;]*\s*\){$escapedSetting}\s*=.*/; \\1{$escapedSetting} = (overridden by 99-custom-{$setting}.ini)/' {$escapedOtherFile}";
+                    if ($server->isNonRoot()) {
+                        $commentCommand = "sudo {$commentCommand}";
+                    }
+                    instant_remote_process([$commentCommand], $server, false);
+                }
+            }
 
             // Also update php.ini file (for completeness, but conf.d takes precedence)
             $escapedPhpIniPath = escapeshellarg($phpIniPath);
@@ -711,24 +791,50 @@ class WordPressManager extends Component
                 instant_remote_process([$reloadCommand], $server, false);
             }
             
-            // Verify the change was applied
-            $verifyCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
-            if ($server->isNonRoot()) {
-                $verifyCommand = "sudo {$verifyCommand}";
-            }
-            $verifiedValue = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
+            // Verify the change was applied - try multiple methods
+            $verifiedValue = null;
             
-            if (!empty($verifiedValue) && $verifiedValue !== $value) {
-                $this->dispatch('warning', "Setting updated in php.ini but may require container restart. Current value: {$verifiedValue}, Expected: {$value}");
+            // Method 1: Try PHP-FPM directly
+            $verifyFpmCommand = "docker exec {$escapedContainer} sh -c 'php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
+            if ($server->isNonRoot()) {
+                $verifyFpmCommand = "sudo {$verifyFpmCommand}";
             }
-
-            // Reload settings
+            $fpmValue = trim(instant_remote_process([$verifyFpmCommand], $server, false) ?? '');
+            if (!empty($fpmValue) && $fpmValue !== 'notfound') {
+                $verifiedValue = $fpmValue;
+            }
+            
+            // Method 2: Try CLI php
+            if (empty($verifiedValue)) {
+                $verifyCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $verifyCommand = "sudo {$verifyCommand}";
+                }
+                $verifiedValue = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
+            }
+            
+            // Method 3: Check conf.d file content directly
+            $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | awk -F'=' '{print \$2}' | xargs";
+            if ($server->isNonRoot()) {
+                $checkConfCommand = "sudo {$checkConfCommand}";
+            }
+            $confFileValue = trim(instant_remote_process([$checkConfCommand], $server, false) ?? '');
+            
+            // Reload settings to update UI
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
-
+            
+            // Show appropriate message with debug info
+            $debugMsg = "File written to: {$confIniFile}. ";
+            if (!empty($debugInfo)) {
+                $debugMsg .= "PHP config: ".substr($debugInfo, 0, 100).". ";
+            }
+            
             if (!empty($verifiedValue) && $verifiedValue === $value) {
-                $this->dispatch('success', "PHP setting {$setting} updated to {$value} and applied successfully.");
+                $this->dispatch('success', "PHP setting {$setting} updated to {$value} and verified successfully. {$debugMsg}");
+            } elseif (!empty($confFileValue) && $confFileValue === $value) {
+                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in conf.d file ({$confIniFile}). PHP currently reports: {$verifiedValue}. Please restart the container completely for changes to take effect. {$debugMsg}");
             } else {
-                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in php.ini. Please restart the container for changes to take full effect.");
+                $this->dispatch('warning', "Setting written to file ({$confIniFile}), value in file: {$confFileValue}, but PHP reports: {$verifiedValue}. Expected: {$value}. Please restart the container. {$debugMsg}");
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error updating PHP setting: '.$e->getMessage());
