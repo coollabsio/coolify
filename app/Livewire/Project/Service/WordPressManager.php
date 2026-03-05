@@ -526,102 +526,93 @@ class WordPressManager extends Component
             $escapedSetting = escapeshellarg($setting);
             $escapedValue = escapeshellarg($value);
 
-            // Find php.ini location - multiple methods
-            $phpIniPath = null;
+            // Detect PHP SAPI (CLI vs FPM)
+            $sapiCommand = "docker exec {$escapedContainer} php -r \"echo php_sapi_name();\" 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $sapiCommand = "sudo {$sapiCommand}";
+            }
+            $sapi = strtolower(trim(instant_remote_process([$sapiCommand], $server, false) ?? 'cli'));
+            
+            // Get PHP version
+            $phpVersionCommand = "docker exec {$escapedContainer} php -r \"echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;\" 2>/dev/null";
+            if ($server->isNonRoot()) {
+                $phpVersionCommand = "sudo {$phpVersionCommand}";
+            }
+            $phpVersion = trim(instant_remote_process([$phpVersionCommand], $server, false) ?? '8.2');
 
-            // Method 1: Get from php -i
-            $findPhpIniCommand = "docker exec {$escapedContainer} php -i 2>/dev/null | grep -E 'Loaded Configuration File|php.ini' | head -1 | awk -F'=> ' '{print \$2}' | awk '{print \$1}'";
+            // Find php.ini location - prioritize FPM if available
+            $phpIniPaths = [];
+
+            // Priority order: FPM conf.d > FPM php.ini > CLI conf.d > CLI php.ini > common locations
+            $priorityPaths = [
+                // PHP-FPM conf.d (highest priority - these override php.ini)
+                "/usr/local/etc/php/conf.d/99-custom-{$setting}.ini",
+                "/etc/php/{$phpVersion}/fpm/conf.d/99-custom-{$setting}.ini",
+                "/etc/php/{$phpVersion}/fpm/conf.d/zzz-custom-{$setting}.ini",
+                // PHP-FPM php.ini
+                "/usr/local/etc/php/php.ini",
+                "/etc/php/{$phpVersion}/fpm/php.ini",
+                // CLI conf.d
+                "/etc/php/{$phpVersion}/cli/conf.d/99-custom-{$setting}.ini",
+                // CLI php.ini
+                "/etc/php/{$phpVersion}/cli/php.ini",
+                // Common locations
+                "/etc/php/php.ini",
+                "/etc/php.ini",
+            ];
+
+            // First, try to get from php -i (what PHP actually uses)
+            $findPhpIniCommand = "docker exec {$escapedContainer} php -i 2>/dev/null | grep 'Loaded Configuration File' | awk -F'=> ' '{print \$2}' | awk '{print \$1}'";
             if ($server->isNonRoot()) {
                 $findPhpIniCommand = "sudo {$findPhpIniCommand}";
             }
-            $phpIniPath = trim(instant_remote_process([$findPhpIniCommand], $server, false) ?? '');
+            $detectedIni = trim(instant_remote_process([$findPhpIniCommand], $server, false) ?? '');
+            
+            if (!empty($detectedIni) && $detectedIni !== '(none)' && str_starts_with($detectedIni, '/')) {
+                $priorityPaths = array_merge([$detectedIni], $priorityPaths);
+            }
 
-            // Method 2: Try php -r to get ini file path
-            if (empty($phpIniPath) || $phpIniPath === '(none)' || $phpIniPath === 'no value') {
-                $getIniPathCommand = "docker exec {$escapedContainer} php -r \"echo php_ini_loaded_file() ?: php_ini_scanned_files();\" 2>/dev/null";
+            // Find existing conf.d directories (these have priority over php.ini)
+            $confDirs = [
+                "/usr/local/etc/php/conf.d",
+                "/etc/php/{$phpVersion}/fpm/conf.d",
+                "/etc/php/{$phpVersion}/cli/conf.d",
+                "/etc/php/conf.d",
+            ];
+
+            $phpIniPath = null;
+            $confDirPath = null;
+
+            // First, check if conf.d exists and use it (highest priority)
+            foreach ($confDirs as $confDir) {
+                $checkDirCommand = "docker exec {$escapedContainer} test -d ".escapeshellarg($confDir)." && echo found || echo notfound";
                 if ($server->isNonRoot()) {
-                    $getIniPathCommand = "sudo {$getIniPathCommand}";
+                    $checkDirCommand = "sudo {$checkDirCommand}";
                 }
-                $phpIniPath = trim(instant_remote_process([$getIniPathCommand], $server, false) ?? '');
-                // If scanned files, get first one
-                if (!empty($phpIniPath) && str_contains($phpIniPath, ',')) {
-                    $phpIniPath = trim(explode(',', $phpIniPath)[0]);
-                }
-            }
-
-            // Method 3: Search common locations
-            if (empty($phpIniPath) || $phpIniPath === '(none)' || $phpIniPath === 'no value' || !str_starts_with($phpIniPath, '/')) {
-                $commonPaths = [
-                    '/usr/local/etc/php/php.ini',
-                    '/usr/local/etc/php/php.ini-development',
-                    '/usr/local/etc/php/php.ini-production',
-                    '/etc/php/8.3/fpm/php.ini',
-                    '/etc/php/8.3/cli/php.ini',
-                    '/etc/php/8.2/fpm/php.ini',
-                    '/etc/php/8.2/cli/php.ini',
-                    '/etc/php/8.1/fpm/php.ini',
-                    '/etc/php/8.1/cli/php.ini',
-                    '/etc/php/8.0/fpm/php.ini',
-                    '/etc/php/8.0/cli/php.ini',
-                    '/etc/php/7.4/fpm/php.ini',
-                    '/etc/php/7.4/cli/php.ini',
-                    '/etc/php7/php.ini',
-                    '/etc/php/php.ini',
-                    '/etc/php.ini',
-                    '/opt/bitnami/php/etc/php.ini',
-                    '/usr/local/lib/php.ini',
-                ];
-
-                foreach ($commonPaths as $path) {
-                    $testCommand = "docker exec {$escapedContainer} test -f ".escapeshellarg($path)." && echo found || echo notfound";
-                    if ($server->isNonRoot()) {
-                        $testCommand = "sudo {$testCommand}";
-                    }
-                    $testResult = trim(instant_remote_process([$testCommand], $server, false) ?? '');
-                    if ($testResult === 'found') {
-                        $phpIniPath = $path;
-                        break;
-                    }
-                }
-            }
-
-            // Method 4: Find any php.ini file in common directories
-            if (empty($phpIniPath) || $phpIniPath === '(none)' || $phpIniPath === 'no value' || !str_starts_with($phpIniPath, '/')) {
-                $searchDirs = [
-                    '/usr/local/etc/php',
-                    '/etc/php',
-                    '/etc',
-                ];
-
-                foreach ($searchDirs as $dir) {
-                    $findCommand = "docker exec {$escapedContainer} find {$dir} -name 'php.ini' -type f 2>/dev/null | head -1";
-                    if ($server->isNonRoot()) {
-                        $findCommand = "sudo {$findCommand}";
-                    }
-                    $foundPath = trim(instant_remote_process([$findCommand], $server, false) ?? '');
-                    if (!empty($foundPath) && str_starts_with($foundPath, '/')) {
-                        $phpIniPath = $foundPath;
-                        break;
-                    }
-                }
-            }
-
-            // Method 5: If still not found, use the default location and create it if needed
-            if (empty($phpIniPath) || $phpIniPath === '(none)' || $phpIniPath === 'no value' || !str_starts_with($phpIniPath, '/')) {
-                // Try to determine PHP version and use appropriate path
-                $phpVersionCommand = "docker exec {$escapedContainer} php -r \"echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;\" 2>/dev/null";
-                if ($server->isNonRoot()) {
-                    $phpVersionCommand = "sudo {$phpVersionCommand}";
-                }
-                $phpVersion = trim(instant_remote_process([$phpVersionCommand], $server, false) ?? '');
+                $dirExists = trim(instant_remote_process([$checkDirCommand], $server, false) ?? '');
                 
-                if (!empty($phpVersion)) {
-                    $phpIniPath = "/usr/local/etc/php/php.ini";
-                } else {
-                    $phpIniPath = "/usr/local/etc/php/php.ini";
+                if ($dirExists === 'found') {
+                    $confDirPath = $confDir;
+                    break;
                 }
+            }
 
-                // Check if directory exists, create if not
+            // Then find php.ini file
+            foreach ($priorityPaths as $path) {
+                $testCommand = "docker exec {$escapedContainer} test -f ".escapeshellarg($path)." && echo found || echo notfound";
+                if ($server->isNonRoot()) {
+                    $testCommand = "sudo {$testCommand}";
+                }
+                $testResult = trim(instant_remote_process([$testCommand], $server, false) ?? '');
+                if ($testResult === 'found') {
+                    $phpIniPath = $path;
+                    break;
+                }
+            }
+
+            // If no php.ini found, use default and create it
+            if ($phpIniPath === null) {
+                $phpIniPath = "/usr/local/etc/php/php.ini";
                 $dirPath = dirname($phpIniPath);
                 $checkDirCommand = "docker exec {$escapedContainer} test -d ".escapeshellarg($dirPath)." || docker exec {$escapedContainer} mkdir -p ".escapeshellarg($dirPath);
                 if ($server->isNonRoot()) {
@@ -629,7 +620,6 @@ class WordPressManager extends Component
                 }
                 instant_remote_process([$checkDirCommand], $server, false);
 
-                // Create php.ini if it doesn't exist
                 $checkFileCommand = "docker exec {$escapedContainer} test -f ".escapeshellarg($phpIniPath)." || docker exec {$escapedContainer} sh -c 'echo \"; PHP Configuration File\" > ".escapeshellarg($phpIniPath)."'";
                 if ($server->isNonRoot()) {
                     $checkFileCommand = "sudo {$checkFileCommand}";
@@ -637,7 +627,31 @@ class WordPressManager extends Component
                 instant_remote_process([$checkFileCommand], $server, false);
             }
 
-            // Update the setting in php.ini - read, modify, write approach
+            // Ensure conf.d exists if we're going to use it
+            if ($confDirPath === null) {
+                $confDirPath = "/usr/local/etc/php/conf.d";
+                $checkDirCommand = "docker exec {$escapedContainer} test -d ".escapeshellarg($confDirPath)." || docker exec {$escapedContainer} mkdir -p ".escapeshellarg($confDirPath);
+                if ($server->isNonRoot()) {
+                    $checkDirCommand = "sudo {$checkDirCommand}";
+                }
+                instant_remote_process([$checkDirCommand], $server, false);
+            }
+
+            // PRIORITY: conf.d files override php.ini, so we ALWAYS update conf.d first
+            // This ensures the setting takes effect even if php.ini has conflicting values
+            
+            // Update conf.d file (highest priority - always do this)
+            $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
+            $escapedConfIni = escapeshellarg($confIniFile);
+            $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
+            $escapedConfContent = escapeshellarg($confContent);
+            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedConfContent} > {$escapedConfIni}'";
+            if ($server->isNonRoot()) {
+                $writeConfCommand = "sudo {$writeConfCommand}";
+            }
+            instant_remote_process([$writeConfCommand], $server, false);
+
+            // Also update php.ini file (for completeness, but conf.d takes precedence)
             $escapedPhpIniPath = escapeshellarg($phpIniPath);
             
             // Read current php.ini content
@@ -679,36 +693,6 @@ class WordPressManager extends Component
                 $writeCommand = "sudo {$writeCommand}";
             }
             instant_remote_process([$writeCommand], $server, false);
-
-            // Also check and update conf.d directory if it exists (for PHP-FPM)
-            $confDirs = [
-                dirname($phpIniPath).'/conf.d',
-                '/usr/local/etc/php/conf.d',
-                '/etc/php/'.(explode('/', $phpIniPath)[3] ?? '8.2').'/fpm/conf.d',
-                '/etc/php/'.(explode('/', $phpIniPath)[3] ?? '8.2').'/cli/conf.d',
-            ];
-            
-            foreach ($confDirs as $confDir) {
-                $checkDirCommand = "docker exec {$escapedContainer} test -d ".escapeshellarg($confDir)." && echo found || echo notfound";
-                if ($server->isNonRoot()) {
-                    $checkDirCommand = "sudo {$checkDirCommand}";
-                }
-                $dirExists = trim(instant_remote_process([$checkDirCommand], $server, false) ?? '');
-                
-                if ($dirExists === 'found') {
-                    // Create or update a custom ini file in conf.d
-                    $customIniFile = $confDir.'/99-custom-'.$setting.'.ini';
-                    $escapedCustomIni = escapeshellarg($customIniFile);
-                    $customContent = "; Custom {$setting} setting\n{$setting} = {$value}\n";
-                    $escapedCustomContent = escapeshellarg($customContent);
-                    $writeCustomCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedCustomContent} > {$escapedCustomIni}'";
-                    if ($server->isNonRoot()) {
-                        $writeCustomCommand = "sudo {$writeCustomCommand}";
-                    }
-                    instant_remote_process([$writeCustomCommand], $server, false);
-                    break; // Only update one conf.d directory
-                }
-            }
 
             // Reload PHP-FPM more aggressively
             $reloadCommands = [
