@@ -19,8 +19,11 @@ class CanAccessTerminal
             abort(401, 'Authentication required');
         }
 
-        // Only admins/owners can access terminal functionality
-        if (! auth()->user()->can('canAccessTerminal')) {
+        $user = auth()->user();
+        
+        // Check if user is admin/owner using isAdminFromSession which is more reliable
+        // Also check isInstanceAdmin for root team access
+        if (! $user->isAdminFromSession() && ! $user->isInstanceAdmin()) {
             abort(403, 'Access to terminal functionality is restricted to team administrators');
         }
 

@@ -149,10 +149,18 @@ class AdminerController extends Controller
         }
 
         // Return response with proper headers to allow iframe embedding
-        return response($adminerContent)
-            ->header('Content-Type', 'text/html; charset=utf-8')
-            ->header('X-Frame-Options', 'SAMEORIGIN') // Allow same-origin iframes
-            ->header('X-Content-Type-Options', 'nosniff')
-            ->header('Referrer-Policy', 'strict-origin-when-cross-origin');
+        // We need to remove any existing X-Frame-Options header and set it to SAMEORIGIN
+        $response = response($adminerContent)
+            ->header('Content-Type', 'text/html; charset=utf-8');
+        
+        // Remove any existing X-Frame-Options header and set to SAMEORIGIN
+        $response->headers->remove('X-Frame-Options');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN', false); // false = replace existing
+        
+        // Set other security headers
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        
+        return $response;
     }
 }
