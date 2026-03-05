@@ -1019,21 +1019,24 @@ class FileExplorer extends Component
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
             $innerCommand = "cd " . escapeshellarg(dirname($filePath)) . " && ";
+            $fileNameEscaped = escapeshellarg(basename($filePath));
+
             if (str_ends_with(strtolower($filePath), '.zip')) {
-                // unzip -q (quiet) -d sets the destination directory
-                $innerCommand .= "unzip -q -o " . escapeshellarg(basename($filePath)) . " -d .";
+                $innerCommand .= "if command -v unzip >/dev/null 2>&1; then unzip -q -o {$fileNameEscaped} -d . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:unzip'; fi";
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
-                // tar -C sets the destination directory
-                $innerCommand .= "tar -xzf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xzf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                $innerCommand .= "tar -xjf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xjf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                $innerCommand .= "tar -xJf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xJf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                $innerCommand .= "tar -xf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
-                // gzip replaces the file in place by default, so we just run it
-                $innerCommand .= "gzip -d -k " . escapeshellarg(basename($filePath));
+                $innerCommand .= "if command -v gzip >/dev/null 2>&1; then gzip -d -k {$fileNameEscaped} 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:gzip'; fi";
+            } else {
+                $this->dispatch('error', 'Unsupported archive format.');
+                $this->showExtractDialog = false;
+                return;
             }
             
             $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
@@ -1042,13 +1045,76 @@ class FileExplorer extends Component
                 $command = "sudo {$command}";
             }
 
-            $output = instant_remote_process([$command], $server, false);
-            $msg = 'File extraction completed.';
-            if (!empty(trim($output ?? ''))) {
-                $msg .= ' Output: ' . substr(trim($output), 0, 150);
+            $output = trim(instant_remote_process([$command], $server, false) ?? '');
+
+            if (str_contains($output, 'TOOL_NOT_FOUND:')) {
+                preg_match('/TOOL_NOT_FOUND:(\w+)/', $output, $matches);
+                $tool = $matches[1] ?? 'required tool';
+                
+                // HOST EXTRACTION FALLBACK
+                // Instead of failing or installing packages inside the container (which might be impossible/unsafe),
+                // we copy the file to the host machine, extract it there, and copy the contents back.
+                try {
+                    $tmpBase = '/tmp/coolify_extract_' . uniqid();
+                    $hostArchivePath = $tmpBase . '_archive';
+                    $hostExtractPath = $tmpBase . '_extracted';
+                    
+                    $containerArchivePath = $filePath;
+                    $containerDestPath = dirname($filePath) === '/' ? '/' : dirname($filePath) . '/';
+                    
+                    $fallbackCmds = [
+                        "mkdir -p " . escapeshellarg($hostExtractPath),
+                        "docker cp " . escapeshellarg($containerName . ':' . $containerArchivePath) . " " . escapeshellarg($hostArchivePath)
+                    ];
+                    
+                    if (str_ends_with(strtolower($filePath), '.zip')) {
+                        $fallbackCmds[] = "unzip -q -o " . escapeshellarg($hostArchivePath) . " -d " . escapeshellarg($hostExtractPath);
+                    } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
+                        $fallbackCmds[] = "tar -xzf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
+                    } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
+                        $fallbackCmds[] = "tar -xjf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
+                    } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
+                        $fallbackCmds[] = "tar -xJf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
+                    } elseif (str_ends_with(strtolower($filePath), '.tar')) {
+                        $fallbackCmds[] = "tar -xf " . escapeshellarg($hostArchivePath) . " -C " . escapeshellarg($hostExtractPath);
+                    } elseif (str_ends_with(strtolower($filePath), '.gz')) {
+                        $extractedName = preg_replace('/\.gz$/i', '', basename($filePath));
+                        $fallbackCmds[] = "gzip -d -k -c " . escapeshellarg($hostArchivePath) . " > " . escapeshellarg($hostExtractPath . '/' . $extractedName);
+                    }
+                    
+                    $fallbackCmds[] = "docker cp " . escapeshellarg($hostExtractPath . '/.') . " " . escapeshellarg($containerName . ':' . $containerDestPath);
+                    $fallbackCmds[] = "rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
+                    
+                    $fallbackCommandShell = implode(' && ', $fallbackCmds);
+                    // Add a final cleanup just in case a command fails midway
+                    $fallbackCommandShell .= " ; rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
+                    
+                    $finalCmd = $server->isNonRoot() 
+                        ? "sudo sh -c " . escapeshellarg($fallbackCommandShell)
+                        : "sh -c " . escapeshellarg($fallbackCommandShell);
+                        
+                    instant_remote_process([$finalCmd], $server);
+                    
+                    $this->dispatch('success', "File extracted successfully via Host Fallback (Container lacked {$tool}).");
+                    $this->selectedFiles = [];
+                    $this->showExtractDialog = false;
+                    $this->loadFiles();
+                    return;
+                } catch (\Throwable $fbE) {
+                    $this->dispatch('error', "Decompression failed natively and host fallback errored: " . $fbE->getMessage());
+                    $this->showExtractDialog = false;
+                    return;
+                }
             }
 
-            $this->dispatch('success', $msg);
+            if (!str_contains($output, 'EXTRACTION_SUCCESS')) {
+                $errorMsg = str_replace('EXTRACTION_SUCCESS', '', $output);
+                $this->dispatch('error', "Extraction failed. Error: " . substr(trim($errorMsg), 0, 200));
+                $this->showExtractDialog = false;
+                return;
+            }
+
+            $this->dispatch('success', 'File extraction completed successfully.');
             $this->selectedFiles = [];
             $this->showExtractDialog = false;
             $this->loadFiles();
@@ -1724,7 +1790,7 @@ class FileExplorer extends Component
             }
 
             $server = data_get($container, 'server');
-            $containerName = data_get($container, 'container.Names');
+            $containerName = ltrim(data_get($container, 'container.Names'), '/');
 
             if (is_null($server)) {
                 $this->adminerUrl = null;
