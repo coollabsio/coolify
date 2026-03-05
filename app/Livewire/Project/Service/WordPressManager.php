@@ -716,11 +716,17 @@ class WordPressManager extends Component
                 // Save the file to the persistent storage on server
                 $fileVolume->saveStorageOnServer();
                 
+                // CRITICAL: Regenerate docker-compose to include the new volume
+                // This ensures the volume is mounted when the container restarts
+                $this->service->parse();
+                $this->service->saveComposeConfigs();
+                
                 // Also write directly to container for immediate effect
                 $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
                 
-                // The file is now persisted in the volume and will be mounted when container restarts
-                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. Changes applied immediately. File will persist after container restart.");
+                // The file is now persisted in the volume and docker-compose has been updated
+                // The volume will be mounted when the service is restarted via docker compose
+                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. Docker-compose has been regenerated with the new volume. Changes applied immediately to running container. IMPORTANT: You must restart the SERVICE (not just the container) from the service page for the volume to be mounted permanently. A simple container restart won't mount new volumes.");
                 
             } catch (\Throwable $e) {
                 $this->dispatch('error', "Failed to save PHP config to persistent volume: ".$e->getMessage().". Trying direct container write...");
