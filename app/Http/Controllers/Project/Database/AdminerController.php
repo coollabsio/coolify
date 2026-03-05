@@ -40,11 +40,25 @@ class AdminerController extends Controller
         // Download Adminer if not exists (store in public directory for easier access)
         $adminerPath = public_path('adminer.php');
         $adminerModifiedPath = public_path('adminer_modified.php');
-        
+
+        // Delete corrupted modified file if it exists (will be regenerated)
+        if (file_exists($adminerModifiedPath)) {
+            // Try to validate PHP syntax by checking if file starts with <?php
+            $testContent = @file_get_contents($adminerModifiedPath);
+            if ($testContent === false || strpos($testContent, '<?php') !== 0) {
+                // File is corrupted or invalid, delete it
+                @unlink($adminerModifiedPath);
+            } else {
+                // Check if original is newer than modified
+                if (file_exists($adminerPath) && filemtime($adminerPath) > filemtime($adminerModifiedPath)) {
+                    @unlink($adminerModifiedPath);
+                }
+            }
+        }
+
         // Check if we need to download or modify Adminer
-        $needsModification = !file_exists($adminerModifiedPath) || 
-                            (file_exists($adminerPath) && filemtime($adminerPath) > filemtime($adminerModifiedPath));
-        
+        $needsModification = !file_exists($adminerModifiedPath);
+
         if ($needsModification) {
             if (! file_exists($adminerPath)) {
                 try {
@@ -57,27 +71,47 @@ class AdminerController extends Controller
                     abort(500, 'Failed to download Adminer: '.$e->getMessage());
                 }
             }
-            
+
             // Read Adminer and modify it to remove problematic headers
             $adminerContent = file_get_contents($adminerPath);
-            
-            // Remove or comment out header() calls that set X-Frame-Options and CSP
-            // This is a bit hacky but necessary to allow iframe embedding
-            $adminerContent = preg_replace(
-                '/header\s*\(\s*["\']X-Frame-Options:\s*deny["\']\s*\)\s*;/i',
-                '// header("X-Frame-Options: deny"); // Removed to allow iframe embedding',
-                $adminerContent
-            );
-            $adminerContent = preg_replace(
-                '/header\s*\(\s*["\']Content-Security-Policy:[^"\']*frame-src[^"\']*none[^"\']*["\']\s*\)\s*;/i',
-                '// header("Content-Security-Policy: ..."); // Modified to allow iframe embedding',
-                $adminerContent
-            );
-            
+
+            // Process line by line to safely comment out problematic header() calls
+            // This is safer than regex replacements that might break PHP syntax
+            $lines = explode("\n", $adminerContent);
+            $modifiedLines = [];
+
+            foreach ($lines as $line) {
+                $originalLine = $line;
+                $trimmedLine = trim($line);
+
+                // Check if this line contains X-Frame-Options: deny header call
+                if (preg_match('/header\s*\(/i', $trimmedLine) &&
+                    preg_match('/X-Frame-Options/i', $trimmedLine) &&
+                    preg_match('/deny/i', $trimmedLine)) {
+                    // Comment out the entire line
+                    $modifiedLines[] = '// ' . $originalLine . ' // Removed to allow iframe embedding';
+                    continue;
+                }
+
+                // Check if this line contains CSP header with frame-src 'none'
+                if (preg_match('/header\s*\(/i', $trimmedLine) &&
+                    preg_match('/Content-Security-Policy/i', $trimmedLine) &&
+                    preg_match('/frame-src[\'"]*\s*none/i', $trimmedLine)) {
+                    // Comment out the entire line
+                    $modifiedLines[] = '// ' . $originalLine . ' // Modified to allow iframe embedding';
+                    continue;
+                }
+
+                // Keep the line as-is
+                $modifiedLines[] = $originalLine;
+            }
+
+            $adminerContent = implode("\n", $modifiedLines);
+
             // Save modified version
             file_put_contents($adminerModifiedPath, $adminerContent);
         }
-        
+
         // Use modified Adminer file
         $adminerPath = $adminerModifiedPath;
 
@@ -102,11 +136,11 @@ class AdminerController extends Controller
         // This prevents Adminer from blocking iframe embedding
         header('X-Frame-Options: SAMEORIGIN', true); // true = replace existing
         header('Content-Security-Policy: script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; connect-src \'self\' https://www.adminer.org; frame-src \'self\'; object-src \'none\'; base-uri \'self\'; form-action \'self\'', true);
-        
+
         // Execute Adminer and capture output
         ob_start();
         ob_implicit_flush(0);
-        
+
         try {
             // Set up Adminer environment variables for auto-login via URL parameters
             // Adminer will read these from $_GET
@@ -127,24 +161,24 @@ class AdminerController extends Controller
             $oldErrorReporting = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
             include basename($adminerPath);
             error_reporting($oldErrorReporting);
-            
+
             // Restore directory
             chdir($oldCwd);
-            
+
             $adminerContent = ob_get_clean();
-            
+
             // Immediately remove headers that Adminer set before they're sent
             // This must be done right after ob_get_clean() and before any output
             @header_remove('X-Frame-Options');
             @header_remove('Content-Security-Policy');
             @header_remove('X-Content-Type-Options');
             @header_remove('X-XSS-Protection');
-            
+
             // If output is empty or looks like PHP code, something went wrong
             if (empty($adminerContent) || (strpos($adminerContent, '<?php') === 0 && strpos($adminerContent, '<!DOCTYPE') === false && strpos($adminerContent, '<html') === false)) {
                 throw new \Exception('Adminer did not output valid HTML');
             }
-            
+
             // Remove problematic meta tags from Adminer's HTML that block iframes
             // Remove CSP meta tags that have frame-src 'none'
             $adminerContent = preg_replace('/<meta[^>]*http-equiv=["\']Content-Security-Policy["\'][^>]*>/i', '', $adminerContent);
@@ -175,7 +209,7 @@ class AdminerController extends Controller
                 var passwordInput = document.querySelector('input[name=\"auth[password]\"]') || document.querySelector('input[name=\"password\"]');
                 var driverSelect = document.querySelector('select[name=\"auth[driver]\"]') || document.querySelector('select[name=\"driver\"]');
                 var form = document.querySelector('form');
-                
+
                 if (serverInput && usernameInput && passwordInput && form) {
                     serverInput.value = 'localhost';
                     usernameInput.value = 'root';
@@ -201,24 +235,24 @@ class AdminerController extends Controller
         // Adminer sets its own headers, so we need to override them completely
         $response = response($adminerContent)
             ->header('Content-Type', 'text/html; charset=utf-8');
-        
+
         // Remove ALL headers that Adminer may have set
         $response->headers->remove('X-Frame-Options');
         $response->headers->remove('Content-Security-Policy');
         $response->headers->remove('X-Content-Type-Options');
         $response->headers->remove('X-XSS-Protection');
-        
+
         // Set our own headers that allow iframe embedding
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN', false);
-        
+
         // Modify CSP to allow frames from same origin
         $csp = "script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://www.adminer.org; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
         $response->headers->set('Content-Security-Policy', $csp, false);
-        
+
         // Set other security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        
+
         return $response;
     }
 }
