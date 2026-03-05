@@ -457,8 +457,8 @@ class FileExplorer extends Component
             $escapedContainer = escapeshellarg($containerName);
             $escapedPath = escapeshellarg($this->currentPath);
 
-            // List files and directories with detailed info (using -la to get exact bytes instead of -lah to prevent 1B parsing errors on large files)
-            $command = "docker exec {$escapedContainer} sh -c 'ls -la {$escapedPath} 2>/dev/null | tail -n +2'";
+            // List files and directories with detailed info
+            $command = "docker exec {$escapedContainer} sh -c 'ls -lah {$escapedPath} 2>/dev/null | tail -n +2'";
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
@@ -1020,31 +1020,35 @@ class FileExplorer extends Component
             $escapedFilePath = escapeshellarg($filePath);
             $dir = escapeshellarg(dirname($filePath));
 
-            $command = "docker exec {$escapedContainer} sh -c '";
+            $command = "docker exec {$escapedContainer} ";
             if (str_ends_with(strtolower($filePath), '.zip')) {
-                // unzip -d sets the destination directory
-                $command .= "unzip -o {$escapedFilePath} -d {$dir}'";
+                // unzip -q (quiet) -d sets the destination directory
+                $command .= "unzip -q -o {$escapedFilePath} -d {$dir}";
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
                 // tar -C sets the destination directory
-                $command .= "tar -xzf {$escapedFilePath} -C {$dir}'";
+                $command .= "tar -xzf {$escapedFilePath} -C {$dir}";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                $command .= "tar -xjf {$escapedFilePath} -C {$dir}'";
+                $command .= "tar -xjf {$escapedFilePath} -C {$dir}";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                $command .= "tar -xJf {$escapedFilePath} -C {$dir}'";
+                $command .= "tar -xJf {$escapedFilePath} -C {$dir}";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                $command .= "tar -xf {$escapedFilePath} -C {$dir}'";
+                $command .= "tar -xf {$escapedFilePath} -C {$dir}";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
                 // gzip replaces the file in place by default, so we just run it
-                $command .= "gzip -d -k {$escapedFilePath}'";
+                $command .= "gzip -d -k {$escapedFilePath}";
             }
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
             }
 
-            instant_remote_process([$command], $server);
+            $output = instant_remote_process([$command], $server, false);
+            $msg = 'File extraction completed.';
+            if (!empty(trim($output ?? ''))) {
+                $msg .= ' Output: ' . substr(trim($output), 0, 150);
+            }
 
-            $this->dispatch('success', 'File extracted successfully.');
+            $this->dispatch('success', $msg);
             $this->selectedFiles = [];
             $this->showExtractDialog = false;
             $this->loadFiles();
