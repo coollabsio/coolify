@@ -204,41 +204,26 @@ class FileExplorer extends Component
                     ]);
                 }
             } elseif (data_get($this->parameters, 'service_uuid')) {
-                // Validate server before processing containers
-                if ($server && $server instanceof \App\Models\Server && ! empty($server->id) && $server->id !== 0) {
-                    // Load ALL applications - don't filter by status, show all containers
-                    $applications = $this->resource->applications()->get();
-                    foreach ($applications as $application) {
-                        $containerName = data_get($application, 'name').'-'.data_get($this->resource, 'uuid');
+                $this->resource->applications()->get()->each(function ($application) use ($server) {
+                    if ($application->isRunning() && $server->isTerminalEnabled()) {
                         $this->containers->push([
                             'server' => $server,
                             'container' => [
-                                'Names' => $containerName,
+                                'Names' => data_get($application, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
                         ]);
                     }
-                    
-                    // Load ALL databases - don't filter by status, show all containers
-                    $databases = $this->resource->databases()->get();
-                    foreach ($databases as $database) {
-                        $containerName = data_get($database, 'name').'-'.data_get($this->resource, 'uuid');
+                });
+                $this->resource->databases()->get()->each(function ($database) use ($server) {
+                    if ($database->isRunning() && $server->isTerminalEnabled()) {
                         $this->containers->push([
                             'server' => $server,
                             'container' => [
-                                'Names' => $containerName,
+                                'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
                         ]);
                     }
-                } else {
-                    \Log::warning('Invalid server for service containers', [
-                        'service_id' => $this->resource->id ?? 'null',
-                        'service_uuid' => $this->resource->uuid ?? 'null',
-                        'server' => $server ? 'exists but invalid' : 'null',
-                        'server_id' => $server ? ($server->id ?? 'null') : 'null',
-                        'server_type' => $server ? get_class($server) : 'null',
-                        'servers_count' => $this->servers->count(),
-                    ]);
-                }
+                });
             }
         }
 
