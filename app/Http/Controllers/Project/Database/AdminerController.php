@@ -13,14 +13,25 @@ class AdminerController extends Controller
         $container = $request->query('container');
         $serverId = $request->query('server_id');
 
-        if (! $container || ! $serverId || $serverId === '0' || $serverId === 0) {
-            abort(404, 'Container or server not specified. Container: '.($container ?? 'null').', Server ID: '.($serverId ?? 'null'));
+        // Validate container is provided
+        if (! $container) {
+            abort(404, 'Container not specified.');
         }
 
+        // Validate server_id is provided (0 is valid for Coolify host)
+        if ($serverId === null || $serverId === '') {
+            abort(404, 'Server ID not specified.');
+        }
+
+        // Convert to integer for comparison
+        $serverId = (int) $serverId;
+
         try {
-            $server = Server::findOrFail($serverId);
-            if (! $server || ! $server->exists) {
-                abort(404, 'Server not found or invalid.');
+            // Server ID 0 is valid (Coolify host), so we use find() instead of findOrFail()
+            // and check if it exists
+            $server = Server::find($serverId);
+            if (! $server) {
+                abort(404, 'Server not found with ID: '.$serverId);
             }
         } catch (\Exception $e) {
             abort(404, 'Server not found: '.$e->getMessage());
