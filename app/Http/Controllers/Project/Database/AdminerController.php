@@ -13,12 +13,15 @@ class AdminerController extends Controller
         $container = $request->query('container');
         $serverId = $request->query('server_id');
 
-        if (! $container || ! $serverId) {
+        if (! $container || ! $serverId || $serverId === '0' || $serverId === 0) {
             abort(404, 'Container or server not specified. Container: '.($container ?? 'null').', Server ID: '.($serverId ?? 'null'));
         }
 
         try {
             $server = Server::findOrFail($serverId);
+            if (! $server || ! $server->exists) {
+                abort(404, 'Server not found or invalid.');
+            }
         } catch (\Exception $e) {
             abort(404, 'Server not found: '.$e->getMessage());
         }

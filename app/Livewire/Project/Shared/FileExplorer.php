@@ -202,20 +202,20 @@ class FileExplorer extends Component
                     ]);
                 }
             } elseif (data_get($this->parameters, 'service_uuid')) {
-                $this->resource->applications()->get()->each(function ($application) {
-                    if ($application->isRunning() && $this->resource->server->isTerminalEnabled()) {
+                $this->resource->applications()->get()->each(function ($application) use ($server) {
+                    if ($application->isRunning() && $server->isTerminalEnabled()) {
                         $this->containers->push([
-                            'server' => $this->resource->server,
+                            'server' => $server,
                             'container' => [
                                 'Names' => data_get($application, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
                         ]);
                     }
                 });
-                $this->resource->databases()->get()->each(function ($database) {
-                    if ($database->isRunning()) {
+                $this->resource->databases()->get()->each(function ($database) use ($server) {
+                    if ($database->isRunning() && $server->isTerminalEnabled()) {
                         $this->containers->push([
-                            'server' => $this->resource->server,
+                            'server' => $server,
                             'container' => [
                                 'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
@@ -1881,6 +1881,14 @@ class FileExplorer extends Component
             if (! $hasRequiredUuid) {
                 \Log::warning('Missing type-specific UUID for Adminer URL', ['routeParams' => $routeParams, 'type' => $this->type]);
                 $this->adminerUrl = null;
+                return;
+            }
+
+            // Ensure server ID is valid
+            if (empty($server->id) || $server->id === 0) {
+                \Log::warning('Invalid server ID for Adminer URL', ['server' => $server, 'container' => $containerName, 'server_id' => $server->id ?? 'null']);
+                $this->adminerUrl = null;
+                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid.');
                 return;
             }
 
