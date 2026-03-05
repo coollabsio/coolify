@@ -175,25 +175,26 @@
                                         }">
                                         @foreach ($phpIniSettings as $setting => $value)
                                             <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
-                                                <label for="php_setting_{{ $setting }}" class="block text-sm font-medium dark:text-white mb-2">
+                                                <label for="php_setting_{{ $setting }}" class="block text-sm font-medium dark:text-white mb-3">
                                                     {{ str_replace('_', ' ', ucwords($setting, '_')) }}
                                                 </label>
-                                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                                <div class="flex flex-col gap-3">
                                                     <input type="text" 
                                                         id="php_setting_{{ $setting }}"
                                                         value="{{ $value }}"
                                                         x-model="settings['{{ $setting }}']"
                                                         @keydown.enter="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="input flex-1 w-full min-w-0 bg-white dark:bg-coolgray-900 text-gray-900 dark:text-white border border-coolgray-300 dark:border-coolgray-600 px-3 py-2 rounded"
-                                                        placeholder="{{ $value }}">
+                                                        class="w-full bg-white dark:bg-coolgray-900 text-gray-900 dark:text-white border-2 border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-base font-mono focus:border-coollabs focus:ring-2 focus:ring-coollabs/20"
+                                                        placeholder="{{ $value }}"
+                                                        style="min-height: 48px; font-size: 16px;">
                                                     <x-forms.button 
                                                         x-on:click="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto flex-shrink-0">
+                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto self-start">
                                                         Actualizar
                                                     </x-forms.button>
                                                 </div>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                    Valor actual: <span class="font-mono">{{ $value }}</span>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                                                    Valor actual: <span class="font-mono font-semibold">{{ $value }}</span>
                                                 </p>
                                             </div>
                                         @endforeach
