@@ -969,7 +969,7 @@ class FileExplorer extends Component
         }
 
         $filePath = $this->selectedFiles[0];
-        
+
         if (! preg_match('/\.(zip|tar|tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|tbz|txz|gz)$/i', $filePath)) {
             $this->dispatch('error', 'Please select a supported compressed file (.zip, .tar.gz, etc.)');
 
@@ -991,7 +991,7 @@ class FileExplorer extends Component
         }
 
         $filePath = $this->selectedFiles[0];
-        
+
         if (! preg_match('/\.(zip|tar|tar\.gz|tar\.bz2|tar\.xz|tgz|tbz2|tbz|txz|gz)$/i', $filePath)) {
             $this->dispatch('error', 'Please select a supported compressed file (.zip, .tar.gz, etc.)');
             $this->showExtractDialog = false;
@@ -1038,7 +1038,7 @@ class FileExplorer extends Component
                 $this->showExtractDialog = false;
                 return;
             }
-            
+
             $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
 
             if ($server->isNonRoot()) {
@@ -1050,7 +1050,7 @@ class FileExplorer extends Component
             if (str_contains($output, 'TOOL_NOT_FOUND:')) {
                 preg_match('/TOOL_NOT_FOUND:(\w+)/', $output, $matches);
                 $tool = $matches[1] ?? 'required tool';
-                
+
                 // HOST EXTRACTION FALLBACK
                 // Instead of failing or installing packages inside the container (which might be impossible/unsafe),
                 // we copy the file to the host machine, extract it there, and copy the contents back.
@@ -1058,15 +1058,15 @@ class FileExplorer extends Component
                     $tmpBase = '/tmp/coolify_extract_' . uniqid();
                     $hostArchivePath = $tmpBase . '_archive';
                     $hostExtractPath = $tmpBase . '_extracted';
-                    
+
                     $containerArchivePath = $filePath;
                     $containerDestPath = dirname($filePath) === '/' ? '/' : dirname($filePath) . '/';
-                    
+
                     $fallbackCmds = [
                         "mkdir -p " . escapeshellarg($hostExtractPath),
                         "docker cp " . escapeshellarg($containerName . ':' . $containerArchivePath) . " " . escapeshellarg($hostArchivePath)
                     ];
-                    
+
                     if (str_ends_with(strtolower($filePath), '.zip')) {
                         $fallbackCmds[] = "unzip -q -o " . escapeshellarg($hostArchivePath) . " -d " . escapeshellarg($hostExtractPath);
                     } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
@@ -1081,20 +1081,20 @@ class FileExplorer extends Component
                         $extractedName = preg_replace('/\.gz$/i', '', basename($filePath));
                         $fallbackCmds[] = "gzip -d -k -c " . escapeshellarg($hostArchivePath) . " > " . escapeshellarg($hostExtractPath . '/' . $extractedName);
                     }
-                    
+
                     $fallbackCmds[] = "docker cp " . escapeshellarg($hostExtractPath . '/.') . " " . escapeshellarg($containerName . ':' . $containerDestPath);
                     $fallbackCmds[] = "rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
-                    
+
                     $fallbackCommandShell = implode(' && ', $fallbackCmds);
                     // Add a final cleanup just in case a command fails midway
                     $fallbackCommandShell .= " ; rm -rf " . escapeshellarg($hostArchivePath) . " " . escapeshellarg($hostExtractPath);
-                    
-                    $finalCmd = $server->isNonRoot() 
+
+                    $finalCmd = $server->isNonRoot()
                         ? "sudo sh -c " . escapeshellarg($fallbackCommandShell)
                         : "sh -c " . escapeshellarg($fallbackCommandShell);
-                        
+
                     instant_remote_process([$finalCmd], $server);
-                    
+
                     $this->dispatch('success', "File extracted successfully via Host Fallback (Container lacked {$tool}).");
                     $this->selectedFiles = [];
                     $this->showExtractDialog = false;
@@ -1781,6 +1781,7 @@ class FileExplorer extends Component
 
     public function generateAdminerUrl()
     {
+        \Log::info('generateAdminerUrl called', ['selected_container' => $this->selected_container]);
         try {
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
@@ -1839,9 +1840,11 @@ class FileExplorer extends Component
                 };
                 $this->adminerUrl = $baseUrl.$path.'?container='.urlencode($containerName).'&server_id='.$server->id;
             }
+            \Log::info('Adminer URL generated', ['adminerUrl' => $this->adminerUrl]);
         } catch (\Throwable $e) {
             $this->adminerUrl = null;
             $this->dispatch('error', 'Failed to generate database connection URL: '.$e->getMessage());
+            \Log::error('Failed to generate Adminer URL', ['error' => $e->getMessage()]);
         }
     }
 
