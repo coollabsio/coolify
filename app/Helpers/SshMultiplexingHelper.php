@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
@@ -158,7 +159,7 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
 
-        self::validateSshKey($server->privateKey);
+        self::validateSshKey($server->privateKey, $server);
 
         $muxSocket = $sshConfig['muxFilename'];
 
@@ -206,14 +207,28 @@ class SshMultiplexingHelper
         return config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop');
     }
 
-    private static function validateSshKey(PrivateKey $privateKey): void
+    private static function validateSshKey(PrivateKey $privateKey, ?Server $server = null): void
     {
-        $keyLocation = $privateKey->getKeyLocation();
-        $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $disk = Storage::disk('ssh-keys');
+        $filename = "ssh_key@{$privateKey->uuid}";
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        $shouldSyncToDisk = ! $disk->exists($filename);
+        if (! $shouldSyncToDisk) {
+            $storedContent = $disk->get($filename);
+            $storedFingerprint = PrivateKey::generateFingerprint($storedContent);
+            $expectedFingerprint = $privateKey->fingerprint ?? PrivateKey::generateFingerprint($privateKey->private_key);
+
+            // Fingerprint mismatch means key file is stale/corrupted on this node.
+            $shouldSyncToDisk = is_null($storedFingerprint) || is_null($expectedFingerprint) || ! hash_equals($expectedFingerprint, $storedFingerprint);
+        }
+
+        if ($shouldSyncToDisk) {
             $privateKey->storeInFileSystem();
+
+            // Any existing mux session can still reference the stale key in memory.
+            if (! is_null($server) && self::isMultiplexingEnabled()) {
+                self::removeMuxFile($server);
+            }
         }
     }
 
