@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -129,6 +130,166 @@ YAML;
     expect($manager->calls)->toHaveCount(3);
     $deleteCommands = implode("\n", $manager->calls[2]['commands']);
     expect($deleteCommands)->toContain("rm -f '$expectedPath' '$expectedTempPath'");
+});
+
+it('creates, updates, and deletes a stable edge route file per application uuid', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 30;
+    $deploymentServer->ip = '10.8.0.30';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-test-uuid';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://app.example.com:3000';
+    $application->ports_mappings = '9010:3000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->toBe([])
+        ->and($manager->calls)->toHaveCount(1);
+
+    $expectedPath = '/tmp/proxy/dynamic/application-remote-application-test-uuid.yaml';
+    $expectedTempPath = '/tmp/proxy/dynamic/application-remote-application-test-uuid.yaml.tmp';
+    $firstWriteCommands = implode("\n", $manager->calls[0]['commands']);
+
+    expect($firstWriteCommands)->toContain($expectedPath)
+        ->and($firstWriteCommands)->toContain($expectedTempPath)
+        ->and($firstWriteCommands)->toContain('tee')
+        ->and($firstWriteCommands)->toContain('mv');
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $firstPayloadMatches);
+    $firstPayload = base64_decode($firstPayloadMatches[1]);
+    expect($firstPayload)->toContain('http://10.8.0.30:9010');
+
+    $application->ports_mappings = '9020:3000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->toBe([])
+        ->and($manager->calls)->toHaveCount(2);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[1]['commands'][1], $secondPayloadMatches);
+    $secondPayload = base64_decode($secondPayloadMatches[1]);
+    expect($secondPayload)->toContain('http://10.8.0.30:9020');
+
+    $manager->deleteApplicationWithServer($application, $edgeProxyServer);
+
+    expect($manager->calls)->toHaveCount(3);
+    $deleteCommands = implode("\n", $manager->calls[2]['commands']);
+    expect($deleteCommands)->toContain("rm -f '$expectedPath' '$expectedTempPath'");
+});
+
+it('creates edge route for docker compose application domains using compose service ports', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 31;
+    $deploymentServer->ip = '10.8.0.31';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-compose-route';
+    $application->build_pack = 'dockercompose';
+    $application->docker_compose_domains = json_encode([
+        'web' => ['domain' => 'https://compose-app.example.com:3000'],
+    ]);
+    $application->docker_compose_raw = <<<'YAML'
+services:
+  web:
+    ports:
+      - "9030:3000"
+YAML;
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->toBe([])
+        ->and($manager->calls)->toHaveCount(1);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`compose-app.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.31:9030');
+});
+
+it('returns actionable warning and does not write route file when application published host port is missing', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 32;
+    $deploymentServer->ip = '10.8.0.32';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-missing-port';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://missing-port.example.com:3000';
+    $application->ports_mappings = null;
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and($warnings[0])->toContain('published host port could not be resolved')
+        ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/application-remote-application-missing-port.yaml')
+        ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
 });
 
 it('does not generate edge route file when published port cannot be resolved and returns actionable warning', function () {
@@ -675,4 +836,246 @@ YAML;
 
     expect($payload)->toContain('Host(`overlap.example.com`)')
         ->and($payload)->toContain('http://10.8.0.40:9060');
+});
+
+it('generates path prefix rule when route contains a non-root path', function () {
+    $service = new EdgeProxyRemoteRouteService;
+
+    $config = $service->generateTraefikConfig('service-path-uuid', [[
+        'host' => 'api.example.com',
+        'path' => '/v1',
+        'upstream_url' => 'http://10.8.0.41:9070',
+    ]]);
+
+    expect(data_get($config, 'http.routers.edge-service-path-uuid-http-1.rule'))
+        ->toBe('Host(`api.example.com`) && PathPrefix(`/v1`)')
+        ->and(data_get($config, 'http.routers.edge-service-path-uuid-https-1.rule'))
+        ->toBe('Host(`api.example.com`) && PathPrefix(`/v1`)');
+});
+
+it('deletes application edge route when deployment server is the same as edge proxy server', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 33;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 33;
+    $deploymentServer->ip = '10.8.0.33';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-edge-self';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://self.example.com:3000';
+    $application->ports_mappings = '9071:3000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->toBe([])
+        ->and($manager->calls)->toHaveCount(1)
+        ->and(implode("\n", $manager->calls[0]['commands']))->toContain("/tmp/proxy/dynamic/application-remote-application-edge-self.yaml")
+        ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
+});
+
+it('normalizes ipv6 tunnel host for application upstream urls', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 34;
+    $deploymentServer->ip = '2001:db8::1';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-ipv6-host';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://ipv6.example.com:3000';
+    $application->ports_mappings = '9072:3000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    expect($warnings)->toBe([]);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('http://[2001:db8::1]:9072');
+});
+
+it('resolves docker compose application ports when domain service uses dashed name and compose uses underscore', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 35;
+    $deploymentServer->ip = '10.8.0.35';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-compose-normalized-service';
+    $application->build_pack = 'dockercompose';
+    $application->docker_compose_domains = json_encode([
+        'my-app' => ['domain' => 'https://normalized-service.example.com:3000'],
+    ]);
+    $application->docker_compose_raw = <<<'YAML'
+services:
+  my_app:
+    ports:
+      - "9073:3000"
+YAML;
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    expect($warnings)->toBe([]);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`normalized-service.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.35:9073');
+});
+
+it('resolves compose application published port from environment variables', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 36;
+    $deploymentServer->ip = '10.8.0.36';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-compose-env-port';
+    $application->build_pack = 'dockercompose';
+    $application->docker_compose_domains = json_encode([
+        'web' => ['domain' => 'https://compose-env.example.com:3000'],
+    ]);
+    $application->docker_compose_raw = <<<'YAML'
+services:
+  web:
+    ports:
+      - "${APP_HOST_PORT:-9080}:3000"
+YAML;
+    $application->setRelation('environment_variables', collect([
+        (object) ['key' => 'APP_HOST_PORT', 'value' => '9091'],
+    ]));
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    expect($warnings)->toBe([]);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('http://10.8.0.36:9091');
+});
+
+it('returns warning for unsupported application domain protocol while preserving valid http route', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 37;
+    $deploymentServer->ip = '10.8.0.37';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-unsupported-protocol';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://valid-app.example.com:3000,tcp://minecraft.example.com:25565';
+    $application->ports_mappings = '9074:3000,25565:25565';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and(collect($warnings)->contains(fn (string $warning) => str_contains($warning, 'protocol "tcp" is not supported for edge remote routing')))
+        ->and($manager->calls)->toHaveCount(1);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('Host(`valid-app.example.com`)')
+        ->and($payload)->toContain('http://10.8.0.37:9074')
+        ->and($payload)->not->toContain('minecraft.example.com');
 });

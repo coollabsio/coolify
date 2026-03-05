@@ -3,6 +3,7 @@
 namespace App\Actions\Database;
 
 use App\Models\ServiceDatabase;
+use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -24,7 +25,7 @@ class StartDatabaseProxy
     {
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
-        $server = data_get($database, 'destination.server');
+        $deploymentServer = data_get($database, 'destination.server');
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
         $isSSLEnabled = $database->enable_ssl ?? false;
@@ -32,7 +33,7 @@ class StartDatabaseProxy
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
             $network = $database->service->uuid;
-            $server = data_get($database, 'service.destination.server');
+            $deploymentServer = data_get($database, 'service.destination.server') ?? data_get($database, 'service.server');
             $containerName = "{$database->name}-{$database->service->uuid}";
         }
         $internalPort = match ($databaseType) {
@@ -50,10 +51,30 @@ class StartDatabaseProxy
             };
         }
 
-        $configuration_dir = database_proxy_dir($database->uuid);
-        if (isDev()) {
-            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+        if (! $deploymentServer instanceof Server) {
+            throw new \RuntimeException('Cannot start database proxy: deployment server is missing.');
         }
+
+        $proxyServer = $deploymentServer;
+        $upstreamTarget = "{$containerName}:{$internalPort}";
+        $proxyNetwork = $network;
+
+        $edgeProxyServer = $this->resolveEdgeProxyServerForTeamId($this->resolveDatabaseTeamId($database));
+        if ($edgeProxyServer instanceof Server && $edgeProxyServer->id !== $deploymentServer->id) {
+            $remoteHost = $this->resolveRemoteHost($deploymentServer);
+            if (! is_null($remoteHost)) {
+                $proxyServer = $edgeProxyServer;
+                $upstreamTarget = "{$remoteHost}:{$internalPort}";
+                $proxyNetwork = null;
+            } else {
+                $this->logWarning(sprintf(
+                    'Database proxy for %s is falling back to deployment server because remote host for edge forwarding is missing.',
+                    $database->uuid
+                ));
+            }
+        }
+
+        $configuration_dir = $this->resolveConfigurationDirectory($database->uuid);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -66,61 +87,68 @@ class StartDatabaseProxy
     stream {
        server {
             listen $database->public_port;
-            proxy_pass $containerName:$internalPort;
+            proxy_pass $upstreamTarget;
        }
     }
     EOF;
-        $docker_compose = [
-            'services' => [
-                $proxyContainerName => [
-                    'image' => 'nginx:stable-alpine',
-                    'container_name' => $proxyContainerName,
-                    'restart' => RESTART_MODE,
-                    'ports' => [
-                        "$database->public_port:$database->public_port",
-                    ],
-                    'networks' => [
-                        $network,
-                    ],
-                    'volumes' => [
-                        [
-                            'type' => 'bind',
-                            'source' => "$configuration_dir/nginx.conf",
-                            'target' => '/etc/nginx/nginx.conf',
-                        ],
-                    ],
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            'stat /etc/nginx/nginx.conf || exit 1',
-                        ],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 3,
-                        'start_period' => '1s',
-                    ],
+        $proxyServiceCompose = [
+            'image' => 'nginx:stable-alpine',
+            'container_name' => $proxyContainerName,
+            'restart' => RESTART_MODE,
+            'ports' => [
+                "$database->public_port:$database->public_port",
+            ],
+            'volumes' => [
+                [
+                    'type' => 'bind',
+                    'source' => "$configuration_dir/nginx.conf",
+                    'target' => '/etc/nginx/nginx.conf',
                 ],
             ],
-            'networks' => [
-                $network => [
-                    'external' => true,
-                    'name' => $network,
-                    'attachable' => true,
+            'healthcheck' => [
+                'test' => [
+                    'CMD-SHELL',
+                    'stat /etc/nginx/nginx.conf || exit 1',
                 ],
+                'interval' => '5s',
+                'timeout' => '5s',
+                'retries' => 3,
+                'start_period' => '1s',
             ],
         ];
+
+        $docker_compose = [
+            'services' => [
+                $proxyContainerName => $proxyServiceCompose,
+            ],
+        ];
+
+        if (filled($proxyNetwork)) {
+            $docker_compose['services'][$proxyContainerName]['networks'] = [$proxyNetwork];
+            $docker_compose['networks'] = [
+                $proxyNetwork => [
+                    'external' => true,
+                    'name' => $proxyNetwork,
+                    'attachable' => true,
+                ],
+            ];
+        }
+
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
-        instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
+        $this->runRemoteCommands(["docker rm -f $proxyContainerName"], $deploymentServer, false);
+        if ($proxyServer->id !== $deploymentServer->id) {
+            $this->runRemoteCommands(["docker rm -f $proxyContainerName"], $proxyServer, false);
+        }
 
         try {
-            instant_remote_process([
+            $this->runRemoteCommands([
                 "mkdir -p $configuration_dir",
                 "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
                 "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
                 "docker compose --project-directory {$configuration_dir} pull",
                 "docker compose --project-directory {$configuration_dir} up -d",
-            ], $server);
+            ], $proxyServer);
         } catch (\RuntimeException $e) {
             if ($this->isNonTransientError($e->getMessage())) {
                 $database->update(['is_public' => false]);
@@ -131,7 +159,7 @@ class StartDatabaseProxy
                 $team?->notify(
                     new \App\Notifications\Container\ContainerRestarted(
                         "TCP Proxy for {$database->name} database has been disabled due to error: {$e->getMessage()}",
-                        $server,
+                        $proxyServer,
                     )
                 );
 
@@ -142,6 +170,124 @@ class StartDatabaseProxy
 
             throw $e;
         }
+    }
+
+    protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
+    {
+        return instant_remote_process($commands, $server, $throwError);
+    }
+
+    protected function resolveConfigurationDirectory(string $databaseUuid): string
+    {
+        $configurationDirectory = database_proxy_dir($databaseUuid);
+        if (isDev()) {
+            $configurationDirectory = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$databaseUuid.'/proxy';
+        }
+
+        return $configurationDirectory;
+    }
+
+    protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
+    {
+        if (is_null($teamId)) {
+            return null;
+        }
+
+        return Server::query()
+            ->where('team_id', $teamId)
+            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function resolveDatabaseTeamId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database): ?int
+    {
+        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+            $teamId = data_get($database, 'service.environment.project.team_id');
+            if (! is_null($teamId)) {
+                return (int) $teamId;
+            }
+        }
+
+        $teamId = data_get($database, 'environment.project.team_id');
+        if (! is_null($teamId)) {
+            return (int) $teamId;
+        }
+
+        $teamId = data_get($database, 'team.id');
+        if (! is_null($teamId)) {
+            return (int) $teamId;
+        }
+
+        return null;
+    }
+
+    private function resolveRemoteHost(Server $deploymentServer): ?string
+    {
+        $candidates = [
+            data_get($deploymentServer, 'proxy.wireguard_ip'),
+            data_get($deploymentServer, 'proxy.wg_ip'),
+            data_get($deploymentServer, 'proxy.tunnel_ip'),
+            data_get($deploymentServer, 'proxy.tunnel_host'),
+            data_get($deploymentServer, 'proxy.tunnel_domain'),
+            data_get($deploymentServer, 'ip'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $normalizedHost = $this->normalizeRemoteHost((string) $candidate);
+            if (! is_null($normalizedHost)) {
+                return $normalizedHost;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeRemoteHost(string $rawHost): ?string
+    {
+        $host = trim($rawHost);
+        if ($host === '') {
+            return null;
+        }
+
+        if (str_starts_with($host, 'http://') || str_starts_with($host, 'https://')) {
+            $parsedHost = parse_url($host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        } elseif (str_contains($host, '/')) {
+            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        }
+
+        $host = trim($host, '[]');
+        if ($host === '') {
+            return null;
+        }
+
+        if (str_contains($host, ':') && ! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $parsedHost = parse_url('http://'.$host, PHP_URL_HOST);
+            $host = is_string($parsedHost) ? $parsedHost : '';
+        }
+
+        if ($host === '') {
+            return null;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return '['.$host.']';
+        }
+
+        return $host;
+    }
+
+    protected function logWarning(string $message): void
+    {
+        if (app()->bound('log')) {
+            app('log')->warning($message);
+
+            return;
+        }
+
+        error_log($message);
     }
 
     private function isNonTransientError(string $message): bool

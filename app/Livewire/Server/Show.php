@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
+use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
@@ -45,8 +46,16 @@ class Show extends Component
 
     public bool $isBuildServer;
 
+    public bool $isMasterDomainRouterEnabled;
+
     #[Locked]
     public bool $isBuildServerLocked = false;
+
+    #[Locked]
+    public bool $isMasterDomainRouterLocked = false;
+
+    #[Locked]
+    public ?string $masterDomainRouterLockMessage = null;
 
     public bool $isMetricsEnabled;
 
@@ -116,6 +125,7 @@ class Show extends Component
             'isSwarmManager' => 'required',
             'isSwarmWorker' => 'required',
             'isBuildServer' => 'required',
+            'isMasterDomainRouterEnabled' => 'required',
             'isMetricsEnabled' => 'required',
             'sentinelToken' => 'required',
             'sentinelUpdatedAt' => 'nullable',
@@ -162,6 +172,7 @@ class Show extends Component
             if (! $this->server->isEmpty()) {
                 $this->isBuildServerLocked = true;
             }
+            $this->refreshMasterDomainRouterLockState();
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
             $this->isValidating = $this->server->is_validating ?? false;
@@ -213,6 +224,7 @@ class Show extends Component
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->is_build_server = $this->isBuildServer;
+            $this->server->settings->is_master_domain_router_enabled = $this->isMasterDomainRouterEnabled;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -243,6 +255,7 @@ class Show extends Component
             $this->isSwarmManager = $this->server->settings->is_swarm_manager;
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
             $this->isBuildServer = $this->server->settings->is_build_server;
+            $this->isMasterDomainRouterEnabled = $this->server->settings->is_master_domain_router_enabled;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
@@ -255,6 +268,8 @@ class Show extends Component
             $this->serverTimezone = $this->server->settings->server_timezone;
             $this->isValidating = $this->server->is_validating ?? false;
         }
+
+        $this->refreshMasterDomainRouterLockState();
     }
 
     public function refresh()
@@ -348,6 +363,25 @@ class Show extends Component
             $this->submit();
             // Dispatch event to refresh the navbar
             $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function updatedIsMasterDomainRouterEnabled($value)
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->refreshMasterDomainRouterLockState();
+
+            if ($value === true && $this->isMasterDomainRouterLocked) {
+                $this->isMasterDomainRouterEnabled = false;
+                $this->dispatch('error', $this->masterDomainRouterLockMessage ?? 'Another server in this team is already selected as the master domain router.');
+
+                return;
+            }
+
+            $this->submit();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -490,6 +524,34 @@ class Show extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function refreshMasterDomainRouterLockState(): void
+    {
+        $this->isMasterDomainRouterLocked = false;
+        $this->masterDomainRouterLockMessage = null;
+
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return;
+        }
+
+        $this->server->loadMissing('settings');
+        if ($this->server->settings->is_master_domain_router_enabled) {
+            return;
+        }
+
+        $masterDomainServerExists = Server::query()
+            ->where('team_id', $this->server->team_id)
+            ->where('id', '!=', $this->server->id)
+            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
+            ->exists();
+
+        if (! $masterDomainServerExists) {
+            return;
+        }
+
+        $this->isMasterDomainRouterLocked = true;
+        $this->masterDomainRouterLockMessage = 'Disabled because another server in this team is already selected as the master domain router. Disable it there first.';
     }
 
     public function loadHetznerTokens(): void

@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
+use App\Services\EdgeProxyRemoteRouteService;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Service;
@@ -102,6 +103,14 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\Throwable $e) {
             throw $e;
         } finally {
+            if ($this->resource instanceof Application) {
+                try {
+                    app(EdgeProxyRemoteRouteService::class)->deleteApplication($this->resource);
+                } catch (\Throwable $e) {
+                    \Log::warning('Failed to delete edge proxy route file for application '.$this->resource->uuid.': '.$e->getMessage());
+                }
+            }
+
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
                 $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ProxyTypes;
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -14,11 +15,14 @@ use Symfony\Component\Yaml\Yaml;
 
 class EdgeProxyRemoteRouteService
 {
-    private const string ROUTE_FILE_PREFIX = 'service-remote-';
+    private const string SERVICE_ROUTE_FILE_PREFIX = 'service-remote-';
+
+    private const string APPLICATION_ROUTE_FILE_PREFIX = 'application-remote-';
 
     public function syncService(Service $service): array
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServer($service);
+        $teamId = $this->extractServiceTeamId($service);
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
         $deploymentServer = $this->resolveDeploymentServer($service);
 
         if (! $deploymentServer instanceof Server) {
@@ -26,16 +30,6 @@ class EdgeProxyRemoteRouteService
         }
 
         if (! $edgeProxyServer instanceof Server) {
-            if ($deploymentServer->id !== 0) {
-                $warning = sprintf(
-                    'Edge proxy route skipped for service %s: edge proxy server (id=0) was not found for the current team.',
-                    $service->uuid
-                );
-                $this->logWarning($warning);
-
-                return [$warning];
-            }
-
             return [];
         }
 
@@ -79,7 +73,7 @@ class EdgeProxyRemoteRouteService
 
         $routes = [];
         $warnings = [];
-        $networkOverlapWarning = $this->detectDockerNetworkOverlapWarning($service, $edgeProxyServer, $tunnelHost);
+        $networkOverlapWarning = $this->detectDockerNetworkOverlapWarningForResource('service', $service->uuid, $edgeProxyServer, $tunnelHost);
         if (! is_null($networkOverlapWarning)) {
             $warnings[] = $networkOverlapWarning;
         }
@@ -165,9 +159,156 @@ class EdgeProxyRemoteRouteService
         return $warnings;
     }
 
+    public function syncApplication(Application $application): array
+    {
+        $teamId = $this->extractApplicationTeamId($application);
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
+        $deploymentServer = $this->resolveApplicationDeploymentServer($application);
+
+        if (! $deploymentServer instanceof Server || ! $edgeProxyServer instanceof Server) {
+            return [];
+        }
+
+        return $this->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    }
+
+    public function syncApplicationOnDeploymentServer(Application $application, Server $deploymentServer): array
+    {
+        $teamId = $this->extractApplicationTeamId($application);
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($teamId);
+        if (! $edgeProxyServer instanceof Server) {
+            return [];
+        }
+
+        return $this->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    }
+
+    public function syncApplicationWithServers(Application $application, Server $edgeProxyServer, Server $deploymentServer): array
+    {
+        if ($edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return [];
+        }
+
+        if ($deploymentServer->id === $edgeProxyServer->id) {
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+
+            return [];
+        }
+
+        $domains = $this->getApplicationDomains($application);
+        if ($domains->isEmpty()) {
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+
+            return [];
+        }
+
+        $tunnelHost = $this->resolveTunnelHost($deploymentServer);
+        if (blank($tunnelHost)) {
+            $warning = sprintf(
+                'Edge proxy route skipped for application %s: remote host is missing. Configure a tunnel host (proxy.wireguard_ip/proxy.wg_ip/proxy.tunnel_ip/proxy.tunnel_host) or set the server IP/domain.',
+                $application->uuid
+            );
+
+            $this->logWarning($warning);
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+
+            return [$warning];
+        }
+
+        $routes = [];
+        $warnings = [];
+        $networkOverlapWarning = $this->detectDockerNetworkOverlapWarningForResource('application', $application->uuid, $edgeProxyServer, $tunnelHost);
+        if (! is_null($networkOverlapWarning)) {
+            $warnings[] = $networkOverlapWarning;
+        }
+
+        $compose = $this->parseApplicationCompose($application);
+        $environmentMap = $this->applicationEnvironmentMap($application);
+
+        foreach ($domains as $domainData) {
+            $domain = data_get($domainData, 'domain');
+            $composeServiceName = data_get($domainData, 'service_name');
+
+            $unsupportedProtocol = $this->detectUnsupportedDomainProtocol($domain);
+            if (! is_null($unsupportedProtocol)) {
+                $warnings[] = sprintf(
+                    'Edge proxy route skipped for application %s (domain %s): protocol "%s" is not supported for edge remote routing. Only http:// and https:// domains are currently supported.',
+                    $application->uuid,
+                    $domain,
+                    $unsupportedProtocol
+                );
+
+                continue;
+            }
+
+            $url = $this->parseDomainUrl($domain);
+            if (! $url instanceof Url) {
+                $warnings[] = sprintf(
+                    'Edge proxy route skipped for application %s (domain %s): domain format is invalid. Use a valid hostname/domain with optional scheme, port and path.',
+                    $application->uuid,
+                    $domain
+                );
+
+                continue;
+            }
+
+            $requestedInternalPort = $url->getPort();
+            $publishedPort = $this->resolvePublishedPortForApplication(
+                $application,
+                $requestedInternalPort,
+                $composeServiceName,
+                $compose,
+                $environmentMap
+            );
+
+            if (is_null($publishedPort)) {
+                $warnings[] = sprintf(
+                    'Edge proxy route skipped for application %s (domain %s): published host port could not be resolved. Expose the application port in host mappings/compose ports and/or include an explicit port in the domain.',
+                    $application->uuid,
+                    $domain
+                );
+
+                continue;
+            }
+
+            $routes[] = [
+                'host' => $url->getHost(),
+                'path' => $url->getPath(),
+                'upstream_url' => sprintf('http://%s:%d', $tunnelHost, $publishedPort),
+            ];
+        }
+
+        if (! empty($warnings)) {
+            foreach ($warnings as $warning) {
+                $this->logWarning($warning);
+            }
+        }
+
+        if (empty($routes)) {
+            $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
+
+            return $warnings;
+        }
+
+        $config = $this->generateTraefikConfig($application->uuid, $routes);
+        try {
+            $this->writeRouteFile($edgeProxyServer, $application->uuid, $config, self::APPLICATION_ROUTE_FILE_PREFIX);
+        } catch (\Throwable $exception) {
+            $warning = sprintf(
+                'Edge proxy route partially applied for application %s: failed to write dynamic route configuration on edge proxy (%s).',
+                $application->uuid,
+                $exception->getMessage()
+            );
+            $this->logWarning($warning);
+            $warnings[] = $warning;
+        }
+
+        return $warnings;
+    }
+
     public function deleteService(Service $service): void
     {
-        $edgeProxyServer = $this->resolveEdgeProxyServer($service);
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractServiceTeamId($service));
         if (! $edgeProxyServer instanceof Server || $edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
             return;
         }
@@ -178,6 +319,21 @@ class EdgeProxyRemoteRouteService
     public function deleteServiceWithServer(Service $service, Server $edgeProxyServer): void
     {
         $this->deleteRouteFile($edgeProxyServer, $service->uuid);
+    }
+
+    public function deleteApplication(Application $application): void
+    {
+        $edgeProxyServer = $this->resolveEdgeProxyServerByTeamId($this->extractApplicationTeamId($application));
+        if (! $edgeProxyServer instanceof Server || $edgeProxyServer->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return;
+        }
+
+        $this->deleteApplicationWithServer($application, $edgeProxyServer);
+    }
+
+    public function deleteApplicationWithServer(Application $application, Server $edgeProxyServer): void
+    {
+        $this->deleteRouteFile($edgeProxyServer, $application->uuid, self::APPLICATION_ROUTE_FILE_PREFIX);
     }
 
     public function generateTraefikConfig(string $serviceUuid, array $routes): array
@@ -241,11 +397,21 @@ class EdgeProxyRemoteRouteService
 
     public function routeFilePath(Server $edgeProxyServer, string $serviceUuid): string
     {
+        return $this->resourceRouteFilePath($edgeProxyServer, self::SERVICE_ROUTE_FILE_PREFIX, $serviceUuid);
+    }
+
+    public function applicationRouteFilePath(Server $edgeProxyServer, string $applicationUuid): string
+    {
+        return $this->resourceRouteFilePath($edgeProxyServer, self::APPLICATION_ROUTE_FILE_PREFIX, $applicationUuid);
+    }
+
+    private function resourceRouteFilePath(Server $edgeProxyServer, string $prefix, string $resourceUuid): string
+    {
         return sprintf(
             '%s/%s%s.yaml',
             $this->routeDirectoryPath($edgeProxyServer),
-            self::ROUTE_FILE_PREFIX,
-            $serviceUuid
+            $prefix,
+            $resourceUuid
         );
     }
 
@@ -259,13 +425,13 @@ class EdgeProxyRemoteRouteService
         return rtrim($edgeProxyServer->proxyPath(), '/').'/dynamic';
     }
 
-    private function writeRouteFile(Server $edgeProxyServer, string $serviceUuid, array $config): void
+    private function writeRouteFile(Server $edgeProxyServer, string $resourceUuid, array $config, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX): void
     {
         $yaml = Yaml::dump($config, 12, 2);
         $banner = "# This file is generated by Coolify, do not edit it manually.\n\n";
         $payload = base64_encode($banner.$yaml);
 
-        $routeFilePath = $this->routeFilePath($edgeProxyServer, $serviceUuid);
+        $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
         $temporaryRouteFilePath = $routeFilePath.'.tmp';
 
         $escapedDirectory = escapeshellarg($this->routeDirectoryPath($edgeProxyServer));
@@ -279,10 +445,11 @@ class EdgeProxyRemoteRouteService
         ]);
     }
 
-    private function deleteRouteFile(Server $edgeProxyServer, string $serviceUuid): void
+    private function deleteRouteFile(Server $edgeProxyServer, string $resourceUuid, string $filePrefix = self::SERVICE_ROUTE_FILE_PREFIX): void
     {
-        $escapedFilePath = escapeshellarg($this->routeFilePath($edgeProxyServer, $serviceUuid));
-        $escapedTemporaryFilePath = escapeshellarg($this->routeFilePath($edgeProxyServer, $serviceUuid).'.tmp');
+        $routeFilePath = $this->resourceRouteFilePath($edgeProxyServer, $filePrefix, $resourceUuid);
+        $escapedFilePath = escapeshellarg($routeFilePath);
+        $escapedTemporaryFilePath = escapeshellarg($routeFilePath.'.tmp');
 
         $this->runRemoteCommands($edgeProxyServer, [
             "rm -f $escapedFilePath $escapedTemporaryFilePath",
@@ -300,16 +467,16 @@ class EdgeProxyRemoteRouteService
         return $rule;
     }
 
-    private function resolveEdgeProxyServer(Service $service): ?Server
+    private function resolveEdgeProxyServerByTeamId(?int $teamId): ?Server
     {
-        $teamId = $this->extractTeamId($service);
         if (is_null($teamId)) {
             return null;
         }
 
         return Server::query()
             ->where('team_id', $teamId)
-            ->where('id', 0)
+            ->whereRelation('settings', 'is_master_domain_router_enabled', true)
+            ->orderBy('id')
             ->first();
     }
 
@@ -332,7 +499,31 @@ class EdgeProxyRemoteRouteService
         return null;
     }
 
-    private function extractTeamId(Service $service): ?int
+    private function resolveApplicationDeploymentServer(Application $application): ?Server
+    {
+        $server = data_get($application, 'server');
+        if ($server instanceof Server) {
+            return $server;
+        }
+
+        $server = data_get($application, 'destination.server');
+        if ($server instanceof Server) {
+            return $server;
+        }
+
+        if ($application->exists) {
+            $application->loadMissing('destination.server');
+
+            $server = data_get($application, 'destination.server');
+            if ($server instanceof Server) {
+                return $server;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractServiceTeamId(Service $service): ?int
     {
         $teamId = data_get($service, 'environment.project.team_id');
         if (! is_null($teamId)) {
@@ -342,6 +533,24 @@ class EdgeProxyRemoteRouteService
         if ($service->exists) {
             $service->loadMissing('environment.project');
             $teamId = data_get($service, 'environment.project.team_id');
+            if (! is_null($teamId)) {
+                return (int) $teamId;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractApplicationTeamId(Application $application): ?int
+    {
+        $teamId = data_get($application, 'environment.project.team_id');
+        if (! is_null($teamId)) {
+            return (int) $teamId;
+        }
+
+        if ($application->exists) {
+            $application->loadMissing('environment.project');
+            $teamId = data_get($application, 'environment.project.team_id');
             if (! is_null($teamId)) {
                 return (int) $teamId;
             }
@@ -362,6 +571,48 @@ class EdgeProxyRemoteRouteService
 
         return $applications
             ->filter(fn (ServiceApplication $application) => filled($application->fqdn))
+            ->values();
+    }
+
+    private function getApplicationDomains(Application $application): Collection
+    {
+        if ($application->build_pack === 'dockercompose') {
+            $domains = collect(json_decode((string) $application->docker_compose_domains, true));
+            if ($domains->isEmpty()) {
+                return collect([]);
+            }
+
+            return $domains
+                ->map(function (mixed $domainConfig, string $serviceName) {
+                    $domain = data_get($domainConfig, 'domain');
+                    if (is_string($domainConfig)) {
+                        $domain = $domainConfig;
+                    }
+
+                    return [
+                        'service_name' => $serviceName,
+                        'domain' => (string) $domain,
+                    ];
+                })
+                ->flatMap(function (array $domainData) {
+                    return collect(explode(',', $domainData['domain']))
+                        ->map(fn (string $domain) => trim($domain))
+                        ->filter()
+                        ->map(fn (string $domain) => [
+                            'service_name' => $domainData['service_name'],
+                            'domain' => $domain,
+                        ]);
+                })
+                ->values();
+        }
+
+        return collect(explode(',', (string) $application->fqdn))
+            ->map(fn (string $domain) => trim($domain))
+            ->filter()
+            ->map(fn (string $domain) => [
+                'service_name' => null,
+                'domain' => $domain,
+            ])
             ->values();
     }
 
@@ -419,6 +670,82 @@ class EdgeProxyRemoteRouteService
             ->all();
     }
 
+    private function parseApplicationCompose(Application $application): array
+    {
+        if ($application->build_pack !== 'dockercompose') {
+            return [];
+        }
+
+        $rawCompose = filled($application->docker_compose_raw)
+            ? $application->docker_compose_raw
+            : $application->docker_compose;
+
+        if (blank($rawCompose)) {
+            return [];
+        }
+
+        try {
+            $parsedCompose = Yaml::parse($rawCompose);
+
+            return is_array($parsedCompose) ? $parsedCompose : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function applicationEnvironmentMap(Application $application): array
+    {
+        if ($application->relationLoaded('environment_variables')) {
+            return $application->environment_variables
+                ->mapWithKeys(fn ($environmentVariable) => [$environmentVariable->key => (string) $environmentVariable->value])
+                ->all();
+        }
+
+        if (! $application->exists) {
+            return [];
+        }
+
+        return $application->environment_variables()
+            ->get()
+            ->mapWithKeys(fn ($environmentVariable) => [$environmentVariable->key => (string) $environmentVariable->value])
+            ->all();
+    }
+
+    private function resolvePublishedPortForApplication(
+        Application $application,
+        ?int $requestedInternalPort,
+        ?string $composeServiceName,
+        array $compose,
+        array $environmentMap
+    ): ?int {
+        if ($application->build_pack === 'dockercompose') {
+            $serviceName = $composeServiceName;
+            if (blank($serviceName)) {
+                $serviceName = $application->uuid;
+            }
+
+            return $this->resolvePublishedPort($compose, $serviceName, $requestedInternalPort, $environmentMap);
+        }
+
+        $portMappings = $this->parsePortMappings($application->ports_mappings_array, $environmentMap)
+            ->filter(fn (array $mapping) => ! is_null($mapping['published']))
+            ->values();
+
+        if ($portMappings->isEmpty()) {
+            return null;
+        }
+
+        $fallbackInternalPort = null;
+        if (is_null($requestedInternalPort)) {
+            $mainPorts = $application->main_port();
+            if (is_array($mainPorts) && count($mainPorts) === 1 && is_numeric($mainPorts[0])) {
+                $fallbackInternalPort = (int) $mainPorts[0];
+            }
+        }
+
+        return $this->selectPublishedPortFromMappings($portMappings, $requestedInternalPort, $fallbackInternalPort);
+    }
+
     private function detectUnsupportedDomainProtocol(string $domain): ?string
     {
         $trimmedDomain = trim($domain);
@@ -434,7 +761,7 @@ class EdgeProxyRemoteRouteService
         return $protocol;
     }
 
-    private function detectDockerNetworkOverlapWarning(Service $service, Server $edgeProxyServer, string $tunnelHost): ?string
+    private function detectDockerNetworkOverlapWarningForResource(string $resourceType, string $resourceUuid, Server $edgeProxyServer, string $tunnelHost): ?string
     {
         // Only run this for persisted server models (normal runtime) to avoid noisy checks in synthetic test stubs.
         if (! $edgeProxyServer->exists) {
@@ -449,8 +776,9 @@ class EdgeProxyRemoteRouteService
         foreach ($this->resolveEdgeDockerSubnets($edgeProxyServer) as $subnet) {
             if ($this->ipv4InCidr($normalizedTunnelHost, $subnet)) {
                 return sprintf(
-                    'Edge proxy route warning for service %s: remote host %s overlaps edge Docker network subnet %s. This can break VPN/WireGuard routing. Configure Docker default-address-pools to a non-overlapping range (for example base 172.20.0.0/16 with size 24) and recreate overlapping networks.',
-                    $service->uuid,
+                    'Edge proxy route warning for %s %s: remote host %s overlaps edge Docker network subnet %s. This can break VPN/WireGuard routing. Configure Docker default-address-pools to a non-overlapping range (for example base 172.20.0.0/16 with size 24) and recreate overlapping networks.',
+                    $resourceType,
+                    $resourceUuid,
                     $normalizedTunnelHost,
                     $subnet
                 );
@@ -554,6 +882,11 @@ class EdgeProxyRemoteRouteService
             return null;
         }
 
+        return $this->selectPublishedPortFromMappings($portMappings, $requestedInternalPort);
+    }
+
+    private function selectPublishedPortFromMappings(Collection $portMappings, ?int $requestedInternalPort, ?int $fallbackInternalPort = null): ?int
+    {
         if (! is_null($requestedInternalPort)) {
             $matchingTarget = $portMappings->first(fn (array $mapping) => $mapping['target'] === $requestedInternalPort);
             if ($matchingTarget) {
@@ -563,6 +896,13 @@ class EdgeProxyRemoteRouteService
             $matchingPublished = $portMappings->first(fn (array $mapping) => $mapping['published'] === $requestedInternalPort);
             if ($matchingPublished) {
                 return $matchingPublished['published'];
+            }
+        }
+
+        if (! is_null($fallbackInternalPort)) {
+            $matchingTarget = $portMappings->first(fn (array $mapping) => $mapping['target'] === $fallbackInternalPort);
+            if ($matchingTarget) {
+                return $matchingTarget['published'];
             }
         }
 
@@ -582,6 +922,18 @@ class EdgeProxyRemoteRouteService
 
         if (array_key_exists($serviceName, $services)) {
             $ports = data_get($services[$serviceName], 'ports');
+
+            return is_array($ports) ? $ports : null;
+        }
+
+        $normalizedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+        foreach ($services as $composeServiceName => $serviceConfig) {
+            $normalizedComposeServiceName = str((string) $composeServiceName)->replace('-', '_')->replace('.', '_')->value();
+            if ($normalizedComposeServiceName !== $normalizedServiceName) {
+                continue;
+            }
+
+            $ports = data_get($serviceConfig, 'ports');
 
             return is_array($ports) ? $ports : null;
         }
@@ -649,7 +1001,7 @@ class EdgeProxyRemoteRouteService
         }
 
         if (str_contains($normalizedPortDefinition, ':')) {
-            $segments = explode(':', $normalizedPortDefinition);
+            $segments = $this->splitPortDefinitionSegments($normalizedPortDefinition);
             if (count($segments) < 2) {
                 return null;
             }
@@ -669,6 +1021,37 @@ class EdgeProxyRemoteRouteService
         ];
     }
 
+    private function splitPortDefinitionSegments(string $portDefinition): array
+    {
+        $segments = [];
+        $currentSegment = '';
+        $braceDepth = 0;
+        $length = strlen($portDefinition);
+
+        for ($index = 0; $index < $length; $index++) {
+            $character = $portDefinition[$index];
+
+            if ($character === '{') {
+                $braceDepth++;
+            } elseif ($character === '}' && $braceDepth > 0) {
+                $braceDepth--;
+            }
+
+            if ($character === ':' && $braceDepth === 0) {
+                $segments[] = $currentSegment;
+                $currentSegment = '';
+
+                continue;
+            }
+
+            $currentSegment .= $character;
+        }
+
+        $segments[] = $currentSegment;
+
+        return $segments;
+    }
+
     private function resolvePortValue(mixed $rawPortValue, array $environmentMap): ?int
     {
         if (is_int($rawPortValue)) {
@@ -676,7 +1059,12 @@ class EdgeProxyRemoteRouteService
         }
 
         $normalizedPortValue = trim((string) $rawPortValue);
-        if ($normalizedPortValue === '' || str_contains($normalizedPortValue, '-')) {
+        if ($normalizedPortValue === '') {
+            return null;
+        }
+
+        // Ignore numeric port ranges (for example 8000-8010), which cannot be mapped deterministically.
+        if (preg_match('/^\d+\s*-\s*\d+$/', $normalizedPortValue) === 1) {
             return null;
         }
 

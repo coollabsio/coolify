@@ -286,6 +286,20 @@
                             </div>
 
                         @endif
+                        @if ($server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value)
+                            <div class="w-96">
+                                @if ($isMasterDomainRouterLocked)
+                                    <x-forms.checkbox disabled instantSave id="isMasterDomainRouterEnabled"
+                                        label="Enable master domain routing?"
+                                        helper="{{ $masterDomainRouterLockMessage }}" />
+                                @else
+                                    <x-forms.checkbox canGate="update" :canResource="$server"
+                                        id="isMasterDomainRouterEnabled" label="Enable master domain routing?"
+                                        helper="Enable this on exactly one server when all domains point to this server and it should forward traffic to resources running on other servers (for example over VPN / WireGuard)."
+                                        :disabled="$isValidating" />
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </div>
             </form>

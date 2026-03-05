@@ -19,6 +19,7 @@ use OpenApi\Attributes as OA;
         'force_server_cleanup' => ['type' => 'boolean'],
         'is_build_server' => ['type' => 'boolean'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
+        'is_master_domain_router_enabled' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
@@ -62,6 +63,7 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_terminal_enabled' => 'boolean',
+        'is_master_domain_router_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
     ];
 
@@ -90,6 +92,30 @@ class ServerSetting extends Model
                 $settings->server->restartSentinel();
             }
         });
+        static::saving(function ($setting) {
+            $setting->ensureSingleMasterDomainRouterEnabled();
+        });
+    }
+
+    private function ensureSingleMasterDomainRouterEnabled(): void
+    {
+        if (! $this->is_master_domain_router_enabled || is_null($this->server_id)) {
+            return;
+        }
+
+        $teamId = Server::query()
+            ->whereKey($this->server_id)
+            ->value('team_id');
+
+        if (is_null($teamId)) {
+            return;
+        }
+
+        static::query()
+            ->where('server_id', '!=', $this->server_id)
+            ->where('is_master_domain_router_enabled', true)
+            ->whereHas('server', fn ($query) => $query->where('team_id', $teamId))
+            ->update(['is_master_domain_router_enabled' => false]);
     }
 
     public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)
