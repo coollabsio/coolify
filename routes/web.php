@@ -31,6 +31,7 @@ use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
+use App\Livewire\Project\Service\WordPressManager;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\FileExplorer;
 use App\Livewire\Project\Shared\Logs;
@@ -251,6 +252,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/files', FileExplorer::class)->name('project.service.files')->middleware('can.access.terminal');
         Route::get('/adminer', [\App\Http\Controllers\Project\Database\AdminerController::class, 'index'])->name('project.service.adminer')->middleware('can.access.terminal');
+        Route::get('/wordpress-manager', WordPressManager::class)->name('project.service.wordpress-manager');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');

@@ -119,4 +119,21 @@ class Configuration extends Component
             return handleError($e, $this);
         }
     }
+
+    public function hasWordPress(): bool
+    {
+        foreach ($this->applications as $application) {
+            if (str_contains(strtolower($application->image ?? ''), 'wordpress')) {
+                return true;
+            }
+            $envVars = $application->environment_variables()->get();
+            foreach ($envVars as $envVar) {
+                if (str_contains(strtoupper($envVar->key ?? ''), 'WORDPRESS')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

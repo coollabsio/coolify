@@ -47,6 +47,11 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        
+        // Setup WordPress automatically after service starts
+        SetupWordPress::dispatch($service)->delay(now()->addSeconds(10));
+        
+        return $activity;
     }
 }
