@@ -13,7 +13,7 @@
             <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
                 href="{{ route('project.service.wordpress-manager', ['project_uuid' => $parameters['project_uuid'], 'environment_uuid' => $parameters['environment_uuid'], 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">WordPress Manager</span></a>
         </div>
-        <div class="w-full">
+        <div class="w-full overflow-x-hidden">
             <div class="box-without-bg">
                 <h2 class="text-xl font-bold dark:text-white mb-6">WordPress Manager</h2>
                 
@@ -22,8 +22,9 @@
                         No WordPress containers detected in this service.
                     </div>
                 @else
+                    <div class="flex flex-col gap-6">
                     <!-- Detected Containers Section -->
-                    <div class="mb-6">
+                    <div>
                         <h3 class="text-lg font-semibold dark:text-white mb-2">Detected WordPress Containers:</h3>
                         <ul class="list-disc list-inside space-y-1">
                             @foreach ($wordpressContainers as $container)
@@ -36,7 +37,7 @@
                     </div>
 
                     <!-- Sync URLs Section -->
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">Sincronizar URLs</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Reemplaza todas las URLs antiguas por las nuevas en la base de datos y regenera los archivos CSS de Elementor.
@@ -85,7 +86,7 @@
                     </div>
 
                     <!-- WordPress Table Prefix Section -->
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">WordPress Table Prefix</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Gestiona el prefijo de las tablas de WordPress. El prefijo se detecta automáticamente desde wp-config.php o desde las tablas de la base de datos.
@@ -126,7 +127,7 @@
                     </div>
 
                     <!-- PHP Configuration Section -->
-                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6 mb-6">
+                    <div class="box-without-bg-without-border dark:bg-coolgray-100 bg-white p-6">
                         <h3 class="text-lg font-semibold dark:text-white mb-4">Configuración PHP (php.ini)</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Gestiona la configuración de PHP para los contenedores WordPress. Los cambios pueden requerir reiniciar el contenedor para aplicarse completamente.
@@ -137,7 +138,7 @@
                             <select id="php_ini_container" 
                                 wire:model.live="selectedContainerForPhpIni"
                                 wire:change="loadPhpIniSettings"
-                                class="input w-full max-w-md">
+                                class="input w-full">
                                 <option value="">-- Selecciona un contenedor --</option>
                                 @foreach ($wordpressContainers as $container)
                                     <option value="{{ $container['id'] }}" 
@@ -210,6 +211,7 @@
                                 No se pudieron cargar las configuraciones de PHP. Asegúrate de que el contenedor esté en ejecución.
                             </div>
                         @endif
+                    </div>
                     </div>
                 @endif
             </div>
