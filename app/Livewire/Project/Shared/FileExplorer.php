@@ -1821,15 +1821,34 @@ class FileExplorer extends Component
     {
         \Log::info('generateAdminerUrl called', ['selected_container' => $this->selected_container]);
         try {
+            // Reload containers to ensure we have the latest data
+            $this->loadContainers();
+
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
+                \Log::warning('Container not found in containers collection', [
+                    'selected_container' => $this->selected_container,
+                    'containers_count' => $this->containers->count(),
+                    'containers' => $this->containers->map(fn($c) => data_get($c, 'container.Names'))->toArray(),
+                ]);
                 $this->adminerUrl = null;
-
+                $this->dispatch('error', 'Container not found. Please select a container first.');
                 return;
             }
 
             $server = data_get($container, 'server');
             $containerName = ltrim(data_get($container, 'container.Names'), '/');
+
+            // If server is not in container data, try to get it from the service/resource
+            if (is_null($server) && isset($this->resource)) {
+                if ($this->type === 'service' && isset($this->resource->server)) {
+                    $server = $this->resource->server;
+                } elseif ($this->type === 'application' && isset($this->resource->destination->server)) {
+                    $server = $this->resource->destination->server;
+                } elseif ($this->type === 'database' && isset($this->resource->destination->server)) {
+                    $server = $this->resource->destination->server;
+                }
+            }
 
             // Validate server exists
             if (is_null($server)) {
@@ -1837,6 +1856,8 @@ class FileExplorer extends Component
                     'container' => $containerName,
                     'containers_count' => $this->containers->count(),
                     'selected_container' => $this->selected_container,
+                    'type' => $this->type,
+                    'resource_exists' => isset($this->resource),
                 ]);
                 $this->adminerUrl = null;
                 $this->dispatch('error', 'Invalid server configuration. Server not found for this container.');
