@@ -444,21 +444,28 @@ class WordPressManager extends Component
             ];
 
             foreach ($settingsToExtract as $setting) {
-                // php -i format: "setting_name => value"
-                $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
-                if (preg_match($pattern, $phpInfo, $matches)) {
-                    $value = trim($matches[1]);
-                    // Remove any trailing spaces or special characters
-                    $value = preg_replace('/\s*\(.*?\)\s*$/', '', $value);
-                    $settings[$setting] = trim($value);
+                // Try using php -r to get specific ini value (more reliable)
+                $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $getIniCommand = "sudo {$getIniCommand}";
+                }
+                $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
+                
+                if (! empty($iniValue)) {
+                    $settings[$setting] = $iniValue;
                 } else {
-                    // Try using php -r to get specific ini value
-                    $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
-                    if ($server->isNonRoot()) {
-                        $getIniCommand = "sudo {$getIniCommand}";
+                    // Fallback to php -i parsing
+                    $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
+                    if (preg_match($pattern, $phpInfo, $matches)) {
+                        $value = trim($matches[1]);
+                        // Extract only the value part (remove "=> value" if present)
+                        $value = preg_replace('/.*?=>\s*/', '', $value);
+                        // Remove any trailing spaces or special characters
+                        $value = preg_replace('/\s*\(.*?\)\s*$/', '', $value);
+                        $settings[$setting] = trim($value);
+                    } else {
+                        $settings[$setting] = 'N/A';
                     }
-                    $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
-                    $settings[$setting] = ! empty($iniValue) ? $iniValue : 'N/A';
                 }
             }
 

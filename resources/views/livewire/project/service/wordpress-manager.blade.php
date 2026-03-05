@@ -184,8 +184,8 @@
                                                         value="{{ $value }}"
                                                         x-model="settings['{{ $setting }}']"
                                                         @keydown.enter="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="w-full bg-white dark:bg-coolgray-900 text-gray-900 dark:text-white border-2 border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-base font-mono focus:border-coollabs focus:ring-2 focus:ring-coollabs/20"
-                                                        placeholder="{{ $value }}"
+                                                        class="w-full bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border-2 border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-base font-mono focus:border-coollabs focus:ring-2 focus:ring-coollabs/20"
+                                                        placeholder="Ej: 200M, 512M, 60, etc."
                                                         style="min-height: 48px; font-size: 16px;">
                                                     <x-forms.button 
                                                         x-on:click="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
