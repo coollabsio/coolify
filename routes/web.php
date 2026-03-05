@@ -207,6 +207,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
+        Route::get('/backups', ApplicationConfiguration::class)->name('project.application.backups');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
@@ -272,7 +273,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
-        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
+        Route::get('/security', fn() => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
         Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
         Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
     });
@@ -328,7 +329,11 @@ Route::middleware(['auth'])->group(function () {
             }
             $filename = data_get($execution, 'filename');
             if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                if ($execution->scheduledDatabaseBackup->database->application_id) {
+                    $server = $execution->scheduledDatabaseBackup->database->application->destination->server;
+                } else {
+                    $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+                }
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
@@ -342,7 +347,7 @@ Route::middleware(['auth'])->group(function () {
                 'privateKey' => $privateKeyLocation,
                 'root' => '/',
             ]);
-            if (! $disk->exists($filename)) {
+            if (!$disk->exists($filename)) {
                 if ($execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
                     return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
                 }
@@ -358,7 +363,7 @@ Route::middleware(['auth'])->group(function () {
                 if ($stream === false || is_null($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
-                while (! feof($stream)) {
+                while (!feof($stream)) {
                     echo fread($stream, 2048);
                     flush();
                 }
@@ -366,7 +371,7 @@ Route::middleware(['auth'])->group(function () {
                 fclose($stream);
             }, 200, [
                 'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
+                'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
             ]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);

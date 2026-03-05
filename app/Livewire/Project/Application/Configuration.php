@@ -43,7 +43,7 @@ class Configuration extends Component
             ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
         $application = $environment->applications()
-            ->with(['destination'])
+            ->with(['destination', 'serviceDatabases'])
             ->where('uuid', request()->route('application_uuid'))
             ->firstOrFail();
 
@@ -56,6 +56,10 @@ class Configuration extends Component
         }
 
         if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
+            return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
+        }
+
+        if ($this->application->build_pack !== 'dockercompose' && $this->currentRoute === 'project.application.backups') {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
         }
     }
