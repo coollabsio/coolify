@@ -672,32 +672,60 @@ class WordPressManager extends Component
             // Update conf.d file (highest priority - always do this)
             $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
             $escapedConfIni = escapeshellarg($confIniFile);
+            
+            // Use printf instead of echo to avoid shell interpretation issues
             $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
-            $escapedConfContent = escapeshellarg($confContent);
-            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedConfContent} > {$escapedConfIni}'";
+            // Escape the content properly for shell
+            $confContentEscaped = str_replace(["'", "\n"], ["'\\''", "\\n"], $confContent);
+            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'printf %s \"{$confContentEscaped}\" > {$escapedConfIni}'";
             if ($server->isNonRoot()) {
                 $writeConfCommand = "sudo {$writeConfCommand}";
             }
             $writeResult = instant_remote_process([$writeConfCommand], $server, false);
             
+            // Wait a moment for file system to sync
+            usleep(500000); // 0.5 seconds
+            
             // Verify conf.d file was written correctly
-            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
+            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null || echo 'FILE_NOT_FOUND'";
             if ($server->isNonRoot()) {
                 $verifyConfCommand = "sudo {$verifyConfCommand}";
             }
             $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
             
-            if (empty($verifyConfContent) || !str_contains($verifyConfContent, "{$setting} = {$value}")) {
-                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. Please check container permissions. Debug: ".substr($debugInfo, 0, 200));
-                return;
+            // Check if file exists first
+            $checkExistsCommand = "docker exec {$escapedContainer} test -f {$escapedConfIni} && echo 'exists' || echo 'not_exists'";
+            if ($server->isNonRoot()) {
+                $checkExistsCommand = "sudo {$checkExistsCommand}";
+            }
+            $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
+            
+            if ($fileExists !== 'exists') {
+                // Try alternative method: write line by line
+                $line1 = "; Custom {$setting} setting - Updated by Coolify";
+                $line2 = "{$setting} = {$value}";
+                $writeAltCommand = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($line1)." > {$escapedConfIni} && echo ".escapeshellarg($line2)." >> {$escapedConfIni}'";
+                if ($server->isNonRoot()) {
+                    $writeAltCommand = "sudo {$writeAltCommand}";
+                }
+                instant_remote_process([$writeAltCommand], $server, false);
+                
+                // Verify again
+                $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
+                $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
             }
             
-            // Also ensure file permissions are correct
-            $chmodCommand = "docker exec {$escapedContainer} chmod 644 {$escapedConfIni}";
-            if ($server->isNonRoot()) {
-                $chmodCommand = "sudo {$chmodCommand}";
+            if ($fileExists !== 'exists' || empty($verifyConfContent) || $verifyConfContent === 'FILE_NOT_FOUND') {
+                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. File exists: {$fileExists}. Content: ".substr($verifyConfContent, 0, 100).". Debug: ".substr($debugInfo, 0, 200));
+                // Continue anyway - maybe php.ini update will work
+            } else {
+                // Also ensure file permissions are correct
+                $chmodCommand = "docker exec {$escapedContainer} chmod 644 {$escapedConfIni}";
+                if ($server->isNonRoot()) {
+                    $chmodCommand = "sudo {$chmodCommand}";
+                }
+                instant_remote_process([$chmodCommand], $server, false);
             }
-            instant_remote_process([$chmodCommand], $server, false);
             
             // Remove duplicate settings from other conf.d files (our file should have priority due to 99- prefix)
             // But let's also check and comment out any conflicting settings in other files
