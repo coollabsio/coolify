@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Models\Service;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class WordPressManager extends Component
@@ -670,56 +671,49 @@ class WordPressManager extends Component
             $debugInfo = instant_remote_process([$debugIniCommand], $server, false) ?? '';
             
             // Update conf.d file (highest priority - always do this)
+            // Use the same reliable method as FileExplorer: write to temp file, copy to server, then to container
             $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
             $escapedConfIni = escapeshellarg($confIniFile);
             
-            // Write file using a heredoc approach via sh -c with proper escaping
-            $line1 = "; Custom {$setting} setting - Updated by Coolify";
-            $line2 = "{$setting} = {$value}";
+            // Prepare file content
+            $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
             
-            // Method 1: Write using echo with proper escaping
-            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($line1)." > {$escapedConfIni} && echo ".escapeshellarg($line2)." >> {$escapedConfIni}'";
-            if ($server->isNonRoot()) {
-                $writeConfCommand = "sudo {$writeConfCommand}";
-            }
-            $writeResult = instant_remote_process([$writeConfCommand], $server, false);
-            
-            // Wait a moment for file system to sync
-            usleep(500000); // 0.5 seconds
-            
-            // Verify conf.d file was written correctly
-            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
-            if ($server->isNonRoot()) {
-                $verifyConfCommand = "sudo {$verifyConfCommand}";
-            }
-            $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
-            
-            // Check if file exists and has content
-            $checkExistsCommand = "docker exec {$escapedContainer} test -f {$escapedConfIni} && echo 'exists' || echo 'not_exists'";
-            if ($server->isNonRoot()) {
-                $checkExistsCommand = "sudo {$checkExistsCommand}";
-            }
-            $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
-            
-            // If file is empty or doesn't exist, try alternative method
-            if ($fileExists !== 'exists' || empty($verifyConfContent) || !str_contains($verifyConfContent, $setting)) {
-                // Method 2: Use base64 encoding to avoid shell escaping issues
-                $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
-                $base64Content = base64_encode($confContent);
-                $writeBase64Command = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($base64Content)." | base64 -d > {$escapedConfIni}'";
+            try {
+                // Save content to a temporary file locally
+                $tmpFilename = 'temp/'.uniqid('php-ini-').'.ini';
+                Storage::disk('local')->put($tmpFilename, $confContent);
+                $localTmpPath = Storage::disk('local')->path($tmpFilename);
+
+                // Copy to server temp location
+                $serverTmpPath = '/tmp/'.basename($tmpFilename);
+                instant_scp($localTmpPath, $serverTmpPath, $server);
+
+                // Copy from server temp to container
+                $escapedServerTmp = escapeshellarg($serverTmpPath);
+                $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedConfIni}";
                 if ($server->isNonRoot()) {
-                    $writeBase64Command = "sudo {$writeBase64Command}";
+                    $copyCommand = "sudo {$copyCommand}";
                 }
-                instant_remote_process([$writeBase64Command], $server, false);
+                instant_remote_process([$copyCommand], $server);
+
+                // Clean up temp files
+                Storage::disk('local')->delete($tmpFilename);
+                $cleanCommand = "rm -f {$escapedServerTmp}";
+                if ($server->isNonRoot()) {
+                    $cleanCommand = "sudo {$cleanCommand}";
+                }
+                instant_remote_process([$cleanCommand], $server, false);
                 
-                // Verify again
-                usleep(500000);
+                // Wait a moment for file system to sync
+                usleep(500000); // 0.5 seconds
+                
+                // Verify conf.d file was written correctly
+                $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $verifyConfCommand = "sudo {$verifyConfCommand}";
+                }
                 $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
-                $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
-            }
-            
-            // Final verification
-            if ($fileExists === 'exists' && !empty($verifyConfContent)) {
+                
                 // Extract value from file to verify
                 $extractValueCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
                 if ($server->isNonRoot()) {
@@ -735,10 +729,10 @@ class WordPressManager extends Component
                 instant_remote_process([$chmodCommand], $server, false);
                 
                 if (empty($fileValue) || $fileValue !== $value) {
-                    $this->dispatch('warning', "File written but content may be incorrect. File value: '{$fileValue}', Expected: '{$value}'. File content: ".substr($verifyConfContent, 0, 200));
+                    $this->dispatch('error', "File written but content verification failed. File value: '{$fileValue}', Expected: '{$value}'. File content: ".substr($verifyConfContent, 0, 200));
                 }
-            } else {
-                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. File exists: {$fileExists}. Content length: ".strlen($verifyConfContent).". Content: ".substr($verifyConfContent, 0, 200));
+            } catch (\Throwable $e) {
+                $this->dispatch('error', "Failed to write conf.d file: ".$e->getMessage());
             }
             
             // CRITICAL: Remove or comment out duplicate settings from other conf.d files
