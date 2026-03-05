@@ -181,13 +181,14 @@
                                                 <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                                                     <input type="text" 
                                                         id="php_setting_{{ $setting }}"
+                                                        value="{{ $value }}"
                                                         x-model="settings['{{ $setting }}']"
                                                         @keydown.enter="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="input flex-1 w-full sm:w-auto min-w-0"
+                                                        class="input flex-1 w-full min-w-0 bg-white dark:bg-coolgray-900 text-gray-900 dark:text-white border border-coolgray-300 dark:border-coolgray-600 px-3 py-2 rounded"
                                                         placeholder="{{ $value }}">
                                                     <x-forms.button 
                                                         x-on:click="updateSetting('{{ $setting }}', settings['{{ $setting }}'])"
-                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto">
+                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto flex-shrink-0">
                                                         Actualizar
                                                     </x-forms.button>
                                                 </div>
