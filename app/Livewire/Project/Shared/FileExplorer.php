@@ -212,25 +212,23 @@ class FileExplorer extends Component
                         ]);
                     }
                 });
-                // Load databases with service relationship to avoid N+1 queries
-                $this->resource->databases()->with('service.server')->get()->each(function ($database) {
-                    // Get server from database's service
-                    $dbServer = $database->service->server ?? null;
-
-                    // Validate server exists and has valid ID
-                    if (! $dbServer || ! ($dbServer instanceof \App\Models\Server) || empty($dbServer->id) || $dbServer->id === 0) {
+                // Load databases - use the service's server (all databases in a service are on the same server)
+                $this->resource->databases()->get()->each(function ($database) use ($server) {
+                    // Use the server from the loop (service's server) instead of trying to get it from database->service->server
+                    // All databases in a service are on the same server as the service
+                    if (! $server || ! ($server instanceof \App\Models\Server) || empty($server->id) || $server->id === 0) {
                         \Log::warning('Invalid server for database container', [
                             'database_id' => $database->id,
                             'database_name' => $database->name,
-                            'service_id' => $database->service_id ?? 'null',
-                            'server' => $dbServer ? 'exists but invalid' : 'null',
+                            'service_id' => $this->resource->id ?? 'null',
+                            'server' => $server ? 'exists but invalid' : 'null',
                         ]);
                         return; // Skip if server is not available or invalid
                     }
 
-                    if ($database->isRunning() && $dbServer->isTerminalEnabled()) {
+                    if ($database->isRunning() && $server->isTerminalEnabled()) {
                         $this->containers->push([
-                            'server' => $dbServer,
+                            'server' => $server,
                             'container' => [
                                 'Names' => data_get($database, 'name').'-'.data_get($this->resource, 'uuid'),
                             ],
@@ -1844,15 +1842,27 @@ class FileExplorer extends Component
             $server = data_get($container, 'server');
             $containerName = ltrim(data_get($container, 'container.Names'), '/');
 
-            // Validate server exists and is a valid Server instance
-            if (is_null($server) || ! ($server instanceof \App\Models\Server)) {
-                \Log::warning('Invalid server in container data', [
+            // Validate server exists
+            if (is_null($server)) {
+                \Log::warning('Server is null in container data', [
                     'container' => $containerName,
-                    'server_type' => gettype($server),
-                    'server' => $server ? 'exists but not Server instance' : 'null',
+                    'containers_count' => $this->containers->count(),
+                    'selected_container' => $this->selected_container,
                 ]);
                 $this->adminerUrl = null;
                 $this->dispatch('error', 'Invalid server configuration. Server not found for this container.');
+                return;
+            }
+
+            // Validate server is a valid Server instance
+            if (! ($server instanceof \App\Models\Server)) {
+                \Log::warning('Server is not Server instance', [
+                    'container' => $containerName,
+                    'server_type' => gettype($server),
+                    'server_class' => is_object($server) ? get_class($server) : 'not object',
+                ]);
+                $this->adminerUrl = null;
+                $this->dispatch('error', 'Invalid server configuration. Server type is incorrect.');
                 return;
             }
 
