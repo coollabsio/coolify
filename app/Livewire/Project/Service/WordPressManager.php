@@ -673,11 +673,12 @@ class WordPressManager extends Component
             $confIniFile = $confDirPath.'/99-custom-'.$setting.'.ini';
             $escapedConfIni = escapeshellarg($confIniFile);
             
-            // Use printf instead of echo to avoid shell interpretation issues
-            $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
-            // Escape the content properly for shell
-            $confContentEscaped = str_replace(["'", "\n"], ["'\\''", "\\n"], $confContent);
-            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'printf %s \"{$confContentEscaped}\" > {$escapedConfIni}'";
+            // Write file using a heredoc approach via sh -c with proper escaping
+            $line1 = "; Custom {$setting} setting - Updated by Coolify";
+            $line2 = "{$setting} = {$value}";
+            
+            // Method 1: Write using echo with proper escaping
+            $writeConfCommand = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($line1)." > {$escapedConfIni} && echo ".escapeshellarg($line2)." >> {$escapedConfIni}'";
             if ($server->isNonRoot()) {
                 $writeConfCommand = "sudo {$writeConfCommand}";
             }
@@ -687,68 +688,84 @@ class WordPressManager extends Component
             usleep(500000); // 0.5 seconds
             
             // Verify conf.d file was written correctly
-            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null || echo 'FILE_NOT_FOUND'";
+            $verifyConfCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
             if ($server->isNonRoot()) {
                 $verifyConfCommand = "sudo {$verifyConfCommand}";
             }
             $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
             
-            // Check if file exists first
+            // Check if file exists and has content
             $checkExistsCommand = "docker exec {$escapedContainer} test -f {$escapedConfIni} && echo 'exists' || echo 'not_exists'";
             if ($server->isNonRoot()) {
                 $checkExistsCommand = "sudo {$checkExistsCommand}";
             }
             $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
             
-            if ($fileExists !== 'exists') {
-                // Try alternative method: write line by line
-                $line1 = "; Custom {$setting} setting - Updated by Coolify";
-                $line2 = "{$setting} = {$value}";
-                $writeAltCommand = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($line1)." > {$escapedConfIni} && echo ".escapeshellarg($line2)." >> {$escapedConfIni}'";
+            // If file is empty or doesn't exist, try alternative method
+            if ($fileExists !== 'exists' || empty($verifyConfContent) || !str_contains($verifyConfContent, $setting)) {
+                // Method 2: Use base64 encoding to avoid shell escaping issues
+                $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
+                $base64Content = base64_encode($confContent);
+                $writeBase64Command = "docker exec {$escapedContainer} sh -c 'echo ".escapeshellarg($base64Content)." | base64 -d > {$escapedConfIni}'";
                 if ($server->isNonRoot()) {
-                    $writeAltCommand = "sudo {$writeAltCommand}";
+                    $writeBase64Command = "sudo {$writeBase64Command}";
                 }
-                instant_remote_process([$writeAltCommand], $server, false);
+                instant_remote_process([$writeBase64Command], $server, false);
                 
                 // Verify again
+                usleep(500000);
                 $verifyConfContent = instant_remote_process([$verifyConfCommand], $server, false) ?? '';
                 $fileExists = trim(instant_remote_process([$checkExistsCommand], $server, false) ?? '');
             }
             
-            if ($fileExists !== 'exists' || empty($verifyConfContent) || $verifyConfContent === 'FILE_NOT_FOUND') {
-                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. File exists: {$fileExists}. Content: ".substr($verifyConfContent, 0, 100).". Debug: ".substr($debugInfo, 0, 200));
-                // Continue anyway - maybe php.ini update will work
-            } else {
-                // Also ensure file permissions are correct
+            // Final verification
+            if ($fileExists === 'exists' && !empty($verifyConfContent)) {
+                // Extract value from file to verify
+                $extractValueCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
+                if ($server->isNonRoot()) {
+                    $extractValueCommand = "sudo {$extractValueCommand}";
+                }
+                $fileValue = trim(instant_remote_process([$extractValueCommand], $server, false) ?? '');
+                
+                // Ensure file permissions are correct
                 $chmodCommand = "docker exec {$escapedContainer} chmod 644 {$escapedConfIni}";
                 if ($server->isNonRoot()) {
                     $chmodCommand = "sudo {$chmodCommand}";
                 }
                 instant_remote_process([$chmodCommand], $server, false);
+                
+                if (empty($fileValue) || $fileValue !== $value) {
+                    $this->dispatch('warning', "File written but content may be incorrect. File value: '{$fileValue}', Expected: '{$value}'. File content: ".substr($verifyConfContent, 0, 200));
+                }
+            } else {
+                $this->dispatch('error', "Failed to write conf.d file at {$confIniFile}. File exists: {$fileExists}. Content length: ".strlen($verifyConfContent).". Content: ".substr($verifyConfContent, 0, 200));
             }
             
-            // Remove duplicate settings from other conf.d files (our file should have priority due to 99- prefix)
-            // But let's also check and comment out any conflicting settings in other files
-            $listConfFilesCommand = "docker exec {$escapedContainer} find {$confDirPath} -name '*.ini' -type f ! -name '99-custom-{$setting}.ini' 2>/dev/null";
+            // CRITICAL: Remove or comment out duplicate settings from other conf.d files
+            // Files are loaded alphabetically, so 99- prefix ensures our file loads last
+            // But we should still check for conflicts
+            $listConfFilesCommand = "docker exec {$escapedContainer} find {$confDirPath} -name '*.ini' -type f ! -name '99-custom-{$setting}.ini' 2>/dev/null | sort";
             if ($server->isNonRoot()) {
                 $listConfFilesCommand = "sudo {$listConfFilesCommand}";
             }
             $otherConfFiles = explode("\n", trim(instant_remote_process([$listConfFilesCommand], $server, false) ?? ''));
             
+            $conflictingFiles = [];
             foreach ($otherConfFiles as $otherFile) {
                 $otherFile = trim($otherFile);
                 if (empty($otherFile) || !str_starts_with($otherFile, '/')) {
                     continue;
                 }
                 
-                // Check if this file has our setting
-                $checkSettingCommand = "docker exec {$escapedContainer} grep -q '^{$setting}\s*=' ".escapeshellarg($otherFile)." 2>/dev/null && echo found || echo notfound";
+                // Check if this file has our setting (commented or not)
+                $checkSettingCommand = "docker exec {$escapedContainer} grep -E '^[;]*\s*{$setting}\s*=' ".escapeshellarg($otherFile)." 2>/dev/null | head -1";
                 if ($server->isNonRoot()) {
                     $checkSettingCommand = "sudo {$checkSettingCommand}";
                 }
-                $hasSetting = trim(instant_remote_process([$checkSettingCommand], $server, false) ?? '');
+                $settingLine = trim(instant_remote_process([$checkSettingCommand], $server, false) ?? '');
                 
-                if ($hasSetting === 'found') {
+                if (!empty($settingLine)) {
+                    $conflictingFiles[] = $otherFile;
                     // Comment out the setting in this file (our 99- file will override it)
                     $escapedOtherFile = escapeshellarg($otherFile);
                     $commentCommand = "docker exec {$escapedContainer} sed -i 's/^\([;]*\s*\){$escapedSetting}\s*=.*/; \\1{$escapedSetting} = (overridden by 99-custom-{$setting}.ini)/' {$escapedOtherFile}";
@@ -757,6 +774,11 @@ class WordPressManager extends Component
                     }
                     instant_remote_process([$commentCommand], $server, false);
                 }
+            }
+            
+            // Log conflicting files for debugging
+            if (!empty($conflictingFiles)) {
+                $this->dispatch('warning', "Found conflicting settings in: ".implode(', ', $conflictingFiles).". They have been commented out.");
             }
 
             // Also update php.ini file (for completeness, but conf.d takes precedence)
@@ -841,12 +863,27 @@ class WordPressManager extends Component
                 $verifiedValue = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
             }
             
-            // Method 3: Check conf.d file content directly
-            $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | awk -F'=' '{print \$2}' | xargs";
+            // Method 3: Check conf.d file content directly - multiple methods
+            $confFileValue = null;
+            
+            // Try grep method
+            $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
             if ($server->isNonRoot()) {
                 $checkConfCommand = "sudo {$checkConfCommand}";
             }
             $confFileValue = trim(instant_remote_process([$checkConfCommand], $server, false) ?? '');
+            
+            // If empty, try reading entire file and parsing
+            if (empty($confFileValue)) {
+                $readFileCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $readFileCommand = "sudo {$readFileCommand}";
+                }
+                $fileContent = instant_remote_process([$readFileCommand], $server, false) ?? '';
+                if (!empty($fileContent) && preg_match('/'.$setting.'\s*=\s*([^\s]+)/', $fileContent, $matches)) {
+                    $confFileValue = trim($matches[1]);
+                }
+            }
             
             // Reload settings to update UI
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
