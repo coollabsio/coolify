@@ -1820,32 +1820,130 @@ class FileExplorer extends Component
     public function generateAdminerUrl()
     {
         try {
+            \Log::info('=== generateAdminerUrl START ===', [
+                'selected_container' => $this->selected_container,
+                'type' => $this->type,
+                'resource_exists' => isset($this->resource),
+                'resource_class' => isset($this->resource) ? get_class($this->resource) : 'null',
+                'containers_count' => $this->containers->count(),
+                'parameters' => $this->parameters,
+            ]);
+
             // Get server directly from resource - this is the most reliable way
             $server = null;
             if (isset($this->resource)) {
-                if ($this->type === 'service' && isset($this->resource->server)) {
-                    $server = $this->resource->server;
-                } elseif ($this->type === 'application' && isset($this->resource->destination->server)) {
-                    $server = $this->resource->destination->server;
-                } elseif ($this->type === 'database' && isset($this->resource->destination->server)) {
-                    $server = $this->resource->destination->server;
+                \Log::info('Resource exists, trying to get server', [
+                    'type' => $this->type,
+                    'resource_id' => $this->resource->id ?? 'null',
+                    'resource_uuid' => $this->resource->uuid ?? 'null',
+                ]);
+
+                if ($this->type === 'service') {
+                    \Log::info('Type is service', [
+                        'has_server' => isset($this->resource->server),
+                        'server_id' => $this->resource->server->id ?? 'null',
+                    ]);
+                    if (isset($this->resource->server)) {
+                        $server = $this->resource->server;
+                        \Log::info('Got server from service', ['server_id' => $server->id ?? 'null']);
+                    }
+                } elseif ($this->type === 'application') {
+                    \Log::info('Type is application', [
+                        'has_destination' => isset($this->resource->destination),
+                        'destination_class' => isset($this->resource->destination) ? get_class($this->resource->destination) : 'null',
+                        'has_server' => isset($this->resource->destination->server),
+                    ]);
+                    if (isset($this->resource->destination->server)) {
+                        $server = $this->resource->destination->server;
+                        \Log::info('Got server from application destination', ['server_id' => $server->id ?? 'null']);
+                    }
+                } elseif ($this->type === 'database') {
+                    \Log::info('Type is database', [
+                        'has_destination' => isset($this->resource->destination),
+                        'destination_class' => isset($this->resource->destination) ? get_class($this->resource->destination) : 'null',
+                        'has_server' => isset($this->resource->destination->server),
+                    ]);
+                    if (isset($this->resource->destination->server)) {
+                        $server = $this->resource->destination->server;
+                        \Log::info('Got server from database destination', ['server_id' => $server->id ?? 'null']);
+                    }
                 }
+            } else {
+                \Log::warning('Resource is not set!', [
+                    'type' => $this->type,
+                    'parameters' => $this->parameters,
+                ]);
             }
 
             // Fallback: try to get from container if resource doesn't have it
             if (is_null($server)) {
+                \Log::info('Server is null, trying fallback from containers', [
+                    'containers_count' => $this->containers->count(),
+                    'selected_container' => $this->selected_container,
+                ]);
                 $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
                 if ($container) {
+                    \Log::info('Found container in collection', [
+                        'container_name' => data_get($container, 'container.Names'),
+                        'has_server' => isset($container['server']),
+                    ]);
                     $server = data_get($container, 'server');
+                    if ($server) {
+                        \Log::info('Got server from container', [
+                            'server_id' => $server->id ?? 'null',
+                            'server_class' => get_class($server),
+                        ]);
+                    }
+                } else {
+                    \Log::warning('Container not found in collection', [
+                        'selected_container' => $this->selected_container,
+                        'available_containers' => $this->containers->map(fn($c) => data_get($c, 'container.Names'))->toArray(),
+                    ]);
                 }
             }
 
             // Validate server
-            if (is_null($server) || ! ($server instanceof \App\Models\Server) || empty($server->id) || $server->id === 0) {
+            \Log::info('Validating server', [
+                'server_is_null' => is_null($server),
+                'server_is_instance' => $server instanceof \App\Models\Server,
+                'server_id' => $server ? ($server->id ?? 'null') : 'null',
+                'server_class' => $server ? get_class($server) : 'null',
+            ]);
+
+            if (is_null($server)) {
+                \Log::error('Server is NULL after all attempts', [
+                    'type' => $this->type,
+                    'resource_exists' => isset($this->resource),
+                    'containers_count' => $this->containers->count(),
+                    'selected_container' => $this->selected_container,
+                ]);
                 $this->adminerUrl = null;
-                $this->dispatch('error', 'Invalid server configuration. Server not found.');
+                $this->dispatch('error', 'Invalid server configuration. Server not found. Check logs for details.');
                 return;
             }
+
+            if (! ($server instanceof \App\Models\Server)) {
+                \Log::error('Server is not Server instance', [
+                    'server_type' => gettype($server),
+                    'server_class' => is_object($server) ? get_class($server) : 'not object',
+                    'server_value' => is_object($server) ? json_encode($server->toArray() ?? []) : (string)$server,
+                ]);
+                $this->adminerUrl = null;
+                $this->dispatch('error', 'Invalid server configuration. Server type is incorrect. Check logs for details.');
+                return;
+            }
+
+            if (empty($server->id) || $server->id === 0) {
+                \Log::error('Server ID is invalid', [
+                    'server_id' => $server->id ?? 'null',
+                    'server_exists' => $server->exists ?? 'null',
+                ]);
+                $this->adminerUrl = null;
+                $this->dispatch('error', 'Invalid server configuration. Server ID is missing or invalid. Check logs for details.');
+                return;
+            }
+
+            \Log::info('Server validation passed', ['server_id' => $server->id]);
 
             $containerName = ltrim($this->selected_container, '/');
 
