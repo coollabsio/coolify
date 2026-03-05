@@ -68,11 +68,55 @@ class AdminerController extends Controller
         $database = $dbMatches[1] ?? '';
         $isMariaDB = ! empty($mariadbMatches[1]) || str_contains(strtolower($container), 'mariadb');
 
-        // Read Adminer file
-        $adminerContent = file_get_contents($adminerPath);
+        // Execute Adminer and capture output
+        // Adminer latest.php is a single PHP file that outputs HTML
+        // We need to execute it within an output buffer to capture the HTML
+        ob_start();
+        ob_implicit_flush(0);
+        
+        try {
+            // Set up Adminer environment variables for auto-login via URL parameters
+            // Adminer will read these from $_GET
+            $_GET['server'] = 'localhost';
+            $_GET['username'] = 'root';
+            $_GET['password'] = $password;
+            $_GET['driver'] = $isMariaDB ? 'mariadb' : 'mysql';
+            if ($database) {
+                $_GET['db'] = $database;
+            }
+
+            // Temporarily change directory to adminer's location to handle relative paths
+            $oldCwd = getcwd();
+            chdir(dirname($adminerPath));
+
+            // Include Adminer file (it will execute and output HTML)
+            // Suppress errors to prevent them from breaking the output
+            $oldErrorReporting = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+            include basename($adminerPath);
+            error_reporting($oldErrorReporting);
+            
+            // Restore directory
+            chdir($oldCwd);
+            
+            $adminerContent = ob_get_clean();
+            
+            // If output is empty or looks like PHP code, something went wrong
+            if (empty($adminerContent) || (strpos($adminerContent, '<?php') === 0 && strpos($adminerContent, '<!DOCTYPE') === false && strpos($adminerContent, '<html') === false)) {
+                throw new \Exception('Adminer did not output valid HTML');
+            }
+        } catch (\Throwable $e) {
+            $output = ob_get_clean();
+            // If we got some output despite the error, use it
+            if (!empty($output) && strpos($output, '<!DOCTYPE') !== false) {
+                $adminerContent = $output;
+            } else {
+                // If no valid output, abort with error
+                abort(500, 'Failed to execute Adminer: '.$e->getMessage());
+            }
+        }
 
         // Adminer accepts URL parameters for auto-login: ?server=localhost&username=root&password=xxx&driver=mysql
-        // We'll inject JavaScript to auto-fill and submit the login form
+        // We'll inject JavaScript to auto-fill and submit the login form as a fallback
         $autoLoginScript = "
         <script>
         window.addEventListener('DOMContentLoaded', function() {
@@ -96,9 +140,14 @@ class AdminerController extends Controller
         });
         </script>";
 
-        // Inject script before closing body tag
-        $adminerContent = str_replace('</body>', $autoLoginScript.'</body>', $adminerContent);
+        // Inject script before closing body tag (if exists) or at the end
+        if (strpos($adminerContent, '</body>') !== false) {
+            $adminerContent = str_replace('</body>', $autoLoginScript.'</body>', $adminerContent);
+        } else {
+            // If no body tag, append at the end
+            $adminerContent .= $autoLoginScript;
+        }
 
-        return response($adminerContent)->header('Content-Type', 'text/html');
+        return response($adminerContent)->header('Content-Type', 'text/html; charset=utf-8');
     }
 }
