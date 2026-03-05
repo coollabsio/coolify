@@ -766,7 +766,7 @@
         x-cloak
         x-transition
         @keydown.escape.window="modalOpen = false; $wire.closeDatabasePanel()"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
         style="display: none;">
         <div @click.away="modalOpen = false; $wire.closeDatabasePanel()"
             x-transition:enter="ease-out duration-300"
@@ -775,9 +775,10 @@
             x-transition:leave="ease-in duration-200"
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-95"
-            class="relative w-full max-w-[95vw] h-[90vh] bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            class="relative w-full max-w-[95vw] my-4 bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col border border-coolgray-300 dark:border-coolgray-600"
+            style="max-height: calc(100vh - 2rem);">
             <!-- Header -->
-            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+            <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <div class="flex items-center gap-3">
                     <svg class="w-6 h-6 text-coollabs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
@@ -794,9 +795,9 @@
             </div>
             
             <!-- Main Content Area -->
-            <div class="flex-1 flex overflow-hidden">
+            <div class="flex-1 flex overflow-hidden min-h-0" style="min-height: 0;">
                 <!-- Sidebar -->
-                <div class="w-80 border-r border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900 flex flex-col overflow-hidden">
+                <div class="w-80 flex-shrink-0 border-r border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900 flex flex-col overflow-hidden">
                     <!-- Database Selector -->
                     <div class="p-4 border-b border-coolgray-300 dark:border-coolgray-600">
                         <label class="block text-sm font-semibold dark:text-white mb-2">Select Database</label>
@@ -855,9 +856,9 @@
                 </div>
                 
                 <!-- Main Content -->
-                <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-base">
+                <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-base min-w-0" style="min-height: 0;">
                     @if (empty($selectedTable))
-                        <div class="flex-1 flex items-center justify-center p-8">
+                        <div class="flex-1 flex items-center justify-center p-8 overflow-y-auto">
                             <div class="text-center">
                                 <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -867,7 +868,7 @@
                         </div>
                     @else
                         <!-- Tabs -->
-                        <div class="flex gap-1 p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                        <div class="flex-shrink-0 flex gap-1 p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                             <button @click="activeTab = 'data'" :class="activeTab === 'data' ? 'bg-coollabs text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'" class="px-4 py-2 text-sm font-medium rounded-lg transition-colors">
                                 Data
                             </button>
@@ -877,7 +878,7 @@
                         </div>
                         
                         <!-- Tab Content -->
-                        <div class="flex-1 overflow-auto p-4">
+                        <div class="flex-1 overflow-y-auto overflow-x-auto p-4" style="min-height: 0;">
                             <!-- Data Tab -->
                             <div x-show="activeTab === 'data'" x-cloak>
                                 <div class="flex items-center justify-between mb-4">
