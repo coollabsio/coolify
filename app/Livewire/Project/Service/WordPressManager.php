@@ -681,6 +681,15 @@ class WordPressManager extends Component
             // Prepare file content
             $confContent = "; Custom {$setting} setting - Updated by Coolify\n{$setting} = {$value}\n";
             
+            // Ensure php-config directory exists in workdir
+            $workdir = $application->service->workdir();
+            $phpConfigDir = $workdir.'/php-config';
+            $createDirCommand = "mkdir -p ".escapeshellarg($phpConfigDir);
+            if ($server->isNonRoot()) {
+                $createDirCommand = "sudo {$createDirCommand}";
+            }
+            instant_remote_process([$createDirCommand], $server, false);
+            
             try {
                 // Find or create LocalFileVolume for this PHP config file
                 $fileVolume = LocalFileVolume::where('resource_type', ServiceApplication::class)
@@ -867,9 +876,11 @@ class WordPressManager extends Component
             
             // Method 3: Check conf.d file content directly - multiple methods
             $confFileValue = null;
+            $confIniFileForCheck = $confDirPath.'/99-custom-'.$setting.'.ini';
+            $escapedConfIniForCheck = escapeshellarg($confIniFileForCheck);
             
             // Try grep method
-            $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIni} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
+            $checkConfCommand = "docker exec {$escapedContainer} grep -E '^{$setting}\s*=' {$escapedConfIniForCheck} 2>/dev/null | head -1 | sed 's/.*=\\s*//' | xargs";
             if ($server->isNonRoot()) {
                 $checkConfCommand = "sudo {$checkConfCommand}";
             }
@@ -877,7 +888,7 @@ class WordPressManager extends Component
             
             // If empty, try reading entire file and parsing
             if (empty($confFileValue)) {
-                $readFileCommand = "docker exec {$escapedContainer} cat {$escapedConfIni} 2>/dev/null";
+                $readFileCommand = "docker exec {$escapedContainer} cat {$escapedConfIniForCheck} 2>/dev/null";
                 if ($server->isNonRoot()) {
                     $readFileCommand = "sudo {$readFileCommand}";
                 }
@@ -890,22 +901,8 @@ class WordPressManager extends Component
             // Reload settings to update UI
             $this->loadPhpIniSettings($this->selectedContainerForPhpIni);
             
-            // Show appropriate message with debug info
-            $debugMsg = "Files updated: {$confIniFile} and {$phpIniPath}. ";
-            if (!empty($debugInfo)) {
-                $debugMsg .= "PHP config: ".substr($debugInfo, 0, 100).". ";
-            }
-            
-            // IMPORTANT: Note about persistence
-            $persistenceNote = "NOTE: Changes are written to the container's filesystem. If the container is recreated from the image, these changes will be lost. To make changes permanent, consider using Docker volumes or modifying the Dockerfile.";
-            
-            if (!empty($verifiedValue) && $verifiedValue === $value) {
-                $this->dispatch('success', "PHP setting {$setting} updated to {$value} and verified successfully. {$debugMsg}");
-            } elseif (!empty($confFileValue) && $confFileValue === $value) {
-                $this->dispatch('success', "PHP setting {$setting} updated to {$value} in both conf.d ({$confIniFile}) and php.ini ({$phpIniPath}). PHP currently reports: {$verifiedValue}. Container restart may be needed. {$persistenceNote}");
-            } else {
-                $this->dispatch('warning', "Setting written to files. conf.d value: {$confFileValue}, PHP reports: {$verifiedValue}, Expected: {$value}. Both php.ini and conf.d have been updated. Please restart the container. {$persistenceNote}");
-            }
+            // Note: Success message is already dispatched in the try block above
+            // This section is only reached if there's an error or if we need additional verification
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Error updating PHP setting: '.$e->getMessage());
         }
