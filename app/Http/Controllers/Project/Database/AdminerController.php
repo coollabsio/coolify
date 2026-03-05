@@ -68,9 +68,12 @@ class AdminerController extends Controller
         $database = $dbMatches[1] ?? '';
         $isMariaDB = ! empty($mariadbMatches[1]) || str_contains(strtolower($container), 'mariadb');
 
+        // Set headers BEFORE executing Adminer so they have priority
+        // This prevents Adminer from blocking iframe embedding
+        header('X-Frame-Options: SAMEORIGIN', true); // true = replace existing
+        header('Content-Security-Policy: script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; connect-src \'self\' https://www.adminer.org; frame-src \'self\'; object-src \'none\'; base-uri \'self\'; form-action \'self\'', true);
+        
         // Execute Adminer and capture output
-        // Adminer latest.php is a single PHP file that outputs HTML
-        // We need to execute it within an output buffer to capture the HTML
         ob_start();
         ob_implicit_flush(0);
         
@@ -104,11 +107,20 @@ class AdminerController extends Controller
             if (empty($adminerContent) || (strpos($adminerContent, '<?php') === 0 && strpos($adminerContent, '<!DOCTYPE') === false && strpos($adminerContent, '<html') === false)) {
                 throw new \Exception('Adminer did not output valid HTML');
             }
+            
+            // Remove problematic meta tags from Adminer's HTML that block iframes
+            // Remove CSP meta tags that have frame-src 'none'
+            $adminerContent = preg_replace('/<meta[^>]*http-equiv=["\']Content-Security-Policy["\'][^>]*>/i', '', $adminerContent);
+            // Remove X-Frame-Options meta tags
+            $adminerContent = preg_replace('/<meta[^>]*http-equiv=["\']X-Frame-Options["\'][^>]*>/i', '', $adminerContent);
         } catch (\Throwable $e) {
             $output = ob_get_clean();
             // If we got some output despite the error, use it
             if (!empty($output) && strpos($output, '<!DOCTYPE') !== false) {
                 $adminerContent = $output;
+                // Remove problematic meta tags
+                $adminerContent = preg_replace('/<meta[^>]*http-equiv=["\']Content-Security-Policy["\'][^>]*>/i', '', $adminerContent);
+                $adminerContent = preg_replace('/<meta[^>]*http-equiv=["\']X-Frame-Options["\'][^>]*>/i', '', $adminerContent);
             } else {
                 // If no valid output, abort with error
                 abort(500, 'Failed to execute Adminer: '.$e->getMessage());
@@ -149,13 +161,22 @@ class AdminerController extends Controller
         }
 
         // Return response with proper headers to allow iframe embedding
-        // We need to remove any existing X-Frame-Options header and set it to SAMEORIGIN
+        // Adminer sets its own headers, so we need to override them completely
         $response = response($adminerContent)
             ->header('Content-Type', 'text/html; charset=utf-8');
         
-        // Remove any existing X-Frame-Options header and set to SAMEORIGIN
+        // Remove ALL headers that Adminer may have set
         $response->headers->remove('X-Frame-Options');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN', false); // false = replace existing
+        $response->headers->remove('Content-Security-Policy');
+        $response->headers->remove('X-Content-Type-Options');
+        $response->headers->remove('X-XSS-Protection');
+        
+        // Set our own headers that allow iframe embedding
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN', false);
+        
+        // Modify CSP to allow frames from same origin
+        $csp = "script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://www.adminer.org; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
+        $response->headers->set('Content-Security-Policy', $csp, false);
         
         // Set other security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');
