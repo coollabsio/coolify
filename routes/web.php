@@ -216,7 +216,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/files', FileExplorer::class)->name('project.application.files')->middleware('can.access.terminal');
-        Route::get('/adminer', [\App\Http\Controllers\Project\Database\AdminerController::class, 'index'])->name('project.application.adminer')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
@@ -235,7 +234,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.database.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/files', FileExplorer::class)->name('project.database.files')->middleware('can.access.terminal');
-        Route::get('/adminer', [\App\Http\Controllers\Project\Database\AdminerController::class, 'index'])->name('project.database.adminer')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
@@ -251,7 +249,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/files', FileExplorer::class)->name('project.service.files')->middleware('can.access.terminal');
-        Route::get('/adminer', [\App\Http\Controllers\Project\Database\AdminerController::class, 'index'])->name('project.service.adminer')->middleware('can.access.terminal');
         Route::get('/wordpress-manager', WordPressManager::class)->name('project.service.wordpress-manager');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
