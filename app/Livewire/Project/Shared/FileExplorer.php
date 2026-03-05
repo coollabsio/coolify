@@ -1018,27 +1018,25 @@ class FileExplorer extends Component
 
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $escapedFilePath = escapeshellarg($filePath);
-            $dir = escapeshellarg(dirname($filePath));
-
-            $command = "docker exec {$escapedContainer} sh -c 'cd {$dir} && ";
+            $innerCommand = "cd " . escapeshellarg(dirname($filePath)) . " && ";
             if (str_ends_with(strtolower($filePath), '.zip')) {
                 // unzip -q (quiet) -d sets the destination directory
-                $command .= "unzip -q -o " . escapeshellarg(basename($filePath)) . " -d .";
+                $innerCommand .= "unzip -q -o " . escapeshellarg(basename($filePath)) . " -d .";
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
                 // tar -C sets the destination directory
-                $command .= "tar -xzf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "tar -xzf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                $command .= "tar -xjf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "tar -xjf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                $command .= "tar -xJf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "tar -xJf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                $command .= "tar -xf " . escapeshellarg(basename($filePath)) . " -C .";
+                $innerCommand .= "tar -xf " . escapeshellarg(basename($filePath)) . " -C .";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
                 // gzip replaces the file in place by default, so we just run it
-                $command .= "gzip -d -k " . escapeshellarg(basename($filePath));
+                $innerCommand .= "gzip -d -k " . escapeshellarg(basename($filePath));
             }
-            $command .= "'";
+            
+            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
@@ -1152,48 +1150,48 @@ class FileExplorer extends Component
             $extension = strtolower(pathinfo($this->compressArchiveName, PATHINFO_EXTENSION));
             $baseExtension = strtolower(pathinfo(pathinfo($this->compressArchiveName, PATHINFO_FILENAME), PATHINFO_EXTENSION));
 
-            $command = "docker exec {$escapedContainer} sh -c 'cd {$escapedDir} && ";
+            $innerCommand = "cd {$escapedDir} && ";
 
             if ($extension === 'zip') {
-                $command .= 'if command -v zip >/dev/null 2>&1; then ';
+                $innerCommand .= 'if command -v zip >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $command .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchive} && ";
                 }
-                $command .= "zip -r {$escapedArchive} {$filesList} 2>&1; ";
-                $command .= 'else echo "zip not available" && exit 1; ';
-                $command .= 'fi';
+                $innerCommand .= "zip -r {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= 'else echo "zip not available" && exit 1; ';
+                $innerCommand .= 'fi';
             } elseif (in_array($extension, ['gz', 'tgz']) || ($extension === 'gz' && str_ends_with($baseExtension, '.tar'))) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
+                $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $command .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchive} && ";
                 }
-                $command .= "tar -czf {$escapedArchive} {$filesList} 2>&1; ";
-                $command .= 'else echo "tar/gzip not available" && exit 1; ';
-                $command .= 'fi';
+                $innerCommand .= "tar -czf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= 'else echo "tar/gzip not available" && exit 1; ';
+                $innerCommand .= 'fi';
             } elseif (in_array($extension, ['bz2', 'tbz2', 'tbz']) || ($extension === 'bz2' && str_ends_with($baseExtension, '.tar'))) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
+                $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v bzip2 >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $command .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchive} && ";
                 }
-                $command .= "tar -cjf {$escapedArchive} {$filesList} 2>&1; ";
-                $command .= 'else echo "tar/bzip2 not available" && exit 1; ';
-                $command .= 'fi';
+                $innerCommand .= "tar -cjf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= 'else echo "tar/bzip2 not available" && exit 1; ';
+                $innerCommand .= 'fi';
             } elseif (in_array($extension, ['xz', 'txz']) || ($extension === 'xz' && str_ends_with($baseExtension, '.tar'))) {
-                $command .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
+                $innerCommand .= 'if command -v tar >/dev/null 2>&1 && command -v xz >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $command .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchive} && ";
                 }
-                $command .= "tar -cJf {$escapedArchive} {$filesList} 2>&1; ";
-                $command .= 'else echo "tar/xz not available" && exit 1; ';
-                $command .= 'fi';
+                $innerCommand .= "tar -cJf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= 'else echo "tar/xz not available" && exit 1; ';
+                $innerCommand .= 'fi';
             } elseif ($extension === 'tar') {
-                $command .= 'if command -v tar >/dev/null 2>&1; then ';
+                $innerCommand .= 'if command -v tar >/dev/null 2>&1; then ';
                 if ($this->overwriteExisting && $exists) {
-                    $command .= "rm -f {$escapedArchive} && ";
+                    $innerCommand .= "rm -f {$escapedArchive} && ";
                 }
-                $command .= "tar -cf {$escapedArchive} {$filesList} 2>&1; ";
-                $command .= 'else echo "tar not available" && exit 1; ';
-                $command .= 'fi';
+                $innerCommand .= "tar -cf {$escapedArchive} {$filesList} 2>&1; ";
+                $innerCommand .= 'else echo "tar not available" && exit 1; ';
+                $innerCommand .= 'fi';
             } else {
                 $this->dispatch('error', 'Unsupported archive format. Use .zip, .tar, .tar.gz, .tar.bz2, or .tar.xz');
                 $this->showCompressDialog = false;
@@ -1201,7 +1199,7 @@ class FileExplorer extends Component
                 return;
             }
 
-            $command .= "'";
+            $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
 
             if ($server->isNonRoot()) {
                 $command = "sudo {$command}";
