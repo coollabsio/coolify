@@ -49,9 +49,10 @@ class ResourceOperations extends Component
     {
         $this->authorize('update', $this->resource);
 
-        $new_destination = StandaloneDocker::find($destination_id);
+        $teamScope = fn ($q) => $q->where('team_id', currentTeam()->id);
+        $new_destination = StandaloneDocker::whereHas('server', $teamScope)->find($destination_id);
         if (! $new_destination) {
-            $new_destination = SwarmDocker::find($destination_id);
+            $new_destination = SwarmDocker::whereHas('server', $teamScope)->find($destination_id);
         }
         if (! $new_destination) {
             return $this->addError('destination_id', 'Destination not found.');
@@ -352,7 +353,7 @@ class ResourceOperations extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $new_environment = Environment::findOrFail($environment_id);
+            $new_environment = Environment::ownedByCurrentTeam()->findOrFail($environment_id);
             $this->resource->update([
                 'environment_id' => $environment_id,
             ]);

@@ -24,6 +24,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Horizon\Contracts\Silenced;
 
 class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
@@ -130,7 +131,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         $this->containers = collect(data_get($data, 'containers'));
         $filesystemUsageRoot = data_get($data, 'filesystem_usage_root.used_percentage');
-        ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+
+        // Only dispatch storage check when disk percentage actually changes
+        $storageCacheKey = 'storage-check:'.$this->server->id;
+        $lastPercentage = Cache::get($storageCacheKey);
+        if ($lastPercentage === null || (string) $lastPercentage !== (string) $filesystemUsageRoot) {
+            Cache::put($storageCacheKey, $filesystemUsageRoot, 600);
+            ServerStorageCheckJob::dispatch($this->server, $filesystemUsageRoot);
+        }
 
         if ($this->containers->isEmpty()) {
             return;
@@ -207,6 +215,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $serviceId = $labels->get('coolify.serviceId');
                 $subType = $labels->get('coolify.service.subType');
                 $subId = $labels->get('coolify.service.subId');
+                if (empty(trim((string) $subId))) {
+                    continue;
+                }
                 if ($subType === 'application') {
                     $this->foundServiceApplicationIds->push($subId);
                     // Store container status for aggregation
@@ -324,6 +335,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             // Parse key: serviceId:subType:subId
             [$serviceId, $subType, $subId] = explode(':', $key);
 
+            if (empty($subId)) {
+                continue;
+            }
+
             $service = $this->services->where('id', $serviceId)->first();
             if (! $service) {
                 continue;
@@ -332,9 +347,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             // Get the service sub-resource (ServiceApplication or ServiceDatabase)
             $subResource = null;
             if ($subType === 'application') {
-                $subResource = $service->applications()->where('id', $subId)->first();
+                $subResource = $service->applications->where('id', $subId)->first();
             } elseif ($subType === 'database') {
-                $subResource = $service->databases()->where('id', $subId)->first();
+                $subResource = $service->databases->where('id', $subId)->first();
             }
 
             if (! $subResource) {
@@ -473,8 +488,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 } catch (\Throwable $e) {
                 }
             } else {
-                // Connect proxy to networks asynchronously to avoid blocking the status update
-                ConnectProxyToNetworksJob::dispatch($this->server);
+                // Connect proxy to networks periodically (every 10 min) to avoid excessive job dispatches.
+                // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
+                $proxyCacheKey = 'connect-proxy:'.$this->server->id;
+                if (! Cache::has($proxyCacheKey)) {
+                    Cache::put($proxyCacheKey, true, 600);
+                    ConnectProxyToNetworksJob::dispatch($this->server);
+                }
             }
         }
     }
@@ -542,7 +562,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             return;
         }
         if ($subType === 'application') {
-            $application = $service->applications()->where('id', $subId)->first();
+            $application = $service->applications->where('id', $subId)->first();
             if ($application) {
                 if ($application->status !== $containerStatus) {
                     $application->status = $containerStatus;
@@ -550,7 +570,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 }
             }
         } elseif ($subType === 'database') {
-            $database = $service->databases()->where('id', $subId)->first();
+            $database = $service->databases->where('id', $subId)->first();
             if ($database) {
                 if ($database->status !== $containerStatus) {
                     $database->status = $containerStatus;

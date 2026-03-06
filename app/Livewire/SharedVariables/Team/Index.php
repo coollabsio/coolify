@@ -33,6 +33,7 @@ class Index extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'team',
                 'team_id' => currentTeam()->id,
             ]);

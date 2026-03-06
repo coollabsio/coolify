@@ -55,6 +55,12 @@ To stay completely free and open-source, with no feature behind the paywall and 
 
 Thank you so much!
 
+### Huge Sponsors
+
+* [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
+* [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+*
+
 ### Big Sponsors
 
 * [23M](https://23m.com?ref=coolify.io) - Your experts for high-availability hosting solutions!
@@ -70,9 +76,10 @@ Thank you so much!
 * [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
 * [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
 * [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
-* [Dade2](https://dade2.net/?ref=coolify.io) - IT Consulting, Cloud Solutions & System Integration
+* [Darweb](https://darweb.nl/?ref=coolify.io) - 3D CPQ solutions for ecommerce design
 * [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
 * [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
+* [Greptile](https://www.greptile.com?ref=coolify.io) - The AI Code Reviewer
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - Server, cloud, hosting, and data center solutions
 * [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - Web hosting and VPS solutions
 * [JobsCollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - 30,000+ remote jobs for developers
@@ -90,6 +97,7 @@ Thank you so much!
 * [Tigris](https://www.tigrisdata.com?ref=coolify.io) - Modern developer data platform
 * [Tolgee](https://tolgee.io?ref=coolify.io) - The open source localization platform
 * [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
+* [VPSDime](https://vpsdime.com?ref=coolify.io) - Affordable high-performance VPS hosting solutions
 
 
 ### Small Sponsors
@@ -126,7 +134,6 @@ Thank you so much!
 <a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://coolify.io/images/runpod.svg"/></a>
 <a href="https://dartnode.com/?utm_source=coolify.io"><img width="60px" alt="DartNode" src="https://github.com/dartnode.png"/></a>
 <a href="https://github.com/whitesidest"><img width="60px" alt="Tyler Whitesides" src="https://avatars.githubusercontent.com/u/12365916?s=52&v=4"/></a>
-<a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
 <a href="https://aquarela.io"><img width="60px" alt="Aquarela" src="https://github.com/aquarela-io.png"/></a>
 <a href="https://cryptojobslist.com/?utm_source=coolify.io"><img width="60px" alt="Crypto Jobs List" src="https://github.com/cryptojobslist.png"/></a>
 <a href="https://www.youtube.com/@AlfredNutile?utm_source=coolify.io"><img width="60px" alt="Alfred Nutile" src="https://github.com/alnutile.png"/></a>

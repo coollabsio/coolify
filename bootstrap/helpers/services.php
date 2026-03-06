@@ -17,9 +17,118 @@ function collectRegex(string $name)
 {
     return "/{$name}\w+/";
 }
+
+/**
+ * Extract content between balanced braces, handling nested braces properly.
+ *
+ * @param  string  $str  The string to search
+ * @param  int  $startPos  Position to start searching from
+ * @return array|null Array with 'content', 'start', and 'end' keys, or null if no balanced braces found
+ */
+function extractBalancedBraceContent(string $str, int $startPos = 0): ?array
+{
+    // Find opening brace
+    if ($startPos >= strlen($str)) {
+        return null;
+    }
+    $openPos = strpos($str, '{', $startPos);
+    if ($openPos === false) {
+        return null;
+    }
+
+    // Track depth to find matching closing brace
+    $depth = 1;
+    $pos = $openPos + 1;
+    $len = strlen($str);
+
+    while ($pos < $len && $depth > 0) {
+        if ($str[$pos] === '{') {
+            $depth++;
+        } elseif ($str[$pos] === '}') {
+            $depth--;
+        }
+        $pos++;
+    }
+
+    if ($depth !== 0) {
+        // Unbalanced braces
+        return null;
+    }
+
+    return [
+        'content' => substr($str, $openPos + 1, $pos - $openPos - 2),
+        'start' => $openPos,
+        'end' => $pos - 1,
+    ];
+}
+
+/**
+ * Split variable expression on operators (:-,  -,  :?,  ?) while respecting nested braces.
+ *
+ * @param  string  $content  The content to split (without outer ${...})
+ * @return array|null Array with 'variable', 'operator', and 'default' keys, or null if no operator found
+ */
+function splitOnOperatorOutsideNested(string $content): ?array
+{
+    $operators = [':-', '-', ':?', '?'];
+    $depth = 0;
+    $len = strlen($content);
+
+    for ($i = 0; $i < $len; $i++) {
+        if ($content[$i] === '{') {
+            $depth++;
+        } elseif ($content[$i] === '}') {
+            $depth--;
+        } elseif ($depth === 0) {
+            // Check for operators only at depth 0 (outside nested braces)
+            foreach ($operators as $op) {
+                if (substr($content, $i, strlen($op)) === $op) {
+                    return [
+                        'variable' => substr($content, 0, $i),
+                        'operator' => $op,
+                        'default' => substr($content, $i + strlen($op)),
+                    ];
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 function replaceVariables(string $variable): Stringable
 {
-    return str($variable)->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
+    // Handle ${VAR} syntax with proper brace matching
+    $str = str($variable);
+
+    // Handle ${VAR} format
+    if ($str->startsWith('${')) {
+        $result = extractBalancedBraceContent($variable, 0);
+        if ($result !== null) {
+            return str($result['content']);
+        }
+
+        // Fallback to old behavior for malformed input
+        return $str->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
+    }
+
+    // Handle {VAR} format (from regex capture group without $)
+    if ($str->startsWith('{') && $str->endsWith('}')) {
+        return str(substr($variable, 1, -1));
+    }
+
+    // Handle {VAR format (from regex capture group, may be truncated)
+    if ($str->startsWith('{')) {
+        $result = extractBalancedBraceContent('$'.$variable, 0);
+        if ($result !== null) {
+            return str($result['content']);
+        }
+
+        // Fallback: remove { and get content before }
+        return $str->replaceFirst('{', '')->before('}');
+    }
+
+    return $str;
 }
 
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)

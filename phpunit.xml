@@ -7,17 +7,20 @@
     <testsuite name="Feature">
       <directory suffix="Test.php">./tests/Feature</directory>
     </testsuite>
+    <testsuite name="v4">
+      <directory suffix="Test.php">./tests/v4</directory>
+    </testsuite>
   </testsuites>
   <coverage/>
   <php>
     <env name="APP_ENV" value="testing"/>
     <env name="BCRYPT_ROUNDS" value="4"/>
-    <env name="CACHE_DRIVER" value="array"/>
-    <env name="DB_CONNECTION" value="testing"/>
-    <env name="DB_TEST_DATABASE" value="coolify"/>
-    <env name="MAIL_MAILER" value="array"/>
-    <env name="QUEUE_CONNECTION" value="sync"/>
-    <env name="SESSION_DRIVER" value="array"/>
+    <env name="CACHE_DRIVER" value="array" force="true"/>
+    <env name="DB_CONNECTION" value="testing" force="true"/>
+
+    <env name="MAIL_MAILER" value="array" force="true"/>
+    <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+    <env name="SESSION_DRIVER" value="array" force="true"/>
     <env name="TELESCOPE_ENABLED" value="false"/>
   </php>
   <source>
