@@ -7,7 +7,6 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
-use Mockery;
 
 beforeEach(function () {
     Queue::fake();

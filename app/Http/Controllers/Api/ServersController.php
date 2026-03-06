@@ -11,6 +11,7 @@ use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Rules\ValidServerIp;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -472,10 +473,10 @@ class ServersController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
-            'ip' => 'string|required',
-            'port' => 'integer|nullable',
+            'ip' => ['string', 'required', new ValidServerIp],
+            'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
-            'user' => 'string|nullable',
+            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
@@ -637,10 +638,10 @@ class ServersController extends Controller
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255|nullable',
             'description' => 'string|nullable',
-            'ip' => 'string|nullable',
-            'port' => 'integer|nullable',
+            'ip' => ['string', 'nullable', new ValidServerIp],
+            'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
-            'user' => 'string|nullable',
+            'user' => ['string', 'nullable', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',

@@ -1006,6 +1006,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--ip6' => 'ip6',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',

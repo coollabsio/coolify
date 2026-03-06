@@ -527,6 +527,7 @@
                     @endif
                 </div>
 
+                <h3 class="pt-8">Labels</h3>
                 @if ($application->settings->is_container_label_readonly_enabled)
                     <x-forms.textarea readonly disabled label="Container Labels" rows="15" id="customLabels"
                         monacoEditorLanguage="ini" useMonacoEditor x-bind:disabled="!canUpdate"></x-forms.textarea>
