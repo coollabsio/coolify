@@ -37,6 +37,10 @@
                         <x-loading wire:loading wire:target="loadFiles" />
                         Refresh
                     </x-forms.button>
+                    <x-forms.button wire:click="checkAndInstallUnzip" wire:loading.attr="disabled" class="bg-green-600">
+                        <x-loading wire:loading wire:target="checkAndInstallUnzip" />
+                        Verificar/Instalar unzip
+                    </x-forms.button>
                 </div>
 
                 @if ($selected_container !== 'default')

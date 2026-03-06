@@ -1025,26 +1025,59 @@ class FileExplorer extends Component
 
             $containerName = data_get($container, 'container.Names');
             $escapedContainer = escapeshellarg($containerName);
-            $innerCommand = "cd " . escapeshellarg(dirname($filePath)) . " && ";
             $fileNameEscaped = escapeshellarg(basename($filePath));
+            $fileDir = dirname($filePath);
+            $fileDirEscaped = escapeshellarg($fileDir);
 
+            // Build extraction command with automatic tool installation
+            $extractionCommand = '';
+            
             if (str_ends_with(strtolower($filePath), '.zip')) {
-                $innerCommand .= "if command -v unzip >/dev/null 2>&1; then unzip -q -o {$fileNameEscaped} -d . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:unzip'; fi";
+                // Try multiple methods: unzip command, Python, or PHP
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v unzip >/dev/null 2>&1; then ";
+                $extractionCommand .= "unzip -q -o {$fileNameEscaped} -d . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "elif command -v python3 >/dev/null 2>&1; then ";
+                $extractionCommand .= "python3 -c \"import zipfile, os; z=zipfile.ZipFile('{$fileNameEscaped}'); z.extractall('.'); z.close()\" 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "elif command -v python >/dev/null 2>&1; then ";
+                $extractionCommand .= "python -c \"import zipfile, os; z=zipfile.ZipFile('{$fileNameEscaped}'); z.extractall('.'); z.close()\" 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "elif command -v php >/dev/null 2>&1; then ";
+                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$fileNameEscaped}') === TRUE) { \\\$zip->extractTo('.'); \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
+                $extractionCommand .= "else ";
+                $extractionCommand .= "echo 'TOOL_NOT_FOUND:unzip'; ";
+                $extractionCommand .= "fi";
             } elseif (preg_match('/\.(tar\.gz|tgz)$/i', $filePath)) {
-                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xzf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= "tar -xzf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.bz2|tbz2|tbz)$/i', $filePath)) {
-                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xjf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= "tar -xjf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (preg_match('/\.(tar\.xz|txz)$/i', $filePath)) {
-                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xJf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= "tar -xJf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.tar')) {
-                $innerCommand .= "if command -v tar >/dev/null 2>&1; then tar -xf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:tar'; fi";
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v tar >/dev/null 2>&1; then ";
+                $extractionCommand .= "tar -xf {$fileNameEscaped} -C . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "else echo 'TOOL_NOT_FOUND:tar'; fi";
             } elseif (str_ends_with(strtolower($filePath), '.gz')) {
-                $innerCommand .= "if command -v gzip >/dev/null 2>&1; then gzip -d -k {$fileNameEscaped} 2>&1 && echo 'EXTRACTION_SUCCESS'; else echo 'TOOL_NOT_FOUND:gzip'; fi";
+                $extractionCommand = "cd {$fileDirEscaped} && ";
+                $extractionCommand .= "if command -v gzip >/dev/null 2>&1; then ";
+                $extractionCommand .= "gzip -d -k {$fileNameEscaped} 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "else echo 'TOOL_NOT_FOUND:gzip'; fi";
             } else {
                 $this->dispatch('error', 'Unsupported archive format.');
                 $this->showExtractDialog = false;
                 return;
             }
+
+            $innerCommand = $extractionCommand;
 
             $command = "docker exec {$escapedContainer} sh -c " . escapeshellarg($innerCommand);
 
@@ -1077,6 +1110,85 @@ class FileExplorer extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to extract file. Ensure the container has the required tools (e.g., unzip, tar). Error: ' . $e->getMessage());
             $this->showExtractDialog = false;
+        }
+    }
+
+    public function checkAndInstallUnzip()
+    {
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            if (is_null($server)) {
+                $this->dispatch('error', 'Server not found.');
+
+                return;
+            }
+
+            $containerName = data_get($container, 'container.Names');
+            $escapedContainer = escapeshellarg($containerName);
+
+            // Check if unzip is installed
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'command -v unzip >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+
+            $checkResult = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+
+            if ($checkResult === 'INSTALLED') {
+                $this->dispatch('success', 'unzip is already installed in this container.');
+                return;
+            }
+
+            // Try to install unzip
+            $this->dispatch('info', 'Installing unzip... This may take a moment.');
+            
+            // Try different package managers
+            $installCommand = "docker exec {$escapedContainer} sh -c '";
+            $installCommand .= "if command -v apk >/dev/null 2>&1; then ";
+            $installCommand .= "apk add --no-cache unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+            $installCommand .= "elif command -v apt-get >/dev/null 2>&1; then ";
+            $installCommand .= "apt-get update -qq && apt-get install -y -qq unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+            $installCommand .= "elif command -v yum >/dev/null 2>&1; then ";
+            $installCommand .= "yum install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+            $installCommand .= "elif command -v dnf >/dev/null 2>&1; then ";
+            $installCommand .= "dnf install -y -q unzip 2>&1 && echo INSTALL_SUCCESS || echo INSTALL_FAILED; ";
+            $installCommand .= "else echo NO_PACKAGE_MANAGER; ";
+            $installCommand .= "fi'";
+
+            if ($server->isNonRoot()) {
+                $installCommand = "sudo {$installCommand}";
+            }
+
+            $installResult = instant_remote_process([$installCommand], $server, false);
+            $installResult = trim($installResult ?? '');
+
+            if (str_contains($installResult, 'INSTALL_SUCCESS')) {
+                // Verify installation
+                $verifyCommand = "docker exec {$escapedContainer} sh -c 'command -v unzip >/dev/null 2>&1 && echo VERIFIED || echo NOT_VERIFIED'";
+                if ($server->isNonRoot()) {
+                    $verifyCommand = "sudo {$verifyCommand}";
+                }
+                $verifyResult = trim(instant_remote_process([$verifyCommand], $server, false) ?? '');
+                
+                if ($verifyResult === 'VERIFIED') {
+                    $this->dispatch('success', 'unzip has been successfully installed in this container.');
+                } else {
+                    $this->dispatch('error', 'unzip installation completed but verification failed. Please try restarting the container.');
+                }
+            } elseif (str_contains($installResult, 'NO_PACKAGE_MANAGER')) {
+                $this->dispatch('error', 'Could not find a supported package manager (apk, apt-get, yum, dnf) in this container. Please install unzip manually.');
+            } else {
+                $this->dispatch('error', 'Failed to install unzip. Error: '.$installResult);
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to check/install unzip: '.$e->getMessage());
         }
     }
 
