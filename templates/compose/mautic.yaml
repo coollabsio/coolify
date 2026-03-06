@@ -1,14 +1,13 @@
-# ignore: true
 # documentation: https://www.mautic.org/
-# slogan: Mautic v5 Open Source Marketing Automation
+# slogan: Mautic Open Source Marketing Automation
 # category: analytics
-# tags: php,mautic,marketing,automation,email,service,5,open,source,crm
+# tags: php,mautic,marketing,automation,email,service,open,source,crm
 # logo: svgs/mautic.svg
 # port: 80
 
 services:
   mysql:
-    image: 'mysql:8.0'
+    image: 'mysql:8.4'
     environment:
       - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLROOT}'
       - 'MYSQL_DATABASE=${MYSQL_DATABASE:-mautic}'
@@ -22,17 +21,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  rabbitmq:
-    image: 'rabbitmq:3'
-    environment:
-      - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}'
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 5s
-      timeout: 30s
-      retries: 10
-    volumes:
-      - 'rabbitmq-data:/var/lib/rabbitmq'
+
   mautic_web:
     image: 'mautic/mautic:latest'
     volumes:
@@ -53,8 +42,8 @@ services:
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
       - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
-      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
-      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-doctrine://default}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-doctrine://default}'
     healthcheck:
       test:
         - CMD
@@ -82,8 +71,8 @@ services:
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
       - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
-      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
-      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-doctrine://default}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-doctrine://default}'
     depends_on:
       mautic_web:
         condition: service_healthy
@@ -110,8 +99,8 @@ services:
       - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
       - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
       - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
-      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
-      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-doctrine://default}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-doctrine://default}'
     depends_on:
       mautic_web:
         condition: service_healthy
