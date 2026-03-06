@@ -2393,33 +2393,16 @@ function serviceParser(Service $resource): Collection
             return $volume;
         });
 
-        // Auto-install unzip in containers when they start
-        // Only add if there's no custom entrypoint/command to avoid breaking existing containers
-        $originalEntrypoint = data_get($service, 'entrypoint');
-        $originalCommand = data_get($service, 'command');
+        // Note: We don't auto-install unzip via entrypoint modification anymore
+        // as it can break containers. Users should use the "Verificar/Instalar unzip" button
+        // in File Explorer for existing containers, or ensure unzip is in their Dockerfile
+        // for new containers.
         
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
-        
-        // Add unzip installation only if no custom entrypoint/command exists
-        // This ensures we don't break containers with complex startup scripts
-        if (! $originalEntrypoint && ! $originalCommand) {
-            // No custom entrypoint/command, safe to add unzip installation
-            $unzipInstallCmd = "sh -c '";
-            $unzipInstallCmd .= "if ! command -v unzip >/dev/null 2>&1; then ";
-            $unzipInstallCmd .= "if command -v apk >/dev/null 2>&1; then apk add --no-cache unzip >/dev/null 2>&1 || true; ";
-            $unzipInstallCmd .= "elif command -v apt-get >/dev/null 2>&1; then apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq unzip >/dev/null 2>&1 || true; ";
-            $unzipInstallCmd .= "elif command -v yum >/dev/null 2>&1; then yum install -y -q unzip >/dev/null 2>&1 || true; ";
-            $unzipInstallCmd .= "elif command -v dnf >/dev/null 2>&1; then dnf install -y -q unzip >/dev/null 2>&1 || true; ";
-            $unzipInstallCmd .= "fi; ";
-            $unzipInstallCmd .= "fi; ";
-            $unzipInstallCmd .= "exec \"\$@\"'";
-            
-            $payload['entrypoint'] = ['sh', '-c', $unzipInstallCmd];
-        }
         
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
