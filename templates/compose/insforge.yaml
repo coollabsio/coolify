@@ -1,0 +1,657 @@
+# documentation: https://insforge.dev/docs
+# slogan: Open-source Backend-as-a-Service for AI agents. Database, Auth, Storage, Functions & more.
+# tags: baas,backend,ai,database,auth,storage,functions,postgresql,postgrest,deno
+# category: backend
+# logo: svgs/insforge.svg
+# port: 7130
+
+services:
+  postgres:
+    image: ghcr.io/insforge/postgres-all:latest
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - JWT_SECRET=${SERVICE_BASE64_64_JWT}
+    command: >
+      postgres
+        -c config_file=/etc/postgresql/postgresql.conf
+        -c app.encryption_key='${SERVICE_BASE64_64_ENCRYPTION}'
+    volumes:
+      - type: bind
+        source: ./postgresql.conf
+        target: /etc/postgresql/postgresql.conf
+        content: |
+          listen_addresses = '*'
+          wal_level = logical
+          max_replication_slots = 10
+          max_wal_senders = 10
+          shared_preload_libraries = 'pg_cron,http,pgcrypto'
+          cron.database_name = 'insforge'
+      - type: bind
+        source: ./db-init.sql
+        target: /docker-entrypoint-initdb.d/01-init.sql
+        content: |
+          -- init.sql
+          -- Create role for anonymous user
+          CREATE ROLE anon NOLOGIN;
+
+          -- Create role for authenticator
+          CREATE ROLE authenticated NOLOGIN;
+
+          -- Create project admin role for admin users
+          CREATE ROLE project_admin NOLOGIN;
+
+          GRANT USAGE ON SCHEMA public TO anon;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
+          GRANT USAGE ON SCHEMA public TO authenticated;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+          GRANT USAGE ON SCHEMA public TO project_admin;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO project_admin;
+
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated, project_admin;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, project_admin;
+
+          CREATE OR REPLACE FUNCTION public.create_default_policies()
+          RETURNS event_trigger AS $$
+          DECLARE
+            obj record;
+            table_schema text;
+            table_name text;
+            has_rls boolean;
+          BEGIN
+            FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE'
+            LOOP
+              SELECT INTO table_schema, table_name
+                split_part(obj.object_identity, '.', 1),
+                trim(both '"' from split_part(obj.object_identity, '.', 2));
+              SELECT INTO has_rls
+                rowsecurity
+              FROM pg_tables
+              WHERE schemaname = table_schema
+                AND tablename = table_name;
+              IF has_rls THEN
+                EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
+              END IF;
+            END LOOP;
+          END;
+          $$ LANGUAGE plpgsql;
+
+          CREATE EVENT TRIGGER create_policies_on_table_create
+            ON ddl_command_end
+            WHEN TAG IN ('CREATE TABLE')
+            EXECUTE FUNCTION public.create_default_policies();
+
+          CREATE OR REPLACE FUNCTION public.create_policies_after_rls()
+          RETURNS event_trigger AS $$
+          DECLARE
+            obj record;
+            table_schema text;
+            table_name text;
+          BEGIN
+            FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'ALTER TABLE'
+            LOOP
+              SELECT INTO table_schema, table_name
+                split_part(obj.object_identity, '.', 1),
+                trim(both '"' from split_part(obj.object_identity, '.', 2));
+              IF EXISTS (
+                SELECT 1 FROM pg_tables
+                WHERE schemaname = table_schema
+                  AND tablename = table_name
+                  AND rowsecurity = true
+              ) AND NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE schemaname = table_schema
+                  AND tablename = table_name
+              ) THEN
+                EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
+              END IF;
+            END LOOP;
+          END;
+          $$ LANGUAGE plpgsql;
+
+          CREATE EVENT TRIGGER create_policies_on_rls_enable
+            ON ddl_command_end
+            WHEN TAG IN ('ALTER TABLE')
+            EXECUTE FUNCTION public.create_policies_after_rls();
+      - type: bind
+        source: ./jwt.sql
+        target: /docker-entrypoint-initdb.d/02-jwt.sql
+        content: |
+          \set jwt_secret `echo "$JWT_SECRET"`
+          \set jwt_exp `echo "$JWT_EXP"`
+
+          ALTER DATABASE postgres SET "app.settings.jwt_secret" TO :'jwt_secret';
+          ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    environment:
+      - SERVICE_FQDN_POSTGREST_3000
+      - PGRST_DB_URI=postgres://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-insforge}
+      - PGRST_OPENAPI_SERVER_PROXY_URI=http://localhost:3000
+      - PGRST_DB_SCHEMA=public
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=${SERVICE_BASE64_64_JWT}
+      - PGRST_DB_CHANNEL_ENABLED=true
+      - PGRST_DB_CHANNEL=pgrst
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:latest
+    environment:
+      - SERVICE_FQDN_INSFORGE_7130
+      - PORT=7130
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?}
+      - JWT_SECRET=${SERVICE_BASE64_64_JWT}
+      - ENCRYPTION_KEY=${SERVICE_BASE64_64_ENCRYPTION}
+      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-insforge}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+      - DENO_RUNTIME_URL=http://deno:7133
+      - API_BASE_URL=${SERVICE_FQDN_INSFORGE}
+      - STORAGE_DIR=/insforge-storage
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
+      - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
+      - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
+      - LOGS_DIR=/insforge-logs
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      - X_CLIENT_ID=${X_CLIENT_ID:-}
+      - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
+      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
+      - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - storage-data:/insforge-storage
+      - shared-logs:/insforge-logs
+
+  deno:
+    image: ghcr.io/insforge/deno-runtime:latest
+    working_dir: /app
+    environment:
+      - SERVICE_FQDN_DENO_7133
+      - PORT=7133
+      - DENO_ENV=production
+      - DENO_DIR=/deno-dir
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+      - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
+      - ENCRYPTION_KEY=${SERVICE_BASE64_64_ENCRYPTION}
+      - JWT_SECRET=${SERVICE_BASE64_64_JWT}
+    volumes:
+      - type: bind
+        source: ./functions/server.ts
+        target: /app/functions/server.ts
+        content: |
+          import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
+          import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/mod.ts';
+
+          /* eslint-disable no-console */
+          const port = parseInt(Deno.env.get('PORT') ?? '7133');
+
+          console.log(`Deno serverless runtime running on port ${port}`);
+
+          const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '60000');
+
+          let workerTemplateCode: string | null = null;
+
+          async function getWorkerTemplateCode(): Promise<string> {
+            if (!workerTemplateCode) {
+              const currentDir = dirname(fromFileUrl(import.meta.url));
+              workerTemplateCode = await Deno.readTextFile(join(currentDir, 'worker-template.js'));
+            }
+            return workerTemplateCode;
+          }
+
+          async function decryptSecret(ciphertext: string, key: string): Promise<string> {
+            try {
+              const parts = ciphertext.split(':');
+              if (parts.length !== 3) {
+                throw new Error('Invalid ciphertext format');
+              }
+              const keyData = new TextEncoder().encode(key);
+              const hashBuffer = await crypto.subtle.digest('SHA-256', keyData);
+              const cryptoKey = await crypto.subtle.importKey('raw', hashBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+              const iv = Uint8Array.from(parts[0].match(/.{2}/g)!.map((byte) => parseInt(byte, 16)));
+              const authTag = Uint8Array.from(parts[1].match(/.{2}/g)!.map((byte) => parseInt(byte, 16)));
+              const encrypted = Uint8Array.from(parts[2].match(/.{2}/g)!.map((byte) => parseInt(byte, 16)));
+              const cipherData = new Uint8Array(encrypted.length + authTag.length);
+              cipherData.set(encrypted);
+              cipherData.set(authTag, encrypted.length);
+              const decryptedBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, cipherData);
+              return new TextDecoder().decode(decryptedBuffer);
+            } catch (error) {
+              console.error('Failed to decrypt secret:', error);
+              throw error;
+            }
+          }
+
+          const dbConfig = {
+            user: Deno.env.get('POSTGRES_USER') || 'postgres',
+            password: Deno.env.get('POSTGRES_PASSWORD') || 'postgres',
+            database: Deno.env.get('POSTGRES_DB') || 'insforge',
+            hostname: Deno.env.get('POSTGRES_HOST') || 'postgres',
+            port: parseInt(Deno.env.get('POSTGRES_PORT') || '5432', 10),
+          };
+
+          async function getFunctionCode(slug: string): Promise<string | null> {
+            const client = new Client(dbConfig);
+            try {
+              await client.connect();
+              const result = await client.queryObject<{ code: string }>`
+                SELECT code FROM functions.definitions
+                WHERE slug = ${slug} AND status = 'active'
+              `;
+              if (!result.rows.length) return null;
+              return result.rows[0].code;
+            } catch (error) {
+              console.error(`Error fetching function ${slug}:`, error);
+              return null;
+            } finally {
+              await client.end();
+            }
+          }
+
+          async function getFunctionSecrets(): Promise<Record<string, string>> {
+            const client = new Client(dbConfig);
+            try {
+              await client.connect();
+              const encryptionKey = Deno.env.get('ENCRYPTION_KEY') || Deno.env.get('JWT_SECRET');
+              if (!encryptionKey) {
+                console.error('No encryption key available for decrypting secrets');
+                return {};
+              }
+              const result = await client.queryObject<{ key: string; value_ciphertext: string }>`
+                SELECT key, value_ciphertext FROM system.secrets
+                WHERE is_active = true AND (expires_at IS NULL OR expires_at > NOW())
+              `;
+              const secrets: Record<string, string> = {};
+              for (const row of result.rows) {
+                try {
+                  secrets[row.key] = await decryptSecret(row.value_ciphertext, encryptionKey);
+                } catch (error) {
+                  console.error(`Failed to decrypt secret ${row.key}:`, error);
+                }
+              }
+              return secrets;
+            } catch (error) {
+              console.error('Error fetching secrets:', error);
+              return {};
+            } finally {
+              await client.end();
+            }
+          }
+
+          async function executeInWorker(code: string, request: Request): Promise<Response> {
+            const template = await getWorkerTemplateCode();
+            const secrets = await getFunctionSecrets();
+            const workerBlob = new Blob([template], { type: 'application/javascript' });
+            const workerUrl = URL.createObjectURL(workerBlob);
+            return new Promise(async (resolve) => {
+              const worker = new Worker(workerUrl, { type: 'module' });
+              const timeout = setTimeout(() => {
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+                resolve(new Response(JSON.stringify({ error: 'Function timeout' }), { status: 504, headers: { 'Content-Type': 'application/json' } }));
+              }, WORKER_TIMEOUT_MS);
+              worker.onmessage = (e) => {
+                clearTimeout(timeout);
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+                if (e.data.success) {
+                  const { response } = e.data;
+                  resolve(new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers }));
+                } else {
+                  resolve(new Response(JSON.stringify({ error: e.data.error }), { status: e.data.status || 500, headers: { 'Content-Type': 'application/json' } }));
+                }
+              };
+              worker.onerror = (error) => {
+                clearTimeout(timeout);
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+                console.error('Worker error:', error);
+                resolve(new Response(JSON.stringify({ error: 'Worker execution error' }), { status: 500, headers: { 'Content-Type': 'application/json' } }));
+              };
+              const body = request.body ? await request.text() : null;
+              const requestData = { url: request.url, method: request.method, headers: Object.fromEntries(request.headers), body };
+              worker.postMessage({ code, requestData, secrets });
+            });
+          }
+
+          Deno.serve({ port }, async (req: Request) => {
+            const url = new URL(req.url);
+            const pathname = url.pathname;
+            if (pathname === '/health') {
+              return new Response(JSON.stringify({ status: 'ok', runtime: 'deno', version: Deno.version.deno }), { headers: { 'Content-Type': 'application/json' } });
+            }
+            const slugMatch = pathname.match(/^\/([a-zA-Z0-9_-]+)$/);
+            if (slugMatch) {
+              const slug = slugMatch[1];
+              const startTime = Date.now();
+              const code = await getFunctionCode(slug);
+              if (!code) {
+                return new Response(JSON.stringify({ error: 'Function not found or not active' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+              }
+              try {
+                const response = await executeInWorker(code, req);
+                const duration = Date.now() - startTime;
+                console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: 'info', slug, method: req.method, status: response.status, duration: `${duration}ms` }));
+                return response;
+              } catch (error) {
+                const duration = Date.now() - startTime;
+                console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: 'error', slug, error: error instanceof Error ? error.message : String(error), duration: `${duration}ms` }));
+                return new Response(JSON.stringify({ error: 'Function execution failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+              }
+            }
+            return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+          });
+      - type: bind
+        source: ./functions/worker-template.js
+        target: /app/functions/worker-template.js
+        content: |
+          /**
+           * Worker Template for Serverless Functions
+           * Runs inside a Web Worker environment created by Deno.
+           */
+          /* eslint-env worker */
+          import { createClient } from 'npm:@insforge/sdk';
+          import { encodeBase64, decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
+
+          self.onmessage = async (e) => {
+            const { code, requestData, secrets = {} } = e.data;
+            try {
+              const mockDeno = {
+                env: {
+                  get: (key) => secrets[key] || undefined,
+                },
+              };
+              const wrapper = new Function('exports', 'module', 'createClient', 'Deno', 'encodeBase64', 'decodeBase64', code);
+              const exports = {};
+              const module = { exports };
+              wrapper(exports, module, createClient, mockDeno, encodeBase64, decodeBase64);
+              const functionHandler = module.exports || exports.default || exports;
+              if (typeof functionHandler !== 'function') {
+                throw new Error('No function exported. Expected: module.exports = async function(req) { ... }');
+              }
+              const request = new Request(requestData.url, { method: requestData.method, headers: requestData.headers, body: requestData.body });
+              const response = await functionHandler(request);
+              let body = null;
+              if (![204, 205, 304].includes(response.status)) {
+                body = await response.text();
+              }
+              const responseData = { status: response.status, statusText: response.statusText, headers: Object.fromEntries(response.headers), body };
+              self.postMessage({ success: true, response: responseData });
+            } catch (error) {
+              if (error instanceof Response) {
+                let body = null;
+                if (![204, 205, 304].includes(error.status)) {
+                  body = await error.text();
+                }
+                const responseData = { status: error.status, statusText: error.statusText, headers: Object.fromEntries(error.headers), body };
+                self.postMessage({ success: true, response: responseData });
+              } else {
+                self.postMessage({ success: false, error: error.message || 'Unknown error', status: error.status || 500 });
+              }
+            }
+          };
+      - deno-cache:/deno-dir
+    depends_on:
+      - postgres
+      - postgrest
+
+  vector:
+    image: timberio/vector:0.28.1-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgrest:
+        condition: service_started
+      insforge:
+        condition: service_started
+      deno:
+        condition: service_started
+    exclude_from_hc: true
+    volumes:
+      - type: bind
+        source: ./vector.yml
+        target: /etc/vector/vector.yml
+        content: |
+          api:
+            enabled: true
+            address: 0.0.0.0:7135
+
+          sources:
+            docker_host:
+              type: docker_logs
+              exclude_containers:
+                - insforge-vector
+              include_containers:
+                - insforge
+                - insforge-deno
+                - insforge-postgrest
+                - insforge-postgres
+
+          transforms:
+            project_logs:
+              type: remap
+              inputs:
+                - docker_host
+              source: |-
+                .project = "default"
+                .event_message = del(.message)
+                container = to_string!(del(.container_name))
+                if starts_with(container, "/") {
+                    .appname = slice!(container, 1)
+                } else {
+                    .appname = container
+                }
+                del(.container_created_at)
+                del(.container_id)
+                del(.source_type)
+                del(.stream)
+                del(.label)
+                del(.image)
+                del(.host)
+                del(.stream)
+
+            router:
+              type: route
+              inputs:
+                - project_logs
+              route:
+                insforge: '.appname == "insforge"'
+                deno: '.appname == "insforge-deno"'
+                rest: '.appname == "insforge-postgrest"'
+                db: '.appname == "insforge-postgres"'
+
+            rest_logs:
+              type: remap
+              inputs:
+                - router.rest
+              source: |-
+                parsed, err = parse_regex(.event_message, r'^(?P<time>\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}): (?P<msg>.*)$')
+                if err == null && parsed != null {
+                    .event_message = parsed.msg
+                    .metadata.level = "info"
+                } else {
+                    .metadata.level = "info"
+                }
+
+            insforge_logs:
+              type: remap
+              inputs:
+                - router.insforge
+              source: |-
+                .event_message = replace!(.event_message, r'^\[backend\] ', "")
+                req, err = parse_json(.event_message)
+                if err == null {
+                    if req.timestamp != null {
+                        .timestamp = to_timestamp!(req.timestamp)
+                    }
+                    .metadata.level = req.level
+                    if req.duration != null {
+                        .user_agent = req.userAgent
+                        .ip = req.ip
+                        .method = req.method
+                        .path = req.path
+                        .protocol = "HTTP/1.1"
+                        .status_code = req.status
+                        .size = req.size
+                        .duration = req.duration
+                        .event_message = join!([req.method, req.path, to_string!(req.status), to_string!(req.size), req.duration, "-", req.ip, "-", req.userAgent], " ")
+                        .log_type = "request"
+                    } else {
+                        .event_message = join!([req.level, req.message], " - ")
+                        .log_type = "application"
+                        if req.error != null { .error = req.error }
+                        if req.stack != null { .stack = req.stack }
+                    }
+                }
+
+            deno_logs:
+              type: remap
+              inputs:
+                - router.deno
+              source: |-
+                parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
+                if err == null {
+                    .event_message = parsed.msg
+                    .timestamp = to_timestamp!(parsed.time)
+                    .metadata.level = upcase!(parsed.level)
+                }
+
+            db_logs:
+              type: remap
+              inputs:
+                - router.db
+              source: |-
+                parsed, err = parse_regex(.event_message, r'^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?P<tz>\w+) \[(?P<pid>\d+)\] (?P<level>LOG|ERROR|WARNING|INFO|NOTICE|FATAL|PANIC|STATEMENT|DETAIL): (?P<msg>.*)$')
+                if err == null && parsed != null {
+                    .metadata.parsed.pid = parsed.pid
+                    .metadata.level = upcase!(parsed.level)
+                    .event_message = parsed.msg
+                    if .metadata.level == "STATEMENT" { .metadata.level = "INFO" }
+                    if .metadata.level == "DETAIL" { .metadata.level = "INFO" }
+                } else {
+                    .metadata.level = "LOG"
+                }
+
+          sinks:
+            file_insforge:
+              type: 'file'
+              inputs:
+                - insforge_logs
+              path: '/insforge-logs/insforge.logs.jsonl'
+              encoding:
+                codec: 'json'
+            file_deno:
+              type: 'file'
+              inputs:
+                - deno_logs
+              path: '/insforge-logs/function.logs.jsonl'
+              encoding:
+                codec: 'json'
+            file_rest:
+              type: 'file'
+              inputs:
+                - rest_logs
+              path: '/insforge-logs/postgrest.logs.jsonl'
+              encoding:
+                codec: 'json'
+            file_db:
+              type: 'file'
+              inputs:
+                - db_logs
+              path: '/insforge-logs/postgres.logs.jsonl'
+              encoding:
+                codec: 'json'
+            cw_insforge:
+              type: aws_cloudwatch_logs
+              inputs:
+                - insforge_logs
+              region: ${AWS_REGION:-skip}
+              group_name: /insforge/local
+              stream_name: ${HOSTNAME_OVERRIDE:-local}-insforge-vector
+              encoding:
+                codec: json
+              healthcheck:
+                enabled: false
+            cw_rest:
+              type: aws_cloudwatch_logs
+              inputs:
+                - rest_logs
+              region: ${AWS_REGION:-skip}
+              group_name: /insforge/local
+              stream_name: ${HOSTNAME_OVERRIDE:-local}-postgrest-vector
+              encoding:
+                codec: json
+              healthcheck:
+                enabled: false
+            cw_deno:
+              type: aws_cloudwatch_logs
+              inputs:
+                - deno_logs
+              region: ${AWS_REGION:-skip}
+              group_name: /insforge/local
+              stream_name: ${HOSTNAME_OVERRIDE:-local}-function-vector
+              encoding:
+                codec: json
+              healthcheck:
+                enabled: false
+            cw_db:
+              type: aws_cloudwatch_logs
+              inputs:
+                - db_logs
+              region: ${AWS_REGION:-skip}
+              group_name: /insforge/local
+              stream_name: ${HOSTNAME_OVERRIDE:-local}-postgres-vector
+              encoding:
+                codec: json
+              healthcheck:
+                enabled: false
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - shared-logs:/insforge-logs
+
+volumes:
+  postgres-data:
+  storage-data:
+  shared-logs:
+  deno-cache:
