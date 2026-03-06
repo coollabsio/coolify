@@ -1,0 +1,85 @@
+# documentation: https://docs.espocrm.com/
+# slogan: Free Self-Hosted CRM Software
+# category: crm
+# tags: crm, helpdesk, support, ticketing, customer-support, postgresql, open-source, self-hosted
+# logo: svgs/espocrm.svg
+# port: 80
+
+services:
+  espocrm:
+    image: espocrm/espocrm:latest
+    environment:
+      - SERVICE_URL_ESPOCRM_80
+      - ESPOCRM_DATABASE_PLATFORM=Postgresql
+      - ESPOCRM_DATABASE_HOST=espocrm-db
+      - ESPOCRM_DATABASE_PORT=5432
+      - ESPOCRM_DATABASE_NAME=${POSTGRES_DB:-espocrm}
+      - ESPOCRM_DATABASE_USER=$SERVICE_USER_POSTGRES
+      - ESPOCRM_DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - ESPOCRM_ADMIN_USERNAME=${ESPOCRM_ADMIN_USERNAME:-admin}
+      - ESPOCRM_ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
+      - ESPOCRM_SITE_URL=$SERVICE_URL_ESPOCRM
+      - ESPOCRM_LANGUAGE=${ESPOCRM_LANGUAGE:-en_US}
+      - ESPOCRM_TIME_ZONE=${ESPOCRM_TIME_ZONE:-UTC}
+      - ESPOCRM_DEFAULT_CURRENCY=${ESPOCRM_DEFAULT_CURRENCY:-USD}
+      - ESPOCRM_DATE_FORMAT=${ESPOCRM_DATE_FORMAT:-MM/DD/YYYY}
+      - ESPOCRM_TIME_FORMAT=${ESPOCRM_TIME_FORMAT:-HH:mm}
+      - ESPOCRM_CONFIG_USE_WEB_SOCKET=${ESPOCRM_CONFIG_USE_WEB_SOCKET:-true}
+      - ESPOCRM_CONFIG_WEB_SOCKET_URL=$SERVICE_URL_ESPOCRM_WEBSOCKET
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBSCRIBER_DSN=tcp://*:7777
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBMISSION_DSN=tcp://espocrm-websocket:7777
+      - ESPOCRM_CONFIG_OUTBOUND_EMAIL_IS_SHARED=${ESPOCRM_CONFIG_OUTBOUND_EMAIL_IS_SHARED:-false}
+      - ESPOCRM_CONFIG_OUTBOUND_EMAIL_FROM_NAME=${SMTP_FROM_NAME}
+      - ESPOCRM_CONFIG_OUTBOUND_EMAIL_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+      - ESPOCRM_CONFIG_SMTP_SERVER=${SMTP_SERVER}
+      - ESPOCRM_CONFIG_SMTP_PORT=${SMTP_PORT:-587}
+      - ESPOCRM_CONFIG_SMTP_AUTH=${SMTP_AUTH:-true}
+      - ESPOCRM_CONFIG_SMTP_SECURITY=${SMTP_SECURITY:-TLS}
+      - ESPOCRM_CONFIG_SMTP_USERNAME=${SMTP_USERNAME}
+      - ESPOCRM_CONFIG_SMTP_PASSWORD=${SMTP_PASSWORD}
+    volumes:
+      - espocrm-data:/var/www/html
+    depends_on:
+      espocrm-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  espocrm-daemon:
+    image: espocrm/espocrm:latest
+    entrypoint: docker-daemon.sh
+    volumes:
+      - espocrm-data:/var/www/html
+    depends_on:
+      - espocrm
+
+  espocrm-websocket:
+    image: espocrm/espocrm:latest
+    entrypoint: docker-websocket.sh
+    environment:
+      - SERVICE_URL_ESPOCRM_WEBSOCKET_8080
+      - ESPOCRM_CONFIG_USE_WEB_SOCKET=${ESPOCRM_CONFIG_USE_WEB_SOCKET:-true}
+      - ESPOCRM_CONFIG_WEB_SOCKET_URL=$SERVICE_URL_ESPOCRM_WEBSOCKET
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBSCRIBER_DSN=tcp://*:7777
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBMISSION_DSN=tcp://espocrm-websocket:7777
+    volumes:
+      - espocrm-data:/var/www/html
+    depends_on:
+      - espocrm
+
+  espocrm-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-espocrm}
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - espocrm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
