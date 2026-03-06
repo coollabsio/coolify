@@ -2382,6 +2382,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+            $this->add_server_metadata_env_variables(
+                $coolify_envs,
+                $this->application->environment_variables_preview,
+                $forBuildTime
+            );
 
             add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
 
@@ -2426,12 +2431,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+            $this->add_server_metadata_env_variables(
+                $coolify_envs,
+                $this->application->environment_variables,
+                $forBuildTime
+            );
 
             add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables);
 
         }
 
         return $coolify_envs;
+    }
+
+    private function add_server_metadata_env_variables(Collection $coolify_envs, Collection $resourceEnvironmentVariables, bool $forBuildTime): void
+    {
+        if ($forBuildTime) {
+            return;
+        }
+
+        if ($resourceEnvironmentVariables->where('key', 'COOLIFY_SERVER_NAME')->isEmpty() && filled($this->server->name)) {
+            $coolify_envs->put('COOLIFY_SERVER_NAME', $this->server->name);
+        }
+
+        if ($resourceEnvironmentVariables->where('key', 'COOLIFY_SERVER_UUID')->isEmpty() && filled($this->server->uuid)) {
+            $coolify_envs->put('COOLIFY_SERVER_UUID', $this->server->uuid);
+        }
     }
 
     private function generate_env_variables()
