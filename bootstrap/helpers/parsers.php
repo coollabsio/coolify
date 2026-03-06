@@ -1416,6 +1416,35 @@ function serviceParser(Service $resource): Collection
 
     try {
         $yaml = Yaml::parse($compose);
+        
+        // Remove problematic unzip installation entrypoints that were added previously
+        // These entrypoints break containers by overriding the original image entrypoints
+        if (isset($yaml['services'])) {
+            foreach ($yaml['services'] as $serviceName => &$service) {
+                if (isset($service['entrypoint']) && is_array($service['entrypoint'])) {
+                    $entrypointStr = is_array($service['entrypoint']) 
+                        ? implode(' ', $service['entrypoint']) 
+                        : (string)$service['entrypoint'];
+                    
+                    // Check if this is the problematic unzip installation entrypoint
+                    if (str_contains($entrypointStr, 'command -v unzip') && 
+                        str_contains($entrypointStr, 'apk add --no-cache unzip')) {
+                        // Remove the problematic entrypoint to restore original image behavior
+                        unset($service['entrypoint']);
+                    }
+                }
+            }
+            unset($service); // Break reference
+        }
+        
+        // Re-encode to YAML if we made changes
+        if ($yaml !== Yaml::parse($compose)) {
+            $compose = Yaml::dump($yaml, 10, 2);
+            $originalCompose = $compose;
+            // Update docker_compose_raw to remove the problematic entrypoints
+            $resource->docker_compose_raw = $compose;
+            $resource->save();
+        }
     } catch (\Exception) {
         return collect([]);
     }
