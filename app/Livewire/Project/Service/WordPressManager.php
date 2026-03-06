@@ -759,9 +759,44 @@ class WordPressManager extends Component
                 // Also write directly to container for immediate effect
                 $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
                 
+                // Verify the file exists in the container after writing
+                $verifyContainerFileCommand = "docker exec {$escapedContainer} test -f ".escapeshellarg($confIniFileMountPath)." && docker exec {$escapedContainer} cat ".escapeshellarg($confIniFileMountPath)." || echo 'NOT_MOUNTED'";
+                if ($server->isNonRoot()) {
+                    $verifyContainerFileCommand = "sudo {$verifyContainerFileCommand}";
+                }
+                $containerFileContent = instant_remote_process([$verifyContainerFileCommand], $server, false) ?? '';
+                
+                // Check if file is mounted from volume or written directly
+                $checkMountCommand = "docker inspect {$escapedContainer} --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' 2>/dev/null | grep -q php-config && echo 'MOUNTED' || echo 'NOT_MOUNTED'";
+                if ($server->isNonRoot()) {
+                    $checkMountCommand = "sudo {$checkMountCommand}";
+                }
+                $isMounted = trim(instant_remote_process([$checkMountCommand], $server, false) ?? '');
+                
+                // Verify PHP is reading the new value (check both CLI and FPM)
+                $verifyPhpCliCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
+                if ($server->isNonRoot()) {
+                    $verifyPhpCliCommand = "sudo {$verifyPhpCliCommand}";
+                }
+                $phpCliValue = trim(instant_remote_process([$verifyPhpCliCommand], $server, false) ?? '');
+                
+                // Check PHP-FPM value (this is what WordPress uses)
+                $verifyPhpFpmCommand = "docker exec {$escapedContainer} sh -c 'php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
+                if ($server->isNonRoot()) {
+                    $verifyPhpFpmCommand = "sudo {$verifyPhpFpmCommand}";
+                }
+                $phpFpmValue = trim(instant_remote_process([$verifyPhpFpmCommand], $server, false) ?? '');
+                if ($phpFpmValue === 'notfound' || empty($phpFpmValue)) {
+                    $phpFpmValue = $phpCliValue;
+                }
+                
                 // The file is now persisted in the volume and docker-compose has been updated
-                $volumeStatus = $volumeInCompose ? "Volume added to docker-compose." : "WARNING: Volume may not be in docker-compose. Please check.";
-                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. File saved at {$serverFilePath}. {$volumeStatus} Changes applied immediately to running container. IMPORTANT: You must restart the SERVICE (not just the container) from the service page for the volume to be mounted permanently.");
+                $volumeStatus = $volumeInCompose ? "Volume added to docker-compose." : "WARNING: Volume may not be in docker-compose.";
+                $containerStatus = str_contains($containerFileContent, $value) ? "File written to container." : "WARNING: File content not found in container.";
+                $mountStatus = ($isMounted === 'MOUNTED') ? "Volume is mounted." : "WARNING: Volume may not be mounted (file written directly to container).";
+                $phpStatus = ($phpFpmValue === $value) ? "PHP-FPM reports {$value}." : "WARNING: PHP-FPM reports {$phpFpmValue} instead of {$value}. Service restart required.";
+                
+                $this->dispatch('success', "PHP setting {$setting} saved. {$volumeStatus} {$containerStatus} {$mountStatus} {$phpStatus} If PHP-FPM shows old value, restart the SERVICE completely from the service page.");
                 
             } catch (\Throwable $e) {
                 $this->dispatch('error', "Failed to save PHP config to persistent volume: ".$e->getMessage().". Trying direct container write...");
@@ -876,21 +911,47 @@ class WordPressManager extends Component
                 $this->dispatch('warning', "Failed to update php.ini file: ".$e->getMessage());
             }
 
-            // Reload PHP-FPM more aggressively
-            $reloadCommands = [
-                // Try to reload PHP-FPM
-                "docker exec {$escapedContainer} sh -c 'pkill -USR2 php-fpm 2>/dev/null || true'",
-                // Try to reload via service
-                "docker exec {$escapedContainer} sh -c 'service php-fpm reload 2>/dev/null || service php8.2-fpm reload 2>/dev/null || service php8.1-fpm reload 2>/dev/null || service php8.0-fpm reload 2>/dev/null || true'",
-                // Try to restart PHP-FPM
-                "docker exec {$escapedContainer} sh -c 'service php-fpm restart 2>/dev/null || service php8.2-fpm restart 2>/dev/null || service php8.1-fpm restart 2>/dev/null || service php8.0-fpm restart 2>/dev/null || true'",
-            ];
+            // CRITICAL: Restart PHP-FPM to reload configuration
+            // upload_max_filesize and post_max_size require a full PHP-FPM restart, not just reload
+            // For these settings, we need to restart the entire container to ensure volume is mounted
+            $needsContainerRestart = in_array($setting, ['upload_max_filesize', 'post_max_size', 'memory_limit']);
             
-            foreach ($reloadCommands as $reloadCommand) {
+            if ($needsContainerRestart) {
+                // Restart the container to ensure volume is mounted and PHP-FPM reads new config
+                $restartContainerCommand = "docker restart {$escapedContainer}";
                 if ($server->isNonRoot()) {
-                    $reloadCommand = "sudo {$reloadCommand}";
+                    $restartContainerCommand = "sudo {$restartContainerCommand}";
                 }
-                instant_remote_process([$reloadCommand], $server, false);
+                instant_remote_process([$restartContainerCommand], $server, false);
+                
+                // Wait for container to be ready
+                $waitCommand = "docker exec {$escapedContainer} sh -c 'sleep 3 && php -r \"echo \\\"ready\\\";\"' 2>/dev/null || echo 'waiting'";
+                if ($server->isNonRoot()) {
+                    $waitCommand = "sudo {$waitCommand}";
+                }
+                $attempts = 0;
+                while ($attempts < 10) {
+                    $ready = trim(instant_remote_process([$waitCommand], $server, false) ?? '');
+                    if ($ready === 'ready') {
+                        break;
+                    }
+                    usleep(500000); // 0.5 seconds
+                    $attempts++;
+                }
+            } else {
+                // For other settings, just restart PHP-FPM
+                $restartCommands = [
+                    "docker exec {$escapedContainer} sh -c 'pkill -9 php-fpm 2>/dev/null || true'",
+                    "docker exec {$escapedContainer} sh -c 'service php-fpm restart 2>/dev/null || service php8.3-fpm restart 2>/dev/null || service php8.2-fpm restart 2>/dev/null || service php8.1-fpm restart 2>/dev/null || service php8.0-fpm restart 2>/dev/null || true'",
+                ];
+                
+                foreach ($restartCommands as $restartCommand) {
+                    if ($server->isNonRoot()) {
+                        $restartCommand = "sudo {$restartCommand}";
+                    }
+                    instant_remote_process([$restartCommand], $server, false);
+                    usleep(1000000); // 1 second
+                }
             }
             
             // Verify the change was applied - try multiple methods
