@@ -128,42 +128,8 @@ function connectProxyToNetworks(Server $server)
 }
 
 /**
- * Generate shell commands to fix a Docker network that has an IPv6 gateway with CIDR notation.
- *
- * Docker 25+ may store IPv6 gateways with CIDR (e.g. fd7d:f7d2:7e77::1/64), which causes
- * ParseAddr errors in Docker Compose. This detects the issue and recreates the network.
- *
- * @see https://github.com/coollabsio/coolify/issues/8649
- *
- * @param  string  $network  Network name to check and fix
- * @return array Shell commands to execute on the remote server
- */
-function fixNetworkIpv6CidrGateway(string $network): array
-{
-    return [
-        "if docker network inspect {$network} >/dev/null 2>&1; then",
-        "  IPV6_GW=\$(docker network inspect {$network} --format '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep '/' || true)",
-        '  if [ -n "$IPV6_GW" ]; then',
-        "    echo \"Fixing network {$network}: IPv6 gateway has CIDR notation (\$IPV6_GW)\"",
-        "    CONTAINERS=\$(docker network inspect {$network} --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null)",
-        '    for c in $CONTAINERS; do',
-        "      [ -n \"\$c\" ] && docker network disconnect {$network} \"\$c\" 2>/dev/null || true",
-        '    done',
-        "    docker network rm {$network} 2>/dev/null || true",
-        "    docker network create --attachable {$network} 2>/dev/null || true",
-        '    for c in $CONTAINERS; do',
-        "      [ -n \"\$c\" ] && [ \"\$c\" != \"coolify-proxy\" ] && docker network connect {$network} \"\$c\" 2>/dev/null || true",
-        '    done',
-        '  fi',
-        'fi',
-    ];
-}
-
-/**
  * Ensures all required networks exist before docker compose up.
  * This must be called BEFORE docker compose up since the compose file declares networks as external.
- *
- * Also detects and fixes networks with IPv6 CIDR gateway notation that causes ParseAddr errors.
  *
  * @param  Server  $server  The server to ensure networks on
  * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
@@ -174,23 +140,17 @@ function ensureProxyNetworksExist(Server $server)
 
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
-            return array_merge(
-                fixNetworkIpv6CidrGateway($network),
-                [
-                    "echo 'Ensuring network $network exists...'",
-                    "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable $network",
-                ]
-            );
+            return [
+                "echo 'Ensuring network $network exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable $network",
+            ];
         });
     } else {
         $commands = $networks->map(function ($network) {
-            return array_merge(
-                fixNetworkIpv6CidrGateway($network),
-                [
-                    "echo 'Ensuring network $network exists...'",
-                    "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable $network",
-                ]
-            );
+            return [
+                "echo 'Ensuring network $network exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable $network",
+            ];
         });
     }
 

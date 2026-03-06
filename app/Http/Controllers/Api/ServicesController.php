@@ -377,6 +377,17 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
+        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+            if (! $destination) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                    ],
+                ], 422);
+            }
+        }
         $services = get_service_templates();
         $serviceKeys = $services->keys();
         if ($serviceKeys->contains($request->type)) {
@@ -543,6 +554,17 @@ class ServicesController extends Controller
                 return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
             }
             $destination = $destinations->first();
+            if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+                $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+                if (! $destination) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                        ],
+                    ], 422);
+                }
+            }
             if (! isBase64Encoded($request->docker_compose_raw)) {
                 return response()->json([
                     'message' => 'Validation failed.',
