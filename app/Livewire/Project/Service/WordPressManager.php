@@ -461,17 +461,34 @@ class WordPressManager extends Component
                 // Try multiple methods to get the value
                 $iniValue = null;
                 
-                // Method 1: Try PHP-FPM directly if available
-                $fpmCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
-                if ($server->isNonRoot()) {
-                    $fpmCommand = "sudo {$fpmCommand}";
-                }
-                $fpmValue = trim(instant_remote_process([$fpmCommand], $server, false) ?? '');
-                if (!empty($fpmValue) && $fpmValue !== 'notfound') {
-                    $iniValue = $fpmValue;
+                // Method 1: Check if there's a LocalFileVolume for this setting (persistent volume)
+                $confIniFileName = '99-custom-'.$setting.'.ini';
+                $confIniFileMountPath = '/usr/local/etc/php/conf.d/'.$confIniFileName;
+                $fileVolume = LocalFileVolume::where('resource_type', ServiceApplication::class)
+                    ->where('resource_id', $application->id)
+                    ->where('mount_path', $confIniFileMountPath)
+                    ->first();
+                
+                if ($fileVolume && !empty($fileVolume->content)) {
+                    // Try to extract value from volume content first
+                    if (preg_match('/'.$setting.'\s*=\s*([^\s\r\n]+)/', $fileVolume->content, $matches)) {
+                        $iniValue = trim($matches[1]);
+                    }
                 }
                 
-                // Method 2: Try php -r (CLI, but more reliable)
+                // Method 2: Try PHP-FPM directly if available
+                if (empty($iniValue)) {
+                    $fpmCommand = "docker exec {$escapedContainer} sh -c 'which php-fpm && php-fpm -i 2>/dev/null | grep \"{$setting}\" | head -1 | awk -F\"=> \" \"{print \\\$2}\" | awk \"{print \\\$1}\" || echo notfound'";
+                    if ($server->isNonRoot()) {
+                        $fpmCommand = "sudo {$fpmCommand}";
+                    }
+                    $fpmValue = trim(instant_remote_process([$fpmCommand], $server, false) ?? '');
+                    if (!empty($fpmValue) && $fpmValue !== 'notfound') {
+                        $iniValue = $fpmValue;
+                    }
+                }
+                
+                // Method 3: Try php -r (CLI, but more reliable)
                 if (empty($iniValue)) {
                     $getIniCommand = "docker exec {$escapedContainer} php -r \"echo ini_get('{$setting}');\" 2>/dev/null";
                     if ($server->isNonRoot()) {
@@ -480,7 +497,7 @@ class WordPressManager extends Component
                     $iniValue = trim(instant_remote_process([$getIniCommand], $server, false) ?? '');
                 }
                 
-                // Method 3: Parse from php -i output
+                // Method 4: Parse from php -i output
                 if (empty($iniValue)) {
                     $pattern = "/{$setting}\s*=>\s*([^\r\n]+)/i";
                     if (preg_match($pattern, $phpInfo, $matches)) {
@@ -716,17 +733,35 @@ class WordPressManager extends Component
                 // Save the file to the persistent storage on server
                 $fileVolume->saveStorageOnServer();
                 
+                // Verify the file was saved correctly on the server
+                $workdir = $application->service->workdir();
+                $serverFilePath = $workdir.'/php-config/'.$confIniFileName;
+                $verifyServerFileCommand = "test -f ".escapeshellarg($serverFilePath)." && cat ".escapeshellarg($serverFilePath)." || echo 'FILE_NOT_FOUND'";
+                if ($server->isNonRoot()) {
+                    $verifyServerFileCommand = "sudo {$verifyServerFileCommand}";
+                }
+                $serverFileContent = instant_remote_process([$verifyServerFileCommand], $server, false) ?? '';
+                
+                if ($serverFileContent === 'FILE_NOT_FOUND' || empty($serverFileContent)) {
+                    $this->dispatch('error', "File was not saved correctly to server volume at {$serverFilePath}. Please check permissions.");
+                    return;
+                }
+                
                 // CRITICAL: Regenerate docker-compose to include the new volume
                 // This ensures the volume is mounted when the container restarts
                 $this->service->parse();
                 $this->service->saveComposeConfigs();
                 
+                // Verify the volume is in docker-compose
+                $composeContent = $this->service->docker_compose ?? '';
+                $volumeInCompose = str_contains($composeContent, 'php-config') && str_contains($composeContent, $confIniFileMountPath);
+                
                 // Also write directly to container for immediate effect
                 $this->writeToContainerDirectly($server, $escapedContainer, $confDirPath, $confIniFileName, $confContent, $setting, $value);
                 
                 // The file is now persisted in the volume and docker-compose has been updated
-                // The volume will be mounted when the service is restarted via docker compose
-                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. Docker-compose has been regenerated with the new volume. Changes applied immediately to running container. IMPORTANT: You must restart the SERVICE (not just the container) from the service page for the volume to be mounted permanently. A simple container restart won't mount new volumes.");
+                $volumeStatus = $volumeInCompose ? "Volume added to docker-compose." : "WARNING: Volume may not be in docker-compose. Please check.";
+                $this->dispatch('success', "PHP setting {$setting} saved to persistent volume at {$confIniFileMountPath}. File saved at {$serverFilePath}. {$volumeStatus} Changes applied immediately to running container. IMPORTANT: You must restart the SERVICE (not just the container) from the service page for the volume to be mounted permanently.");
                 
             } catch (\Throwable $e) {
                 $this->dispatch('error', "Failed to save PHP config to persistent volume: ".$e->getMessage().". Trying direct container write...");
