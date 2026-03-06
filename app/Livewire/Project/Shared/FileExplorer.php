@@ -1052,17 +1052,25 @@ class FileExplorer extends Component
                 $command = "sudo {$command}";
             }
 
-            // Use remote_process for long operations to avoid nginx timeout
-            // This executes in background and shows progress in activity monitor
-            $activity = remote_process(
-                [$command],
-                $server,
-                type: ActivityTypes::COMMAND->value,
-                type_uuid: $this->selected_container,
-                callEventOnFinish: 'FileExtractionCompleted'
-            );
+            // Execute extraction synchronously and check result
+            $output = instant_remote_process([$command], $server, false);
+            $output = trim($output ?? '');
 
-            $this->dispatch('success', 'File extraction started. Check the activity monitor for progress.');
+            // Check if extraction was successful
+            if (str_contains($output, 'EXTRACTION_SUCCESS')) {
+                $this->dispatch('success', 'File extracted successfully.');
+                // Refresh file list to show extracted files
+                $this->loadFiles();
+            } elseif (str_contains($output, 'TOOL_NOT_FOUND:')) {
+                $tool = str_replace('TOOL_NOT_FOUND:', '', $output);
+                $this->dispatch('error', "Required tool not found in container: {$tool}. Please install it first.");
+            } elseif (!empty($output)) {
+                // Show error output from extraction command
+                $this->dispatch('error', 'Extraction failed: '.$output);
+            } else {
+                $this->dispatch('error', 'Extraction failed. No output received from container.');
+            }
+
             $this->selectedFiles = [];
             $this->showExtractDialog = false;
             return;
