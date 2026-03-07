@@ -1,0 +1,359 @@
+# documentation: https://docs.appflowy.io/docs/documentation/appflowy-cloud
+# slogan: AppFlowy is the AI collaborative workspace where you achieve more without losing control of your data.
+# tags: appflowy,notion,open-source,productivity,notes,ai,self-hosted
+# logo: svgs/appflowy.svg
+# category: productivity
+# port: 80
+
+services:
+  nginx:
+    image: nginx:1.29.2
+    environment:
+      - SERVICE_URL_ADMIN
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        content: |
+          # Please do not directly edit this file.
+
+          error_log  /var/log/nginx/error.log notice;
+          pid        /var/run/nginx.pid;
+
+
+          events {
+              worker_connections  1024;
+          }
+
+
+          http {
+              resolver 127.0.0.11 valid=10s;
+              map $http_upgrade $connection_upgrade {
+                  default upgrade;
+                  '' close;
+              }
+
+              server {
+                  listen 80;
+                  client_max_body_size 10M;
+                  underscores_in_headers on;
+
+                  # Backend services
+                  set $appflowy_cloud_backend "http://appflowy_cloud:8000";
+                  set $gotrue_backend "http://gotrue:9999";
+                  set $admin_frontend_backend "http://admin_frontend:3000";
+                  # GoTrue Authentication Service
+                  location /gotrue/ {
+                      proxy_pass $gotrue_backend;
+
+                      rewrite ^/gotrue(/.*)$ $1 break;
+                      
+                      # Allow headers like redirect_to to be handed over to the gotrue
+                      # for correct redirecting
+                      proxy_set_header Host $http_host;
+                      proxy_pass_request_headers on;
+                  }
+
+                  # WebSocket endpoint - handle both /ws and /ws/v2
+                  location /ws {
+                      proxy_pass $appflowy_cloud_backend;
+
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Connection "Upgrade";
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                      proxy_read_timeout 86400s;
+                  }
+
+                  # API endpoints
+                  location /api {
+                      proxy_pass $appflowy_cloud_backend;
+                      proxy_set_header X-Request-Id $request_id;
+                      proxy_set_header Host $http_host;
+
+                      # Special handling for publish endpoint
+                      location ~* ^/api/workspace/([a-zA-Z0-9_-]+)/publish$ {
+                          proxy_pass $appflowy_cloud_backend;
+                          proxy_request_buffering off;
+                          client_max_body_size 256M;
+                      }
+
+                      # Chat endpoint (streaming)
+                      location /api/chat {
+                          proxy_pass $appflowy_cloud_backend;
+
+                          proxy_http_version 1.1;
+                          proxy_set_header Connection "";
+                          chunked_transfer_encoding on;
+                          proxy_buffering off;
+                          proxy_cache off;
+
+                          proxy_read_timeout 600s;
+                          proxy_connect_timeout 600s;
+                          proxy_send_timeout 600s;
+                      }
+
+                      # Import endpoint
+                      location /api/import {
+                          proxy_pass $appflowy_cloud_backend;
+
+                          proxy_set_header X-Request-Id $request_id;
+                          proxy_set_header Host $http_host;
+
+                          proxy_read_timeout 600s;
+                          proxy_connect_timeout 600s;
+                          proxy_send_timeout 600s;
+
+                          proxy_request_buffering off;
+                          proxy_buffering off;
+                          proxy_cache off;
+                          client_max_body_size 2G;
+                      }
+                  }
+
+                  # Admin Frontend
+                  # Optional Module, comment this section if you did not deploy admin_frontend in docker-compose.yml
+                  location /console {
+                      proxy_pass $admin_frontend_backend;
+
+                      proxy_set_header X-Scheme $scheme;
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+
+                      proxy_http_version 1.1;
+                      proxy_set_header Connection "";
+
+                      proxy_buffering off;
+                      proxy_cache off;
+
+                      proxy_read_timeout 60s;
+                      proxy_connect_timeout 60s;
+                      proxy_send_timeout 60s;
+                  }
+
+                  # Redirect root path to /console
+                  location = / {
+                      return 301 /console;
+                  }
+
+                  # Health check endpoint
+                  location /health {
+                      access_log off;
+                      return 200 "healthy\n";
+                      add_header Content-Type text/plain;
+                  }
+              }
+          }
+    depends_on:
+      - appflowy_cloud
+      - gotrue
+      - admin_frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  appflowy_web:
+    environment:
+      - SERVICE_URL_APPFLOWYWEB
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
+      - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
+      - APPFLOWY_WS_BASE_URL=${SERVICE_URL_ADMIN}/ws/v2
+    image: appflowyinc/appflowy_web:0.9.132
+    depends_on:
+      - appflowy_cloud
+
+  appflowy_cloud:
+    image: appflowyinc/appflowy_cloud:0.9.149
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
+      - APPFLOWY_ENVIRONMENT=production
+      - APPFLOWY_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
+      - APPFLOWY_REDIS_URI=redis://redis:6379
+      - APPFLOWY_GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - APPFLOWY_GOTRUE_BASE_URL=http://gotrue:9999
+      - APPFLOWY_S3_CREATE_BUCKET=${APPFLOWY_S3_CREATE_BUCKET:-true}
+      - APPFLOWY_S3_USE_MINIO=true
+      - APPFLOWY_S3_MINIO_URL=http://minio:9000
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - APPFLOWY_S3_BUCKET=${APPFLOWY_S3_BUCKET:-appflowy}
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION:-us-east-1}
+      - APPFLOWY_MAILER_SMTP_HOST=${APPFLOWY_MAILER_SMTP_HOST:-smtp.gmail.com}
+      - APPFLOWY_MAILER_SMTP_PORT=${APPFLOWY_MAILER_SMTP_PORT:-587}
+      - APPFLOWY_MAILER_SMTP_USERNAME=${APPFLOWY_MAILER_SMTP_USERNAME:-notify@appflowy.io}
+      - APPFLOWY_MAILER_SMTP_EMAIL=${APPFLOWY_MAILER_SMTP_EMAIL:-notify@appflowy.io}
+      - APPFLOWY_MAILER_SMTP_PASSWORD=${APPFLOWY_MAILER_SMTP_PASSWORD:-email_sender_password}
+      - APPFLOWY_MAILER_SMTP_TLS_KIND=${APPFLOWY_MAILER_SMTP_TLS_KIND:-none}
+      - APPFLOWY_ACCESS_CONTROL=true
+      - APPFLOWY_DATABASE_MAX_CONNECTIONS=40
+      - AI_SERVER_HOST=ai
+      - AI_SERVER_PORT=5001
+      - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
+      - APPFLOWY_WEB_URL=${SERVICE_URL_APPFLOWYWEB}
+    healthcheck:
+      test: "curl --fail http://127.0.0.1:8000/api/health || exit 1"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    
+    depends_on:
+      gotrue:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  gotrue:
+    image: appflowyinc/gotrue:0.9.149
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - PORT=9999
+      - GOTRUE_ADMIN_EMAIL=${GOTRUE_ADMIN_EMAIL:-admin@example.com}
+      - GOTRUE_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - GOTRUE_DISABLE_SIGNUP=false
+      - GOTRUE_SITE_URL=appflowy-flutter://
+      - GOTRUE_URI_ALLOW_LIST=**
+      - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
+      - GOTRUE_DB_DRIVER=postgres
+      - API_EXTERNAL_URL=${SERVICE_URL_ADMIN}/gotrue
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}?search_path=auth
+      - GOTRUE_SMTP_HOST=${GOTRUE_SMTP_HOST}
+      - GOTRUE_SMTP_PORT=${GOTRUE_SMTP_PORT:-587}
+      - GOTRUE_SMTP_USER=${GOTRUE_SMTP_USER}
+      - GOTRUE_SMTP_PASS=${GOTRUE_SMTP_PASS}
+      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=/verify
+      - GOTRUE_MAILER_URLPATHS_INVITE=/verify
+      - GOTRUE_MAILER_URLPATHS_RECOVERY=/verify
+      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/verify
+      - GOTRUE_SMTP_ADMIN_EMAIL=${GOTRUE_SMTP_ADMIN_EMAIL}
+      - GOTRUE_SMTP_MAX_FREQUENCY=1ns
+      - GOTRUE_RATE_LIMIT_EMAIL_SENT=100
+      - GOTRUE_MAILER_AUTOCONFIRM=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: "curl --fail http://127.0.0.1:9999/health || exit 1"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  admin_frontend:
+    image: appflowyinc/admin_frontend:0.9.149
+    environment:
+      - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
+      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
+    depends_on:
+      gotrue:
+        condition: service_healthy
+      appflowy_cloud:
+        condition: service_started
+
+  ai:
+    image: appflowyinc/appflowy_ai:0.9.149
+    environment:
+      - OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
+      - AI_SERVER_PORT=5001
+      - DEFAULT_AI_MODEL=gpt-4.1-mini # Make sure the model is available in your OpenAI account
+      - DEFAULT_AI_COMPLETION_MODEL=gpt-4.1-mini # Make sure the model is available in your OpenAI account
+      - AI_APPFLOWY_HOST=${SERVICE_URL_APPFLOWYWEB}
+      - APPFLOWY_GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - APPFLOWY_S3_BUCKET=${APPFLOWY_S3_BUCKET:-appflowy}
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION:-us-east-1}
+      - AI_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
+      - AI_REDIS_URL=redis://redis:6379
+      - AI_USE_MINIO=true
+      - AI_MINIO_URL=http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  appflowy_worker:
+    image: appflowyinc/appflowy_worker:0.9.149
+    environment:
+      - RUST_LOG=info
+      - APPFLOWY_ENVIRONMENT=production
+      - APPFLOWY_WORKER_ENVIRONMENT=production
+      - APPFLOWY_WORKER_REDIS_URL=redis://redis:6379
+      - APPFLOWY_WORKER_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
+      - APPFLOWY_WORKER_DATABASE_NAME=${POSTGRES_DB:-appflowy}
+      - APPFLOWY_WORKER_IMPORT_TICK_INTERVAL=30
+      - APPFLOWY_S3_USE_MINIO=true
+      - APPFLOWY_S3_MINIO_URL=http://minio:9000
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - APPFLOWY_S3_BUCKET=${APPFLOWY_S3_BUCKET:-appflowy}
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION:-us-east-1}
+      - APPFLOWY_MAILER_SMTP_HOST=${APPFLOWY_MAILER_SMTP_HOST:-smtp.gmail.com}
+      - APPFLOWY_MAILER_SMTP_PORT=${APPFLOWY_MAILER_SMTP_PORT:-587}
+      - APPFLOWY_MAILER_SMTP_USERNAME=${APPFLOWY_MAILER_SMTP_USERNAME:-notify@appflowy.io}
+      - APPFLOWY_MAILER_SMTP_EMAIL=${APPFLOWY_MAILER_SMTP_EMAIL:-notify@appflowy.io}
+      - APPFLOWY_MAILER_SMTP_PASSWORD=${APPFLOWY_MAILER_SMTP_PASSWORD:-email_sender_password}
+      - APPFLOWY_MAILER_SMTP_TLS_KIND=${APPFLOWY_MAILER_SMTP_TLS_KIND:-none}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      # Coolify will manage this named volume for persistent object storage.
+      - minio_data:/data
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-appflowy}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_HOST=postgres
+    volumes:
+      # Coolify will manage this named volume for persistent database storage.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "${SERVICE_USER_POSTGRES}", "-d", "${POSTGRES_DB:-appflowy}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8.2.2-alpine3.22
+    volumes:
+      - "redis_data:/data"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "redis-cli -h localhost -p 6379 ping"
+      interval: 5s
+      timeout: 5s
+      retries: 3

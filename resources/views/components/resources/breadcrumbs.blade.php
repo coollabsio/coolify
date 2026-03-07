@@ -2,12 +2,28 @@
     'lastDeploymentInfo' => null,
     'lastDeploymentLink' => null,
     'resource' => null,
+    'projects' => null,
+    'environments' => null,
 ])
 @php
-    $projects = auth()->user()->currentTeam()->projects()->get();
-    $environments = $resource->environment->project
+    use App\Models\Project;
+
+    // Use passed props if available, otherwise query (backwards compatible)
+    $projects = $projects ?? Project::ownedByCurrentTeamCached();
+    $environments = $environments ?? $resource->environment->project
         ->environments()
-        ->with(['applications', 'services'])
+        ->with([
+            'applications',
+            'services',
+            'postgresqls',
+            'redis',
+            'mongodbs',
+            'mysqls',
+            'mariadbs',
+            'keydbs',
+            'dragonflies',
+            'clickhouses',
+        ])
         ->get();
     $currentProjectUuid = data_get($resource, 'environment.project.uuid');
     $currentEnvironmentUuid = data_get($resource, 'environment.uuid');
@@ -18,7 +34,7 @@
         <!-- Project Level -->
         <li class="inline-flex items-center" x-data="{ projectOpen: false, closeTimeout: null, toggle() { this.projectOpen = !this.projectOpen }, open() { clearTimeout(this.closeTimeout); this.projectOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.projectOpen = false }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ route('project.show', ['project_uuid' => $currentProjectUuid]) }}">
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}
                 </a>
@@ -36,7 +52,7 @@
                     x-transition:leave-end="opacity-0 scale-95"
                     class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                     @foreach ($projects as $project)
-                        <a href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}"
+                        <a href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
                             class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $project->uuid === $currentProjectUuid ? 'dark:text-warning font-semibold' : '' }}"
                             title="{{ $project->name }}">
                             {{ $project->name }}
@@ -50,7 +66,7 @@
         <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, activeRes: null, resPositions: {}, activeMenuEnv: null, menuPositions: {}, closeTimeout: null, envTimeout: null, resTimeout: null, menuTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; } }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false; this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout); clearTimeout(this.envTimeout); this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null; this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openRes(id) { clearTimeout(this.envTimeout); clearTimeout(this.resTimeout); this.activeRes = id }, closeRes() { this.resTimeout = setTimeout(() => { this.activeRes = null; this.activeMenuEnv = null; }, 100) }, openMenu(id) { clearTimeout(this.resTimeout); clearTimeout(this.menuTimeout); this.activeMenuEnv = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenuEnv = null; }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()"
                 @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ route('project.resource.index', [
                         'environment_uuid' => $currentEnvironmentUuid,
                         'project_uuid' => $currentProjectUuid,
@@ -74,6 +90,16 @@
                         class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                         @foreach ($environments as $environment)
                             @php
+                                // Use pre-loaded relations instead of databases() method to avoid N+1 queries
+                                $envDatabases = collect()
+                                    ->merge($environment->postgresqls ?? collect())
+                                    ->merge($environment->redis ?? collect())
+                                    ->merge($environment->mongodbs ?? collect())
+                                    ->merge($environment->mysqls ?? collect())
+                                    ->merge($environment->mariadbs ?? collect())
+                                    ->merge($environment->keydbs ?? collect())
+                                    ->merge($environment->dragonflies ?? collect())
+                                    ->merge($environment->clickhouses ?? collect());
                                 $envResources = collect()
                                     ->merge(
                                         $environment->applications->map(
@@ -81,9 +107,7 @@
                                         ),
                                     )
                                     ->merge(
-                                        $environment
-                                            ->databases()
-                                            ->map(fn($db) => ['type' => 'database', 'resource' => $db]),
+                                        $envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]),
                                     )
                                     ->merge(
                                         $environment->services->map(
@@ -96,7 +120,7 @@
                                 <a href="{{ route('project.resource.index', [
                                     'environment_uuid' => $environment->uuid,
                                     'project_uuid' => $currentProjectUuid,
-                                ]) }}"
+                                ]) }}" {{ wireNavigate() }}
                                     class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $environment->uuid === $currentEnvironmentUuid ? 'dark:text-warning font-semibold' : '' }}"
                                     title="{{ $environment->name }}">
                                     <span class="truncate">{{ $environment->name }}</span>
@@ -111,7 +135,7 @@
                             </div>
                         @endforeach
                         <div class="border-t border-neutral-200 dark:border-coolgray-200 mt-1 pt-1">
-                            <a href="{{ route('project.show', ['project_uuid' => $currentProjectUuid]) }}"
+                            <a href="{{ route('project.show', ['project_uuid' => $currentProjectUuid]) }}" {{ wireNavigate() }}
                                 class="flex items-center gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -173,12 +197,14 @@
                                                 ]),
                                             };
                                             $isCurrentResource = $res->uuid === $currentResourceUuid;
-                                            $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') && $res->additional_servers()->count() > 0;
+                                            // Use loaded relation count if available, otherwise check additional_servers_count attribute
+                                            $resHasMultipleServers = $resType === 'application' && method_exists($res, 'additional_servers') &&
+                                                ($res->relationLoaded('additional_servers') ? $res->additional_servers->count() > 0 : ($res->additional_servers_count ?? 0) > 0);
                                             $resServerName = $resHasMultipleServers ? null : data_get($res, 'destination.server.name');
                                         @endphp
                                         <div @mouseenter="openRes('{{ $environment->uuid }}-{{ $res->uuid }}'); resPositions['{{ $environment->uuid }}-{{ $res->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                             @mouseleave="closeRes()">
-                                            <a href="{{ $resRoute }}"
+                                            <a href="{{ $resRoute }}" {{ wireNavigate() }}
                                                 class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $isCurrentResource ? 'dark:text-warning font-semibold' : '' }}"
                                                 title="{{ $res->name }}{{ $resServerName ? ' ('.$resServerName.')' : '' }}">
                                                 <span class="truncate">{{ $res->name }}@if($resServerName) <span class="text-xs text-neutral-400">({{ $resServerName }})</span>@endif</span>
@@ -223,7 +249,7 @@
                                             @if ($resType === 'application')
                                                 <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
-                                                    <a href="{{ route('project.application.configuration', $resParams) }}"
+                                                    <a href="{{ route('project.application.configuration', $resParams) }}" {{ wireNavigate() }}
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                         <span>Configuration</span>
                                                         <svg class="w-3 h-3 shrink-0" fill="none"
@@ -233,9 +259,9 @@
                                                         </svg>
                                                     </a>
                                                 </div>
-                                                <a href="{{ route('project.application.deployment.index', $resParams) }}"
+                                                <a href="{{ route('project.application.deployment.index', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Deployments</a>
-                                                <a href="{{ route('project.application.logs', $resParams) }}"
+                                                <a href="{{ route('project.application.logs', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
                                                 @can('canAccessTerminal')
                                                     <a href="{{ route('project.application.command', $resParams) }}"
@@ -244,7 +270,7 @@
                                             @elseif ($resType === 'service')
                                                 <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
-                                                    <a href="{{ route('project.service.configuration', $resParams) }}"
+                                                    <a href="{{ route('project.service.configuration', $resParams) }}" {{ wireNavigate() }}
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                         <span>Configuration</span>
                                                         <svg class="w-3 h-3 shrink-0" fill="none"
@@ -254,7 +280,7 @@
                                                         </svg>
                                                     </a>
                                                 </div>
-                                                <a href="{{ route('project.service.logs', $resParams) }}"
+                                                <a href="{{ route('project.service.logs', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
                                                 @can('canAccessTerminal')
                                                     <a href="{{ route('project.service.command', $resParams) }}"
@@ -263,7 +289,7 @@
                                             @else
                                                 <div @mouseenter="openMenu('{{ $resKey }}-config'); menuPositions['{{ $resKey }}-config'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
                                                     @mouseleave="closeMenu()">
-                                                    <a href="{{ route('project.database.configuration', $resParams) }}"
+                                                    <a href="{{ route('project.database.configuration', $resParams) }}" {{ wireNavigate() }}
                                                         class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                                         <span>Configuration</span>
                                                         <svg class="w-3 h-3 shrink-0" fill="none"
@@ -273,7 +299,7 @@
                                                         </svg>
                                                     </a>
                                                 </div>
-                                                <a href="{{ route('project.database.logs', $resParams) }}"
+                                                <a href="{{ route('project.database.logs', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Logs</a>
                                                 @can('canAccessTerminal')
                                                     <a href="{{ route('project.database.command', $resParams) }}"
@@ -284,7 +310,7 @@
                                                         $res->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                                                         $res->getMorphClass() === 'App\Models\StandaloneMysql' ||
                                                         $res->getMorphClass() === 'App\Models\StandaloneMariadb')
-                                                    <a href="{{ route('project.database.backup.index', $resParams) }}"
+                                                    <a href="{{ route('project.database.backup.index', $resParams) }}" {{ wireNavigate() }}
                                                         class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">Backups</a>
                                                 @endif
                                             @endif
@@ -300,90 +326,90 @@
                                             class="pl-1">
                                         <div class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                             @if ($resType === 'application')
-                                                <a href="{{ route('project.application.configuration', $resParams) }}"
+                                                <a href="{{ route('project.application.configuration', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                <a href="{{ route('project.application.environment-variables', $resParams) }}"
+                                                <a href="{{ route('project.application.environment-variables', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                                     Variables</a>
-                                                <a href="{{ route('project.application.persistent-storage', $resParams) }}"
+                                                <a href="{{ route('project.application.persistent-storage', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
                                                     Storage</a>
-                                                <a href="{{ route('project.application.source', $resParams) }}"
+                                                <a href="{{ route('project.application.source', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Source</a>
-                                                <a href="{{ route('project.application.servers', $resParams) }}"
+                                                <a href="{{ route('project.application.servers', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                <a href="{{ route('project.application.scheduled-tasks.show', $resParams) }}"
+                                                <a href="{{ route('project.application.scheduled-tasks.show', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
                                                     Tasks</a>
-                                                <a href="{{ route('project.application.webhooks', $resParams) }}"
+                                                <a href="{{ route('project.application.webhooks', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                <a href="{{ route('project.application.preview-deployments', $resParams) }}"
+                                                <a href="{{ route('project.application.preview-deployments', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Preview
                                                     Deployments</a>
-                                                <a href="{{ route('project.application.healthcheck', $resParams) }}"
+                                                <a href="{{ route('project.application.healthcheck', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Healthcheck</a>
-                                                <a href="{{ route('project.application.rollback', $resParams) }}"
+                                                <a href="{{ route('project.application.rollback', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Rollback</a>
-                                                <a href="{{ route('project.application.resource-limits', $resParams) }}"
+                                                <a href="{{ route('project.application.resource-limits', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                                     Limits</a>
-                                                <a href="{{ route('project.application.resource-operations', $resParams) }}"
+                                                <a href="{{ route('project.application.resource-operations', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                                     Operations</a>
-                                                <a href="{{ route('project.application.metrics', $resParams) }}"
+                                                <a href="{{ route('project.application.metrics', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                <a href="{{ route('project.application.tags', $resParams) }}"
+                                                <a href="{{ route('project.application.tags', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                <a href="{{ route('project.application.advanced', $resParams) }}"
+                                                <a href="{{ route('project.application.advanced', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Advanced</a>
-                                                <a href="{{ route('project.application.danger', $resParams) }}"
+                                                <a href="{{ route('project.application.danger', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                                     Zone</a>
                                             @elseif ($resType === 'service')
-                                                <a href="{{ route('project.service.configuration', $resParams) }}"
+                                                <a href="{{ route('project.service.configuration', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                <a href="{{ route('project.service.environment-variables', $resParams) }}"
+                                                <a href="{{ route('project.service.environment-variables', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                                     Variables</a>
-                                                <a href="{{ route('project.service.storages', $resParams) }}"
+                                                <a href="{{ route('project.service.storages', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Storages</a>
-                                                <a href="{{ route('project.service.scheduled-tasks.show', $resParams) }}"
+                                                <a href="{{ route('project.service.scheduled-tasks.show', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
                                                     Tasks</a>
-                                                <a href="{{ route('project.service.webhooks', $resParams) }}"
+                                                <a href="{{ route('project.service.webhooks', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                <a href="{{ route('project.service.resource-operations', $resParams) }}"
+                                                <a href="{{ route('project.service.resource-operations', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                                     Operations</a>
-                                                <a href="{{ route('project.service.tags', $resParams) }}"
+                                                <a href="{{ route('project.service.tags', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                <a href="{{ route('project.service.danger', $resParams) }}"
+                                                <a href="{{ route('project.service.danger', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                                     Zone</a>
                                             @else
-                                                <a href="{{ route('project.database.configuration', $resParams) }}"
+                                                <a href="{{ route('project.database.configuration', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                                                <a href="{{ route('project.database.environment-variables', $resParams) }}"
+                                                <a href="{{ route('project.database.environment-variables', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                                     Variables</a>
-                                                <a href="{{ route('project.database.servers', $resParams) }}"
+                                                <a href="{{ route('project.database.servers', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                                                <a href="{{ route('project.database.persistent-storage', $resParams) }}"
+                                                <a href="{{ route('project.database.persistent-storage', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
                                                     Storage</a>
-                                                <a href="{{ route('project.database.webhooks', $resParams) }}"
+                                                <a href="{{ route('project.database.webhooks', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                                                <a href="{{ route('project.database.resource-limits', $resParams) }}"
+                                                <a href="{{ route('project.database.resource-limits', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                                     Limits</a>
-                                                <a href="{{ route('project.database.resource-operations', $resParams) }}"
+                                                <a href="{{ route('project.database.resource-operations', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                                     Operations</a>
-                                                <a href="{{ route('project.database.metrics', $resParams) }}"
+                                                <a href="{{ route('project.database.metrics', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                                                <a href="{{ route('project.database.tags', $resParams) }}"
+                                                <a href="{{ route('project.database.tags', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                                                <a href="{{ route('project.database.danger', $resParams) }}"
+                                                <a href="{{ route('project.database.danger', $resParams) }}" {{ wireNavigate() }}
                                                     class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                                     Zone</a>
                                             @endif
@@ -405,7 +431,9 @@
             $isApplication = $resourceType === 'App\Models\Application';
             $isService = $resourceType === 'App\Models\Service';
             $isDatabase = str_contains($resourceType, 'Database') || str_contains($resourceType, 'Standalone');
-            $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') && $resource->additional_servers()->count() > 0;
+            // Use loaded relation count if available, otherwise check additional_servers_count attribute
+            $hasMultipleServers = $isApplication && method_exists($resource, 'additional_servers') &&
+                ($resource->relationLoaded('additional_servers') ? $resource->additional_servers->count() > 0 : ($resource->additional_servers_count ?? 0) > 0);
             $serverName = $hasMultipleServers ? null : data_get($resource, 'destination.server.name');
             $routeParams = [
                 'project_uuid' => $currentProjectUuid,
@@ -422,7 +450,7 @@
         <li class="inline-flex items-center" x-data="{ resourceOpen: false, activeMenu: null, menuPosition: 0, closeTimeout: null, menuTimeout: null, toggle() { this.resourceOpen = !this.resourceOpen; if (!this.resourceOpen) { this.activeMenu = null; } }, open() { clearTimeout(this.closeTimeout); this.resourceOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.resourceOpen = false; this.activeMenu = null; }, 100) }, openMenu(id) { clearTimeout(this.closeTimeout); clearTimeout(this.menuTimeout); this.activeMenu = id }, closeMenu() { this.menuTimeout = setTimeout(() => { this.activeMenu = null; }, 100) } }">
             <div class="flex items-center relative" @mouseenter="open()"
                 @mouseleave="close()">
-                <a class="text-xs truncate lg:text-sm hover:text-warning"
+                <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
                     href="{{ $isApplication
                         ? route('project.application.configuration', $routeParams)
                         : ($isService
@@ -451,7 +479,7 @@
                         @if ($isApplication)
                             <!-- Application Main Menus -->
                             <div @mouseenter="openMenu('config'); menuPosition = $el.offsetTop" @mouseleave="closeMenu()">
-                                <a href="{{ route('project.application.configuration', $routeParams) }}"
+                                <a href="{{ route('project.application.configuration', $routeParams) }}" {{ wireNavigate() }}
                                     class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                     <span>Configuration</span>
                                     <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor"
@@ -461,11 +489,11 @@
                                     </svg>
                                 </a>
                             </div>
-                            <a href="{{ route('project.application.deployment.index', $routeParams) }}"
+                            <a href="{{ route('project.application.deployment.index', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                 Deployments
                             </a>
-                            <a href="{{ route('project.application.logs', $routeParams) }}"
+                            <a href="{{ route('project.application.logs', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                 Logs
                             </a>
@@ -478,7 +506,7 @@
                         @elseif ($isService)
                             <!-- Service Main Menus -->
                             <div @mouseenter="openMenu('config'); menuPosition = $el.offsetTop" @mouseleave="closeMenu()">
-                                <a href="{{ route('project.service.configuration', $routeParams) }}"
+                                <a href="{{ route('project.service.configuration', $routeParams) }}" {{ wireNavigate() }}
                                     class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                     <span>Configuration</span>
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
@@ -488,7 +516,7 @@
                                     </svg>
                                 </a>
                             </div>
-                            <a href="{{ route('project.service.logs', $routeParams) }}"
+                            <a href="{{ route('project.service.logs', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                 Logs
                             </a>
@@ -501,7 +529,7 @@
                         @else
                             <!-- Database Main Menus -->
                             <div @mouseenter="openMenu('config'); menuPosition = $el.offsetTop" @mouseleave="closeMenu()">
-                                <a href="{{ route('project.database.configuration', $routeParams) }}"
+                                <a href="{{ route('project.database.configuration', $routeParams) }}" {{ wireNavigate() }}
                                     class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                     <span>Configuration</span>
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
@@ -511,7 +539,7 @@
                                     </svg>
                                 </a>
                             </div>
-                            <a href="{{ route('project.database.logs', $routeParams) }}"
+                            <a href="{{ route('project.database.logs', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                 Logs
                             </a>
@@ -526,7 +554,7 @@
                                     $resourceType === 'App\Models\StandaloneMongodb' ||
                                     $resourceType === 'App\Models\StandaloneMysql' ||
                                     $resourceType === 'App\Models\StandaloneMariadb')
-                                <a href="{{ route('project.database.backup.index', $routeParams) }}"
+                                <a href="{{ route('project.database.backup.index', $routeParams) }}" {{ wireNavigate() }}
                                     class="block px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
                                     Backups
                                 </a>
@@ -543,90 +571,90 @@
                         class="pl-1">
                         <div class="w-52 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                         @if ($isApplication)
-                            <a href="{{ route('project.application.configuration', $routeParams) }}"
+                            <a href="{{ route('project.application.configuration', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                            <a href="{{ route('project.application.environment-variables', $routeParams) }}"
+                            <a href="{{ route('project.application.environment-variables', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                 Variables</a>
-                            <a href="{{ route('project.application.persistent-storage', $routeParams) }}"
+                            <a href="{{ route('project.application.persistent-storage', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
                                 Storage</a>
-                            <a href="{{ route('project.application.source', $routeParams) }}"
+                            <a href="{{ route('project.application.source', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Source</a>
-                            <a href="{{ route('project.application.servers', $routeParams) }}"
+                            <a href="{{ route('project.application.servers', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                            <a href="{{ route('project.application.scheduled-tasks.show', $routeParams) }}"
+                            <a href="{{ route('project.application.scheduled-tasks.show', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
                                 Tasks</a>
-                            <a href="{{ route('project.application.webhooks', $routeParams) }}"
+                            <a href="{{ route('project.application.webhooks', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                            <a href="{{ route('project.application.preview-deployments', $routeParams) }}"
+                            <a href="{{ route('project.application.preview-deployments', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Preview
                                 Deployments</a>
-                            <a href="{{ route('project.application.healthcheck', $routeParams) }}"
+                            <a href="{{ route('project.application.healthcheck', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Healthcheck</a>
-                            <a href="{{ route('project.application.rollback', $routeParams) }}"
+                            <a href="{{ route('project.application.rollback', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Rollback</a>
-                            <a href="{{ route('project.application.resource-limits', $routeParams) }}"
+                            <a href="{{ route('project.application.resource-limits', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                 Limits</a>
-                            <a href="{{ route('project.application.resource-operations', $routeParams) }}"
+                            <a href="{{ route('project.application.resource-operations', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                 Operations</a>
-                            <a href="{{ route('project.application.metrics', $routeParams) }}"
+                            <a href="{{ route('project.application.metrics', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                            <a href="{{ route('project.application.tags', $routeParams) }}"
+                            <a href="{{ route('project.application.tags', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                            <a href="{{ route('project.application.advanced', $routeParams) }}"
+                            <a href="{{ route('project.application.advanced', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Advanced</a>
-                            <a href="{{ route('project.application.danger', $routeParams) }}"
+                            <a href="{{ route('project.application.danger', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                 Zone</a>
                         @elseif ($isService)
-                            <a href="{{ route('project.service.configuration', $routeParams) }}"
+                            <a href="{{ route('project.service.configuration', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                            <a href="{{ route('project.service.environment-variables', $routeParams) }}"
+                            <a href="{{ route('project.service.environment-variables', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                 Variables</a>
-                            <a href="{{ route('project.service.storages', $routeParams) }}"
+                            <a href="{{ route('project.service.storages', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Storages</a>
-                            <a href="{{ route('project.service.scheduled-tasks.show', $routeParams) }}"
+                            <a href="{{ route('project.service.scheduled-tasks.show', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Scheduled
                                 Tasks</a>
-                            <a href="{{ route('project.service.webhooks', $routeParams) }}"
+                            <a href="{{ route('project.service.webhooks', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                            <a href="{{ route('project.service.resource-operations', $routeParams) }}"
+                            <a href="{{ route('project.service.resource-operations', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                 Operations</a>
-                            <a href="{{ route('project.service.tags', $routeParams) }}"
+                            <a href="{{ route('project.service.tags', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                            <a href="{{ route('project.service.danger', $routeParams) }}"
+                            <a href="{{ route('project.service.danger', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                 Zone</a>
                         @else
-                            <a href="{{ route('project.database.configuration', $routeParams) }}"
+                            <a href="{{ route('project.database.configuration', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">General</a>
-                            <a href="{{ route('project.database.environment-variables', $routeParams) }}"
+                            <a href="{{ route('project.database.environment-variables', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Environment
                                 Variables</a>
-                            <a href="{{ route('project.database.servers', $routeParams) }}"
+                            <a href="{{ route('project.database.servers', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Servers</a>
-                            <a href="{{ route('project.database.persistent-storage', $routeParams) }}"
+                            <a href="{{ route('project.database.persistent-storage', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Persistent
                                 Storage</a>
-                            <a href="{{ route('project.database.webhooks', $routeParams) }}"
+                            <a href="{{ route('project.database.webhooks', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Webhooks</a>
-                            <a href="{{ route('project.database.resource-limits', $routeParams) }}"
+                            <a href="{{ route('project.database.resource-limits', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                 Limits</a>
-                            <a href="{{ route('project.database.resource-operations', $routeParams) }}"
+                            <a href="{{ route('project.database.resource-operations', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Resource
                                 Operations</a>
-                            <a href="{{ route('project.database.metrics', $routeParams) }}"
+                            <a href="{{ route('project.database.metrics', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Metrics</a>
-                            <a href="{{ route('project.database.tags', $routeParams) }}"
+                            <a href="{{ route('project.database.tags', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200">Tags</a>
-                            <a href="{{ route('project.database.danger', $routeParams) }}"
+                            <a href="{{ route('project.database.danger', $routeParams) }}" {{ wireNavigate() }}
                                 class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 text-red-500">Danger
                                 Zone</a>
                         @endif

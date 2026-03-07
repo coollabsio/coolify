@@ -58,9 +58,9 @@
             </svg>
             <span>This is a destructive action, existing data will be replaced!</span>
         </div>
-        @if (str(data_get($resource, 'status'))->startsWith('running'))
+        @if (str($resourceStatus)->startsWith('running'))
             {{-- Restore Command Configuration --}}
-            @if ($resource->type() === 'standalone-postgresql')
+            @if ($resourceDbType === 'standalone-postgresql')
                 @if ($dumpAll)
                     <x-forms.textarea rows="6" readonly label="Custom Import Command"
                         wire:model='restoreCommandText'></x-forms.textarea>
@@ -75,7 +75,7 @@
                 <div class="w-64 pt-2">
                     <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
-            @elseif ($resource->type() === 'standalone-mysql')
+            @elseif ($resourceDbType === 'standalone-mysql')
                 @if ($dumpAll)
                     <x-forms.textarea rows="14" readonly label="Custom Import Command"
                         wire:model='restoreCommandText'></x-forms.textarea>
@@ -85,7 +85,7 @@
                 <div class="w-64 pt-2">
                     <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
-            @elseif ($resource->type() === 'standalone-mariadb')
+            @elseif ($resourceDbType === 'standalone-mariadb')
                 @if ($dumpAll)
                     <x-forms.textarea rows="14" readonly label="Custom Import Command"
                         wire:model='restoreCommandText'></x-forms.textarea>
@@ -112,7 +112,7 @@
                     </div>
                 </div>
 
-                @if ($availableS3Storages->count() > 0)
+                @if (count($availableS3Storages) > 0)
                     <div @click="restoreType = 's3'"
                          class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
                          :class="restoreType === 's3' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
@@ -128,7 +128,7 @@
             </div>
 
             {{-- File Restore Section --}}
-            @can('update', $resource)
+            @can('update', $this->resource)
                 <div x-show="restoreType === 'file'" class="pt-6">
                     <h3>Backup File</h3>
                     <form class="flex gap-2 items-end pt-2">
@@ -139,7 +139,7 @@
                     <div class="pt-2 text-center text-xl font-bold">
                         Or
                     </div>
-                    <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone" wire:ignore>
+                    <form action="/upload/backup/{{ $resourceUuid }}" class="dropzone" id="my-dropzone" wire:ignore>
                         @csrf
                     </form>
                     <div x-show="isUploading">
@@ -168,17 +168,17 @@
             @endcan
 
             {{-- S3 Restore Section --}}
-            @if ($availableS3Storages->count() > 0)
-                @can('update', $resource)
+            @if (count($availableS3Storages) > 0)
+                @can('update', $this->resource)
                     <div x-show="restoreType === 's3'" class="pt-6">
                         <h3>Restore from S3</h3>
                         <div class="flex flex-col gap-2 pt-2">
                             <x-forms.select label="S3 Storage" wire:model.live="s3StorageId">
                                 <option value="">Select S3 Storage</option>
                                 @foreach ($availableS3Storages as $storage)
-                                    <option value="{{ $storage->id }}">{{ $storage->name }}
-                                        @if ($storage->description)
-                                            - {{ $storage->description }}
+                                    <option value="{{ $storage['id'] }}">{{ $storage['name'] }}
+                                        @if ($storage['description'])
+                                            - {{ $storage['description'] }}
                                         @endif
                                     </option>
                                 @endforeach
@@ -226,7 +226,7 @@
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
                     <div wire:ignore>
-                        <livewire:activity-monitor wire:key="database-restore-{{ $resource->uuid }}" header="Logs" fullHeight />
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
                     </div>
                 </x-slot:content>
             </x-slide-over>

@@ -13,6 +13,10 @@ function isSubscriptionActive()
         if (! $team) {
             return false;
         }
+        // Root team (id=0) doesn't require subscription
+        if ($team->id === 0) {
+            return true;
+        }
         $subscription = $team?->subscription;
 
         if (is_null($subscription)) {
@@ -73,6 +77,7 @@ function allowedPathsForUnsubscribedAccounts()
         'login',
         'logout',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
         'admin',
     ];
@@ -91,6 +96,7 @@ function allowedPathsForInvalidAccounts()
         'logout',
         'verify',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
     ];
 }

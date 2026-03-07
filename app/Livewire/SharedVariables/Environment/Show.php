@@ -40,6 +40,7 @@ class Show extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'environment',
                 'team_id' => currentTeam()->id,
             ]);

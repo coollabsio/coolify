@@ -70,6 +70,11 @@
     },
 
     openModal() {
+        // Check if $wire is available (may not be after SPA navigation destroys/recreates component)
+        if (typeof $wire === 'undefined' || !$wire) {
+            console.warn('Global search: $wire not available, skipping open');
+            return;
+        }
         this.modalOpen = true;
         this.selectedIndex = -1;
         this.isLoadingInitialData = true;
@@ -79,6 +84,10 @@
             this.creatableItems = $wire.creatableItems || [];
             this.isLoadingInitialData = false;
             setTimeout(() => this.$refs.searchInput?.focus(), 50);
+        }).catch(() => {
+            // Handle case where component was destroyed during navigation
+            this.modalOpen = false;
+            this.isLoadingInitialData = false;
         });
     },
     closeModal() {
@@ -90,7 +99,10 @@
         this.allSearchableItems = [];
         // Ensure scroll is restored
         document.body.style.overflow = '';
-        @this.closeSearchModal();
+        // Use $wire instead of @this for SPA navigation compatibility
+        if ($wire) {
+            $wire.closeSearchModal();
+        }
     },
     navigateResults(direction) {
         const results = document.querySelectorAll('.search-result-item');
@@ -120,7 +132,7 @@
             const trimmed = value.trim().toLowerCase();
 
             if (trimmed === '') {
-                if ($wire.isSelectingResource) {
+                if (typeof $wire !== 'undefined' && $wire && $wire.isSelectingResource) {
                     $wire.cancelResourceSelection();
                 }
                 return;
@@ -149,7 +161,7 @@
                            (item.quickcommand && item.quickcommand.toLowerCase().includes(trimmed));
                 });
 
-                if (matchingItem) {
+                if (matchingItem && typeof $wire !== 'undefined' && $wire) {
                     $wire.navigateToResource(matchingItem.type);
                 }
             }
@@ -186,7 +198,7 @@
                 // If search query is empty, close the modal
                 if (!this.searchQuery || this.searchQuery === '') {
                     // Check if we're in a selection state using Alpine-accessible Livewire state
-                    if ($wire.isSelectingResource) {
+                    if (typeof $wire !== 'undefined' && $wire && $wire.isSelectingResource) {
                         $wire.cancelResourceSelection();
                         setTimeout(() => this.$refs.searchInput?.focus(), 100);
                     } else {
@@ -227,19 +239,23 @@
             document.removeEventListener('keydown', arrowKeyHandler);
         });
 
-        // Watch for auto-open resource
-        this.$watch('$wire.autoOpenResource', value => {
-            if (value) {
-                // Close search modal first
-                this.closeModal();
-                // Open the specific resource modal after a short delay
-                setTimeout(() => {
-                    this.$dispatch('open-create-modal-' + value);
-                    // Reset the value so it can trigger again
-                    @this.set('autoOpenResource', null);
-                }, 150);
-            }
-        });
+        // Watch for auto-open resource (only if $wire is available)
+        if (typeof $wire !== 'undefined' && $wire) {
+            this.$watch('$wire.autoOpenResource', value => {
+                if (value) {
+                    // Close search modal first
+                    this.closeModal();
+                    // Open the specific resource modal after a short delay
+                    setTimeout(() => {
+                        this.$dispatch('open-create-modal-' + value);
+                        // Reset the value so it can trigger again
+                        if (typeof $wire !== 'undefined' && $wire) {
+                            $wire.set('autoOpenResource', null);
+                        }
+                    }, 150);
+                }
+            });
+        }
 
         // Listen for closeSearchModal event from backend
         window.addEventListener('closeSearchModal', () => {
@@ -307,7 +323,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -382,7 +398,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -451,7 +467,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -526,7 +542,7 @@
                                     <div class="mb-4" x-init="selectedIndex = -1">
                                         <div class="flex items-center gap-3 mb-3">
                                             <button type="button"
-                                                @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                @click="$wire.goBack()"
                                                 class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
@@ -683,15 +699,21 @@
                                             class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div
-                                                        class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M12 4v16m8-8H4" />
-                                                        </svg>
-                                                    </div>
+                                                    @if (! empty($item['logo']))
+                                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-7 h-7 object-contain">
+                                                        </div>
+                                                    @else
+                                                        <div
+                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none"
+                                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                    d="M12 4v16m8-8H4" />
+                                                            </svg>
+                                                        </div>
+                                                    @endif
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <div class="font-medium text-neutral-900 dark:text-white truncate">
@@ -792,15 +814,22 @@
                                                 class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                        <div
-                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                class="h-5 w-5 text-warning-600 dark:text-warning-400"
-                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2" d="M12 4v16m8-8H4" />
-                                                            </svg>
-                                                        </div>
+                                                        <template x-if="item.logo">
+                                                            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                                <img :src="'/' + item.logo" :alt="item.name" class="w-7 h-7 object-contain">
+                                                            </div>
+                                                        </template>
+                                                        <template x-if="!item.logo">
+                                                            <div
+                                                                class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
+                                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                                    class="h-5 w-5 text-warning-600 dark:text-warning-400"
+                                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                                        stroke-width="2" d="M12 4v16m8-8H4" />
+                                                                </svg>
+                                                            </div>
+                                                        </template>
                                                         <div class="flex-1 min-w-0">
                                                             <div class="flex items-center gap-2 mb-1">
                                                                 <div class="font-medium text-neutral-900 dark:text-white truncate"

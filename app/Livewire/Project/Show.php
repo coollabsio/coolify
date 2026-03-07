@@ -48,7 +48,7 @@ class Show extends Component
                 'uuid' => (string) new Cuid2,
             ]);
 
-            return redirect()->route('project.resource.index', [
+            return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->project->uuid,
                 'environment_uuid' => $environment->uuid,
             ]);
@@ -59,7 +59,7 @@ class Show extends Component
 
     public function navigateToEnvironment($projectUuid, $environmentUuid)
     {
-        return redirect()->route('project.resource.index', [
+        return redirectRoute($this, 'project.resource.index', [
             'project_uuid' => $projectUuid,
             'environment_uuid' => $environmentUuid,
         ]);

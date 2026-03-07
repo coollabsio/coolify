@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://docs.twenty.com
 # slogan: Twenty is a CRM designed to fit your unique business needs.
 # category: cms
@@ -8,86 +7,127 @@
 
 services:
   twenty:
-    image: 'twentycrm/twenty:latest'
+    image: twentycrm/twenty:v1.15
     environment:
       - SERVICE_URL_TWENTY_3000
-      - SERVER_URL=$SERVICE_URL_TWENTY
-      - FRONT_BASE_URL=$SERVICE_URL_TWENTY
+      - SERVER_URL=${SERVICE_URL_TWENTY}
+      - FRONT_BASE_URL=${SERVICE_URL_TWENTY}
+      - APP_SECRET=${SERVICE_BASE64_32_SECRET}
       - ENABLE_DB_MIGRATIONS=true
-      - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
-      - REDIS_URL=redis://redis:6379
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#security
-      - API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}
-      - API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#tokens
-      - APP_SECRET=$SERVICE_BASE64_32_SECRET
-      - POSTGRES_ADMIN_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - PG_DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@postgres:5432/default
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#auth
-      - IS_SIGN_UP_DISABLED=${IS_SIGN_UP_DISABLED:-false}
-      - PASSWORD_RESET_TOKEN_EXPIRES_IN=${PASSWORD_RESET_TOKEN_EXPIRES_IN:-5m}
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#workspace-cleaning
-      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=$WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION
-      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=$WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#captcha
-      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - 'CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}'
+      - 'REDIS_URL=redis://redis:6379'
+      - 'API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}'
+      - 'API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}'
+      - POSTGRES_ADMIN_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - 'PG_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-twenty-db}'
+      - 'IS_SIGN_UP_DISABLED=${IS_SIGN_UP_DISABLED:-false}'
+      - 'PASSWORD_RESET_TOKEN_EXPIRES_IN=${PASSWORD_RESET_TOKEN_EXPIRES_IN:-5m}'
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=${WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION:-7}
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=${WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION:-21}
+      - 'STORAGE_TYPE=${STORAGE_TYPE:-local}'
       - STORAGE_S3_REGION=$STORAGE_S3_REGION
       - STORAGE_S3_NAME=$STORAGE_S3_NAME
       - STORAGE_S3_ENDPOINT=$STORAGE_S3_ENDPOINT
       - STORAGE_S3_ACCESS_KEY_ID=$STORAGE_S3_ACCESS_KEY_ID
       - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#message-queue
-      - MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#email
+      - 'MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}'
       - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
       - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
       - EMAIL_SYSTEM_ADDRESS=$EMAIL_SYSTEM_ADDRESS
-      - EMAIL_DRIVER=${EMAIL_DRIVER:-logger}
+      - 'EMAIL_DRIVER=${EMAIL_DRIVER:-logger}'
       - EMAIL_SMTP_HOST=$EMAIL_SMTP_HOST
       - EMAIL_SMTP_PORT=$EMAIL_SMTP_PORT
       - EMAIL_SMTP_USER=$EMAIL_SMTP_USER
       - EMAIL_SMTP_PASSWORD=$EMAIL_SMTP_PASSWORD
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#debug-/-development
       - SIGN_IN_PREFILLED=false
-      - DEBUG_MODE=${DEBUG_MODE:-false}
-
-      # https://twenty.com/developers/section/self-hosting/self-hosting-var#telemetry
-      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+      - 'DEBUG_MODE=${DEBUG_MODE:-false}'
+      - 'TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}'
+    volumes:
+      - twenty-local-storage:/app/packages/twenty-server/.local-storage
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:3000/healthz'
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/healthz"]
-      interval: 2s
-      timeout: 10s
-      retries: 15
-  postgres:
-    image: "twentycrm/twenty-postgres:latest"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=default
+
+  worker:
+    image: twentycrm/twenty:v1.15
+    command: ["yarn", "worker:prod"]
     volumes:
-      - pg-data:/bitnami/postgresql
+      - twenty-local-storage:/app/packages/twenty-server/.local-storage
+    environment:
+      - SERVICE_URL_TWENTY_3000
+      - SERVER_URL=${SERVICE_URL_TWENTY}
+      - FRONT_BASE_URL=${SERVICE_URL_TWENTY}
+      - APP_SECRET=${SERVICE_BASE64_32_SECRET}
+      - ENABLE_DB_MIGRATIONS=true
+      - 'CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}'
+      - 'REDIS_URL=redis://redis:6379'
+      - 'API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}'
+      - 'API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}'
+      - POSTGRES_ADMIN_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - 'PG_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-twenty-db}'
+      - 'IS_SIGN_UP_DISABLED=${IS_SIGN_UP_DISABLED:-false}'
+      - 'PASSWORD_RESET_TOKEN_EXPIRES_IN=${PASSWORD_RESET_TOKEN_EXPIRES_IN:-5m}'
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION=${WORKSPACE_INACTIVE_DAYS_BEFORE_NOTIFICATION:-7}
+      - WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION=${WORKSPACE_INACTIVE_DAYS_BEFORE_DELETION:-21}
+      - 'STORAGE_TYPE=${STORAGE_TYPE:-local}'
+      - STORAGE_S3_REGION=$STORAGE_S3_REGION
+      - STORAGE_S3_NAME=$STORAGE_S3_NAME
+      - STORAGE_S3_ENDPOINT=$STORAGE_S3_ENDPOINT
+      - STORAGE_S3_ACCESS_KEY_ID=$STORAGE_S3_ACCESS_KEY_ID
+      - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
+      - 'MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}'
+      - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
+      - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+      - EMAIL_SYSTEM_ADDRESS=$EMAIL_SYSTEM_ADDRESS
+      - 'EMAIL_DRIVER=${EMAIL_DRIVER:-logger}'
+      - EMAIL_SMTP_HOST=$EMAIL_SMTP_HOST
+      - EMAIL_SMTP_PORT=$EMAIL_SMTP_PORT
+      - EMAIL_SMTP_USER=$EMAIL_SMTP_USER
+      - EMAIL_SMTP_PASSWORD=$EMAIL_SMTP_PASSWORD
+      - SIGN_IN_PREFILLED=false
+      - 'DEBUG_MODE=${DEBUG_MODE:-false}'
+      - 'TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}'
+      - DISABLE_DB_MIGRATIONS=true
+      - DISABLE_CRON_JOBS_REGISTRATION=true
+    depends_on:
+      twenty:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-twenty-db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
       interval: 5s
       timeout: 20s
       retries: 10
+
   redis:
-    image: "redis:latest"
+    image: redis:7-alpine
     volumes:
-      - "redis-data:/data"
+      - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 5s
       timeout: 20s
       retries: 10

@@ -111,7 +111,7 @@ class Danger extends Component
                 $this->docker_cleanup
             );
 
-            return redirect()->route('project.resource.index', [
+            return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,
                 'environment_uuid' => $this->environmentUuid,
             ]);

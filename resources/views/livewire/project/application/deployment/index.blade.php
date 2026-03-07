@@ -45,7 +45,7 @@
                 'border-error' => data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])>
-                <a href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}" class="block">
+                <a href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}" {{ wireNavigate() }} class="block">
                     <div class="flex flex-col">
                         <div class="flex items-center gap-2 mb-2">
                             <span @class([

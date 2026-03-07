@@ -46,7 +46,7 @@ class Delete extends Component
                 $this->server->team_id
             );
 
-            return redirect()->route('server.index');
+            return redirectRoute($this, 'server.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

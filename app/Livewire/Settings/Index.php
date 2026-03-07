@@ -12,9 +12,9 @@ class Index extends Component
 {
     public InstanceSettings $settings;
 
-    public Server $server;
+    public ?Server $server = null;
 
-    #[Validate('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
     #[Validate('required|integer|min:1025|max:65535')]
@@ -26,10 +26,10 @@ class Index extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $instance_name = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv4')]
     public ?string $public_ipv4 = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv6')]
     public ?string $public_ipv6 = null;
 
     #[Validate('required|string|timezone')]
@@ -46,6 +46,11 @@ class Index extends Component
 
     public $buildActivityId = null;
 
+    protected array $messages = [
+        'fqdn.url' => 'Invalid instance URL.',
+        'fqdn.max' => 'URL must not exceed 255 characters.',
+    ];
+
     public function render()
     {
         return view('livewire.settings.index');
@@ -57,7 +62,9 @@ class Index extends Component
             return redirect()->route('dashboard');
         }
         $this->settings = instanceSettings();
-        $this->server = Server::findOrFail(0);
+        if (! isCloud()) {
+            $this->server = Server::findOrFail(0);
+        }
         $this->fqdn = $this->settings->fqdn;
         $this->public_port_min = $this->settings->public_port_min;
         $this->public_port_max = $this->settings->public_port_max;
@@ -80,7 +87,7 @@ class Index extends Component
     public function instantSave($isSave = true)
     {
         $this->validate();
-        $this->settings->fqdn = $this->fqdn;
+        $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -119,9 +126,15 @@ class Index extends Component
 
                 return;
             }
+
+            // Trim FQDN to remove leading/trailing whitespace before validation
+            if ($this->fqdn) {
+                $this->fqdn = trim($this->fqdn);
+            }
+
             $this->validate();
 
-            if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
+            if ($this->settings->is_dns_validation_enabled && $this->fqdn && $this->server) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
                     $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
@@ -145,7 +158,9 @@ class Index extends Component
             $this->instantSave(isSave: false);
 
             $this->settings->save();
-            $this->server->setupDynamicProxyConfiguration();
+            if ($this->server) {
+                $this->server->setupDynamicProxyConfiguration();
+            }
             if (! $error_show) {
                 $this->dispatch('success', 'Instance settings updated successfully!');
             }
@@ -159,6 +174,12 @@ class Index extends Component
         try {
             if (! isDev()) {
                 $this->dispatch('error', 'Building helper image is only available in development mode.');
+
+                return;
+            }
+
+            if (! $this->server) {
+                $this->dispatch('error', 'Server not available.');
 
                 return;
             }

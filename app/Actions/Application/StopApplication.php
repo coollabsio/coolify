@@ -55,6 +55,14 @@ class StopApplication
                 return $e->getMessage();
             }
         }
+
+        // Reset restart tracking when application is manually stopped
+        $application->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
+
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }
 }

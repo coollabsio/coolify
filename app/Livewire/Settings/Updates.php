@@ -12,7 +12,7 @@ class Updates extends Component
 {
     public InstanceSettings $settings;
 
-    public Server $server;
+    public ?Server $server = null;
 
     #[Validate('string')]
     public string $auto_update_frequency;
@@ -25,7 +25,9 @@ class Updates extends Component
 
     public function mount()
     {
-        $this->server = Server::findOrFail(0);
+        if (! isCloud()) {
+            $this->server = Server::findOrFail(0);
+        }
 
         $this->settings = instanceSettings();
         $this->auto_update_frequency = $this->settings->auto_update_frequency;
@@ -76,7 +78,9 @@ class Updates extends Component
             }
 
             $this->instantSave();
-            $this->server->setupDynamicProxyConfiguration();
+            if ($this->server) {
+                $this->server->setupDynamicProxyConfiguration();
+            }
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

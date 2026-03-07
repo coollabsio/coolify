@@ -97,7 +97,7 @@ class Destination extends Component
                 return;
             }
 
-            return redirect()->route('project.application.deployment.show', [
+            return redirectRoute($this, 'project.application.deployment.show', [
                 'project_uuid' => data_get($this->resource, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->resource, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,

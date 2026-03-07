@@ -29,6 +29,7 @@ use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
+use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
@@ -56,9 +57,12 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Security\TerminalAccess;
+use App\Livewire\Server\Sentinel as ServerSentinel;
 use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
+use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -116,6 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
@@ -216,7 +221,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
-        Route::get('/import-backups', DatabaseConfiguration::class)->name('project.database.import-backups')->middleware('can.update.resource');
+        Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
         Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
         Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
@@ -241,6 +246,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
+        Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
+        Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
@@ -251,6 +258,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
+        Route::get('/swarm', ServerSwarm::class)->name('server.swarm');
+        Route::get('/sentinel', ServerSentinel::class)->name('server.sentinel');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/cloud-provider-token', CloudProviderTokenShow::class)->name('server.cloud-provider-token');
         Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');

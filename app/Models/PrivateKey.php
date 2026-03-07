@@ -237,7 +237,7 @@ class PrivateKey extends BaseModel
         $testSuccess = $disk->put($testFilename, 'test');
 
         if (! $testSuccess) {
-            throw new \Exception('SSH keys storage directory is not writable');
+            throw new \Exception('SSH keys storage directory is not writable. Run on the host: sudo chown -R 9999 /data/coolify/ssh && sudo chmod -R 700 /data/coolify/ssh && docker restart coolify');
         }
 
         // Clean up test file

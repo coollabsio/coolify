@@ -1,0 +1,210 @@
+services:
+  coolify:
+    image: coolify:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/development/Dockerfile
+      args:
+        - USER_ID=${USERID:-1000}
+        - GROUP_ID=${GROUPID:-1000}
+    ports:
+      - "${APP_PORT:-8000}:8080"
+    environment:
+      AUTORUN_ENABLED: false
+      PUSHER_HOST: "${PUSHER_HOST}"
+      PUSHER_PORT: "${PUSHER_PORT}"
+      PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
+      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+    healthcheck:
+      test: curl -sf http://127.0.0.1:8080/api/health || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - .:/var/www/html/:cached
+      - dev_backups_data:/var/www/html/storage/app/backups
+    networks:
+      - coolify
+  postgres:
+    pull_policy: always
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-password}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+  redis:
+    pull_policy: always
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    env_file:
+      - .env
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - dev_redis_data:/data
+  soketi:
+    image: coolify-realtime:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/coolify-realtime/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "6002:6002"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
+    environment:
+      SOKETI_DEBUG: "false"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      SOKETI_HOST: "${SOKETI_HOST:-0.0.0.0}"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:6001/ready && curl -fsS http://127.0.0.1:6002/ready || exit 1" ]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
+  vite:
+    image: node:24-alpine
+    pull_policy: always
+    container_name: coolify-vite
+    working_dir: /var/www/html
+    environment:
+      VITE_HOST: "${VITE_HOST:-localhost}"
+      VITE_PORT: "${VITE_PORT:-5173}"
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    volumes:
+      - .:/var/www/html/:cached
+    command: sh -c "npm install && npm run dev"
+    networks:
+      - coolify
+  testing-host:
+    image: coolify-testing-host:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/testing-host/Dockerfile
+    init: true
+    container_name: coolify-testing-host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dev_coolify_data:/data/coolify
+      - dev_backups_data:/data/coolify/backups
+      - dev_postgres_data:/data/coolify/_volumes/database
+      - dev_redis_data:/data/coolify/_volumes/redis
+      - dev_minio_data:/data/coolify/_volumes/minio
+    networks:
+      - coolify
+  mailpit:
+    image: axllent/mailpit:latest
+    pull_policy: always
+    container_name: coolify-mail
+    ports:
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+    networks:
+      - coolify
+  # maxio:
+  #   image: ghcr.io/coollabsio/maxio 
+  #   pull_policy: always
+  #   container_name: coolify-maxio
+  #   ports:
+  #     - "${FORWARD_MAXIO_PORT:-9000}:9000"
+  #   environment:
+  #     MAXIO_ACCESS_KEY: "${MAXIO_ACCESS_KEY:-maxioadmin}"
+  #     MAXIO_SECRET_KEY: "${MAXIO_SECRET_KEY:-maxioadmin}"
+  #   volumes:
+  #     - dev_maxio_data:/data
+  #   networks:
+  #     - coolify
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    pull_policy: always
+    container_name: coolify-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "${FORWARD_MINIO_PORT:-9000}:9000"
+      - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
+    volumes:
+      - dev_minio_data:/data
+      - dev_maxio_data:/data
+    networks:
+      - coolify
+  # maxio-init:
+  #   image: minio/mc:latest
+  #   pull_policy: always
+  #   container_name: coolify-maxio-init
+  #   restart: no
+  #   depends_on:
+  #     - maxio
+  #   entrypoint: >
+  #     /bin/sh -c "
+  #     echo 'Waiting for MaxIO to be ready...';
+  #     until mc alias set local http://coolify-maxio:9000 maxioadmin maxioadmin 2>/dev/null; do
+  #       echo 'MaxIO not ready yet, waiting...';
+  #       sleep 2;
+  #     done;
+  #     echo 'MaxIO is ready, creating bucket if needed...';
+  #     mc mb local/local --ignore-existing;
+  #     echo 'MaxIO initialization complete - bucket local is ready';
+  #     "
+  #   networks:
+  #     - coolify
+  minio-init:
+    image: minio/mc:latest
+    pull_policy: always
+    container_name: coolify-minio-init
+    restart: no
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      until mc alias set local http://coolify-minio:9000 minioadmin minioadmin 2>/dev/null; do
+        echo 'MinIO not ready yet, waiting...';
+        sleep 2;
+      done;
+      echo 'MinIO is ready, creating bucket if needed...';
+      mc mb local/local --ignore-existing;
+      echo 'MinIO initialization complete - bucket local is ready';
+      "
+    networks:
+      - coolify
+
+volumes:
+  dev_backups_data:
+  dev_postgres_data:
+  dev_redis_data:
+  dev_coolify_data:
+  dev_minio_data:
+  dev_maxio_data:
+
+networks:
+  coolify:
+    name: coolify
+    external: false

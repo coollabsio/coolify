@@ -70,7 +70,7 @@ class PublicGitRepository extends Component
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
         'base_directory' => 'nullable|string',
-        'docker_compose_location' => 'nullable|string',
+        'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
     ];
 
     protected function rules()
@@ -82,7 +82,7 @@ class PublicGitRepository extends Component
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
             'base_directory' => 'nullable|string',
-            'docker_compose_location' => 'nullable|string',
+            'docker_compose_location' => ['nullable', 'string', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
             'git_branch' => ['required', 'string', new ValidGitBranch],
         ];
     }

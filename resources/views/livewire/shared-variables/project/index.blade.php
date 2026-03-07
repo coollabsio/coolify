@@ -9,7 +9,7 @@
     <div class="flex flex-col gap-2">
         @forelse ($projects as $project)
             <a class="coolbox group"
-                href="{{ route('shared-variables.project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
+                href="{{ route('shared-variables.project.show', ['project_uuid' => data_get($project, 'uuid')]) }}" {{ wireNavigate() }}>
                 <div class="flex flex-col justify-center mx-6 ">
                     <div class="box-title">{{ $project->name }}</div>
                     <div class="box-description ">

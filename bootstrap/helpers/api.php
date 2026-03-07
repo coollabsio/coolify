@@ -86,8 +86,11 @@ function sharedDataApplications()
         'git_branch' => 'string',
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
+        'is_spa' => 'boolean',
+        'is_auto_deploy_enabled' => 'boolean',
+        'is_force_https_enabled' => 'boolean',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string',
+        'domains' => 'string|nullable',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => 'string',
         'docker_registry_image_name' => 'string|nullable',
@@ -101,12 +104,14 @@ function sharedDataApplications()
         'base_directory' => 'string|nullable',
         'publish_directory' => 'string|nullable',
         'health_check_enabled' => 'boolean',
-        'health_check_path' => 'string',
-        'health_check_port' => 'string|nullable',
-        'health_check_host' => 'string',
-        'health_check_method' => 'string',
+        'health_check_type' => 'string|in:http,cmd',
+        'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
+        'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'],
+        'health_check_port' => 'integer|nullable|min:1|max:65535',
+        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
-        'health_check_scheme' => 'string',
+        'health_check_scheme' => 'string|in:http,https',
         'health_check_response_text' => 'string|nullable',
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
@@ -129,12 +134,13 @@ function sharedDataApplications()
         'manual_webhook_secret_gitlab' => 'string|nullable',
         'manual_webhook_secret_bitbucket' => 'string|nullable',
         'manual_webhook_secret_gitea' => 'string|nullable',
-        'docker_compose_location' => 'string',
+        'dockerfile_location' => ['string', 'nullable', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
+        'docker_compose_location' => ['string', 'nullable', 'max:255', 'regex:/^\/[a-zA-Z0-9._\-\/]+$/'],
         'docker_compose' => 'string|nullable',
-        'docker_compose_raw' => 'string|nullable',
         'docker_compose_domains' => 'array|nullable',
         'docker_compose_custom_start_command' => 'string|nullable',
         'docker_compose_custom_build_command' => 'string|nullable',
+        'is_container_label_escape_enabled' => 'boolean',
     ];
 }
 
@@ -177,6 +183,12 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('is_static');
+    $request->offsetUnset('is_spa');
+    $request->offsetUnset('is_auto_deploy_enabled');
+    $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
+    $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('docker_compose_raw');
 }

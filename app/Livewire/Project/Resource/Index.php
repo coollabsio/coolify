@@ -33,6 +33,10 @@ class Index extends Component
 
     public Collection $services;
 
+    public Collection $allProjects;
+
+    public Collection $allEnvironments;
+
     public array $parameters;
 
     public function mount()
@@ -50,6 +54,33 @@ class Index extends Component
             ->firstOrFail();
 
         $this->project = $project;
+
+        // Load projects and environments for breadcrumb navigation (avoids inline queries in view)
+        $this->allProjects = Project::ownedByCurrentTeamCached();
+        $this->allEnvironments = $project->environments()
+            ->with([
+                'applications.additional_servers',
+                'applications.destination.server',
+                'services',
+                'services.destination.server',
+                'postgresqls',
+                'postgresqls.destination.server',
+                'redis',
+                'redis.destination.server',
+                'mongodbs',
+                'mongodbs.destination.server',
+                'mysqls',
+                'mysqls.destination.server',
+                'mariadbs',
+                'mariadbs.destination.server',
+                'keydbs',
+                'keydbs.destination.server',
+                'dragonflies',
+                'dragonflies.destination.server',
+                'clickhouses',
+                'clickhouses.destination.server',
+            ])->get();
+
         $this->environment = $environment->loadCount([
             'applications',
             'redis',
@@ -71,11 +102,13 @@ class Index extends Component
             'destination.server.settings',
             'settings',
         ])->get()->sortBy('name');
-        $this->applications = $this->applications->map(function ($application) {
+        $projectUuid = $this->project->uuid;
+        $environmentUuid = $this->environment->uuid;
+        $this->applications = $this->applications->map(function ($application) use ($projectUuid, $environmentUuid) {
             $application->hrefLink = route('project.application.configuration', [
-                'project_uuid' => data_get($application, 'environment.project.uuid'),
-                'environment_uuid' => data_get($application, 'environment.uuid'),
-                'application_uuid' => data_get($application, 'uuid'),
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $environmentUuid,
+                'application_uuid' => $application->uuid,
             ]);
 
             return $application;
@@ -98,11 +131,11 @@ class Index extends Component
                 'tags',
                 'destination.server.settings',
             ])->get()->sortBy('name');
-            $this->{$property} = $this->{$property}->map(function ($db) {
+            $this->{$property} = $this->{$property}->map(function ($db) use ($projectUuid, $environmentUuid) {
                 $db->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => $this->project->uuid,
+                    'project_uuid' => $projectUuid,
                     'database_uuid' => $db->uuid,
-                    'environment_uuid' => data_get($this->environment, 'uuid'),
+                    'environment_uuid' => $environmentUuid,
                 ]);
 
                 return $db;
@@ -114,11 +147,11 @@ class Index extends Component
             'tags',
             'destination.server.settings',
         ])->get()->sortBy('name');
-        $this->services = $this->services->map(function ($service) {
+        $this->services = $this->services->map(function ($service) use ($projectUuid, $environmentUuid) {
             $service->hrefLink = route('project.service.configuration', [
-                'project_uuid' => data_get($service, 'environment.project.uuid'),
-                'environment_uuid' => data_get($service, 'environment.uuid'),
-                'service_uuid' => data_get($service, 'uuid'),
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $environmentUuid,
+                'service_uuid' => $service->uuid,
             ]);
 
             return $service;

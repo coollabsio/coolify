@@ -16,6 +16,7 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -103,9 +104,15 @@ use Visus\Cuid2\Cuid2;
 
 class Server extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, SchemalessAttributesTrait, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
+
+    /**
+     * Identity map cache for request-scoped Server lookups.
+     * Prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    private static ?array $identityMapCache = null;
 
     protected $appends = ['is_coolify_host'];
 
@@ -185,6 +192,40 @@ class Server extends BaseModel
             $server->settings()->delete();
             $server->sslCertificates()->delete();
         });
+
+        static::updated(function () {
+            static::flushIdentityMap();
+        });
+    }
+
+    /**
+     * Find a Server by ID using the identity map cache.
+     * This prevents N+1 queries when the same Server is accessed multiple times.
+     */
+    public static function findCached($id): ?static
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        if (static::$identityMapCache === null) {
+            static::$identityMapCache = [];
+        }
+
+        if (! isset(static::$identityMapCache[$id])) {
+            static::$identityMapCache[$id] = static::query()->find($id);
+        }
+
+        return static::$identityMapCache[$id];
+    }
+
+    /**
+     * Flush the identity map cache.
+     * Called automatically on update, and should be called in tests.
+     */
+    public static function flushIdentityMap(): void
+    {
+        static::$identityMapCache = null;
     }
 
     protected $casts = [
@@ -267,15 +308,6 @@ class Server extends BaseModel
     public static function isUsable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
-    }
-
-    public static function destinationsByServer(string $server_id)
-    {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
-        $standaloneDocker = collect($server->standaloneDockers->all());
-        $swarmDocker = collect($server->swarmDockers->all());
-
-        return $standaloneDocker->concat($swarmDocker);
     }
 
     public function settings()
@@ -667,51 +699,6 @@ $schema://$host {
         CheckAndStartSentinelJob::dispatch($this);
     }
 
-    public function getCpuMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $cpu = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/cpu/history?from=$from'"], $this, false);
-            if (str($cpu)->contains('error')) {
-                $error = json_decode($cpu, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $cpu = json_decode($cpu, true);
-
-            return collect($cpu)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['percent']];
-            });
-        }
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        if ($this->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $memory = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$this->settings->sentinel_token}\" http://localhost:8888/api/memory/history?from=$from'"], $this, false);
-            if (str($memory)->contains('error')) {
-                $error = json_decode($memory, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error === 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-                }
-                throw new \Exception($error);
-            }
-            $memory = json_decode($memory, true);
-            $parsedCollection = collect($memory)->map(function ($metric) {
-                $usedPercent = $metric['usedPercent'] ?? 0.0;
-
-                return [(int) $metric['time'], (float) $usedPercent];
-            });
-
-            return $parsedCollection->toArray();
-        }
-    }
-
     public function getDiskUsage(): ?string
     {
         return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
@@ -926,6 +913,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return (int) preg_replace('/[^0-9]/', '', $value);
+            },
+            set: function ($value) {
+                return (int) preg_replace('/[^0-9]/', '', (string) $value);
             }
         );
     }
@@ -935,6 +925,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+            },
+            set: function ($value) {
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
             }
         );
     }
@@ -943,6 +936,9 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            },
+            set: function ($value) {
                 return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
             }
         );
@@ -1465,12 +1461,14 @@ $schema://$host {
                 $certificateContent = $caCertificate->ssl_certificate;
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
+                $base64Cert = base64_encode($certificateContent);
+
                 $commands = collect([
                     "mkdir -p $caCertPath",
                     "chown -R 9999:root $caCertPath",
                     "chmod -R 700 $caCertPath",
                     "rm -rf $caCertPath/coolify-ca.crt",
-                    "echo '{$certificateContent}' > $caCertPath/coolify-ca.crt",
+                    "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
                     "chmod 644 $caCertPath/coolify-ca.crt",
                 ]);
 

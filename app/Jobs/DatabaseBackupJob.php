@@ -113,6 +113,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
+                Log::info('DatabaseBackupJob skipped: database not running', [
+                    'backup_id' => $this->backup->id,
+                    'database_id' => $this->database->id,
+                    'status' => (string) $status,
+                ]);
+
                 return;
             }
 

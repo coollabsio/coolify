@@ -1,0 +1,20 @@
+# documentation: https://databasus.com/installation
+# slogan: Databasus is a free, open source and self-hosted tool to backup PostgreSQL, MySQL, and MongoDB.
+# category: devtools
+# tags: postgres,mysql,mongo,backup
+# logo: svgs/databasus.svg
+# port: 4005
+
+services:
+  databasus:
+    image: 'databasus/databasus:v2.18.0' # Released on 28 Dec, 2025
+    environment:
+      - SERVICE_URL_DATABASUS_4005
+    volumes:
+      - 'databasus-data:/databasus-data'
+    healthcheck:
+      test:
+        ['CMD', 'wget', '-qO-', 'http://localhost:4005/api/v1/system/health']
+      interval: 5s
+      timeout: 10s
+      retries: 5

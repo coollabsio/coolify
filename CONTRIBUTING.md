@@ -151,32 +151,84 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 ## 7. Create a Pull Request
 
+> [!IMPORTANT]
+> Please read the [Pull Request Guidelines](#pull-request-guidelines) carefully before creating your PR.
+
 1. After making changes or adding a new service:
-   - Commit your changes to your forked repository.
-   - Push the changes to your GitHub account.
+    - Commit your changes to your forked repository.
+    - Push the changes to your GitHub account.
 
 2. Creating the Pull Request (PR):
-   - Navigate to the main Coolify repository on GitHub.
-   - Click the "Pull requests" tab.
-   - Click the green "New pull request" button.
-   - Choose your fork and branch as the compare branch.
-   - Click "Create pull request".
+    - Navigate to the main Coolify repository on GitHub.
+    - Click the "Pull requests" tab.
+    - Click the green "New pull request" button.
+    - Choose your fork and `next` branch as the compare branch.
+    - Click "Create pull request".
 
 3. Filling out the PR details:
-   - Give your PR a descriptive title.
-   - Use the Pull Request Template provided and fill in the details.
+    - Give your PR a descriptive title.
+    - Use the Pull Request Template provided and fill in the details.
 
 > [!IMPORTANT]
-> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
+> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `v4.x` branch.
 
 4. Submit your PR:
-   - Review your changes one last time.
-   - Click "Create pull request" to submit.
+    - Review your changes one last time.
+    - Click "Create pull request" to submit.
 
 > [!NOTE]
 > Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
 
 After submission, maintainers will review your PR and may request changes or provide feedback.
+
+#### Pull Request Guidelines
+To maintain high-quality contributions and efficient review process:
+- **Target Branch**: Always target the `next` branch, never `v4.x` or any other branch. PRs targeting incorrect branches will be closed without review.
+- **Descriptive Titles**: Use clear, concise PR titles that describe the change (e.g., "fix: one click postgresql database stuck in restart loop" instead of "Fix database").
+- **PR Descriptions**: Provide detailed, meaningful descriptions. Avoid generic or AI-generated fluff. Include:
+  - What the change does
+  - Why it's needed
+  - How to test it
+  - Any breaking changes
+  - Screenshot or video recording of your changes working without any issues
+  - Links to related issues
+- **Link to Issues**: All PRs must link to an existing GitHub issue. If no issue exists, create one first. Unrelated PRs may be closed.
+- **Single Responsibility**: Each PR should address one issue or feature. Do not bundle unrelated changes.
+- **Draft Mode**: Use draft PRs for work-in-progress. Convert to ready-for-review only when complete and tested.
+- **Review Readiness**: Ensure your PR is ready for review within a reasonable timeframe (max 7 days in draft). Stale drafts may be closed.
+- **Current Focus**: We are currently prioritizing stability and bug fixes over new features. PRs adding new features may not be reviewed, or may be closed without review to maintain focus.
+- **Language Translations**: Coolify currently supports only English. Pull requests for new language translations will not be accepted. Multi-language support may be considered in the next major version (v5).
+- **AI Usage Policy**: We are not against AI tools—we use them ourselves. However, AI discourse is mandatory: You must fully understand the changes in your PR and be able to explain them clearly. Many PRs using AI lack this understanding, leading to untested or incorrect submissions. If you use AI, ensure you can articulate what the code does, why it was changed, and how it was tested.
+
+#### Review Process
+- **Response Time**: Maintainers will review PRs promptly, but complex changes may take time. Be patient and responsive to feedback.
+- **Revisions**: Address all review comments. Unresolved feedback may lead to PR closure.
+- **Merge Criteria**: PRs are merged only after:
+  - All tests pass (including CI)
+  - Code review approval
+- **Closing PRs**: PRs may be closed for:
+  - Inactivity (>7 days without response)
+  - Failure to meet guidelines
+  - Duplicate or superseded work
+  - Security or quality concerns
+
+#### Code Quality, Testing, and Bounty Submissions
+All contributions must adhere to the highest standards of code quality and testing:
+
+- **Testing Required**: Every PR must include steps to test your changes. Untested code will not be reviewed or merged.
+- **Local Verification**: Ensure your changes work in the development environment. Test all affected features thoroughly.
+- **Code Standards**: Follow the existing code style, conventions, and patterns in the codebase.
+- **No AI-Generated Code**: Do not submit code generated by AI tools without fully understanding and verifying it. AI-generated submissions that are untested or incorrect will be rejected immediately.
+
+**For PRs that claim bounties:**
+
+- **Eligibility**: Bounty PRs must strictly follow all guidelines above. Untested, poorly described, or non-compliant PRs will not qualify for bounty rewards.
+- **Original Work**: Bounties are for genuine contributions. Submitting AI-generated or copied code solely for bounty claims will result in disqualification and potential removal from contributing.
+- **Quality Standards**: Bounty submissions are held to even higher standards. Ensure comprehensive testing, clear documentation, and alignment with project goals. When maintainers review the changes, they should work as expected (the things mentioned in the PR description plus what the bounty issuer needs).
+- **Claim Process**: Only successfully merged PRs that pass all reviews (core maintainers + bounty issuer) and meet bounty criteria will be awarded. Follow the issue's bounty guidelines precisely.
+- **Prioritization**: Contributor PRs are prioritized over first-time or new contributors.
+- **Developer Experience**: We highly advise beginners to avoid participating in bug bounties for our codebase. Most of the time, they don't know what they are changing, how it affects other parts of the system, or if their changes are even correct.
+- **Review Comments**: When maintainers ask questions, you should be able to respond properly without generic or AI-generated fluff.
 
 ## Development Notes
 

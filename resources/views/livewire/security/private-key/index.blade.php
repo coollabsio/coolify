@@ -17,7 +17,7 @@
             @can('view', $key)
                 {{-- Admin/Owner: Clickable link --}}
                 <a class="coolbox group"
-                    href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}">
+                    href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}" {{ wireNavigate() }}>
                     <div class="flex flex-col justify-center mx-6">
                         <div class="box-title">
                             {{ data_get($key, 'name') }}
