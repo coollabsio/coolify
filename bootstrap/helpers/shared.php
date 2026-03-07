@@ -556,8 +556,12 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     }
 
     // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // or application->environment->project->team_id (for Git-based Docker Compose)
     if ($resource instanceof \App\Models\ServiceDatabase) {
         if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+        if ($resource->application?->environment?->project?->team_id === $teamId) {
             return $resource;
         }
 
@@ -2114,7 +2118,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $detectedDatabaseNames = collect();
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $detectedDatabaseNames) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -2417,6 +2422,25 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $image = data_get_str($service, 'image');
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
+
+            // Create/update ServiceDatabase records for detected databases (enables backups)
+            if ($isDatabase && $pull_request_id === 0) {
+                $detectedDatabaseNames->push($serviceName);
+                $existingDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('application_id', $resource->id)
+                    ->first();
+                if (is_null($existingDb)) {
+                    ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                        'service_id' => null,
+                    ]);
+                } elseif ($existingDb->image !== $image) {
+                    $existingDb->image = $image;
+                    $existingDb->save();
+                }
+            }
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
@@ -2813,6 +2837,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();
+
+        // Clean up stale ServiceDatabase records for databases removed from compose
+        if ($pull_request_id === 0) {
+            $query = ServiceDatabase::where('application_id', $resource->id);
+            if ($detectedDatabaseNames->isNotEmpty()) {
+                $query->whereNotIn('name', $detectedDatabaseNames->toArray());
+            }
+            $query->each(function ($staleDb) {
+                $staleDb->delete();
+            });
+        }
 
         return collect($finalServices);
     }

@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +55,82 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Check if this database is owned by an Application (Git-based Docker Compose).
+     */
+    public function isApplicationOwned(): bool
+    {
+        return filled($this->application_id);
+    }
+
+    /**
+     * Get the parent resource (Service or Application).
+     */
+    public function parentResource(): Service|Application|null
+    {
+        if ($this->isApplicationOwned()) {
+            return $this->application;
+        }
+
+        return $this->service;
+    }
+
+    /**
+     * Get the server this database runs on.
+     */
+    public function getServer(): ?Server
+    {
+        $parent = $this->parentResource();
+        if (! $parent) {
+            return null;
+        }
+
+        if ($parent instanceof Application) {
+            return $parent->destination?->server;
+        }
+
+        return $parent->destination?->server;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $server = $this->getServer();
+        $containerName = $this->containerName();
+        if ($server && $containerName) {
+            remote_process(["docker restart {$containerName}"], $server);
+        }
+    }
+
+    /**
+     * Get the container name for this database.
+     * For application-owned databases, resolves the running container via docker labels.
+     * Falls back to the expected name pattern if resolution fails.
+     */
+    public function containerName(): string
+    {
+        if ($this->isApplicationOwned()) {
+            // Try to find the running container by label
+            $server = $this->getServer();
+            if ($server) {
+                try {
+                    $output = instant_remote_process(
+                        ["docker ps --filter 'label=coolify.applicationId={$this->application->id}' --filter 'name={$this->name}-' --format '{{.Names}}' | head -1"],
+                        $server,
+                        throwError: false,
+                    );
+                    if (filled($output)) {
+                        return trim($output);
+                    }
+                } catch (\Throwable) {
+                    // Fall through to default
+                }
+            }
+
+            // Fallback: construct from uuid (consistent naming pattern)
+            return "{$this->name}-{$this->application->uuid}";
+        }
+
+        return "{$this->name}-{$this->service->uuid}";
     }
 
     public function isRunning()
@@ -114,8 +192,12 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        if (! $server) {
+            return null;
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +206,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        if ($this->isApplicationOwned()) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->isApplicationOwned()) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()

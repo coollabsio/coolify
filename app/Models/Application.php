@@ -134,6 +134,12 @@ class Application extends BaseModel
                 'additional_networks',
             ]);
         });
+        static::deleting(function ($application) {
+            // Clean up compose database records and their scheduled backups
+            $application->composeDatabases()->each(function ($db) {
+                $db->delete();
+            });
+        });
         static::saving(function ($application) {
             $payload = [];
             if ($application->isDirty('fqdn')) {
@@ -908,6 +914,11 @@ class Application extends BaseModel
     public function previews()
     {
         return $this->hasMany(ApplicationPreview::class)->orderBy('pull_request_id', 'desc');
+    }
+
+    public function composeDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
     }
 
     public function deployment_queue()

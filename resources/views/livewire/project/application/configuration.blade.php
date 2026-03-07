@@ -44,6 +44,10 @@
             </a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Scheduled Tasks</span></a>
+            @if ($application->build_pack === 'dockercompose' && $application->composeDatabases()->count() > 0)
+                <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.database-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Database Backups</span></a>
+            @endif
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Webhooks</span></a>
             @if ($application->deploymentType() !== 'deploy_key')
@@ -100,6 +104,8 @@
                 <livewire:project.shared.metrics :resource="$application" />
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
+            @elseif ($currentRoute === 'project.application.database-backups')
+                <livewire:project.application.compose-database-backups :application="$application" />
             @elseif ($currentRoute === 'project.application.danger')
                 <livewire:project.shared.danger :resource="$application" />
             @endif
