@@ -31,6 +31,8 @@ class Add extends Component
 
     public bool $is_buildtime = true;
 
+    public ?string $comment = null;
+
     public array $problematicVariables = [];
 
     protected $listeners = ['clearAddEnv' => 'clear'];
@@ -42,6 +44,7 @@ class Add extends Component
         'is_literal' => 'required|boolean',
         'is_runtime' => 'required|boolean',
         'is_buildtime' => 'required|boolean',
+        'comment' => 'nullable|string|max:256',
     ];
 
     protected $validationAttributes = [
@@ -51,6 +54,7 @@ class Add extends Component
         'is_literal' => 'literal',
         'is_runtime' => 'runtime',
         'is_buildtime' => 'buildtime',
+        'comment' => 'comment',
     ];
 
     public function mount()
@@ -136,6 +140,7 @@ class Add extends Component
             'is_runtime' => $this->is_runtime,
             'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
+            'comment' => $this->comment,
         ]);
         $this->clear();
     }
@@ -148,5 +153,6 @@ class Add extends Component
         $this->is_literal = false;
         $this->is_runtime = true;
         $this->is_buildtime = true;
+        $this->comment = null;
     }
 }

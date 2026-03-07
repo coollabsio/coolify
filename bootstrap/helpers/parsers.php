@@ -998,53 +998,139 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
-                    if ($value->contains(':-')) {
-                        $value = replaceVariables($value);
-                        $key = $value->before(':');
-                        $value = $value->after(':-');
-                    } elseif ($value->contains('-')) {
-                        $value = replaceVariables($value);
 
-                        $key = $value->before('-');
-                        $value = $value->after('-');
-                    } elseif ($value->contains(':?')) {
-                        $value = replaceVariables($value);
+                    // Extract variable content between ${...} using balanced brace matching
+                    $result = extractBalancedBraceContent($value->value(), 0);
 
-                        $key = $value->before(':');
-                        $value = $value->after(':?');
-                        $isRequired = true;
-                    } elseif ($value->contains('?')) {
-                        $value = replaceVariables($value);
+                    if ($result !== null) {
+                        $content = $result['content'];
+                        $split = splitOnOperatorOutsideNested($content);
 
-                        $key = $value->before('?');
-                        $value = $value->after('?');
-                        $isRequired = true;
-                    }
-                    if ($originalValue->value() === $value->value()) {
-                        // This means the variable does not have a default value, so it needs to be created in Coolify
-                        $parsedKeyValue = replaceVariables($value);
+                        if ($split !== null) {
+                            // Has default value syntax (:-,  -,  :?, or ?)
+                            $varName = $split['variable'];
+                            $operator = $split['operator'];
+                            $defaultValue = $split['default'];
+                            $isRequired = str_contains($operator, '?');
+
+                            // Create the primary variable with its default (only if it doesn't exist)
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $varName,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $defaultValue,
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+
+                            // Add the variable to the environment so it will be shown in the deployable compose file
+                            $environment[$varName] = $envVar->value;
+
+                            // Recursively process nested variables in default value
+                            if (str_contains($defaultValue, '${')) {
+                                $searchPos = 0;
+                                $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                while ($nestedResult !== null) {
+                                    $nestedContent = $nestedResult['content'];
+                                    $nestedSplit = splitOnOperatorOutsideNested($nestedContent);
+
+                                    // Determine the nested variable name
+                                    $nestedVarName = $nestedSplit !== null ? $nestedSplit['variable'] : $nestedContent;
+
+                                    // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
+                                    $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
+
+                                    if (! $isMagicVariable) {
+                                        if ($nestedSplit !== null) {
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedSplit['variable'],
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'value' => $nestedSplit['default'],
+                                                'is_preview' => false,
+                                            ]);
+                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
+                                        } else {
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedContent,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'is_preview' => false,
+                                            ]);
+                                            $environment[$nestedContent] = $nestedEnvVar->value;
+                                        }
+                                    }
+
+                                    $searchPos = $nestedResult['end'] + 1;
+                                    if ($searchPos >= strlen($defaultValue)) {
+                                        break;
+                                    }
+                                    $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                }
+                            }
+                        } else {
+                            // Simple variable reference without default
+                            $parsedKeyValue = replaceVariables($value);
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => $content,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+                            // Add the variable to the environment
+                            $environment[$content] = $value;
+                        }
+                    } else {
+                        // Fallback to old behavior for malformed input (backward compatibility)
+                        if ($value->contains(':-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':-');
+                        } elseif ($value->contains('-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('-');
+                            $value = $value->after('-');
+                        } elseif ($value->contains(':?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':?');
+                            $isRequired = true;
+                        } elseif ($value->contains('?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('?');
+                            $value = $value->after('?');
+                            $isRequired = true;
+                        }
+                        if ($originalValue->value() === $value->value()) {
+                            // This means the variable does not have a default value
+                            $parsedKeyValue = replaceVariables($value);
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => $parsedKeyValue,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+                            $environment[$parsedKeyValue->value()] = $value;
+
+                            continue;
+                        }
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => $parsedKeyValue,
+                            'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
+                            'value' => $value,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
-                        // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $value;
-
-                        continue;
                     }
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => $key,
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $value,
-                        'is_preview' => false,
-                        'is_required' => $isRequired,
-                    ]);
                 }
             }
         }
@@ -1411,6 +1497,9 @@ function serviceParser(Service $resource): Collection
         return collect([]);
     }
 
+    // Extract inline comments from raw YAML before Symfony parser discards them
+    $envComments = extractYamlEnvironmentComments($compose);
+
     $server = data_get($resource, 'server');
     $allServices = get_service_templates();
 
@@ -1694,51 +1783,60 @@ function serviceParser(Service $resource): Collection
                 }
 
                 // ALWAYS create BOTH base SERVICE_URL and SERVICE_FQDN pairs (without port)
+                $fqdnKey = "SERVICE_FQDN_{$serviceName}";
                 $resource->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_FQDN_{$serviceName}",
+                    'key' => $fqdnKey,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $fqdnValueForEnv,
                     'is_preview' => false,
+                    'comment' => $envComments[$fqdnKey] ?? null,
                 ]);
 
+                $urlKey = "SERVICE_URL_{$serviceName}";
                 $resource->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_URL_{$serviceName}",
+                    'key' => $urlKey,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $url,
                     'is_preview' => false,
+                    'comment' => $envComments[$urlKey] ?? null,
                 ]);
 
                 // For port-specific variables, ALSO create port-specific pairs
                 // If template variable has port, create both URL and FQDN with port suffix
                 if ($parsed['has_port'] && $port) {
+                    $fqdnPortKey = "SERVICE_FQDN_{$serviceName}_{$port}";
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceName}_{$port}",
+                        'key' => $fqdnPortKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdnValueForEnvWithPort,
                         'is_preview' => false,
+                        'comment' => $envComments[$fqdnPortKey] ?? null,
                     ]);
 
+                    $urlPortKey = "SERVICE_URL_{$serviceName}_{$port}";
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_URL_{$serviceName}_{$port}",
+                        'key' => $urlPortKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $urlWithPort,
                         'is_preview' => false,
+                        'comment' => $envComments[$urlPortKey] ?? null,
                     ]);
                 }
             }
         }
         $allMagicEnvironments = $allMagicEnvironments->merge($magicEnvironments);
         if ($magicEnvironments->count() > 0) {
-            foreach ($magicEnvironments as $key => $value) {
-                $key = str($key);
+            foreach ($magicEnvironments as $magicKey => $value) {
+                $originalMagicKey = $magicKey; // Preserve original key for comment lookup
+                $key = str($magicKey);
                 $value = replaceVariables($value);
                 $command = parseCommandFromMagicEnvVariable($key);
                 if ($command->value() === 'FQDN') {
@@ -1762,18 +1860,33 @@ function serviceParser(Service $resource): Collection
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
-                    $resource->environment_variables()->firstOrCreate([
+                    // Create FQDN variable
+                    $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdn,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
+                    ]);
+
+                    // Also create the paired SERVICE_URL_* variable
+                    $urlKey = 'SERVICE_URL_'.strtoupper($fqdnFor);
+                    $resource->environment_variables()->updateOrCreate([
+                        'key' => $urlKey,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => $url,
+                        'is_preview' => false,
+                        'comment' => $envComments[$urlKey] ?? null,
                     ]);
 
                 } elseif ($command->value() === 'URL') {
                     $urlFor = $key->after('SERVICE_URL_')->lower()->value();
                     $url = generateUrl(server: $server, random: str($urlFor)->replace('_', '-')->value()."-$uuid");
+                    $fqdn = generateFqdn(server: $server, random: str($urlFor)->replace('_', '-')->value()."-$uuid", parserVersion: $resource->compose_parsing_version);
 
                     $envExists = $resource->environment_variables()->where('key', $key->value())->first();
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
@@ -1790,24 +1903,39 @@ function serviceParser(Service $resource): Collection
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
-                    $resource->environment_variables()->firstOrCreate([
+                    // Create URL variable
+                    $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $url,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
+                    ]);
+
+                    // Also create the paired SERVICE_FQDN_* variable
+                    $fqdnKey = 'SERVICE_FQDN_'.strtoupper($urlFor);
+                    $resource->environment_variables()->updateOrCreate([
+                        'key' => $fqdnKey,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => $fqdn,
+                        'is_preview' => false,
+                        'comment' => $envComments[$fqdnKey] ?? null,
                     ]);
 
                 } else {
                     $value = generateEnvValue($command, $resource);
-                    $resource->environment_variables()->firstOrCreate([
+                    $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
                     ]);
                 }
             }
@@ -2163,18 +2291,20 @@ function serviceParser(Service $resource): Collection
             return ! str($value)->startsWith('SERVICE_');
         });
         foreach ($normalEnvironments as $key => $value) {
+            $originalKey = $key; // Preserve original key for comment lookup
             $key = str($key);
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
             if ($parsedValue->startsWith('SERVICE_')) {
-                $resource->environment_variables()->firstOrCreate([
+                $resource->environment_variables()->updateOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
                 ]);
 
                 continue;
@@ -2184,64 +2314,161 @@ function serviceParser(Service $resource): Collection
             }
             if ($key->value() === $parsedValue->value()) {
                 $value = null;
-                $resource->environment_variables()->firstOrCreate([
+                $resource->environment_variables()->updateOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
                 ]);
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
-                    if ($value->contains(':-')) {
-                        $value = replaceVariables($value);
-                        $key = $value->before(':');
-                        $value = $value->after(':-');
-                    } elseif ($value->contains('-')) {
-                        $value = replaceVariables($value);
 
-                        $key = $value->before('-');
-                        $value = $value->after('-');
-                    } elseif ($value->contains(':?')) {
-                        $value = replaceVariables($value);
+                    // Extract variable content between ${...} using balanced brace matching
+                    $result = extractBalancedBraceContent($value->value(), 0);
 
-                        $key = $value->before(':');
-                        $value = $value->after(':?');
-                        $isRequired = true;
-                    } elseif ($value->contains('?')) {
-                        $value = replaceVariables($value);
+                    if ($result !== null) {
+                        $content = $result['content'];
+                        $split = splitOnOperatorOutsideNested($content);
 
-                        $key = $value->before('?');
-                        $value = $value->after('?');
-                        $isRequired = true;
-                    }
-                    if ($originalValue->value() === $value->value()) {
-                        // This means the variable does not have a default value, so it needs to be created in Coolify
-                        $parsedKeyValue = replaceVariables($value);
-                        $resource->environment_variables()->firstOrCreate([
-                            'key' => $parsedKeyValue,
+                        if ($split !== null) {
+                            // Has default value syntax (:-,  -,  :?, or ?)
+                            $varName = $split['variable'];
+                            $operator = $split['operator'];
+                            $defaultValue = $split['default'];
+                            $isRequired = str_contains($operator, '?');
+
+                            // Create the primary variable with its default (only if it doesn't exist)
+                            // Use firstOrCreate instead of updateOrCreate to avoid overwriting user edits
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $varName,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $defaultValue,
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+
+                            // Add the variable to the environment so it will be shown in the deployable compose file
+                            $environment[$varName] = $envVar->value;
+
+                            // Recursively process nested variables in default value
+                            if (str_contains($defaultValue, '${')) {
+                                // Extract and create nested variables
+                                $searchPos = 0;
+                                $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                while ($nestedResult !== null) {
+                                    $nestedContent = $nestedResult['content'];
+                                    $nestedSplit = splitOnOperatorOutsideNested($nestedContent);
+
+                                    // Determine the nested variable name
+                                    $nestedVarName = $nestedSplit !== null ? $nestedSplit['variable'] : $nestedContent;
+
+                                    // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
+                                    $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
+
+                                    if (! $isMagicVariable) {
+                                        if ($nestedSplit !== null) {
+                                            // Create nested variable with its default (only if it doesn't exist)
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedSplit['variable'],
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'value' => $nestedSplit['default'],
+                                                'is_preview' => false,
+                                            ]);
+                                            // Add nested variable to environment
+                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
+                                        } else {
+                                            // Simple nested variable without default (only if it doesn't exist)
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedContent,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'is_preview' => false,
+                                            ]);
+                                            // Add nested variable to environment
+                                            $environment[$nestedContent] = $nestedEnvVar->value;
+                                        }
+                                    }
+
+                                    // Look for more nested variables
+                                    $searchPos = $nestedResult['end'] + 1;
+                                    if ($searchPos >= strlen($defaultValue)) {
+                                        break;
+                                    }
+                                    $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                }
+                            }
+                        } else {
+                            // Simple variable reference without default
+                            $resource->environment_variables()->updateOrCreate([
+                                'key' => $content,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+                        }
+                    } else {
+                        // Fallback to old behavior for malformed input (backward compatibility)
+                        if ($value->contains(':-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':-');
+                        } elseif ($value->contains('-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('-');
+                            $value = $value->after('-');
+                        } elseif ($value->contains(':?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':?');
+                            $isRequired = true;
+                        } elseif ($value->contains('?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('?');
+                            $value = $value->after('?');
+                            $isRequired = true;
+                        }
+
+                        if ($originalValue->value() === $value->value()) {
+                            // This means the variable does not have a default value
+                            $parsedKeyValue = replaceVariables($value);
+                            $resource->environment_variables()->updateOrCreate([
+                                'key' => $parsedKeyValue,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+                            // Add the variable to the environment so it will be shown in the deployable compose file
+                            $environment[$parsedKeyValue->value()] = $value;
+
+                            continue;
+                        }
+                        $resource->environment_variables()->updateOrCreate([
+                            'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
+                            'value' => $value,
                             'is_preview' => false,
                             'is_required' => $isRequired,
+                            'comment' => $envComments[$originalKey] ?? null,
                         ]);
-                        // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $value;
-
-                        continue;
                     }
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => $key,
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $value,
-                        'is_preview' => false,
-                        'is_required' => $isRequired,
-                    ]);
                 }
             }
         }

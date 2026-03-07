@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Jobs\ConnectProxyToNetworksJob;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class StandaloneDocker extends BaseModel
 {
+    use HasFactory;
     use HasSafeStringAttribute;
 
     protected $guarded = [];

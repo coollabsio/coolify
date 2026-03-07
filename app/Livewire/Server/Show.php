@@ -8,6 +8,7 @@ use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Rules\ValidServerIp;
 use App\Services\HetznerService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -115,9 +116,9 @@ class Show extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'ip' => 'required',
-            'user' => 'required',
-            'port' => 'required',
+            'ip' => ['required', new ValidServerIp],
+            'user' => ['required', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'port' => 'required|integer|between:1,65535',
             'validationLogs' => 'nullable',
             'wildcardDomain' => 'nullable|url',
             'isReachable' => 'required',

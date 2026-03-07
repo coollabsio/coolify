@@ -64,7 +64,7 @@ class SchedulerLogParser
                     continue;
                 }
 
-                if (! str_contains($entry['message'], 'ScheduledJobManager')) {
+                if (! str_contains($entry['message'], 'ScheduledJobManager') || str_contains($entry['message'], 'started')) {
                     continue;
                 }
 

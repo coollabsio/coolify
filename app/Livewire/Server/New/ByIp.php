@@ -5,6 +5,7 @@ namespace App\Livewire\Server\New;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
@@ -55,8 +56,8 @@ class ByIp extends Component
             'new_private_key_value' => 'nullable|string',
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'ip' => 'required|string',
-            'user' => 'required|string',
+            'ip' => ['required', 'string', new ValidServerIp],
+            'user' => ['required', 'string', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'port' => 'required|integer|between:1,65535',
             'is_build_server' => 'required|boolean',
         ];

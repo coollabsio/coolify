@@ -5,7 +5,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
 use Illuminate\Support\Facades\Validator;
-use Mockery;
 
 beforeEach(function () {
     Mockery::close();

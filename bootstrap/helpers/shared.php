@@ -448,17 +448,284 @@ function parseEnvFormatToArray($env_file_contents)
         $equals_pos = strpos($line, '=');
         if ($equals_pos !== false) {
             $key = substr($line, 0, $equals_pos);
-            $value = substr($line, $equals_pos + 1);
-            if (substr($value, 0, 1) === '"' && substr($value, -1) === '"') {
-                $value = substr($value, 1, -1);
-            } elseif (substr($value, 0, 1) === "'" && substr($value, -1) === "'") {
-                $value = substr($value, 1, -1);
+            $value_and_comment = substr($line, $equals_pos + 1);
+            $comment = null;
+            $remainder = '';
+
+            // Check if value starts with quotes
+            $firstChar = $value_and_comment[0] ?? '';
+            $isDoubleQuoted = $firstChar === '"';
+            $isSingleQuoted = $firstChar === "'";
+
+            if ($isDoubleQuoted) {
+                // Find the closing double quote
+                $closingPos = strpos($value_and_comment, '"', 1);
+                if ($closingPos !== false) {
+                    // Extract quoted value and remove quotes
+                    $value = substr($value_and_comment, 1, $closingPos - 1);
+                    // Everything after closing quote (including comments)
+                    $remainder = substr($value_and_comment, $closingPos + 1);
+                } else {
+                    // No closing quote - treat as unquoted
+                    $value = substr($value_and_comment, 1);
+                }
+            } elseif ($isSingleQuoted) {
+                // Find the closing single quote
+                $closingPos = strpos($value_and_comment, "'", 1);
+                if ($closingPos !== false) {
+                    // Extract quoted value and remove quotes
+                    $value = substr($value_and_comment, 1, $closingPos - 1);
+                    // Everything after closing quote (including comments)
+                    $remainder = substr($value_and_comment, $closingPos + 1);
+                } else {
+                    // No closing quote - treat as unquoted
+                    $value = substr($value_and_comment, 1);
+                }
+            } else {
+                // Unquoted value - strip inline comments
+                // Only treat # as comment if preceded by whitespace
+                if (preg_match('/\s+#/', $value_and_comment, $matches, PREG_OFFSET_CAPTURE)) {
+                    // Found whitespace followed by #, extract comment
+                    $remainder = substr($value_and_comment, $matches[0][1]);
+                    $value = substr($value_and_comment, 0, $matches[0][1]);
+                    $value = rtrim($value);
+                } else {
+                    $value = $value_and_comment;
+                }
             }
-            $env_array[$key] = $value;
+
+            // Extract comment from remainder (if any)
+            if ($remainder !== '') {
+                // Look for # in remainder
+                $hashPos = strpos($remainder, '#');
+                if ($hashPos !== false) {
+                    // Extract everything after the # and trim
+                    $comment = substr($remainder, $hashPos + 1);
+                    $comment = trim($comment);
+                    // Set to null if empty after trimming
+                    if ($comment === '') {
+                        $comment = null;
+                    }
+                }
+            }
+
+            $env_array[$key] = [
+                'value' => $value,
+                'comment' => $comment,
+            ];
         }
     }
 
     return $env_array;
+}
+
+/**
+ * Extract inline comments from environment variables in raw docker-compose YAML.
+ *
+ * Parses raw docker-compose YAML to extract inline comments from environment sections.
+ * Standard YAML parsers discard comments, so this pre-processes the raw text.
+ *
+ * Handles both formats:
+ * - Map format: `KEY: "value"  # comment` or `KEY: value  # comment`
+ * - Array format: `- KEY=value  # comment`
+ *
+ * @param  string  $rawYaml  The raw docker-compose.yml content
+ * @return array Map of environment variable keys to their inline comments
+ */
+function extractYamlEnvironmentComments(string $rawYaml): array
+{
+    $comments = [];
+    $lines = explode("\n", $rawYaml);
+    $inEnvironmentBlock = false;
+    $environmentIndent = 0;
+
+    foreach ($lines as $line) {
+        // Skip empty lines
+        if (trim($line) === '') {
+            continue;
+        }
+
+        // Calculate current line's indentation (number of leading spaces)
+        $currentIndent = strlen($line) - strlen(ltrim($line));
+
+        // Check if this line starts an environment block
+        if (preg_match('/^(\s*)environment\s*:\s*$/', $line, $matches)) {
+            $inEnvironmentBlock = true;
+            $environmentIndent = strlen($matches[1]);
+
+            continue;
+        }
+
+        // Check if this line starts an environment block with inline content (rare but possible)
+        if (preg_match('/^(\s*)environment\s*:\s*\{/', $line)) {
+            // Inline object format - not supported for comment extraction
+            continue;
+        }
+
+        // If we're in an environment block, check if we've exited it
+        if ($inEnvironmentBlock) {
+            // If we hit a line with same or less indentation that's not empty, we've left the block
+            // Unless it's a continuation of the environment block
+            $trimmedLine = ltrim($line);
+
+            // Check if this is a new top-level key (same indent as 'environment:' or less)
+            if ($currentIndent <= $environmentIndent && ! str_starts_with($trimmedLine, '-') && ! str_starts_with($trimmedLine, '#')) {
+                // Check if it looks like a YAML key (contains : not inside quotes)
+                if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/', $trimmedLine)) {
+                    $inEnvironmentBlock = false;
+
+                    continue;
+                }
+            }
+
+            // Skip comment-only lines
+            if (str_starts_with($trimmedLine, '#')) {
+                continue;
+            }
+
+            // Try to extract environment variable and comment from this line
+            $extracted = extractEnvVarCommentFromYamlLine($trimmedLine);
+            if ($extracted !== null && $extracted['comment'] !== null) {
+                $comments[$extracted['key']] = $extracted['comment'];
+            }
+        }
+    }
+
+    return $comments;
+}
+
+/**
+ * Extract environment variable key and inline comment from a single YAML line.
+ *
+ * @param  string  $line  A trimmed line from the environment section
+ * @return array|null Array with 'key' and 'comment', or null if not an env var line
+ */
+function extractEnvVarCommentFromYamlLine(string $line): ?array
+{
+    $key = null;
+    $comment = null;
+
+    // Handle array format: `- KEY=value  # comment` or `- KEY  # comment`
+    if (str_starts_with($line, '-')) {
+        $content = ltrim(substr($line, 1));
+
+        // Check for KEY=value format
+        if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)/', $content, $keyMatch)) {
+            $key = $keyMatch[1];
+            // Find comment - need to handle quoted values
+            $comment = extractCommentAfterValue($content);
+        }
+    }
+    // Handle map format: `KEY: "value"  # comment` or `KEY: value  # comment`
+    elseif (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s*:/', $line, $keyMatch)) {
+        $key = $keyMatch[1];
+        // Get everything after the key and colon
+        $afterKey = substr($line, strlen($keyMatch[0]));
+        $comment = extractCommentAfterValue($afterKey);
+    }
+
+    if ($key === null) {
+        return null;
+    }
+
+    return [
+        'key' => $key,
+        'comment' => $comment,
+    ];
+}
+
+/**
+ * Extract inline comment from a value portion of a YAML line.
+ *
+ * Handles quoted values (where # inside quotes is not a comment).
+ *
+ * @param  string  $valueAndComment  The value portion (may include comment)
+ * @return string|null The comment text, or null if no comment
+ */
+function extractCommentAfterValue(string $valueAndComment): ?string
+{
+    $valueAndComment = ltrim($valueAndComment);
+
+    if ($valueAndComment === '') {
+        return null;
+    }
+
+    $firstChar = $valueAndComment[0] ?? '';
+
+    // Handle case where value is empty and line starts directly with comment
+    // e.g., `KEY:  # comment` becomes `# comment` after ltrim
+    if ($firstChar === '#') {
+        $comment = trim(substr($valueAndComment, 1));
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    // Handle double-quoted value
+    if ($firstChar === '"') {
+        // Find closing quote (handle escaped quotes)
+        $pos = 1;
+        $len = strlen($valueAndComment);
+        while ($pos < $len) {
+            if ($valueAndComment[$pos] === '\\' && $pos + 1 < $len) {
+                $pos += 2; // Skip escaped character
+
+                continue;
+            }
+            if ($valueAndComment[$pos] === '"') {
+                // Found closing quote
+                $remainder = substr($valueAndComment, $pos + 1);
+
+                return extractCommentFromRemainder($remainder);
+            }
+            $pos++;
+        }
+
+        // No closing quote found
+        return null;
+    }
+
+    // Handle single-quoted value
+    if ($firstChar === "'") {
+        // Find closing quote (single quotes don't have escapes in YAML)
+        $closingPos = strpos($valueAndComment, "'", 1);
+        if ($closingPos !== false) {
+            $remainder = substr($valueAndComment, $closingPos + 1);
+
+            return extractCommentFromRemainder($remainder);
+        }
+
+        // No closing quote found
+        return null;
+    }
+
+    // Unquoted value - find # that's preceded by whitespace
+    // Be careful not to match # at the start of a value like color codes
+    if (preg_match('/\s+#\s*(.*)$/', $valueAndComment, $matches)) {
+        $comment = trim($matches[1]);
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    return null;
+}
+
+/**
+ * Extract comment from the remainder of a line after a quoted value.
+ *
+ * @param  string  $remainder  Text after the closing quote
+ * @return string|null The comment text, or null if no comment
+ */
+function extractCommentFromRemainder(string $remainder): ?string
+{
+    // Look for # in remainder
+    $hashPos = strpos($remainder, '#');
+    if ($hashPos !== false) {
+        $comment = trim(substr($remainder, $hashPos + 1));
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    return null;
 }
 
 function data_get_str($data, $key, $default = null): Stringable
@@ -1149,24 +1416,48 @@ function checkIPAgainstAllowlist($ip, $allowlist)
             }
 
             $mask = (int) $mask;
+            $isIpv6Subnet = filter_var($subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+            $maxMask = $isIpv6Subnet ? 128 : 32;
 
-            // Validate mask
-            if ($mask < 0 || $mask > 32) {
+            // Validate mask for address family
+            if ($mask < 0 || $mask > $maxMask) {
                 continue;
             }
 
-            // Calculate network addresses
-            $ip_long = ip2long($ip);
-            $subnet_long = ip2long($subnet);
+            if ($isIpv6Subnet) {
+                // IPv6 CIDR matching using binary string comparison
+                $ipBin = inet_pton($ip);
+                $subnetBin = inet_pton($subnet);
 
-            if ($ip_long === false || $subnet_long === false) {
-                continue;
-            }
+                if ($ipBin === false || $subnetBin === false) {
+                    continue;
+                }
 
-            $mask_long = ~((1 << (32 - $mask)) - 1);
+                // Build a 128-bit mask from $mask prefix bits
+                $maskBin = str_repeat("\xff", (int) ($mask / 8));
+                $remainder = $mask % 8;
+                if ($remainder > 0) {
+                    $maskBin .= chr(0xFF & (0xFF << (8 - $remainder)));
+                }
+                $maskBin = str_pad($maskBin, 16, "\x00");
 
-            if (($ip_long & $mask_long) == ($subnet_long & $mask_long)) {
-                return true;
+                if (($ipBin & $maskBin) === ($subnetBin & $maskBin)) {
+                    return true;
+                }
+            } else {
+                // IPv4 CIDR matching
+                $ip_long = ip2long($ip);
+                $subnet_long = ip2long($subnet);
+
+                if ($ip_long === false || $subnet_long === false) {
+                    continue;
+                }
+
+                $mask_long = ~((1 << (32 - $mask)) - 1);
+
+                if (($ip_long & $mask_long) == ($subnet_long & $mask_long)) {
+                    return true;
+                }
             }
         } else {
             // Special case: 0.0.0.0 means allow all
@@ -1182,6 +1473,67 @@ function checkIPAgainstAllowlist($ip, $allowlist)
     }
 
     return false;
+}
+
+function deduplicateAllowlist(array $entries): array
+{
+    if (count($entries) <= 1) {
+        return array_values($entries);
+    }
+
+    // Normalize each entry into [original, ip, mask]
+    $parsed = [];
+    foreach ($entries as $entry) {
+        $entry = trim($entry);
+        if (empty($entry)) {
+            continue;
+        }
+
+        if ($entry === '0.0.0.0') {
+            // Special case: bare 0.0.0.0 means "allow all" — treat as /0
+            $parsed[] = ['original' => $entry, 'ip' => '0.0.0.0', 'mask' => 0];
+        } elseif (str_contains($entry, '/')) {
+            [$ip, $mask] = explode('/', $entry);
+            $parsed[] = ['original' => $entry, 'ip' => $ip, 'mask' => (int) $mask];
+        } else {
+            $ip = $entry;
+            $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+            $parsed[] = ['original' => $entry, 'ip' => $ip, 'mask' => $isIpv6 ? 128 : 32];
+        }
+    }
+
+    $count = count($parsed);
+    $redundant = array_fill(0, $count, false);
+
+    for ($i = 0; $i < $count; $i++) {
+        if ($redundant[$i]) {
+            continue;
+        }
+
+        for ($j = 0; $j < $count; $j++) {
+            if ($i === $j || $redundant[$j]) {
+                continue;
+            }
+
+            // Entry $j is redundant if its mask is narrower/equal (>=) than $i's mask
+            // AND $j's network IP falls within $i's CIDR range
+            if ($parsed[$j]['mask'] >= $parsed[$i]['mask']) {
+                $cidr = $parsed[$i]['ip'].'/'.$parsed[$i]['mask'];
+                if (checkIPAgainstAllowlist($parsed[$j]['ip'], [$cidr])) {
+                    $redundant[$j] = true;
+                }
+            }
+        }
+    }
+
+    $result = [];
+    for ($i = 0; $i < $count; $i++) {
+        if (! $redundant[$i]) {
+            $result[] = $parsed[$i]['original'];
+        }
+    }
+
+    return $result;
 }
 
 function get_public_ips()
@@ -1317,6 +1669,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 {
     if ($resource->getMorphClass() === \App\Models\Service::class) {
         if ($resource->docker_compose_raw) {
+            // Extract inline comments from raw YAML before Symfony parser discards them
+            $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
+
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
@@ -1348,7 +1703,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices, $envComments) {
                 // Workarounds for beta users.
                 if ($serviceName === 'registry') {
                     $tempServiceName = 'docker-registry';
@@ -1694,6 +2049,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $key = str($variableName);
                         $value = str($variable);
                     }
+                    // Preserve original key for comment lookup before $key might be reassigned
+                    $originalKey = $key->value();
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if ($isNew || $savedService->fqdn === null) {
                             $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
@@ -1747,6 +2104,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                                'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
                         // Caddy needs exact port in some cases.
@@ -1826,6 +2184,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
+                                            'comment' => $envComments[$originalKey] ?? null,
                                         ]);
                                     }
                                     if (! $isDatabase) {
@@ -1864,6 +2223,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
+                                            'comment' => $envComments[$originalKey] ?? null,
                                         ]);
                                     }
                                 }
@@ -1902,6 +2262,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                                'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
                     }
@@ -3445,6 +3806,58 @@ function verifyPasswordConfirmation(mixed $password, ?Livewire\Component $compon
     }
 
     return true;
+}
+
+/**
+ * Extract hard-coded environment variables from docker-compose YAML.
+ *
+ * @param  string  $dockerComposeRaw  Raw YAML content
+ * @return \Illuminate\Support\Collection Collection of arrays with: key, value, comment, service_name
+ */
+function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): \Illuminate\Support\Collection
+{
+    if (blank($dockerComposeRaw)) {
+        return collect([]);
+    }
+
+    try {
+        $yaml = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+    } catch (\Exception $e) {
+        // Malformed YAML - return empty collection
+        return collect([]);
+    }
+
+    $services = data_get($yaml, 'services', []);
+    if (empty($services)) {
+        return collect([]);
+    }
+
+    // Extract inline comments from raw YAML
+    $envComments = extractYamlEnvironmentComments($dockerComposeRaw);
+
+    $hardcodedVars = collect([]);
+
+    foreach ($services as $serviceName => $service) {
+        $environment = collect(data_get($service, 'environment', []));
+
+        if ($environment->isEmpty()) {
+            continue;
+        }
+
+        // Convert environment variables to key-value format
+        $environment = convertToKeyValueCollection($environment);
+
+        foreach ($environment as $key => $value) {
+            $hardcodedVars->push([
+                'key' => $key,
+                'value' => $value,
+                'comment' => $envComments[$key] ?? null,
+                'service_name' => $serviceName,
+            ]);
+        }
+    }
+
+    return $hardcodedVars;
 }
 
 /**

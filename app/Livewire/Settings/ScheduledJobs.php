@@ -3,8 +3,11 @@
 namespace App\Livewire\Settings;
 
 use App\Models\DockerCleanupExecution;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
+use App\Models\Server;
 use App\Services\SchedulerLogParser;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -15,6 +18,18 @@ class ScheduledJobs extends Component
     public string $filterType = 'all';
 
     public string $filterDate = 'last_24h';
+
+    public int $skipPage = 0;
+
+    public int $skipDefaultTake = 20;
+
+    public bool $showSkipNext = false;
+
+    public bool $showSkipPrev = false;
+
+    public int $skipCurrentPage = 1;
+
+    public int $skipTotalCount = 0;
 
     protected Collection $executions;
 
@@ -42,11 +57,30 @@ class ScheduledJobs extends Component
 
     public function updatedFilterType(): void
     {
+        $this->skipPage = 0;
         $this->loadData();
     }
 
     public function updatedFilterDate(): void
     {
+        $this->skipPage = 0;
+        $this->loadData();
+    }
+
+    public function skipNextPage(): void
+    {
+        $this->skipPage += $this->skipDefaultTake;
+        $this->showSkipPrev = true;
+        $this->loadData();
+    }
+
+    public function skipPreviousPage(): void
+    {
+        $this->skipPage -= $this->skipDefaultTake;
+        if ($this->skipPage < 0) {
+            $this->skipPage = 0;
+        }
+        $this->showSkipPrev = $this->skipPage > 0;
         $this->loadData();
     }
 
@@ -69,8 +103,84 @@ class ScheduledJobs extends Component
         $this->executions = $this->getExecutions($teamId);
 
         $parser = new SchedulerLogParser;
-        $this->skipLogs = $parser->getRecentSkips(50, $teamId);
+        $allSkips = $parser->getRecentSkips(500, $teamId);
+        $this->skipTotalCount = $allSkips->count();
+        $this->skipLogs = $this->enrichSkipLogsWithLinks(
+            $allSkips->slice($this->skipPage, $this->skipDefaultTake)->values()
+        );
+        $this->showSkipPrev = $this->skipPage > 0;
+        $this->showSkipNext = ($this->skipPage + $this->skipDefaultTake) < $this->skipTotalCount;
+        $this->skipCurrentPage = intval($this->skipPage / $this->skipDefaultTake) + 1;
         $this->managerRuns = $parser->getRecentRuns(30, $teamId);
+    }
+
+    private function enrichSkipLogsWithLinks(Collection $skipLogs): Collection
+    {
+        $taskIds = $skipLogs->where('type', 'task')->pluck('context.task_id')->filter()->unique()->values();
+        $backupIds = $skipLogs->where('type', 'backup')->pluck('context.backup_id')->filter()->unique()->values();
+        $serverIds = $skipLogs->where('type', 'docker_cleanup')->pluck('context.server_id')->filter()->unique()->values();
+
+        $tasks = $taskIds->isNotEmpty()
+            ? ScheduledTask::with(['application.environment.project', 'service.environment.project'])->whereIn('id', $taskIds)->get()->keyBy('id')
+            : collect();
+
+        $backups = $backupIds->isNotEmpty()
+            ? ScheduledDatabaseBackup::with(['database.environment.project'])->whereIn('id', $backupIds)->get()->keyBy('id')
+            : collect();
+
+        $servers = $serverIds->isNotEmpty()
+            ? Server::whereIn('id', $serverIds)->get()->keyBy('id')
+            : collect();
+
+        return $skipLogs->map(function (array $skip) use ($tasks, $backups, $servers): array {
+            $skip['link'] = null;
+            $skip['resource_name'] = null;
+
+            if ($skip['type'] === 'task') {
+                $task = $tasks->get($skip['context']['task_id'] ?? null);
+                if ($task) {
+                    $skip['resource_name'] = $skip['context']['task_name'] ?? $task->name;
+                    $resource = $task->application ?? $task->service;
+                    $environment = $resource?->environment;
+                    $project = $environment?->project;
+                    if ($project && $environment && $resource) {
+                        $routeName = $task->application_id
+                            ? 'project.application.scheduled-tasks'
+                            : 'project.service.scheduled-tasks';
+                        $routeKey = $task->application_id ? 'application_uuid' : 'service_uuid';
+                        $skip['link'] = route($routeName, [
+                            'project_uuid' => $project->uuid,
+                            'environment_uuid' => $environment->uuid,
+                            $routeKey => $resource->uuid,
+                            'task_uuid' => $task->uuid,
+                        ]);
+                    }
+                }
+            } elseif ($skip['type'] === 'backup') {
+                $backup = $backups->get($skip['context']['backup_id'] ?? null);
+                if ($backup) {
+                    $database = $backup->database;
+                    $skip['resource_name'] = $database?->name ?? 'Database backup';
+                    $environment = $database?->environment;
+                    $project = $environment?->project;
+                    if ($project && $environment && $database) {
+                        $skip['link'] = route('project.database.backup.index', [
+                            'project_uuid' => $project->uuid,
+                            'environment_uuid' => $environment->uuid,
+                            'database_uuid' => $database->uuid,
+                        ]);
+                    }
+                }
+            } elseif ($skip['type'] === 'docker_cleanup') {
+                $server = $servers->get($skip['context']['server_id'] ?? null);
+                if ($server) {
+                    $skip['resource_name'] = $server->name;
+                    $skip['link'] = route('server.show', ['server_uuid' => $server->uuid]);
+                }
+            }
+
+            return $skip;
+        });
     }
 
     private function getExecutions(?int $teamId = null): Collection

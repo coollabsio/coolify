@@ -57,7 +57,9 @@ Thank you so much!
 
 ### Huge Sponsors
 
+* [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
+*
 
 ### Big Sponsors
 
@@ -85,7 +87,6 @@ Thank you so much!
 * [LiquidWeb](https://liquidweb.com?ref=coolify.io) - Premium managed hosting solutions
 * [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
-* [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
 * [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
 * [PFGLabs](https://pfglabs.com?ref=coolify.io) - Build Real Projects with Golang
 * [Ramnode](https://ramnode.com/?ref=coolify.io) - High Performance Cloud VPS Hosting
@@ -96,6 +97,7 @@ Thank you so much!
 * [Tigris](https://www.tigrisdata.com?ref=coolify.io) - Modern developer data platform
 * [Tolgee](https://tolgee.io?ref=coolify.io) - The open source localization platform
 * [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
+* [VPSDime](https://vpsdime.com?ref=coolify.io) - Affordable high-performance VPS hosting solutions
 
 
 ### Small Sponsors

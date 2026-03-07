@@ -913,6 +913,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return (int) preg_replace('/[^0-9]/', '', $value);
+            },
+            set: function ($value) {
+                return (int) preg_replace('/[^0-9]/', '', (string) $value);
             }
         );
     }
@@ -922,6 +925,9 @@ $schema://$host {
         return Attribute::make(
             get: function ($value) {
                 return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+            },
+            set: function ($value) {
+                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
             }
         );
     }
@@ -930,6 +936,9 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
+                return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
+            },
+            set: function ($value) {
                 return preg_replace('/[^0-9a-zA-Z.:%-]/', '', $value);
             }
         );
