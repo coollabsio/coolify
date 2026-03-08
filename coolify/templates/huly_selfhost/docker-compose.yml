@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  huly_selfhost:
+    build: .
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./app:/app
+    environment:
+      - NODE_ENV=production
