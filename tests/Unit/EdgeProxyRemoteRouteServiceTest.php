@@ -84,6 +84,22 @@ it('uses configured traefik entrypoints and cert resolver for remote routes', fu
     }
 });
 
+it('adds an insecure transport when an edge route falls back to the deployment proxy https entrypoint', function () {
+    $service = new EdgeProxyRemoteRouteService;
+
+    $config = $service->generateTraefikConfig('service-uuid', [[
+        'host' => 'demo.example.com',
+        'path' => '/',
+        'upstream_url' => 'https://10.8.0.15:443',
+        'pass_host_header' => true,
+        'use_insecure_transport' => true,
+    ]]);
+
+    expect(data_get($config, 'http.services.edge-service-uuid-svc-1.loadBalancer.passHostHeader'))->toBeTrue()
+        ->and(data_get($config, 'http.services.edge-service-uuid-svc-1.loadBalancer.serversTransport'))->toBe('edge-service-uuid-transport-1')
+        ->and(data_get($config, 'http.serversTransports.edge-service-uuid-transport-1.insecureSkipVerify'))->toBeTrue();
+});
+
 it('returns warning when syncing service route without a master domain router', function () {
     $manager = new class extends EdgeProxyRemoteRouteService
     {
@@ -387,6 +403,97 @@ it('returns actionable warning and does not write route file when application pu
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
 });
 
+it('keeps application edge route files for HSTS-sensitive domains by falling back to the deployment proxy https entrypoint', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 32;
+    $deploymentServer->ip = '10.8.0.32';
+    $deploymentServer->proxy = ['type' => 'TRAEFIK'];
+
+    $application = new Application;
+    $application->uuid = 'application-missing-port-fallback';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://missing-port.example.com:3000';
+    $application->ports_mappings = null;
+    $application->ports_exposes = '3000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and(collect($warnings)->contains(fn (string $warning) => str_contains($warning, 'deployment server HTTPS proxy instead')))
+        ->and($manager->calls)->toHaveCount(1);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('https://10.8.0.32:443')
+        ->and($payload)->toContain('passHostHeader: true')
+        ->and($payload)->toContain('serversTransport: edge-application-missing-port-fallback-transport-1')
+        ->and($payload)->toContain('insecureSkipVerify: true')
+        ->and($payload)->toContain('certResolver: letsencrypt');
+});
+
+it('does not fall back through the deployment proxy when an application domain targets an unknown internal port', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 33;
+    $deploymentServer->ip = '10.8.0.33';
+    $deploymentServer->proxy = ['type' => 'TRAEFIK'];
+
+    $application = new Application;
+    $application->uuid = 'application-invalid-fallback-port';
+    $application->build_pack = 'nixpacks';
+    $application->fqdn = 'https://invalid-port.example.com:9999';
+    $application->ports_mappings = null;
+    $application->ports_exposes = '3000,4000';
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and($warnings[0])->toContain('published host port could not be resolved')
+        ->and(collect($warnings)->contains(fn (string $warning) => ! str_contains($warning, 'deployment server HTTPS proxy instead')))->toBeTrue()
+        ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/application-remote-application-invalid-fallback-port.yaml')
+        ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
+});
+
 it('keeps valid application edge routes when one domain port cannot be resolved and returns warning only for invalid domain', function () {
     $manager = new class extends EdgeProxyRemoteRouteService
     {
@@ -492,6 +599,63 @@ YAML;
         ->and($warnings[0])->toContain('published host port could not be resolved')
         ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/service-remote-service-without-port.yaml')
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
+});
+
+it('keeps service edge route files for HSTS-sensitive domains by falling back to the deployment proxy https entrypoint', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 11;
+    $deploymentServer->ip = '10.8.0.16';
+    $deploymentServer->proxy = ['type' => 'TRAEFIK'];
+
+    $service = new Service;
+    $service->uuid = 'service-without-port-fallback';
+    $service->docker_compose_raw = <<<'YAML'
+services:
+  app:
+    ports:
+      - "3000"
+YAML;
+
+    $application = new ServiceApplication;
+    $application->name = 'app';
+    $application->fqdn = 'https://broken.example.com:3000';
+
+    $service->setRelation('applications', collect([$application]));
+    $application->setRelation('service', $service);
+
+    $warnings = $manager->syncServiceWithServers($service, $edgeProxyServer, $deploymentServer);
+
+    expect($warnings)->not->toBeEmpty()
+        ->and(collect($warnings)->contains(fn (string $warning) => str_contains($warning, 'deployment server HTTPS proxy instead')))
+        ->and($manager->calls)->toHaveCount(1);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('https://10.8.0.16:443')
+        ->and($payload)->toContain('Host(`broken.example.com`)')
+        ->and($payload)->toContain('insecureSkipVerify: true')
+        ->and($payload)->toContain('certResolver: letsencrypt');
 });
 
 it('keeps valid edge routes when one domain port cannot be resolved and returns warning only for invalid domain', function () {

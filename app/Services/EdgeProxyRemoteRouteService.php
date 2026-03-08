@@ -133,7 +133,19 @@ class EdgeProxyRemoteRouteService
                 $requestedInternalPort = $url->getPort() ?? $application->getRequiredPort();
                 $publishedPort = $this->resolvePublishedPort($compose, $application->name, $requestedInternalPort, $environmentMap);
 
-                if (is_null($publishedPort)) {
+                $upstream = $this->resolveRouteUpstream(
+                    $deploymentServer,
+                    $tunnelHost,
+                    $publishedPort,
+                    $this->canFallbackToDeploymentProxyForServiceApplication(
+                        $application,
+                        $requestedInternalPort,
+                        $compose,
+                        $environmentMap
+                    )
+                );
+
+                if (is_null($upstream)) {
                     $warnings[] = sprintf(
                         'Edge proxy route skipped for service %s (%s, domain %s): published host port could not be resolved. Expose the container port in docker-compose "ports:" and/or include an explicit port in the domain.',
                         $service->uuid,
@@ -144,10 +156,19 @@ class EdgeProxyRemoteRouteService
                     continue;
                 }
 
+                if ($this->isDeploymentProxyFallbackUpstream($upstream)) {
+                    $warnings[] = sprintf(
+                        'Edge proxy route fallback for service %s (%s, domain %s): published host port could not be resolved, so traffic will be forwarded to the deployment server HTTPS proxy instead.',
+                        $service->uuid,
+                        $application->name,
+                        $domain
+                    );
+                }
+
                 $routes[] = [
                     'host' => $url->getHost(),
                     'path' => $url->getPath(),
-                    'upstream_url' => sprintf('http://%s:%d', $tunnelHost, $publishedPort),
+                    ...$upstream,
                 ];
             }
         }
@@ -313,7 +334,20 @@ class EdgeProxyRemoteRouteService
                 $environmentMap
             );
 
-            if (is_null($publishedPort)) {
+            $upstream = $this->resolveRouteUpstream(
+                $deploymentServer,
+                $tunnelHost,
+                $publishedPort,
+                $this->canFallbackToDeploymentProxyForApplication(
+                    $application,
+                    $requestedInternalPort,
+                    $composeServiceName,
+                    $compose,
+                    $environmentMap
+                )
+            );
+
+            if (is_null($upstream)) {
                 $warnings[] = sprintf(
                     'Edge proxy route skipped for application %s (domain %s): published host port could not be resolved. Expose the application port in host mappings/compose ports and/or include an explicit port in the domain.',
                     $application->uuid,
@@ -323,10 +357,18 @@ class EdgeProxyRemoteRouteService
                 continue;
             }
 
+            if ($this->isDeploymentProxyFallbackUpstream($upstream)) {
+                $warnings[] = sprintf(
+                    'Edge proxy route fallback for application %s (domain %s): published host port could not be resolved, so traffic will be forwarded to the deployment server HTTPS proxy instead.',
+                    $application->uuid,
+                    $domain
+                );
+            }
+
             $routes[] = [
                 'host' => $url->getHost(),
                 'path' => $url->getPath(),
-                'upstream_url' => sprintf('http://%s:%d', $tunnelHost, $publishedPort),
+                ...$upstream,
             ];
         }
 
@@ -445,6 +487,18 @@ class EdgeProxyRemoteRouteService
                     ],
                 ],
             ];
+
+            if (data_get($route, 'pass_host_header') === true) {
+                $config['http']['services'][$serviceName]['loadBalancer']['passHostHeader'] = true;
+            }
+
+            if (data_get($route, 'use_insecure_transport') === true) {
+                $transportName = "edge-{$serviceKey}-transport-{$suffix}";
+                $config['http']['services'][$serviceName]['loadBalancer']['serversTransport'] = $transportName;
+                $config['http']['serversTransports'][$transportName] = [
+                    'insecureSkipVerify' => true,
+                ];
+            }
         }
 
         return $config;
@@ -819,6 +873,103 @@ class EdgeProxyRemoteRouteService
         return $this->selectPublishedPortFromMappings($portMappings, $requestedInternalPort, $fallbackInternalPort);
     }
 
+    private function resolveRouteUpstream(
+        Server $deploymentServer,
+        string $tunnelHost,
+        ?int $publishedPort,
+        bool $allowDeploymentProxyFallback
+    ): ?array {
+        if (! is_null($publishedPort)) {
+            return [
+                'upstream_url' => sprintf('http://%s:%d', $tunnelHost, $publishedPort),
+            ];
+        }
+
+        if (! $allowDeploymentProxyFallback) {
+            return null;
+        }
+
+        if ($deploymentServer->proxyType() === ProxyTypes::NONE->value) {
+            return null;
+        }
+
+        return [
+            'upstream_url' => sprintf('https://%s:443', $tunnelHost),
+            'pass_host_header' => true,
+            'use_insecure_transport' => true,
+        ];
+    }
+
+    private function isDeploymentProxyFallbackUpstream(array $upstream): bool
+    {
+        return data_get($upstream, 'use_insecure_transport') === true;
+    }
+
+    private function canFallbackToDeploymentProxyForServiceApplication(
+        ServiceApplication $application,
+        ?int $requestedInternalPort,
+        array $compose,
+        array $environmentMap
+    ): bool {
+        $candidatePorts = $this->resolveComposeServiceInternalPorts($compose, $application->name, $environmentMap);
+        $requiredPort = $application->getRequiredPort();
+        if (! is_null($requiredPort)) {
+            $candidatePorts->push($requiredPort);
+        }
+
+        return $this->candidatePortsSupportProxyFallback($requestedInternalPort, $candidatePorts);
+    }
+
+    private function canFallbackToDeploymentProxyForApplication(
+        Application $application,
+        ?int $requestedInternalPort,
+        ?string $composeServiceName,
+        array $compose,
+        array $environmentMap
+    ): bool {
+        if ($application->build_pack === 'dockercompose') {
+            $serviceName = blank($composeServiceName) ? $application->uuid : $composeServiceName;
+
+            return $this->candidatePortsSupportProxyFallback(
+                $requestedInternalPort,
+                $this->resolveComposeServiceInternalPorts($compose, $serviceName, $environmentMap)
+            );
+        }
+
+        return $this->candidatePortsSupportProxyFallback(
+            $requestedInternalPort,
+            $this->applicationInternalPorts($application)
+        );
+    }
+
+    private function candidatePortsSupportProxyFallback(?int $requestedInternalPort, Collection $candidatePorts): bool
+    {
+        $candidatePorts = $candidatePorts
+            ->filter(fn (mixed $port) => is_int($port) || (is_string($port) && is_numeric($port)))
+            ->map(fn (mixed $port) => (int) $port)
+            ->unique()
+            ->values();
+
+        if ($candidatePorts->isEmpty()) {
+            return false;
+        }
+
+        if (! is_null($requestedInternalPort)) {
+            return $candidatePorts->contains($requestedInternalPort);
+        }
+
+        return $candidatePorts->count() === 1;
+    }
+
+    private function applicationInternalPorts(Application $application): Collection
+    {
+        if ($application->relationLoaded('settings') && data_get($application, 'settings.is_static', false)) {
+            return collect([80]);
+        }
+
+        return collect($application->ports_exposes_array ?? []);
+    }
+
     private function detectUnsupportedDomainProtocol(string $domain): ?string
     {
         $trimmedDomain = trim($domain);
@@ -958,6 +1109,24 @@ class EdgeProxyRemoteRouteService
         return $this->selectPublishedPortFromMappings($portMappings, $requestedInternalPort);
     }
 
+    private function resolveComposeServiceInternalPorts(array $compose, string $serviceName, array $environmentMap): Collection
+    {
+        $serviceConfig = $this->resolveComposeServiceConfig($compose, $serviceName);
+        if (! is_array($serviceConfig)) {
+            return collect();
+        }
+
+        $ports = $this->parsePortMappings((array) data_get($serviceConfig, 'ports', []), $environmentMap)
+            ->pluck('target')
+            ->filter(fn (mixed $port) => ! is_null($port));
+
+        $exposedPorts = collect((array) data_get($serviceConfig, 'expose', []))
+            ->map(fn (mixed $port) => $this->resolvePortValue($port, $environmentMap))
+            ->filter(fn (?int $port) => ! is_null($port));
+
+        return $ports->merge($exposedPorts)->values();
+    }
+
     private function selectPublishedPortFromMappings(Collection $portMappings, ?int $requestedInternalPort, ?int $fallbackInternalPort = null): ?int
     {
         if (! is_null($requestedInternalPort)) {
@@ -988,27 +1157,35 @@ class EdgeProxyRemoteRouteService
 
     private function resolveComposeServicePorts(array $compose, string $serviceName): ?array
     {
+        $serviceConfig = $this->resolveComposeServiceConfig($compose, $serviceName);
+        if (! is_array($serviceConfig)) {
+            return null;
+        }
+
+        $ports = data_get($serviceConfig, 'ports');
+
+        return is_array($ports) ? $ports : null;
+    }
+
+    private function resolveComposeServiceConfig(array $compose, string $serviceName): ?array
+    {
         $services = data_get($compose, 'services', []);
         if (! is_array($services) || empty($services)) {
             return null;
         }
 
-        if (array_key_exists($serviceName, $services)) {
-            $ports = data_get($services[$serviceName], 'ports');
-
-            return is_array($ports) ? $ports : null;
+        if (array_key_exists($serviceName, $services) && is_array($services[$serviceName])) {
+            return $services[$serviceName];
         }
 
         $normalizedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
         foreach ($services as $composeServiceName => $serviceConfig) {
             $normalizedComposeServiceName = str((string) $composeServiceName)->replace('-', '_')->replace('.', '_')->value();
-            if ($normalizedComposeServiceName !== $normalizedServiceName) {
+            if ($normalizedComposeServiceName !== $normalizedServiceName || ! is_array($serviceConfig)) {
                 continue;
             }
 
-            $ports = data_get($serviceConfig, 'ports');
-
-            return is_array($ports) ? $ports : null;
+            return $serviceConfig;
         }
 
         // Defensive fallback for templates where application name does not match compose key.
@@ -1017,7 +1194,7 @@ class EdgeProxyRemoteRouteService
             ->values();
 
         if ($servicesWithPorts->count() === 1) {
-            return data_get($servicesWithPorts->first(), 'ports');
+            return $servicesWithPorts->first();
         }
 
         return null;
