@@ -1,0 +1,72 @@
+{
+  "name": "Email Server",
+  "description": "Complete email server solution with Docker Mailserver and Roundcube webmail interface",
+  "category": "Communication",
+  "tags": ["email", "mail", "smtp", "imap", "webmail"],
+  "icon": "envelope",
+  "version": "1.0.0",
+  "author": "Coolify Community",
+  "compose_file": "docker-compose.yml",
+  "environment_variables": [
+    {
+      "name": "DOMAIN",
+      "description": "Your email domain (e.g., example.com)",
+      "required": true,
+      "example": "example.com"
+    }
+  ],
+  "ports": [
+    {
+      "port": 25,
+      "description": "SMTP"
+    },
+    {
+      "port": 143,
+      "description": "IMAP"
+    },
+    {
+      "port": 465,
+      "description": "SMTPS"
+    },
+    {
+      "port": 587,
+      "description": "SMTP Submission"
+    },
+    {
+      "port": 993,
+      "description": "IMAPS"
+    },
+    {
+      "port": 80,
+      "description": "Roundcube Webmail"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "mail-data",
+      "description": "Email storage",
+      "required": true
+    },
+    {
+      "name": "mail-state",
+      "description": "Mail server state",
+      "required": true
+    },
+    {
+      "name": "mail-logs",
+      "description": "Mail server logs",
+      "required": true
+    },
+    {
+      "name": "config",
+      "description": "Mail server configuration",
+      "required": true
+    },
+    {
+      "name": "roundcube-data",
+      "description": "Roundcube webmail data",
+      "required": true
+    }
+  ],
+  "documentation": "# Email Server Template\n\nThis template provides a complete email server solution using Docker Mailserver with Roundcube webmail interface.\n\n## Features\n- Full SMTP/IMAP email server\n- Anti-spam (Rspamd)\n- Anti-virus (ClamAV)\n- Fail2Ban protection\n- Webmail interface (Roundcube)\n- SSL/TLS support with Let's Encrypt\n\n## Setup\n1. Set your domain in the DOMAIN environment variable\n2. Configure DNS records (MX, SPF, DKIM, DMARC)\n3. Access webmail at your configured domain\n4. Create email accounts using the setup script\n\n## Post-deployment\nRun the following commands to create email accounts:\n\n# Access the mailserver container\ndocker exec -it <container_name> setup email add user@domain.com [password]\n"
+}
