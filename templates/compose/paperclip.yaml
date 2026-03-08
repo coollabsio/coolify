@@ -1,0 +1,46 @@
+# documentation: https://paperclip.ing/docs
+# slogan: Open-source orchestration for zero-human AI companies with org charts, budgets, and governance.
+# category: ai
+# tags: ai, agents, orchestration, automation, company, org-chart, budget, governance
+# logo: svgs/default.webp
+# port: 3100
+
+services:
+  paperclip:
+    image: ghcr.io/paperclipai/paperclip:latest
+    environment:
+      - SERVICE_FQDN_PAPERCLIP_3100
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-paperclip}
+      - PORT=3100
+      - SERVE_UI=true
+      - PAPERCLIP_HOME=/paperclip
+      - PAPERCLIP_DEPLOYMENT_MODE=${PAPERCLIP_DEPLOYMENT_MODE:-authenticated}
+      - PAPERCLIP_DEPLOYMENT_EXPOSURE=${PAPERCLIP_DEPLOYMENT_EXPOSURE:-private}
+      - PAPERCLIP_PUBLIC_URL=$SERVICE_FQDN_PAPERCLIP
+      - BETTER_AUTH_SECRET=$SERVICE_PASSWORD_64_AUTHSECRET
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - paperclip-data:/paperclip
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  postgresql:
+    image: postgres:17-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-paperclip}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
