@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  mailserver:
+    image: docker.io/mailserver/docker-mailserver:latest
+    hostname: mail.${DOMAIN}
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - ./docker-data/dms/mail-data:/var/mail
+      - ./docker-data/dms/mail-state:/var/mail-state
+      - ./docker-data/dms/mail-logs:/var/log/mail
+      - ./docker-data/dms/config:/tmp/docker-mailserver
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    environment:
+      ENABLE_RSPAMD: 1
+      ENABLE_CLAMAV: 1
+      ENABLE_FAIL2BAN: 1
+      ENABLE_POSTGREY: 1
+      ENABLE_MANAGESIEVE: 1
+      ONE_DIR: 1
+      ENABLE_UPDATE_CHECK: 1
+      UPDATE_CHECK_INTERVAL: 1d
+      SSL_TYPE: letsencrypt
+      PERMIT_DOCKER: none
+      SPOOF_PROTECTION: 1
+      ENABLE_SRS: 1
+      OVERRIDE_HOSTNAME: mail.${DOMAIN}
+      POSTMASTER_ADDRESS: postmaster@${DOMAIN}
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    stop_grace_period: 1m
+    healthcheck:
+      test: "ss -lntp | grep -P ':25\s' || exit 1"
+      timeout: 3s
+      retries: 0
+      
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_SKIN: elastic
+      ROUNDCUBEMAIL_DEFAULT_HOST: mailserver
+      ROUNDCUBEMAIL_SMTP_SERVER: mailserver
+      ROUNDCUBEMAIL_SMTP_PORT: 587
+    volumes:
+      - ./docker-data/roundcube:/var/roundcube
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - mailserver
+
+volumes:
+  mail-data:
+  mail-state:
+  mail-logs:
+  config:
+  roundcube-data:
