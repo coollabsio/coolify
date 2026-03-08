@@ -27,6 +27,18 @@ class StartService
         // This is defensive programming - saveComposeConfigs() already creates it,
         // but we guarantee it here in case of any edge cases or manual deployments
         $commands[] = "touch {$workdir}/.env";
+        // Also ensure per-service .env files exist (env vars isolation, see #7655)
+        if ($service->docker_compose) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($service->docker_compose);
+                $serviceNames = array_keys(data_get($dockerCompose, 'services', []));
+                foreach ($serviceNames as $svcName) {
+                    $commands[] = "touch {$workdir}/.env.{$svcName}";
+                }
+            } catch (\Exception $e) {
+                // Silently ignore parsing errors - saveComposeConfigs handles the actual creation
+            }
+        }
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "docker compose --project-directory {$workdir} pull";

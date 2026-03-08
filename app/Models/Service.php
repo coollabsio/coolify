@@ -1545,17 +1545,24 @@ class Service extends BaseModel
         Storage::disk('local')->delete("tmp/{$filename}");
 
         $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        // Clean up old env files (global + per-service)
+        $commands[] = 'rm -f .env .env.* || true';
 
-        $envs = collect([]);
+        // Build the full environment variables map (key=value)
+        $allEnvs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
+        $serviceNames = [];
         if ($this->docker_compose) {
             try {
                 $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                    $serviceNames[] = $serviceName;
+                    $allEnvs->put(
+                        'SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper(),
+                        $serviceName
+                    );
                 }
             } catch (\Exception $e) {
                 ray($e->getMessage());
@@ -1574,13 +1581,84 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            $allEnvs->put($env->key, $env->real_value);
         }
-        if ($envs->count() === 0) {
+
+        // Write global .env file (used by docker compose for YAML variable substitution only)
+        if ($allEnvs->count() === 0) {
             $commands[] = 'touch .env';
         } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
+            $globalEnvLines = $allEnvs->map(fn ($value, $key) => "{$key}={$value}")->values();
+            $envs_base64 = base64_encode($globalEnvLines->implode("\n"));
             $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+        }
+
+        // Generate per-service .env files so each container only receives its own
+        // environment variables, preventing secret leakage between services (see #7655)
+        if (! empty($serviceNames) && isset($dockerCompose)) {
+            foreach ($serviceNames as $serviceName) {
+                $serviceConfig = data_get($dockerCompose, "services.{$serviceName}", []);
+
+                // Collect variable keys referenced in this service's environment section
+                $referencedKeys = collect([]);
+                $serviceEnvironment = data_get($serviceConfig, 'environment', []);
+                if (is_array($serviceEnvironment)) {
+                    foreach ($serviceEnvironment as $key => $value) {
+                        if (is_numeric($key) && is_string($value)) {
+                            // Format: "KEY=value" or "KEY"
+                            $envKey = str($value)->before('=')->value();
+                            $referencedKeys->push($envKey);
+                            // Also extract any ${VAR} references from the value part
+                            $valuePart = str($value)->after('=')->value();
+                            preg_match_all('/\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?/', $valuePart, $matches);
+                            if (! empty($matches[1])) {
+                                foreach ($matches[1] as $match) {
+                                    $referencedKeys->push($match);
+                                }
+                            }
+                        } else {
+                            // Format: KEY: value (associative)
+                            $referencedKeys->push($key);
+                            if (is_string($value)) {
+                                preg_match_all('/\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?/', $value, $matches);
+                                if (! empty($matches[1])) {
+                                    foreach ($matches[1] as $match) {
+                                        $referencedKeys->push($match);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $referencedKeys = $referencedKeys->unique();
+
+                // Build per-service env: only include variables this service actually needs
+                $serviceEnvs = $allEnvs->filter(function ($value, $key) use ($referencedKeys) {
+                    // Always include COOLIFY_* variables (safe, non-secret metadata)
+                    if (str($key)->startsWith('COOLIFY_')) {
+                        return true;
+                    }
+                    // Always include SERVICE_NAME_* variables (safe, non-secret)
+                    if (str($key)->startsWith('SERVICE_NAME_')) {
+                        return true;
+                    }
+                    // Include if this service explicitly references the variable
+                    if ($referencedKeys->contains($key)) {
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                if ($serviceEnvs->count() > 0) {
+                    $serviceEnvLines = $serviceEnvs->map(fn ($value, $key) => "{$key}={$value}")->values();
+                    $serviceEnvBase64 = base64_encode($serviceEnvLines->implode("\n"));
+                    $commands[] = "echo '$serviceEnvBase64' | base64 -d | tee .env.{$serviceName} > /dev/null";
+                } else {
+                    $commands[] = "touch .env.{$serviceName}";
+                }
+            }
         }
 
         instant_remote_process($commands, $this->server);
