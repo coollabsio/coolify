@@ -50,6 +50,14 @@
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Preview Deployments</span></a>
             @endif
+            @if ($application->build_pack === 'dockercompose' && $application->databases()->count() > 0)
+                @foreach ($application->databases as $database)
+                    @if ($database->isBackupSolutionAvailable())
+                        <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                            href="{{ route('project.application.database.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Backups: {{ $database->name }}</span></a>
+                    @endif
+                @endforeach
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Healthcheck</span></a>

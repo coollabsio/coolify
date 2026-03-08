@@ -404,6 +404,35 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $parsedServices = collect([]);
 
+    // Presave: detect database services and create ServiceDatabase records
+    // This enables backups for databases in dockercompose Applications (GitHub App deployments)
+    if ($resource->build_pack === 'dockercompose') {
+        $existingDbNames = $resource->databases()->pluck('name')->toArray();
+        foreach ($services as $svcName => $svc) {
+            $svcImage = data_get_str($svc, 'image');
+            if ($svcImage && isDatabaseImage($svcImage, $svc)) {
+                if (! in_array($svcName, $existingDbNames)) {
+                    ServiceDatabase::firstOrCreate([
+                        'name' => $svcName,
+                        'application_id' => $resource->id,
+                    ], [
+                        'image' => $svcImage,
+                    ]);
+                } else {
+                    // Update image if changed
+                    $existingDb = $resource->databases()->where('name', $svcName)->first();
+                    if ($existingDb && $existingDb->image !== (string) $svcImage) {
+                        $existingDb->image = $svcImage;
+                        $existingDb->save();
+                    }
+                }
+            }
+        }
+        // Clean up ServiceDatabase records for services no longer in the compose file
+        $currentServiceNames = array_keys($services);
+        $resource->databases()->whereNotIn('name', $currentServiceNames)->delete();
+    }
+
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
         // Validate service name for command injection

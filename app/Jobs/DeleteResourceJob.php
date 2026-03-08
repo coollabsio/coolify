@@ -96,6 +96,16 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
             $this->resource->environment_variables()->delete();
 
+            // Clean up ServiceDatabase records for dockercompose Applications
+            if ($this->resource instanceof Application && $this->resource->build_pack === 'dockercompose') {
+                foreach ($this->resource->databases as $db) {
+                    $db->scheduledBackups()->delete();
+                    $db->persistentStorages()->delete();
+                    $db->fileStorages()->delete();
+                    $db->delete();
+                }
+            }
+
             if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
                 $this->resource->deleteConnectedNetworks();
             }

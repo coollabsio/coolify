@@ -500,6 +500,14 @@ class Application extends BaseModel
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
 
+    /**
+     * Get database services detected in dockercompose applications.
+     */
+    public function databases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function type()
     {
         return 'application';

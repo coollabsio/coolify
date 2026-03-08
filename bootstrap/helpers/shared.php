@@ -556,9 +556,16 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
     }
 
     // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    // or application->environment->project->team_id for dockercompose Applications
     if ($resource instanceof \App\Models\ServiceDatabase) {
-        if ($resource->service?->environment?->project?->team_id === $teamId) {
-            return $resource;
+        if ($resource->isComposeApplication()) {
+            if ($resource->application?->environment?->project?->team_id === $teamId) {
+                return $resource;
+            }
+        } else {
+            if ($resource->service?->environment?->project?->team_id === $teamId) {
+                return $resource;
+            }
         }
 
         return null;

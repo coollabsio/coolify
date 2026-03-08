@@ -47,10 +47,10 @@ class LocalFileVolume extends BaseModel
     public function loadStorageOnServer()
     {
         $this->load(['service']);
-        $isService = data_get($this->resource, 'service');
+        $isService = data_get($this->resource, 'service') || ($this->resource instanceof ServiceDatabase && $this->resource->isComposeApplication());
         if ($isService) {
-            $workdir = $this->resource->service->workdir();
-            $server = $this->resource->service->server;
+            $workdir = $this->resource->workdir();
+            $server = $this->resource instanceof ServiceDatabase ? $this->resource->getServer() : $this->resource->service->server;
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
@@ -82,10 +82,10 @@ class LocalFileVolume extends BaseModel
     public function deleteStorageOnServer()
     {
         $this->load(['service']);
-        $isService = data_get($this->resource, 'service');
+        $isService = data_get($this->resource, 'service') || ($this->resource instanceof ServiceDatabase && $this->resource->isComposeApplication());
         if ($isService) {
-            $workdir = $this->resource->service->workdir();
-            $server = $this->resource->service->server;
+            $workdir = $this->resource->workdir();
+            $server = $this->resource instanceof ServiceDatabase ? $this->resource->getServer() : $this->resource->service->server;
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
@@ -119,10 +119,10 @@ class LocalFileVolume extends BaseModel
     public function saveStorageOnServer()
     {
         $this->load(['service']);
-        $isService = data_get($this->resource, 'service');
+        $isService = data_get($this->resource, 'service') || ($this->resource instanceof ServiceDatabase && $this->resource->isComposeApplication());
         if ($isService) {
-            $workdir = $this->resource->service->workdir();
-            $server = $this->resource->service->server;
+            $workdir = $this->resource->workdir();
+            $server = $this->resource instanceof ServiceDatabase ? $this->resource->getServer() : $this->resource->service->server;
         } else {
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;

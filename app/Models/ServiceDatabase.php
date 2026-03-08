@@ -27,7 +27,10 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -36,7 +39,10 @@ class ServiceDatabase extends BaseModel
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceDatabase::where(function ($query) {
+            $query->whereRelation('service.environment.project.team', 'id', currentTeam()->id)
+                ->orWhereRelation('application.environment.project.team', 'id', currentTeam()->id);
+        })->orderBy('name');
     }
 
     /**
@@ -49,10 +55,67 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    /**
+     * Check if this database belongs to a dockercompose Application.
+     */
+    public function isComposeApplication(): bool
+    {
+        return ! is_null($this->application_id);
+    }
+
+    /**
+     * Get the parent resource (Service or Application).
+     */
+    public function parentResource()
+    {
+        if ($this->isComposeApplication()) {
+            return $this->application;
+        }
+
+        return $this->service;
+    }
+
+    /**
+     * Get the server this database runs on.
+     */
+    public function getServer()
+    {
+        if ($this->isComposeApplication()) {
+            return $this->application->destination->server;
+        }
+
+        return $this->service->server;
+    }
+
+    /**
+     * Get the parent UUID (used for container naming).
+     */
+    public function getParentUuid(): string
+    {
+        if ($this->isComposeApplication()) {
+            return $this->application->uuid;
+        }
+
+        return $this->service->uuid;
+    }
+
+    /**
+     * Get the parent name (used for backup directory naming).
+     */
+    public function getParentName(): string
+    {
+        if ($this->isComposeApplication()) {
+            return $this->application->name;
+        }
+
+        return $this->service->name;
+    }
+
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        $parentUuid = $this->getParentUuid();
+        $container_id = $this->name.'-'.$parentUuid;
+        remote_process(["docker restart {$container_id}"], $this->getServer());
     }
 
     public function isRunning()
@@ -114,8 +177,9 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        $server = $this->getServer();
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +188,30 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
+        if ($this->isComposeApplication()) {
+            return data_get($this->application, 'environment.project.team');
+        }
+
         return data_get($this, 'environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->isComposeApplication()) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
     }
 
     public function persistentStorages()
