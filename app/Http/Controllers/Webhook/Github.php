@@ -150,6 +150,43 @@ class Github extends Controller
                             ]);
                         }
                     }
+                    if ($x_github_event === 'release') {
+                        if ($application->isReleaseDeployable()) {
+                            $deployment_uuid = new Cuid2;
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                commit: data_get($payload, 'release.tag_name', 'HEAD'),
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => "Deployment queued for release $tag_name.",
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $result['deployment_uuid'],
+                                ]);
+                            }
+                        } else {
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Deploy on release is disabled.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        }
+                    }
                     if ($x_github_event === 'pull_request') {
                         // Check if PR deployments are enabled (but allow 'closed' action to cleanup)
                         if (! $application->isPRDeployable() && $action !== 'closed') {
@@ -235,6 +272,15 @@ class Github extends Controller
                 $modified_files = data_get($payload, 'commits.*.modified');
                 $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                if ($action !== 'published') {
+                    return response("Nothing to do. Release action is '$action', not 'published'.");
+                }
+                $id = data_get($payload, 'repository.id');
+                $branch = data_get($payload, 'release.target_commitish');
+                $tag_name = data_get($payload, 'release.tag_name');
+            }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
                 $id = data_get($payload, 'repository.id');
@@ -256,6 +302,12 @@ class Github extends Controller
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$branch'.");
+                }
+            }
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get();
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications found with branch '$branch' for release.");
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -320,6 +372,35 @@ class Github extends Controller
                             $return_payloads->push([
                                 'status' => 'failed',
                                 'message' => 'Deployments disabled.',
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                            ]);
+                        }
+                    }
+                    if ($x_github_event === 'release') {
+                        if ($application->isReleaseDeployable()) {
+                            $deployment_uuid = new Cuid2;
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                commit: data_get($payload, 'release.tag_name', 'HEAD'),
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            }
+                            $return_payloads->push([
+                                'status' => $result['status'],
+                                'message' => $result['message'],
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'deployment_uuid' => $result['deployment_uuid'] ?? null,
+                            ]);
+                        } else {
+                            $return_payloads->push([
+                                'status' => 'failed',
+                                'message' => 'Deploy on release is disabled.',
                                 'application_uuid' => $application->uuid,
                                 'application_name' => $application->name,
                             ]);
