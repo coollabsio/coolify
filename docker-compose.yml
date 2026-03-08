@@ -1,37 +1,23 @@
+version: "3.8"
 services:
-    coolify:
-        container_name: coolify
-        restart: always
-        working_dir: /var/www/html
-        extra_hosts:
-            - host.docker.internal:host-gateway
-        networks:
-            - coolify
-        depends_on:
-            - postgres
-            - redis
-            - soketi
-    postgres:
-        image: postgres:15-alpine
-        container_name: coolify-db
-        restart: always
-        networks:
-            - coolify
-    redis:
-        image: redis:7-alpine
-        container_name: coolify-redis
-        restart: always
-        networks:
-            - coolify
-    soketi:
-        container_name: coolify-realtime
-        extra_hosts:
-            - host.docker.internal:host-gateway
-        restart: always
-        networks:
-            - coolify
-networks:
-    coolify:
-        name: coolify
-        driver: bridge
-        external: false
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: surrealdb
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      - SURREALDB_DB_PATH=/db
+      - SURREALDB_BACKEND=${SURREALDB_BACKEND:-rockdb}  # 默认使用 rockdb, 可以通过环境变量切换
+    volumes:
+      - surrealdb_data:/db
+    command: >
+      /bin/sh -c "
+        if [ "${SURREALDB_BACKEND}" = 'tikv' ]; then
+          surrealdb server --db /db --tikv
+        else
+          surrealdb server --db /db --rockdb
+        fi
+      "
+volumes:
+  surrealdb_data:
