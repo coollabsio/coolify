@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
+use App\Services\EdgeProxyRemotePortForwardService;
 use App\Services\EdgeProxyRemoteRouteService;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -60,6 +61,14 @@ class DeleteService
                 app(EdgeProxyRemoteRouteService::class)->deleteService($service);
             } catch (\Throwable $exception) {
                 Log::warning('Failed to delete edge proxy route file for service.', [
+                    'service_uuid' => $service->uuid,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+            try {
+                app(EdgeProxyRemotePortForwardService::class)->deleteService($service);
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to delete edge port proxy for service.', [
                     'service_uuid' => $service->uuid,
                     'error' => $exception->getMessage(),
                 ]);

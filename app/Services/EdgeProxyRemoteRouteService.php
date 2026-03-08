@@ -1093,12 +1093,14 @@ class EdgeProxyRemoteRouteService
 
     private function resolvePublishedPort(array $compose, string $serviceName, ?int $requestedInternalPort, array $environmentMap): ?int
     {
-        $ports = $this->resolveComposeServicePorts($compose, $serviceName);
-        if (! is_array($ports)) {
+        $serviceConfig = $this->resolveComposeServiceConfig($compose, $serviceName);
+        if (! is_array($serviceConfig)) {
             return null;
         }
 
-        $portMappings = $this->parsePortMappings($ports, $environmentMap)
+        $resolvedEnvironmentMap = $this->mergeComposeEnvironmentMap($serviceConfig, $environmentMap);
+
+        $portMappings = $this->parsePortMappings((array) data_get($serviceConfig, 'ports', []), $resolvedEnvironmentMap)
             ->filter(fn (array $mapping) => ! is_null($mapping['published']))
             ->values();
 
@@ -1116,15 +1118,130 @@ class EdgeProxyRemoteRouteService
             return collect();
         }
 
-        $ports = $this->parsePortMappings((array) data_get($serviceConfig, 'ports', []), $environmentMap)
+        $resolvedEnvironmentMap = $this->mergeComposeEnvironmentMap($serviceConfig, $environmentMap);
+
+        $ports = $this->parsePortMappings((array) data_get($serviceConfig, 'ports', []), $resolvedEnvironmentMap)
             ->pluck('target')
             ->filter(fn (mixed $port) => ! is_null($port));
 
         $exposedPorts = collect((array) data_get($serviceConfig, 'expose', []))
-            ->map(fn (mixed $port) => $this->resolvePortValue($port, $environmentMap))
+            ->map(fn (mixed $port) => $this->resolvePortValue($port, $resolvedEnvironmentMap))
             ->filter(fn (?int $port) => ! is_null($port));
 
         return $ports->merge($exposedPorts)->values();
+    }
+
+    private function mergeComposeEnvironmentMap(array $serviceConfig, array $environmentMap): array
+    {
+        $resolvedEnvironmentMap = $environmentMap;
+
+        foreach ($this->composeEnvironmentDefinitions($serviceConfig) as $environmentKey => $rawValue) {
+            if (
+                array_key_exists($environmentKey, $environmentMap) &&
+                trim((string) $environmentMap[$environmentKey]) !== ''
+            ) {
+                continue;
+            }
+
+            $resolvedValue = $this->resolveEnvironmentValue($rawValue, $resolvedEnvironmentMap);
+            if (! is_null($resolvedValue)) {
+                $resolvedEnvironmentMap[$environmentKey] = $resolvedValue;
+            }
+        }
+
+        return $resolvedEnvironmentMap;
+    }
+
+    private function composeEnvironmentDefinitions(array $serviceConfig): array
+    {
+        $environmentDefinitions = [];
+        $environment = data_get($serviceConfig, 'environment', []);
+
+        if (! is_array($environment)) {
+            return $environmentDefinitions;
+        }
+
+        foreach ($environment as $key => $value) {
+            if (is_int($key)) {
+                $environmentPair = explode('=', (string) $value, 2);
+                if (count($environmentPair) !== 2 || trim($environmentPair[0]) === '') {
+                    continue;
+                }
+
+                $environmentDefinitions[trim($environmentPair[0])] = $environmentPair[1];
+
+                continue;
+            }
+
+            if (! is_string($key) || trim($key) === '') {
+                continue;
+            }
+
+            if (! is_scalar($value) && ! is_null($value)) {
+                continue;
+            }
+
+            $environmentDefinitions[trim($key)] = $value;
+        }
+
+        return $environmentDefinitions;
+    }
+
+    private function resolveEnvironmentValue(mixed $rawValue, array $environmentMap): ?string
+    {
+        if (is_null($rawValue)) {
+            return null;
+        }
+
+        if (is_bool($rawValue)) {
+            return $rawValue ? 'true' : 'false';
+        }
+
+        if (is_int($rawValue) || is_float($rawValue)) {
+            return (string) $rawValue;
+        }
+
+        $normalizedValue = trim((string) $rawValue);
+        if ($normalizedValue === '') {
+            return '';
+        }
+
+        if (
+            preg_match(
+                '/^\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-?])([^}]*))?\}$/',
+                $normalizedValue,
+                $matches
+            )
+        ) {
+            $environmentKey = $matches[1];
+            $defaultValue = trim((string) ($matches[3] ?? ''));
+            $resolvedEnvironmentValue = $environmentMap[$environmentKey] ?? null;
+
+            if (! is_null($resolvedEnvironmentValue) && trim((string) $resolvedEnvironmentValue) !== '') {
+                return trim((string) $resolvedEnvironmentValue);
+            }
+
+            return $defaultValue !== '' ? $defaultValue : null;
+        }
+
+        if (preg_match('/^\$([A-Za-z_][A-Za-z0-9_]*)$/', $normalizedValue, $matches)) {
+            $environmentKey = $matches[1];
+            $resolvedEnvironmentValue = $environmentMap[$environmentKey] ?? null;
+
+            if (! is_null($resolvedEnvironmentValue) && trim((string) $resolvedEnvironmentValue) !== '') {
+                return trim((string) $resolvedEnvironmentValue);
+            }
+
+            return null;
+        }
+
+        if (array_key_exists($normalizedValue, $environmentMap)) {
+            $resolvedEnvironmentValue = trim((string) $environmentMap[$normalizedValue]);
+
+            return $resolvedEnvironmentValue !== '' ? $resolvedEnvironmentValue : null;
+        }
+
+        return $normalizedValue;
     }
 
     private function selectPublishedPortFromMappings(Collection $portMappings, ?int $requestedInternalPort, ?int $fallbackInternalPort = null): ?int

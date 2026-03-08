@@ -1207,7 +1207,7 @@ it('deletes application edge route when deployment server is the same as edge pr
 
     expect($warnings)->toBe([])
         ->and($manager->calls)->toHaveCount(1)
-        ->and(implode("\n", $manager->calls[0]['commands']))->toContain("/tmp/proxy/dynamic/application-remote-application-edge-self.yaml")
+        ->and(implode("\n", $manager->calls[0]['commands']))->toContain('/tmp/proxy/dynamic/application-remote-application-edge-self.yaml')
         ->and(implode("\n", $manager->calls[0]['commands']))->not->toContain('tee');
 });
 
@@ -1350,6 +1350,56 @@ YAML;
     $payload = base64_decode($payloadMatches[1]);
 
     expect($payload)->toContain('http://10.8.0.36:9091');
+});
+
+it('resolves compose application published port from compose environment defaults', function () {
+    $manager = new class extends EdgeProxyRemoteRouteService
+    {
+        public array $calls = [];
+
+        protected function runRemoteCommands(Server $server, array $commands, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+    };
+
+    $edgeProxyServer = Mockery::mock(Server::class)->makePartial();
+    $edgeProxyServer->id = 0;
+    $edgeProxyServer->shouldReceive('proxyType')->andReturn('TRAEFIK');
+    $edgeProxyServer->shouldReceive('proxyPath')->andReturn('/tmp/proxy');
+
+    $deploymentServer = Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 37;
+    $deploymentServer->ip = '10.8.0.37';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $application = new Application;
+    $application->uuid = 'application-compose-env-default-port';
+    $application->build_pack = 'dockercompose';
+    $application->docker_compose_domains = json_encode([
+        'web' => ['domain' => 'https://compose-env-default.example.com:3000'],
+    ]);
+    $application->docker_compose_raw = <<<'YAML'
+services:
+  web:
+    ports:
+      - "${APP_HOST_PORT}:3000"
+    environment:
+      - APP_HOST_PORT=${APP_HOST_PORT:-9082}
+YAML;
+
+    $warnings = $manager->syncApplicationWithServers($application, $edgeProxyServer, $deploymentServer);
+    expect($warnings)->toBe([]);
+
+    preg_match("/echo '([^']+)' \\| base64 -d/", $manager->calls[0]['commands'][1], $payloadMatches);
+    $payload = base64_decode($payloadMatches[1]);
+
+    expect($payload)->toContain('http://10.8.0.37:9082');
 });
 
 it('returns warning for unsupported application domain protocol while preserving valid http route', function () {

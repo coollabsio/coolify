@@ -7,7 +7,6 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
-use App\Services\EdgeProxyRemoteRouteService;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Service;
@@ -19,6 +18,8 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Services\EdgeProxyRemotePortForwardService;
+use App\Services\EdgeProxyRemoteRouteService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -108,6 +109,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     app(EdgeProxyRemoteRouteService::class)->deleteApplication($this->resource);
                 } catch (\Throwable $e) {
                     \Log::warning('Failed to delete edge proxy route file for application '.$this->resource->uuid.': '.$e->getMessage());
+                }
+                try {
+                    app(EdgeProxyRemotePortForwardService::class)->deleteApplication($this->resource);
+                } catch (\Throwable $e) {
+                    \Log::warning('Failed to delete edge port proxy for application '.$this->resource->uuid.': '.$e->getMessage());
                 }
             }
 
