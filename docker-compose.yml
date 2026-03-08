@@ -1,37 +1,36 @@
+version: '3.8'
+
 services:
-    coolify:
-        container_name: coolify
-        restart: always
-        working_dir: /var/www/html
-        extra_hosts:
-            - host.docker.internal:host-gateway
-        networks:
-            - coolify
-        depends_on:
-            - postgres
-            - redis
-            - soketi
-    postgres:
-        image: postgres:15-alpine
-        container_name: coolify-db
-        restart: always
-        networks:
-            - coolify
-    redis:
-        image: redis:7-alpine
-        container_name: coolify-redis
-        restart: always
-        networks:
-            - coolify
-    soketi:
-        container_name: coolify-realtime
-        extra_hosts:
-            - host.docker.internal:host-gateway
-        restart: always
-        networks:
-            - coolify
+  email:
+    image: mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail
+    domainname: example.com  # Set your domain here
+    ports:
+      - "25:25"
+      - "143:143"
+      - "587:587"
+      - "993:993"
+      - "465:465"
+    environment:
+      - MAIL_USER=user@example.com
+      - MAIL_PASSWORD=strongpassword
+    volumes:
+      - mail_data:/var/mail
+      - mail_config:/etc/mail
+      - mail_cert:/etc/letsencrypt
+    networks:
+      - mail_network
+    restart: unless-stopped
+
 networks:
-    coolify:
-        name: coolify
-        driver: bridge
-        external: false
+  mail_network:
+    driver: bridge
+
+volumes:
+  mail_data:
+    driver: local
+  mail_config:
+    driver: local
+  mail_cert:
+    driver: local
