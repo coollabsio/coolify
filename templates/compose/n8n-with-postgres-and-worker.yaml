@@ -7,7 +7,7 @@
 
 services:
   n8n:
-    image: n8nio/n8n:2.1.5
+    image: n8nio/n8n:2.10.4
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -27,7 +27,6 @@ services:
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_HEALTH_CHECK_ACTIVE=true
       - N8N_ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTION}
-      - N8N_RUNNERS_ENABLED=true
       - N8N_RUNNERS_MODE=external
       - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=${N8N_RUNNERS_BROKER_LISTEN_ADDRESS:-0.0.0.0}
       - N8N_RUNNERS_BROKER_PORT=${N8N_RUNNERS_BROKER_PORT:-5679}
@@ -40,6 +39,7 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
       - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
       - N8N_SKIP_AUTH_ON_OAUTH_CALLBACK=${N8N_SKIP_AUTH_ON_OAUTH_CALLBACK:-false}
+      - N8N_MIGRATE_FS_STORAGE_PATH=${N8N_MIGRATE_FS_STORAGE_PATH:-true}
     volumes:
       - n8n-data:/home/node/.n8n
     depends_on:
@@ -54,7 +54,7 @@ services:
       retries: 10
 
   n8n-worker:
-    image: n8nio/n8n:2.1.5
+    image: n8nio/n8n:2.10.4
     command: worker
     environment:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
@@ -70,7 +70,6 @@ services:
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_HEALTH_CHECK_ACTIVE=true
       - N8N_ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTION}
-      - N8N_RUNNERS_ENABLED=true
       - N8N_RUNNERS_MODE=external
       - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=${N8N_RUNNERS_BROKER_LISTEN_ADDRESS:-0.0.0.0}
       - N8N_RUNNERS_BROKER_PORT=${N8N_RUNNERS_BROKER_PORT:-5679}
@@ -82,6 +81,7 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
       - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
       - N8N_SKIP_AUTH_ON_OAUTH_CALLBACK=${N8N_SKIP_AUTH_ON_OAUTH_CALLBACK:-false}
+      - N8N_MIGRATE_FS_STORAGE_PATH=${N8N_MIGRATE_FS_STORAGE_PATH:-true}
     volumes:
       - n8n-data:/home/node/.n8n
     healthcheck:
@@ -122,14 +122,15 @@ services:
       retries: 10
 
   task-runners:
-    image: n8nio/runners:2.1.5
+    image: n8nio/runners:2.10.4
     environment:
       - N8N_RUNNERS_TASK_BROKER_URI=${N8N_RUNNERS_TASK_BROKER_URI:-http://n8n-worker:5679}
       - N8N_RUNNERS_AUTH_TOKEN=$SERVICE_PASSWORD_N8N
       - N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT=${N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT:-15}
       - N8N_RUNNERS_MAX_CONCURRENCY=${N8N_RUNNERS_MAX_CONCURRENCY:-5}
     depends_on:
-      - n8n
+      n8n:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD-SHELL
