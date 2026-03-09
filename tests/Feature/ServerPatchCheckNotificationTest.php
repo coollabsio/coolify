@@ -144,3 +144,222 @@ it('uses correct url in error notifications', function () {
     expect($webhook['url'])->toBe('https://coolify.production.com/server/error-server-uuid/security/patches')
         ->and($webhook['event'])->toBe('server_patch_check_error');
 });
+
+it('uses correct level for patch notifications in Discord', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    // Regular patches (no critical packages)
+    $regularPatchData = [
+        'total_updates' => 5,
+        'updates' => [
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+            ['package' => 'curl', 'current_version' => '7.68', 'new_version' => '7.70', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $regularNotification = new ServerPatchCheck($mockServer, $regularPatchData);
+    $regularDiscord = $regularNotification->toDiscord();
+
+    expect($regularDiscord->color)->toBe(\App\Notifications\Dto\DiscordMessage::infoColor())
+        ->and($regularDiscord->title)->toContain(':information_source:');
+
+    // Critical packages (docker, kernel, openssh, ssl)
+    $criticalPatchData = [
+        'total_updates' => 3,
+        'updates' => [
+            ['package' => 'docker-ce', 'current_version' => '20.10', 'new_version' => '20.11', 'architecture' => 'amd64', 'repository' => 'main'],
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $criticalNotification = new ServerPatchCheck($mockServer, $criticalPatchData);
+    $criticalDiscord = $criticalNotification->toDiscord();
+
+    expect($criticalDiscord->color)->toBe(\App\Notifications\Dto\DiscordMessage::warningColor())
+        ->and($criticalDiscord->title)->toContain(':warning:');
+});
+
+it('uses correct level for patch notifications in Slack', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    // Regular patches
+    $regularPatchData = [
+        'total_updates' => 5,
+        'updates' => [
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $regularNotification = new ServerPatchCheck($mockServer, $regularPatchData);
+    $regularSlack = $regularNotification->toSlack();
+
+    expect($regularSlack->color)->toBe(\App\Notifications\Dto\SlackMessage::infoColor());
+
+    // Critical packages
+    $criticalPatchData = [
+        'total_updates' => 2,
+        'updates' => [
+            ['package' => 'linux-kernel', 'current_version' => '5.4', 'new_version' => '5.5', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $criticalNotification = new ServerPatchCheck($mockServer, $criticalPatchData);
+    $criticalSlack = $criticalNotification->toSlack();
+
+    expect($criticalSlack->color)->toBe(\App\Notifications\Dto\SlackMessage::warningColor());
+});
+
+it('uses correct level for patch notifications in Pushover', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    // Regular patches
+    $regularPatchData = [
+        'total_updates' => 5,
+        'updates' => [
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $regularNotification = new ServerPatchCheck($mockServer, $regularPatchData);
+    $regularPushover = $regularNotification->toPushover();
+
+    expect($regularPushover->level)->toBe('info');
+
+    // Critical packages
+    $criticalPatchData = [
+        'total_updates' => 2,
+        'updates' => [
+            ['package' => 'openssh-server', 'current_version' => '8.2', 'new_version' => '8.3', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $criticalNotification = new ServerPatchCheck($mockServer, $criticalPatchData);
+    $criticalPushover = $criticalNotification->toPushover();
+
+    expect($criticalPushover->level)->toBe('warning');
+});
+
+it('uses correct icon for patch notifications in Telegram', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    // Regular patches
+    $regularPatchData = [
+        'total_updates' => 5,
+        'updates' => [
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $regularNotification = new ServerPatchCheck($mockServer, $regularPatchData);
+    $regularTelegram = $regularNotification->toTelegram();
+
+    expect($regularTelegram['message'])->toContain('ℹ️');
+
+    // Critical packages
+    $criticalPatchData = [
+        'total_updates' => 2,
+        'updates' => [
+            ['package' => 'libssl1.1', 'current_version' => '1.1.1', 'new_version' => '1.1.2', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $criticalNotification = new ServerPatchCheck($mockServer, $criticalPatchData);
+    $criticalTelegram = $criticalNotification->toTelegram();
+
+    expect($criticalTelegram['message'])->toContain('⚠️');
+});
+
+it('returns success true for regular patches and false for errors in webhook', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    // Regular patches
+    $regularPatchData = [
+        'total_updates' => 5,
+        'updates' => [
+            ['package' => 'nginx', 'current_version' => '1.18', 'new_version' => '1.20', 'architecture' => 'amd64', 'repository' => 'main'],
+        ],
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $regularNotification = new ServerPatchCheck($mockServer, $regularPatchData);
+    $regularWebhook = $regularNotification->toWebhook();
+
+    expect($regularWebhook['success'])->toBeTrue()
+        ->and($regularWebhook['message'])->toBe('Server patches available')
+        ->and($regularWebhook['event'])->toBe('server_patch_check');
+
+    // Error case
+    $errorPatchData = [
+        'error' => 'Failed to connect to package manager',
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $errorNotification = new ServerPatchCheck($mockServer, $errorPatchData);
+    $errorWebhook = $errorNotification->toWebhook();
+
+    expect($errorWebhook['success'])->toBeFalse()
+        ->and($errorWebhook['message'])->toBe('Failed to check patches')
+        ->and($errorWebhook['event'])->toBe('server_patch_check_error');
+});
+
+it('uses error level for actual errors in all channels', function () {
+    ($this->setInstanceSettings)('https://coolify.test');
+
+    $mockServer = ($this->createMockServer)('test-uuid', 'Test Server');
+
+    $errorPatchData = [
+        'error' => 'Connection refused',
+        'osId' => 'ubuntu',
+        'package_manager' => 'apt',
+    ];
+
+    $notification = new ServerPatchCheck($mockServer, $errorPatchData);
+
+    // Discord should use error color
+    $discord = $notification->toDiscord();
+    expect($discord->color)->toBe(\App\Notifications\Dto\DiscordMessage::errorColor());
+
+    // Slack should use error color
+    $slack = $notification->toSlack();
+    expect($slack->color)->toBe(\App\Notifications\Dto\SlackMessage::errorColor());
+
+    // Pushover should use error level
+    $pushover = $notification->toPushover();
+    expect($pushover->level)->toBe('error');
+
+    // Telegram should use error icon
+    $telegram = $notification->toTelegram();
+    expect($telegram['message'])->toContain('❌');
+
+    // Webhook should return success false
+    $webhook = $notification->toWebhook();
+    expect($webhook['success'])->toBeFalse();
+});
