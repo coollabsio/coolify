@@ -54,6 +54,8 @@ if [ "$1" == "--all" ]; then
         "routes"
         "tests"
         "config"
+        "templates/compose"
+        "public/svgs"
     )
 
     for dir in "${KEY_DIRS[@]}"; do
@@ -62,7 +64,7 @@ if [ "$1" == "--all" ]; then
             while IFS= read -r file; do
                 RELATIVE_PATH="${file#$COOLIFY_DIR/}"
                 FILES+=("$RELATIVE_PATH")
-            done < <(find "$COOLIFY_DIR/$dir" -type f \( -name "*.php" -o -name "*.blade.php" -o -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" \) 2>/dev/null)
+            done < <(find "$COOLIFY_DIR/$dir" -type f \( -name "*.php" -o -name "*.blade.php" -o -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.env" -o -name "*.svg" \) 2>/dev/null)
         fi
     done
 elif [ $# -gt 0 ]; then
@@ -87,6 +89,8 @@ else
         "routes"
         "tests"
         "config"
+        "templates/compose"
+        "public/svgs"
     )
 
     if git rev-parse --git-dir > /dev/null 2>&1; then
@@ -117,9 +121,9 @@ else
             echo -e "${GREEN}   Procesando archivos del working directory...${NC}"
             # Filtrar solo archivos relevantes (PHP, Blade, JS, etc.)
             while IFS= read -r file; do
-                if [[ "$file" =~ \.(php|blade\.php|js|vue|ts|tsx|jsx|css|scss|json|yaml|yml)$ ]] || [[ "$file" =~ ^(routes|config|app|resources|tests)/ ]]; then
-                    FILES+=("$file")
-                fi
+                        if [[ "$file" =~ \.(php|blade\.php|js|vue|ts|tsx|jsx|css|scss|json|yaml|yml|env|svg)$ ]] || [[ "$file" =~ ^(routes|config|app|resources|tests|templates|public)/ ]]; then
+                            FILES+=("$file")
+                        fi
             done <<< "$ALL_FILES"
             echo -e "${GREEN}   ✓ Se encontraron ${#FILES[@]} archivo(s) relevante(s)${NC}"
         else
@@ -155,7 +159,7 @@ else
                     echo -e "${GREEN}   Encontrados $COMMIT_COUNT archivo(s) en el último commit${NC}"
                     # Filtrar solo archivos relevantes
                     while IFS= read -r file; do
-                        if [[ "$file" =~ \.(php|blade\.php|js|vue|ts|tsx|jsx|css|scss|json|yaml|yml)$ ]] || [[ "$file" =~ ^(routes|config|app|resources|tests)/ ]]; then
+                        if [[ "$file" =~ \.(php|blade\.php|js|vue|ts|tsx|jsx|css|scss|json|yaml|yml|env|svg)$ ]] || [[ "$file" =~ ^(routes|config|app|resources|tests|templates|public)/ ]]; then
                             # Verificar que el archivo existe en el working directory
                             if [ -f "$COOLIFY_DIR/$file" ]; then
                                 FILES+=("$file")
@@ -194,7 +198,7 @@ else
                 while IFS= read -r file; do
                     RELATIVE_PATH="${file#$COOLIFY_DIR/}"
                     FILES+=("$RELATIVE_PATH")
-                done < <(find "$COOLIFY_DIR/$dir" -type f \( -name "*.php" -o -name "*.blade.php" -o -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" \) -mtime -7 2>/dev/null)
+                done < <(find "$COOLIFY_DIR/$dir" -type f \( -name "*.php" -o -name "*.blade.php" -o -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.env" -o -name "*.svg" \) -mtime -7 2>/dev/null)
             fi
         done
     fi
@@ -253,7 +257,7 @@ for file in "${FILES[@]}"; do
     DEST_DIR="/var/www/html/$(dirname "$file")"
     docker exec "$COOLIFY_CONTAINER" mkdir -p "$DEST_DIR" 2>/dev/null || true
 done
-docker exec "$COOLIFY_CONTAINER" chown -R www-data:www-data /var/www/html/app /var/www/html/resources /var/www/html/routes /var/www/html/tests /var/www/html/config 2>/dev/null || true
+docker exec "$COOLIFY_CONTAINER" chown -R www-data:www-data /var/www/html/app /var/www/html/resources /var/www/html/routes /var/www/html/tests /var/www/html/config /var/www/html/templates /var/www/html/public/svgs 2>/dev/null || true
 echo -e "${GREEN}✓ Directorios preparados${NC}"
 echo ""
 
@@ -321,6 +325,38 @@ docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php arti
 docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan route:cache" || true
 docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan view:cache" || true
 
+# Regenerar service templates JSON si hay cambios en templates/compose
+TEMPLATE_CHANGES=$(echo "${FILES[@]}" | grep -E "templates/compose|public/svgs" || echo "")
+if [ ! -z "$TEMPLATE_CHANGES" ]; then
+    echo ""
+    echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}Regenerando service templates JSON...${NC}"
+    echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
+
+    # Verificar si el comando generate:services existe y funciona
+    if docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan list | grep -q 'generate:services'" 2>/dev/null; then
+        echo -e "${YELLOW}Ejecutando: php artisan generate:services${NC}"
+        if docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan generate:services" 2>/dev/null; then
+            echo -e "${GREEN}✓ Service templates JSON regenerado exitosamente${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Error al regenerar service templates JSON (puede ser normal si hay problemas de PDO)${NC}"
+            echo -e "${YELLOW}   El JSON se regenerará automáticamente en el próximo despliegue${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Comando generate:services no disponible${NC}"
+        echo -e "${YELLOW}   Los cambios en templates se aplicarán en el próximo despliegue${NC}"
+    fi
+
+    # Verificar que Laravel esté en el JSON
+    if docker exec "$COOLIFY_CONTAINER" sh -c "test -f /var/www/html/templates/service-templates-latest.json && grep -q 'laravel-with-mariadb' /var/www/html/templates/service-templates-latest.json" 2>/dev/null; then
+        echo -e "${GREEN}✓ Laravel template verificado en service-templates-latest.json${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Laravel template no encontrado en JSON (se regenerará automáticamente)${NC}"
+    fi
+
+    echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
+fi
+
 echo -e "${BLUE}Verificando rutas...${NC}"
 ROUTES=$(docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan route:list | grep -E '(files|Files)'" || echo "")
 if [ ! -z "$ROUTES" ]; then
@@ -337,5 +373,10 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo -e "${YELLOW}📝 Próximos pasos:${NC}"
 echo -e "${YELLOW}   1. Recarga la página en el navegador con Ctrl+F5${NC}"
-echo -e "${YELLOW}   2. El botón 'Files' debería aparecer ahora${NC}"
+if echo "${FILES[@]}" | grep -q "templates/compose/laravel"; then
+    echo -e "${YELLOW}   2. Ve a 'New Resource' y busca 'Laravel' en la lista de servicios${NC}"
+    echo -e "${YELLOW}   3. Si no aparece, haz clic en 'Reload List' en el panel de servicios${NC}"
+else
+    echo -e "${YELLOW}   2. Los cambios deberían estar aplicados${NC}"
+fi
 echo ""

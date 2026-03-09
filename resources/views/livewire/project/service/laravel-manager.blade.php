@@ -81,54 +81,43 @@
                                 </select>
                             </div>
 
-                            @if ($selectedContainerForEnv && !empty($envVariables))
-                                <div class="space-y-4" 
-                                    x-data="{ 
-                                        variables: @js($envVariables),
-                                        updateVariable(key, value) {
-                                            if (!value || value.trim() === '') {
-                                                return;
-                                            }
-                                            $wire.updateEnvVariable(key, value.trim());
-                                        }
-                                    }">
-                                    @if ($isLoadingEnv)
-                                        <div class="flex items-center justify-center p-8">
-                                            <svg class="animate-spin h-8 w-8 text-coollabs" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando variables...</span>
-                                        </div>
-                                    @else
-                                        @foreach ($envVariables as $key => $value)
-                                            <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
-                                                <label for="env_{{ $key }}" class="block text-sm font-medium dark:text-white mb-3">
-                                                    {{ $key }}
-                                                </label>
-                                                <div class="flex flex-col gap-3">
-                                                    <input type="text" 
-                                                        id="env_{{ $key }}"
-                                                        value="{{ $value }}"
-                                                        x-model="variables['{{ $key }}']"
-                                                        @keydown.enter="updateVariable('{{ $key }}', variables['{{ $key }}'])"
-                                                        class="w-full bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border-2 border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-base font-mono focus:border-coollabs focus:ring-2 focus:ring-coollabs/20"
-                                                        placeholder="Valor..."
-                                                        style="min-height: 48px; font-size: 16px;">
-                                                    <x-forms.button 
-                                                        x-on:click="updateVariable('{{ $key }}', variables['{{ $key }}'])"
-                                                        class="bg-coollabs whitespace-nowrap w-full sm:w-auto self-start">
-                                                        Actualizar
-                                                    </x-forms.button>
-                                                </div>
+                            @if ($selectedContainerForEnv)
+                                @if ($isLoadingEnv)
+                                    <div class="flex items-center justify-center p-8">
+                                        <svg class="animate-spin h-8 w-8 text-coollabs" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando archivo .env...</span>
+                                    </div>
+                                @else
+                                    <div class="space-y-4">
+                                        <div class="p-4 border border-coolgray-300 dark:border-coolgray-600 rounded bg-white dark:bg-coolgray-800">
+                                            <label for="env_content" class="block text-sm font-medium dark:text-white mb-3">
+                                                Contenido del archivo .env
+                                            </label>
+                                            <textarea 
+                                                id="env_content"
+                                                wire:model="envContent"
+                                                rows="20"
+                                                class="w-full bg-white dark:bg-coolgray-900 text-gray-900 dark:text-gray-100 border-2 border-coolgray-300 dark:border-coolgray-600 px-4 py-3 rounded text-sm font-mono focus:border-coollabs focus:ring-2 focus:ring-coollabs/20 resize-y"
+                                                placeholder="APP_NAME=Laravel&#10;APP_ENV=production&#10;APP_KEY=&#10;APP_DEBUG=false&#10;APP_URL=https://example.com&#10;&#10;DB_CONNECTION=mysql&#10;DB_HOST=127.0.0.1&#10;DB_PORT=3306&#10;DB_DATABASE=laravel&#10;DB_USERNAME=root&#10;DB_PASSWORD="
+                                                style="min-height: 400px; font-family: 'Courier New', monospace; line-height: 1.6;"></textarea>
+                                            <div class="mt-4 flex gap-2">
+                                                <x-forms.button 
+                                                    wire:click="saveEnvFile"
+                                                    class="bg-coollabs">
+                                                    Guardar Cambios
+                                                </x-forms.button>
+                                                <x-forms.button 
+                                                    wire:click="loadEnvVariables"
+                                                    class="bg-gray-500 hover:bg-gray-600">
+                                                    Recargar
+                                                </x-forms.button>
                                             </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            @elseif ($selectedContainerForEnv && empty($envVariables) && !$isLoadingEnv)
-                                <div class="p-4 text-sm text-gray-600 dark:text-gray-400">
-                                    No se pudieron cargar las variables de entorno. Asegúrate de que el contenedor esté en ejecución.
-                                </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
                         </div>
 

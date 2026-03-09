@@ -28,7 +28,7 @@ class LaravelManager extends Component
 
     public ?int $selectedContainerForCron = null;
 
-    public array $envVariables = [];
+    public string $envContent = '';
 
     public array $phpIniSettings = [];
 
@@ -120,7 +120,7 @@ class LaravelManager extends Component
         }
 
         $this->isLoadingEnv = true;
-        $this->envVariables = [];
+        $this->envContent = '';
 
         try {
             $container = collect($this->laravelContainers)->firstWhere('id', $this->selectedContainerForEnv);
@@ -157,204 +157,17 @@ class LaravelManager extends Component
                 $envContent = instant_remote_process([$readCommand], $server, false) ?? '';
             }
 
-            // Parse .env content
-            $lines = explode("\n", $envContent);
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (empty($line) || str_starts_with($line, '#')) {
-                    continue;
-                }
+            // Store the complete .env content
+            $this->envContent = $envContent;
 
-                if (str_contains($line, '=')) {
-                    [$key, $value] = explode('=', $line, 2);
-                    $key = trim($key);
-                    $value = trim($value);
-                    // Remove quotes
-                    $value = trim($value, '"\'');
-                    $this->envVariables[$key] = $value;
-                }
-            }
-
-            // Auto-configure Laravel .env if needed
-            $this->autoConfigureLaravelEnv($server, $escapedContainer, $envPath);
-
-            $this->dispatch('success', 'Environment variables loaded successfully.');
+            $this->dispatch('success', 'Archivo .env cargado exitosamente.');
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Error loading environment variables: '.$e->getMessage());
+            $this->dispatch('error', 'Error loading .env file: '.$e->getMessage());
         } finally {
             $this->isLoadingEnv = false;
         }
     }
 
-    private function autoConfigureLaravelEnv($server, $escapedContainer, $envPath)
-    {
-        try {
-            $needsUpdate = false;
-            $updates = [];
-
-            // Get service environment variables
-            $serviceEnvVars = $this->service->environment_variables()->get()->keyBy('key');
-
-            // Auto-configure APP_URL from SERVICE_URL_LARAVEL or FQDN
-            if (empty($this->envVariables['APP_URL'] ?? '')) {
-                $appUrl = null;
-                if ($serviceEnvVars->has('SERVICE_URL_LARAVEL')) {
-                    $appUrl = $serviceEnvVars['SERVICE_URL_LARAVEL']->real_value;
-                } elseif ($this->service->fqdn) {
-                    $appUrl = 'https://'.$this->service->fqdn;
-                }
-                if ($appUrl) {
-                    $this->envVariables['APP_URL'] = $appUrl;
-                    $updates['APP_URL'] = $appUrl;
-                    $needsUpdate = true;
-                }
-            }
-
-            // Auto-configure APP_KEY if empty
-            if (empty($this->envVariables['APP_KEY'] ?? '')) {
-                // Generate APP_KEY using artisan
-                $generateKeyCommand = "docker exec {$escapedContainer} php /var/www/html/artisan key:generate --show 2>/dev/null || echo 'failed'";
-                if ($server->isNonRoot()) {
-                    $generateKeyCommand = "sudo {$generateKeyCommand}";
-                }
-                $appKey = trim(instant_remote_process([$generateKeyCommand], $server, false) ?? '');
-                
-                if ($appKey && $appKey !== 'failed' && str_starts_with($appKey, 'base64:')) {
-                    $this->envVariables['APP_KEY'] = $appKey;
-                    $updates['APP_KEY'] = $appKey;
-                    $needsUpdate = true;
-                }
-            }
-
-            // Auto-configure database variables from service environment
-            $dbConfig = [
-                'DB_HOST' => 'mariadb',
-                'DB_PORT' => '3306',
-                'DB_DATABASE' => null,
-                'DB_USERNAME' => null,
-                'DB_PASSWORD' => null,
-            ];
-
-            // Try to get database config from service environment variables
-            if ($serviceEnvVars->has('SERVICE_DATABASE_LARAVEL')) {
-                $dbConfig['DB_DATABASE'] = $serviceEnvVars['SERVICE_DATABASE_LARAVEL']->real_value;
-            }
-            if ($serviceEnvVars->has('SERVICE_USER_LARAVEL')) {
-                $dbConfig['DB_USERNAME'] = $serviceEnvVars['SERVICE_USER_LARAVEL']->real_value;
-            }
-            if ($serviceEnvVars->has('SERVICE_PASSWORD_LARAVEL')) {
-                $dbConfig['DB_PASSWORD'] = $serviceEnvVars['SERVICE_PASSWORD_LARAVEL']->real_value;
-            }
-
-            // Update database config if values are available and not set
-            foreach ($dbConfig as $key => $value) {
-                if ($value && empty($this->envVariables[$key] ?? '')) {
-                    $this->envVariables[$key] = $value;
-                    $updates[$key] = $value;
-                    $needsUpdate = true;
-                }
-            }
-
-            // Auto-configure Redis if available
-            if ($serviceEnvVars->has('SERVICE_PASSWORD_REDIS') && empty($this->envVariables['REDIS_PASSWORD'] ?? '')) {
-                $this->envVariables['REDIS_PASSWORD'] = $serviceEnvVars['SERVICE_PASSWORD_REDIS']->real_value;
-                $updates['REDIS_PASSWORD'] = $serviceEnvVars['SERVICE_PASSWORD_REDIS']->real_value;
-                $needsUpdate = true;
-            }
-
-            // Auto-configure other Laravel defaults
-            $defaults = [
-                'APP_NAME' => 'Laravel',
-                'APP_ENV' => 'production',
-                'APP_DEBUG' => 'false',
-                'LOG_CHANNEL' => 'stack',
-                'LOG_LEVEL' => 'debug',
-                'QUEUE_CONNECTION' => 'database',
-                'CACHE_DRIVER' => 'file',
-                'SESSION_DRIVER' => 'file',
-            ];
-
-            foreach ($defaults as $key => $defaultValue) {
-                if (empty($this->envVariables[$key] ?? '')) {
-                    $this->envVariables[$key] = $defaultValue;
-                    $updates[$key] = $defaultValue;
-                    $needsUpdate = true;
-                }
-            }
-
-            // Write updates to .env file if needed
-            if ($needsUpdate && ! empty($updates)) {
-                $this->writeEnvUpdates($server, $escapedContainer, $envPath, $updates);
-                $this->dispatch('success', 'Laravel .env configurado automáticamente con: '.implode(', ', array_keys($updates)));
-            }
-        } catch (\Throwable $e) {
-            $this->dispatch('warning', 'No se pudo configurar automáticamente el .env: '.$e->getMessage());
-        }
-    }
-
-    private function writeEnvUpdates($server, $escapedContainer, $envPath, $updates)
-    {
-        // Read current .env
-        $readCommand = "docker exec {$escapedContainer} cat {$envPath}";
-        if ($server->isNonRoot()) {
-            $readCommand = "sudo {$readCommand}";
-        }
-        $envContent = instant_remote_process([$readCommand], $server, false) ?? '';
-
-        // Update or add variables
-        $lines = explode("\n", $envContent);
-        $newLines = [];
-        $updatedKeys = [];
-
-        foreach ($lines as $line) {
-            $trimmedLine = trim($line);
-            $updated = false;
-
-            foreach ($updates as $key => $value) {
-                if (preg_match('/^'.preg_quote($key, '/').'\s*=/i', $trimmedLine)) {
-                    $newLines[] = "{$key}={$value}";
-                    $updatedKeys[] = $key;
-                    $updated = true;
-                    break;
-                }
-            }
-
-            if (! $updated) {
-                $newLines[] = $line;
-            }
-        }
-
-        // Add new variables that weren't in the file
-        foreach ($updates as $key => $value) {
-            if (! in_array($key, $updatedKeys)) {
-                $newLines[] = "{$key}={$value}";
-            }
-        }
-
-        $newContent = implode("\n", $newLines);
-
-        // Write back to container
-        $tmpFilename = 'temp/'.uniqid('laravel-env-update-').'.env';
-        Storage::disk('local')->put($tmpFilename, $newContent);
-        $localTmpPath = Storage::disk('local')->path($tmpFilename);
-
-        $serverTmpPath = '/tmp/'.basename($tmpFilename);
-        instant_scp($localTmpPath, $serverTmpPath, $server);
-
-        $escapedServerTmp = escapeshellarg($serverTmpPath);
-        $copyCommand = "docker cp {$escapedServerTmp} {$escapedContainer}:{$envPath}";
-        if ($server->isNonRoot()) {
-            $copyCommand = "sudo {$copyCommand}";
-        }
-        instant_remote_process([$copyCommand], $server);
-
-        Storage::disk('local')->delete($tmpFilename);
-        $cleanCommand = "rm -f {$escapedServerTmp}";
-        if ($server->isNonRoot()) {
-            $cleanCommand = "sudo {$cleanCommand}";
-        }
-        instant_remote_process([$cleanCommand], $server, false);
-    }
 
     private function createDefaultEnvFile($server, $escapedContainer, $envPath)
     {
@@ -418,7 +231,7 @@ class LaravelManager extends Component
         }
     }
 
-    public function updateEnvVariable($key, $value)
+    public function saveEnvFile()
     {
         if (! $this->selectedContainerForEnv) {
             return;
@@ -444,37 +257,9 @@ class LaravelManager extends Component
             $escapedContainer = escapeshellarg($containerName);
             $envPath = '/var/www/html/.env';
 
-            // Read current .env
-            $readCommand = "docker exec {$escapedContainer} cat {$envPath}";
-            if ($server->isNonRoot()) {
-                $readCommand = "sudo {$readCommand}";
-            }
-            $envContent = instant_remote_process([$readCommand], $server, false) ?? '';
-
-            // Update or add the variable
-            $lines = explode("\n", $envContent);
-            $found = false;
-            $newLines = [];
-
-            foreach ($lines as $line) {
-                $trimmedLine = trim($line);
-                if (preg_match('/^'.preg_quote($key, '/').'\s*=/i', $trimmedLine)) {
-                    $newLines[] = "{$key}={$value}";
-                    $found = true;
-                } else {
-                    $newLines[] = $line;
-                }
-            }
-
-            if (! $found) {
-                $newLines[] = "{$key}={$value}";
-            }
-
-            $newContent = implode("\n", $newLines);
-
-            // Write back to container
-            $tmpFilename = 'temp/'.uniqid('laravel-env-update-').'.env';
-            Storage::disk('local')->put($tmpFilename, $newContent);
+            // Write the complete .env content to container
+            $tmpFilename = 'temp/'.uniqid('laravel-env-').'.env';
+            Storage::disk('local')->put($tmpFilename, $this->envContent);
             $localTmpPath = Storage::disk('local')->path($tmpFilename);
 
             $serverTmpPath = '/tmp/'.basename($tmpFilename);
@@ -494,11 +279,9 @@ class LaravelManager extends Component
             }
             instant_remote_process([$cleanCommand], $server, false);
 
-            // Update local state
-            $this->envVariables[$key] = $value;
-            $this->dispatch('success', "Environment variable {$key} updated successfully.");
+            $this->dispatch('success', 'Archivo .env guardado exitosamente.');
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Error updating environment variable: '.$e->getMessage());
+            $this->dispatch('error', 'Error guardando archivo .env: '.$e->getMessage());
         }
     }
 

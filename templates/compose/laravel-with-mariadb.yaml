@@ -112,6 +112,8 @@ services:
           if [ ! -f /var/www/html/artisan ]; then
             echo "Laravel not found. Installing Laravel..."
             cd /var/www/html
+            # Clear directory first
+            rm -rf * .[!.]* 2>/dev/null || true
             composer create-project laravel/laravel . --prefer-dist --no-interaction --no-scripts
             echo "Laravel installed successfully!"
           fi
@@ -127,6 +129,13 @@ services:
           chown -R www-data:www-data /var/www/html
           chmod -R 775 /var/www/html/storage
           chmod -R 775 /var/www/html/bootstrap/cache
+
+          # Wait for Laravel to be fully installed before starting supervisor
+          echo "Waiting for Laravel installation to complete..."
+          while [ ! -f /var/www/html/artisan ]; do
+            sleep 2
+          done
+          echo "Laravel is ready!"
 
           # Create shutdown.sh script for supervisor
           cat > /usr/local/bin/shutdown.sh << 'EOF'
@@ -190,6 +199,14 @@ services:
 
               access_log /dev/stdout;
               error_log /dev/stderr;
+
+              # Return 503 if Laravel is not installed yet
+              location = / {
+                if (!-f $document_root/index.php) {
+                  return 503 "Laravel is installing, please wait...";
+                }
+                try_files $uri $uri/ /index.php?$query_string;
+              }
 
               location / {
                   try_files $uri $uri/ /index.php?$query_string;
