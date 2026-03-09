@@ -6,11 +6,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Visus\Cuid2\Cuid2;
 
-/**
- * @property string $uuid
- * @property string|null $name
- * @mixin \Illuminate\Database\Eloquent\Builder
- */
 abstract class BaseModel extends Model
 {
     protected static function boot()

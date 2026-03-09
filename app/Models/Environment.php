@@ -22,16 +22,6 @@ use App\Models\StandaloneClickhouse;
 use function currentTeam;
 use function str;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string|null $description
- * @property int $project_id
- * @property-read \App\Models\Project $project
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Application[] $applications
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Service[] $services
- */
 #[OA\Schema(
     description: 'Environment model',
     type: 'object',

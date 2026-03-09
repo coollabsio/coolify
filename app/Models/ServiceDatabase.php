@@ -5,16 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string|null $image
- * @property string|null $status
- * @property string|null $public_port
- * @property string|null $custom_type
- * @property-read \App\Models\Service $service
- */
 class ServiceDatabase extends BaseModel
 {
     use HasFactory, SoftDeletes;

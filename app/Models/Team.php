@@ -40,19 +40,6 @@ use function isDev;
 use function config;
 use function collect;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string|null $description
- * @property bool $personal_team
- * @property bool $show_boarding
- * @property string|null $custom_server_limit
- * @property-read \App\Models\Subscription|null $subscription
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Server[] $servers
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Project[] $projects
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\User[] $members
- */
 #[OA\Schema(
     description: 'Team model',
     type: 'object',

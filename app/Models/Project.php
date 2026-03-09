@@ -25,13 +25,6 @@ use function currentTeam;
 use function once;
 use function route;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string|null $description
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Environment[] $environments
- */
 #[OA\Schema(
     description: 'Project model',
     type: 'object',

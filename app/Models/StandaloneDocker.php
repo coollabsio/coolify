@@ -19,16 +19,6 @@ use App\Models\StandaloneClickhouse;
 
 use function instant_remote_process;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string $network
- * @property int $server_id
- * @property-read \App\Models\Server $server
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Application[] $applications
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Service[] $services
- */
 class StandaloneDocker extends BaseModel
 {
     use HasFactory;

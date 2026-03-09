@@ -27,27 +27,6 @@ use function route;
 use function now;
 use function collect;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $name
- * @property string|null $status
- * @property string $image
- * @property string|null $mariadb_user
- * @property string|null $mariadb_password
- * @property string|null $mariadb_root_password
- * @property string|null $mariadb_database
- * @property string|null $mariadb_conf
- * @property bool $is_public
- * @property int|null $public_port
- * @property string|null $ports_mappings
- * @property string|null $config_hash
- * @property bool $enable_ssl
- * @property int $environment_id
- * @property-read \App\Models\Server|null $server
- * @property-read \App\Models\Environment $environment
- * @property-read \App\Models\StandaloneDocker|\App\Models\SwarmDocker|null $destination
- */
 class StandaloneMariadb extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;

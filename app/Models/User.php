@@ -31,17 +31,6 @@ use function dispatch;
 use function isCloud;
 use function send_user_an_email;
 
-/**
- * @property int $id
- * @property string $name
- * @property string $email
- * @property string|null $pending_email
- * @property string|null $email_change_code
- * @property \Illuminate\Support\Carbon|null $email_change_code_expires_at
- * @property string|null $password
- * @property bool $force_password_reset
- * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Team[] $teams
- */
 #[OA\Schema(
     description: 'User model',
     type: 'object',
