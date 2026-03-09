@@ -102,6 +102,20 @@ services:
           sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
           sed -i 's/;clear_env = no/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
 
+          # Install Composer if not present
+          if ! command -v composer >/dev/null 2>&1; then
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            chmod +x /usr/local/bin/composer
+          fi
+
+          # Install Laravel if not present
+          if [ ! -f /var/www/html/artisan ]; then
+            echo "Laravel not found. Installing Laravel..."
+            cd /var/www/html
+            composer create-project laravel/laravel . --prefer-dist --no-interaction --no-scripts
+            echo "Laravel installed successfully!"
+          fi
+
           # Create Laravel directories if they don't exist
           mkdir -p /var/www/html/storage/logs
           mkdir -p /var/www/html/storage/framework/cache
@@ -110,15 +124,16 @@ services:
           mkdir -p /var/www/html/bootstrap/cache
 
           # Set permissions
-          chown -R www-data:www-data /var/www/html/storage
-          chown -R www-data:www-data /var/www/html/bootstrap/cache
+          chown -R www-data:www-data /var/www/html
           chmod -R 775 /var/www/html/storage
           chmod -R 775 /var/www/html/bootstrap/cache
 
           # Create shutdown.sh script for supervisor
           cat > /usr/local/bin/shutdown.sh << 'EOF'
           #!/bin/sh
-          /usr/bin/supervisorctl shutdown
+          if [ -f /tmp/supervisord.pid ]; then
+            kill -TERM $(cat /tmp/supervisord.pid) 2>/dev/null || true
+          fi
           EOF
           chmod +x /usr/local/bin/shutdown.sh
 
