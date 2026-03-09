@@ -5,6 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $image
+ * @property string|null $status
+ * @property string|null $public_port
+ * @property string|null $custom_type
+ * @property-read \App\Models\Service $service
+ */
 class ServiceDatabase extends BaseModel
 {
     use HasFactory, SoftDeletes;
@@ -51,7 +61,7 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
+        $container_id = $this->name . '-' . $this->service->uuid;
         remote_process(["docker restart {$container_id}"], $this->service->server);
     }
 
@@ -93,7 +103,7 @@ class ServiceDatabase extends BaseModel
     public function databaseType()
     {
         if (filled($this->custom_type)) {
-            return 'standalone-'.$this->custom_type;
+            return 'standalone-' . $this->custom_type;
         }
         $image = str($this->image)->before(':');
         if ($image->contains('supabase/postgres')) {
@@ -129,7 +139,7 @@ class ServiceDatabase extends BaseModel
 
     public function workdir()
     {
-        return service_configuration_dir()."/{$this->service->uuid}";
+        return service_configuration_dir() . "/{$this->service->uuid}";
     }
 
     public function service()

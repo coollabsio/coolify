@@ -7,7 +7,31 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use OpenApi\Attributes as OA;
 use Visus\Cuid2\Cuid2;
+use App\Models\Environment;
+use App\Models\ProjectSetting;
+use App\Models\SharedEnvironmentVariable;
+use App\Models\Service;
+use App\Models\Application;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandaloneMariadb;
 
+use function currentTeam;
+use function once;
+use function route;
+
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Environment[] $environments
+ */
 #[OA\Schema(
     description: 'Project model',
     type: 'object',

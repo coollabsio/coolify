@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Visus\Cuid2\Cuid2;
 
+/**
+ * @property string $uuid
+ * @property string|null $name
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 abstract class BaseModel extends Model
 {
     protected static function boot()
@@ -14,7 +19,7 @@ abstract class BaseModel extends Model
 
         static::creating(function (Model $model) {
             // Generate a UUID if one isn't set
-            if (! $model->uuid) {
+            if (!$model->uuid) {
                 $model->uuid = (string) new Cuid2;
             }
         });
@@ -23,14 +28,14 @@ abstract class BaseModel extends Model
     public function sanitizedName(): Attribute
     {
         return new Attribute(
-            get: fn () => sanitize_string($this->getRawOriginal('name')),
+            get: fn() => sanitize_string($this->getRawOriginal('name')),
         );
     }
 
     public function image(): Attribute
     {
         return new Attribute(
-            get: fn () => sanitize_string($this->getRawOriginal('image')),
+            get: fn() => sanitize_string($this->getRawOriginal('image')),
         );
     }
 }

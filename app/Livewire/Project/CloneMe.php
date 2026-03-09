@@ -11,8 +11,16 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
+
+use function redirect;
+use function str;
+use function view;
+use function currentTeam;
+use function clone_application;
+use function handleError;
 
 class CloneMe extends Component
 {
@@ -60,8 +68,8 @@ class CloneMe extends Component
         $this->servers = currentTeam()
             ->servers()
             ->get()
-            ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
+            ->reject(fn($server) => $server->isBuildServer());
+        $this->newName = str($this->project->name . '-clone-' . (string) new Cuid2)->slug();
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -103,7 +111,7 @@ class CloneMe extends Component
                 $project = Project::create([
                     'name' => $this->newName,
                     'team_id' => currentTeam()->id,
-                    'description' => $this->project->description.' (clone)',
+                    'description' => $this->project->description . ' (clone)',
                 ]);
                 if ($this->environment->name !== 'production') {
                     $project->environments()->create([
@@ -127,7 +135,7 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $selectedDestination = $this->servers->flatMap(fn ($server) => $server->destinations())->where('id', $this->selectedDestination)->first();
+                $selectedDestination = $this->servers->flatMap(fn($server) => $server->destinations())->where('id', $this->selectedDestination)->first();
                 clone_application($application, $selectedDestination, [
                     'environment_id' => $environment->id,
                 ], $this->cloneVolumeData);
@@ -140,12 +148,12 @@ class CloneMe extends Component
                     'created_at',
                     'updated_at',
                 ])->fill([
-                    'uuid' => $uuid,
-                    'status' => 'exited',
-                    'started_at' => null,
-                    'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
-                ]);
+                            'uuid' => $uuid,
+                            'status' => 'exited',
+                            'started_at' => null,
+                            'environment_id' => $environment->id,
+                            'destination_id' => $this->selectedDestination,
+                        ]);
                 $newDatabase->save();
 
                 $tags = $database->tags;
@@ -160,26 +168,26 @@ class CloneMe extends Component
                     $newName = '';
 
                     if (str_starts_with($originalName, 'postgres-data-')) {
-                        $newName = 'postgres-data-'.$newDatabase->uuid;
+                        $newName = 'postgres-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
-                        $newName = 'mysql-data-'.$newDatabase->uuid;
+                        $newName = 'mysql-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'redis-data-')) {
-                        $newName = 'redis-data-'.$newDatabase->uuid;
+                        $newName = 'redis-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
-                        $newName = 'clickhouse-data-'.$newDatabase->uuid;
+                        $newName = 'clickhouse-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
-                        $newName = 'mariadb-data-'.$newDatabase->uuid;
+                        $newName = 'mariadb-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {
-                        $newName = 'mongodb-data-'.$newDatabase->uuid;
+                        $newName = 'mongodb-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'keydb-data-')) {
-                        $newName = 'keydb-data-'.$newDatabase->uuid;
+                        $newName = 'keydb-data-' . $newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
-                        $newName = 'dragonfly-data-'.$newDatabase->uuid;
+                        $newName = 'dragonfly-data-' . $newDatabase->uuid;
                     } else {
                         if (str_starts_with($volume->name, $database->uuid)) {
                             $newName = str($volume->name)->replace($database->uuid, $newDatabase->uuid);
                         } else {
-                            $newName = $newDatabase->uuid.'-'.$volume->name;
+                            $newName = $newDatabase->uuid . '-' . $volume->name;
                         }
                     }
 
@@ -188,9 +196,9 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'name' => $newName,
-                        'resource_id' => $newDatabase->id,
-                    ]);
+                                'name' => $newName,
+                                'resource_id' => $newDatabase->id,
+                            ]);
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
@@ -205,7 +213,7 @@ class CloneMe extends Component
 
                             StartDatabase::dispatch($database);
                         } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            \Log::error('Failed to copy volume data for ' . $volume->name . ': ' . $e->getMessage());
                         }
                     }
                 }
@@ -217,8 +225,8 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'resource_id' => $newDatabase->id,
-                    ]);
+                                'resource_id' => $newDatabase->id,
+                            ]);
                     $newStorage->save();
                 }
 
@@ -230,11 +238,11 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'uuid' => $uuid,
-                        'database_id' => $newDatabase->id,
-                        'database_type' => $newDatabase->getMorphClass(),
-                        'team_id' => currentTeam()->id,
-                    ]);
+                                'uuid' => $uuid,
+                                'database_id' => $newDatabase->id,
+                                'database_type' => $newDatabase->getMorphClass(),
+                                'team_id' => currentTeam()->id,
+                            ]);
                     $newBackup->save();
                 }
 
@@ -259,10 +267,10 @@ class CloneMe extends Component
                     'created_at',
                     'updated_at',
                 ])->fill([
-                    'uuid' => $uuid,
-                    'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
-                ]);
+                            'uuid' => $uuid,
+                            'environment_id' => $environment->id,
+                            'destination_id' => $this->selectedDestination,
+                        ]);
                 $newService->save();
 
                 $tags = $service->tags;
@@ -277,10 +285,10 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'uuid' => (string) new Cuid2,
-                        'service_id' => $newService->id,
-                        'team_id' => currentTeam()->id,
-                    ]);
+                                'uuid' => (string) new Cuid2,
+                                'service_id' => $newService->id,
+                                'team_id' => currentTeam()->id,
+                            ]);
                     $newTask->save();
                 }
 
@@ -291,24 +299,42 @@ class CloneMe extends Component
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'resourceable_id' => $newService->id,
-                        'resourceable_type' => $newService->getMorphClass(),
-                    ]);
+                                'resourceable_id' => $newService->id,
+                                'resourceable_type' => $newService->getMorphClass(),
+                            ]);
                     $newEnvironmentVariable->save();
                 }
 
-                foreach ($newService->applications() as $application) {
-                    $application->update([
+                foreach ($environmentVariables as $environmentVariable) {
+                    $newEnvironmentVariable = $environmentVariable->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                                'resourceable_id' => $newService->id,
+                                'resourceable_type' => $newService->getMorphClass(),
+                            ]);
+                    $newEnvironmentVariable->save();
+                }
+
+                $newService->parse();
+
+                foreach ($newService->applications as $newServiceApp) {
+                    $newServiceApp->update([
                         'status' => 'exited',
                     ]);
+                    $oldServiceApp = $service->applications->where('name', $newServiceApp->name)->first();
+                    if (!$oldServiceApp) {
+                        continue;
+                    }
 
-                    $persistentVolumes = $application->persistentStorages()->get();
+                    $persistentVolumes = $oldServiceApp->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $application->uuid)) {
-                            $newName = str($volume->name)->replace($application->uuid, $application->uuid);
+                        if (str_starts_with($volume->name, $oldServiceApp->uuid)) {
+                            $newName = str($volume->name)->replace($oldServiceApp->uuid, $newServiceApp->uuid);
                         } else {
-                            $newName = $application->uuid.'-'.$volume->name;
+                            $newName = $newServiceApp->uuid . '-' . $volume->name;
                         }
 
                         $newPersistentVolume = $volume->replicate([
@@ -316,53 +342,57 @@ class CloneMe extends Component
                             'created_at',
                             'updated_at',
                         ])->fill([
-                            'name' => $newName,
-                            'resource_id' => $application->id,
-                        ]);
+                                    'name' => $newName,
+                                    'resource_id' => $newServiceApp->id,
+                                ]);
                         $newPersistentVolume->save();
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($application);
+                                StopService::dispatch($oldServiceApp);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $application->service->destination->server;
+                                $sourceServer = $oldServiceApp->service->destination->server;
                                 $targetServer = $newService->destination->server;
 
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
-                                StartService::dispatch($application);
+                                StartService::dispatch($oldServiceApp);
                             } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                                \Log::error('Failed to copy volume data for ' . $volume->name . ': ' . $e->getMessage());
                             }
                         }
                     }
 
-                    $fileStorages = $application->fileStorages()->get();
+                    $fileStorages = $oldServiceApp->fileStorages()->get();
                     foreach ($fileStorages as $storage) {
                         $newStorage = $storage->replicate([
                             'id',
                             'created_at',
                             'updated_at',
                         ])->fill([
-                            'resource_id' => $application->id,
-                        ]);
+                                    'resource_id' => $newServiceApp->id,
+                                ]);
                         $newStorage->save();
                     }
                 }
 
-                foreach ($newService->databases() as $database) {
-                    $database->update([
+                foreach ($newService->databases as $newServiceDb) {
+                    $newServiceDb->update([
                         'status' => 'exited',
                     ]);
+                    $oldServiceDb = $service->databases->where('name', $newServiceDb->name)->first();
+                    if (!$oldServiceDb) {
+                        continue;
+                    }
 
-                    $persistentVolumes = $database->persistentStorages()->get();
+                    $persistentVolumes = $oldServiceDb->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $database->uuid)) {
-                            $newName = str($volume->name)->replace($database->uuid, $database->uuid);
+                        if (str_starts_with($volume->name, $oldServiceDb->uuid)) {
+                            $newName = str($volume->name)->replace($oldServiceDb->uuid, $newServiceDb->uuid);
                         } else {
-                            $newName = $database->uuid.'-'.$volume->name;
+                            $newName = $newServiceDb->uuid . '-' . $volume->name;
                         }
 
                         $newPersistentVolume = $volume->replicate([
@@ -370,41 +400,41 @@ class CloneMe extends Component
                             'created_at',
                             'updated_at',
                         ])->fill([
-                            'name' => $newName,
-                            'resource_id' => $database->id,
-                        ]);
+                                    'name' => $newName,
+                                    'resource_id' => $newServiceDb->id,
+                                ]);
                         $newPersistentVolume->save();
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($database->service);
+                                StopService::dispatch($oldServiceDb->service);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $database->service->destination->server;
+                                $sourceServer = $oldServiceDb->service->destination->server;
                                 $targetServer = $newService->destination->server;
 
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
-                                StartService::dispatch($database->service);
+                                StartService::dispatch($oldServiceDb->service);
                             } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                                \Log::error('Failed to copy volume data for ' . $volume->name . ': ' . $e->getMessage());
                             }
                         }
                     }
 
-                    $fileStorages = $database->fileStorages()->get();
+                    $fileStorages = $oldServiceDb->fileStorages()->get();
                     foreach ($fileStorages as $storage) {
                         $newStorage = $storage->replicate([
                             'id',
                             'created_at',
                             'updated_at',
                         ])->fill([
-                            'resource_id' => $database->id,
-                        ]);
+                                    'resource_id' => $newServiceDb->id,
+                                ]);
                         $newStorage->save();
                     }
 
-                    $scheduledBackups = $database->scheduledBackups()->get();
+                    $scheduledBackups = $oldServiceDb->scheduledBackups()->get();
                     foreach ($scheduledBackups as $backup) {
                         $uuid = (string) new Cuid2;
                         $newBackup = $backup->replicate([
@@ -412,16 +442,14 @@ class CloneMe extends Component
                             'created_at',
                             'updated_at',
                         ])->fill([
-                            'uuid' => $uuid,
-                            'database_id' => $database->id,
-                            'database_type' => $database->getMorphClass(),
-                            'team_id' => currentTeam()->id,
-                        ]);
+                                    'uuid' => $uuid,
+                                    'database_id' => $newServiceDb->id,
+                                    'database_type' => $newServiceDb->getMorphClass(),
+                                    'team_id' => currentTeam()->id,
+                                ]);
                         $newBackup->save();
                     }
                 }
-
-                $newService->parse();
             }
 
         } catch (\Exception $e) {
@@ -429,7 +457,7 @@ class CloneMe extends Component
 
             return;
         } finally {
-            if (! isset($e)) {
+            if (!isset($e)) {
                 return redirect()->route('project.resource.index', [
                     'project_uuid' => $project->uuid,
                     'environment_uuid' => $environment->uuid,

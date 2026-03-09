@@ -5,7 +5,30 @@ namespace App\Models;
 use App\Jobs\ConnectProxyToNetworksJob;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Application;
+use App\Models\Service;
+use App\Models\Server;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneClickhouse;
 
+use function instant_remote_process;
+
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string $network
+ * @property int $server_id
+ * @property-read \App\Models\Server $server
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Application[] $applications
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Service[] $services
+ */
 class StandaloneDocker extends BaseModel
 {
     use HasFactory;

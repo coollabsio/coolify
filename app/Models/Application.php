@@ -2,16 +2,52 @@
 
 namespace App\Models;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $fqdn
+ * @property string $git_repository
+ * @property string $git_branch
+ * @property string|null $git_commit_sha
+ * @property string $build_pack
+ * @property string $status
+ * @property string $preview_url_template
+ * @property string|null $docker_compose_raw
+ * @property string $compose_parsing_version
+ * @property bool $is_container_label_escape_enabled
+ * @property \App\Models\Server|null $server
+ * @property \App\Models\Environment|null $environment
+ * @property \App\Models\ApplicationSetting $settings
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Server[] $additional_servers
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\StandaloneNetwork[] $additional_networks
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Tag[] $tags
+ * @property \Illuminate\Database\Eloquent\Model|null $destination
+ */
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationSetting;
+use App\Models\EnvironmentVariable;
+use App\Models\Team;
+use App\Models\Server;
+use App\Models\Environment;
+use App\Models\StandaloneNetwork;
+use App\Models\Tag;
+
 use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
+use App\Traits\HasDockerConfiguration;
+use App\Traits\HasGitRepository;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -21,6 +57,24 @@ use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+
+use function blank;
+use function collect;
+use function config;
+use function data_forget;
+use function data_get;
+use function data_set;
+use function filled;
+use function now;
+use function once;
+use function route;
+use function str;
 
 #[OA\Schema(
     description: 'Application model',
@@ -71,7 +125,7 @@ use Visus\Cuid2\Cuid2;
         'limits_cpuset' => ['type' => 'string', 'nullable' => true, 'description' => 'CPU set.'],
         'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
         'status' => ['type' => 'string', 'description' => 'Application status.'],
-        'preview_url_template' => ['type' => 'string',  'description' => 'Preview URL template.'],
+        'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
         'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'Destination identifier.'],
         'source_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Source identifier.'],
@@ -114,7 +168,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasDockerConfiguration, HasFactory, HasGitRepository, HasMetrics, HasSafeStringAttribute, HasStatus, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -252,89 +306,6 @@ class Application extends BaseModel
         });
     }
 
-    public function customNetworkAliases(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return null;
-                }
-
-                // If it's already a JSON string, decode it
-                if (is_string($value) && $this->isJson($value)) {
-                    $value = json_decode($value, true);
-                }
-
-                // If it's a string but not JSON, treat it as a comma-separated list
-                if (is_string($value) && ! is_array($value)) {
-                    $value = explode(',', $value);
-                }
-
-                $value = collect($value)
-                    ->map(function ($alias) {
-                        if (is_string($alias)) {
-                            return str_replace(' ', '-', trim($alias));
-                        }
-
-                        return null;
-                    })
-                    ->filter()
-                    ->unique() // Remove duplicate values
-                    ->values()
-                    ->toArray();
-
-                return empty($value) ? null : json_encode($value);
-            },
-            get: function ($value) {
-                if (is_null($value)) {
-                    return null;
-                }
-
-                if (is_string($value) && $this->isJson($value)) {
-                    $decoded = json_decode($value, true);
-
-                    // Return as comma-separated string, not array
-                    return is_array($decoded) ? implode(',', $decoded) : $value;
-                }
-
-                return $value;
-            }
-        );
-    }
-
-    /**
-     * Get custom_network_aliases as an array
-     */
-    public function customNetworkAliasesArray(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                $value = $this->getRawOriginal('custom_network_aliases');
-                if (is_null($value)) {
-                    return null;
-                }
-
-                if (is_string($value) && $this->isJson($value)) {
-                    return json_decode($value, true);
-                }
-
-                return is_array($value) ? $value : [];
-            }
-        );
-    }
-
-    /**
-     * Check if a string is a valid JSON
-     */
-    private function isJson($string)
-    {
-        if (! is_string($string)) {
-            return false;
-        }
-        json_decode($string);
-
-        return json_last_error() === JSON_ERROR_NONE;
-    }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
@@ -374,7 +345,7 @@ class Application extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -510,287 +481,49 @@ class Application extends BaseModel
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value ? '/'.ltrim($value, '/') : null,
+            set: fn($value) => $value ? '/' . ltrim($value, '/') : null,
         );
     }
 
-    public function gitBranchLocation(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                $base_dir = $this->base_directory ?? '/';
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
-                    if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
-                    }
-
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
-                }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-                    if (str($this->git_repository)->contains('bitbucket')) {
-                        return "https://{$git_repository}/src/{$this->git_branch}{$base_dir}";
-                    }
-
-                    return "https://{$git_repository}/tree/{$this->git_branch}{$base_dir}";
-                }
-
-                return $this->git_repository;
-            }
-        );
-    }
-
-    public function gitWebhook(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
-                    return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
-                }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-                    return "https://{$git_repository}/settings/hooks";
-                }
-
-                return $this->git_repository;
-            }
-        );
-    }
-
-    public function gitCommits(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
-                    return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
-                }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-                    return "https://{$git_repository}/commits/{$this->git_branch}";
-                }
-
-                return $this->git_repository;
-            }
-        );
-    }
-
-    public function gitCommitLink($link): string
-    {
-        if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
-            if (str($this->source->html_url)->contains('bitbucket')) {
-                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
-            }
-
-            return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
-        }
-        if (str($this->git_repository)->contains('bitbucket')) {
-            $git_repository = str_replace('.git', '', $this->git_repository);
-            $url = Url::fromString($git_repository);
-            $url = $url->withUserInfo('');
-            $url = $url->withPath($url->getPath().'/commits/'.$link);
-
-            return $url->__toString();
-        }
-        if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-            if (data_get($this, 'source.html_url')) {
-                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
-            }
-
-            return "{$git_repository}/commit/{$link}";
-        }
-
-        return $this->git_repository;
-    }
-
-    public function dockerfileLocation(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return '/Dockerfile';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
-                }
-            }
-        );
-    }
-
-    public function dockerComposeLocation(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return '/docker-compose.yaml';
-                } else {
-                    if ($value !== '/') {
-                        return Str::start(Str::replaceEnd('/', '', $value), '/');
-                    }
-
-                    return Str::start($value, '/');
-                }
-            }
-        );
-    }
 
     public function baseDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => '/'.ltrim($value, '/'),
+            set: fn($value) => '/' . ltrim($value, '/'),
         );
     }
 
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            get: fn() => is_null($this->ports_mappings)
+            ? []
+            : explode(',', $this->ports_mappings),
 
-        );
-    }
-
-    public function isRunning()
-    {
-        return (bool) str($this->status)->startsWith('running');
-    }
-
-    public function isExited()
-    {
-        return (bool) str($this->status)->startsWith('exited');
-    }
-
-    public function realStatus()
-    {
-        return $this->getRawOriginal('status');
-    }
-
-    protected function serverStatus(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                // Check main server infrastructure health
-                $main_server_functional = $this->destination?->server?->isFunctional() ?? false;
-
-                if (! $main_server_functional) {
-                    return false;
-                }
-
-                // Check additional servers infrastructure health (not container status!)
-                if ($this->relationLoaded('additional_servers') && $this->additional_servers->count() > 0) {
-                    foreach ($this->additional_servers as $server) {
-                        if (! $server->isFunctional()) {
-                            return false;  // Real server infrastructure problem
-                        }
-                    }
-                }
-
-                return true;
-            }
-        );
-    }
-
-    public function status(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if ($this->additional_servers->count() === 0) {
-                    if (str($value)->contains('(')) {
-                        $status = str($value)->before('(')->trim()->value();
-                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                    } elseif (str($value)->contains(':')) {
-                        $status = str($value)->before(':')->trim()->value();
-                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
-                    } else {
-                        $status = $value;
-                        $health = 'unhealthy';
-                    }
-
-                    return "$status:$health";
-                } else {
-                    if (str($value)->contains('(')) {
-                        $status = str($value)->before('(')->trim()->value();
-                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                    } elseif (str($value)->contains(':')) {
-                        $status = str($value)->before(':')->trim()->value();
-                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
-                    } else {
-                        $status = $value;
-                        $health = 'unhealthy';
-                    }
-
-                    return "$status:$health";
-                }
-            },
-            get: function ($value) {
-                if ($this->additional_servers->count() === 0) {
-                    // running (healthy)
-                    if (str($value)->contains('(')) {
-                        $status = str($value)->before('(')->trim()->value();
-                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
-                    } elseif (str($value)->contains(':')) {
-                        $status = str($value)->before(':')->trim()->value();
-                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
-                    } else {
-                        $status = $value;
-                        $health = 'unhealthy';
-                    }
-
-                    return "$status:$health";
-                } else {
-                    $complex_status = null;
-                    $complex_health = null;
-                    $complex_status = $main_server_status = str($value)->before(':')->value();
-                    $complex_health = $main_server_health = str($value)->after(':')->value() ?? 'unhealthy';
-                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                    foreach ($additional_servers_status as $status) {
-                        $server_status = str($status)->before(':')->value();
-                        $server_health = str($status)->after(':')->value() ?? 'unhealthy';
-                        if ($main_server_status !== $server_status) {
-                            $complex_status = 'degraded';
-                        }
-                        if ($main_server_health !== $server_health) {
-                            $complex_health = 'unhealthy';
-                        }
-                    }
-
-                    return "$complex_status:$complex_health";
-                }
-            },
         );
     }
 
     public function customNginxConfiguration(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => base64_encode($value),
-            get: fn ($value) => base64_decode($value),
+            set: fn($value) => base64_encode($value),
+            get: fn($value) => base64_decode($value),
         );
     }
 
     public function portsExposesArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_exposes)
-                ? []
-                : explode(',', $this->ports_exposes)
+            get: fn() => is_null($this->ports_exposes)
+            ? []
+            : explode(',', $this->ports_exposes)
         );
     }
 
@@ -992,7 +725,7 @@ class Application extends BaseModel
         if (isDev() && data_get($this, 'private_key_id') === 0) {
             return 'deploy_key';
         }
-        if (! is_null(data_get($this, 'private_key_id'))) {
+        if (!is_null(data_get($this, 'private_key_id'))) {
             return 'deploy_key';
         } elseif (data_get($this, 'source')) {
             return 'source';
@@ -1034,7 +767,7 @@ class Application extends BaseModel
 
     public function workdir()
     {
-        return application_configuration_dir()."/{$this->uuid}";
+        return application_configuration_dir() . "/{$this->uuid}";
     }
 
     public function isLogDrainEnabled()
@@ -1044,11 +777,11 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings->use_build_secrets.$this->settings->inject_build_args_to_dockerfile.$this->settings->include_source_commit_in_build);
+        $newConfigHash = base64_encode($this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command . $this->build_command . $this->start_command . $this->ports_exposes . $this->ports_mappings . $this->custom_network_aliases . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels . $this->custom_docker_run_options . $this->dockerfile_target_build . $this->redirect . $this->custom_nginx_configuration . $this->settings->use_build_secrets . $this->settings->inject_build_args_to_dockerfile . $this->settings->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1084,7 +817,7 @@ class Application extends BaseModel
 
     public function dirOnServer()
     {
-        return application_configuration_dir()."/{$this->uuid}";
+        return application_configuration_dir() . "/{$this->uuid}";
     }
 
     public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null)
@@ -1291,7 +1024,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
                     $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                    if (! $only_checkout) {
+                    if (!$only_checkout) {
                         $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit);
                     }
                     if ($exec_in_docker) {
@@ -1312,7 +1045,7 @@ class Application extends BaseModel
                         $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
                         $fullRepoUrl = $repoUrl;
                     }
-                    if (! $only_checkout) {
+                    if (!$only_checkout) {
                         $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit);
                     }
                     if ($exec_in_docker) {
@@ -1375,7 +1108,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1383,14 +1116,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" " . $this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -1420,7 +1153,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -1428,14 +1161,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && " . $this->buildGitCheckoutCommand($pr_branch_name);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
                     } else {
                         $commands->push("echo 'Checking out $branch'");
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" " . $this->buildGitCheckoutCommand($commit);
                 }
             }
 
@@ -1479,29 +1212,16 @@ class Application extends BaseModel
                         $type = data_get_str($volume, 'type');
                         $source = data_get_str($volume, 'source');
                     }
-                    if ($type?->value() === 'bind') {
-                        if ($source->value() === '/var/run/docker.sock') {
-                            continue;
-                        }
-                        if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                            continue;
-                        }
-                        if ($source->startsWith('.')) {
-                            $source = $source->after('.');
-                            $source = $workdir.$source;
-                        }
-                        $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
-                    }
                 }
             }
             $labels = collect(data_get($service, 'labels', []));
-            if (! $labels->contains('coolify.managed')) {
+            if (!$labels->contains('coolify.managed')) {
                 $labels->push('coolify.managed=true');
             }
-            if (! $labels->contains('coolify.applicationId')) {
-                $labels->push('coolify.applicationId='.$this->id);
+            if (!$labels->contains('coolify.applicationId')) {
+                $labels->push('coolify.applicationId=' . $this->id);
             }
-            if (! $labels->contains('coolify.type')) {
+            if (!$labels->contains('coolify.type')) {
                 $labels->push('coolify.type=application');
             }
             data_set($service, 'labels', $labels->toArray());
@@ -1539,7 +1259,7 @@ class Application extends BaseModel
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
-        if (! $gitRemoteStatus['is_accessible']) {
+        if (!$gitRemoteStatus['is_accessible']) {
             throw new \RuntimeException("Failed to read Git source:\n\n{$gitRemoteStatus['error']}");
         }
         $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
@@ -1551,7 +1271,7 @@ class Application extends BaseModel
                 $paths = collect();
                 $currentPath = '';
                 foreach ($parts as $part) {
-                    $currentPath .= ($currentPath ? '/' : '').$part;
+                    $currentPath .= ($currentPath ? '/' : '') . $part;
                     if (str($currentPath)->isNotEmpty()) {
                         $paths->push($currentPath);
                     }
@@ -1631,7 +1351,7 @@ class Application extends BaseModel
                 $jsonNames = $json->keys()->toArray();
                 $diff = array_diff($jsonNames, $names);
                 $json = $json->filter(function ($value, $key) use ($diff) {
-                    return ! in_array($key, $diff);
+                    return !in_array($key, $diff);
                 });
                 if ($json) {
                     $this->docker_compose_domains = json_encode($json);
@@ -1658,7 +1378,7 @@ class Application extends BaseModel
     public function parseContainerLabels(?ApplicationPreview $preview = null)
     {
         $customLabels = data_get($this, 'custom_labels');
-        if (! $customLabels) {
+        if (!$customLabels) {
             return;
         }
         if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
@@ -1678,9 +1398,9 @@ class Application extends BaseModel
     public function fqdns(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->fqdn)
-                ? []
-                : explode(',', $this->fqdn),
+            get: fn() => is_null($this->fqdn)
+            ? []
+            : explode(',', $this->fqdn),
         );
     }
 
@@ -1708,7 +1428,7 @@ class Application extends BaseModel
                         $pathWithoutNegation = substr($path, 1);
                         $pathWithoutNegation = ltrim(trim($pathWithoutNegation), '/');
 
-                        return $negation.$pathWithoutNegation;
+                        return $negation . $pathWithoutNegation;
                     }
 
                     return ltrim($path, '/');
@@ -1762,16 +1482,16 @@ class Application extends BaseModel
 
                 if (self::globMatch($matchPattern, $file)) {
                     // This pattern matches - it determines the current state
-                    $shouldInclude = ! $isExclusion;
+                    $shouldInclude = !$isExclusion;
                 }
             }
 
             // If no patterns matched and we only have exclusion patterns, include by default
             if ($shouldInclude === null) {
                 // Check if we only have exclusion patterns
-                $hasInclusionPatterns = $watch_paths->contains(fn ($p) => ! str_starts_with(trim($p), '!'));
+                $hasInclusionPatterns = $watch_paths->contains(fn($p) => !str_starts_with(trim($p), '!'));
 
-                return ! $hasInclusionPatterns;
+                return !$hasInclusionPatterns;
             }
 
             return $shouldInclude;
@@ -1855,7 +1575,7 @@ class Application extends BaseModel
                 case '|':
                 case '\\':
                     // Escape regex special characters
-                    $regex .= '\\'.$c;
+                    $regex .= '\\' . $c;
                     break;
 
                 default:
@@ -1865,7 +1585,7 @@ class Application extends BaseModel
         }
 
         // Wrap in delimiters and anchors
-        return '#^'.$regex.'$#';
+        return '#^' . $regex . '$#';
     }
 
     public function normalizeWatchPaths(): void
@@ -1910,7 +1630,7 @@ class Application extends BaseModel
         $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
-        if (! $hasHealthcheck && $this->custom_healthcheck_found) {
+        if (!$hasHealthcheck && $this->custom_healthcheck_found) {
             // HEALTHCHECK was removed from Dockerfile, reset to defaults
             $this->custom_healthcheck_found = false;
             $this->health_check_interval = 5;
@@ -1933,10 +1653,10 @@ class Application extends BaseModel
                     continue;
                 }
                 if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
-                    $healthcheckCommand .= ' '.trim($trimmedLine, '\\ ');
+                    $healthcheckCommand .= ' ' . trim($trimmedLine, '\\ ');
                 }
-                if (isset($healthcheckCommand) && ! str_contains($trimmedLine, '\\') && ! empty($healthcheckCommand)) {
-                    $healthcheckCommand .= ' '.$trimmedLine;
+                if (isset($healthcheckCommand) && !str_contains($trimmedLine, '\\') && !empty($healthcheckCommand)) {
+                    $healthcheckCommand .= ' ' . $trimmedLine;
                     break;
                 }
             }

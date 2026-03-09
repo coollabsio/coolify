@@ -2,12 +2,47 @@
 
 namespace App\Models;
 
-use App\Traits\ClearsGlobalSearchCache;
-use App\Traits\HasMetrics;
-use App\Traits\HasSafeStringAttribute;
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $status
+ * @property string $image
+ * @property string|null $redis_password
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property string|null $ports_mappings
+ * @property string|null $config_hash
+ * @property int $environment_id
+ * @property-read \App\Models\Server|null $server
+ * @property-read \App\Models\Environment $environment
+ * @property-read \App\Models\StandaloneDocker|\App\Models\SwarmDocker|null $destination
+ */
+
+use App\Models\Server;
+use App\Models\Destination;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
+use App\Models\LocalPersistentVolume;
+use App\Models\LocalFileVolume;
+use App\Models\SslCertificate;
+use App\Models\EnvironmentVariable;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\Tag;
+use App\Models\Environment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+
+use function currentTeam;
+use function once;
+use function database_configuration_dir;
+use function instant_remote_process;
+use function data_get;
+use function str;
+use function route;
+use function now;
+use function collect;
 
 class StandaloneRedis extends BaseModel
 {
@@ -27,7 +62,7 @@ class StandaloneRedis extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'redis-data-'.$database->uuid,
+                'name' => 'redis-data-' . $database->uuid,
                 'mount_path' => '/data',
                 'host_path' => null,
                 'resource_id' => $database->id,
@@ -47,7 +82,7 @@ class StandaloneRedis extends BaseModel
         });
 
         static::retrieved(function ($database) {
-            if (! $database->redis_username) {
+            if (!$database->redis_username) {
                 $database->redis_username = 'default';
             }
         });
@@ -83,7 +118,7 @@ class StandaloneRedis extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->image.$this->ports_mappings.$this->redis_conf;
+        $newConfigHash = $this->image . $this->ports_mappings . $this->redis_conf;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -119,7 +154,7 @@ class StandaloneRedis extends BaseModel
 
     public function workdir()
     {
-        return database_configuration_dir()."/{$this->uuid}";
+        return database_configuration_dir() . "/{$this->uuid}";
     }
 
     public function deleteConfigurations()
@@ -127,7 +162,7 @@ class StandaloneRedis extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -223,14 +258,14 @@ class StandaloneRedis extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
+            get: fn() => is_null($this->ports_mappings)
             ? []
             : explode(',', $this->ports_mappings),
 
@@ -245,7 +280,7 @@ class StandaloneRedis extends BaseModel
     public function databaseType(): Attribute
     {
         return new Attribute(
-            get: fn () => $this->type(),
+            get: fn() => $this->type(),
         );
     }
 
@@ -254,7 +289,7 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 $redis_version = $this->getRedisVersion();
-                $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
+                $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username) . ':' : '';
                 $encodedPass = rawurlencode($this->redis_password);
                 $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                 $port = $this->enable_ssl ? 6380 : 6379;
@@ -279,7 +314,7 @@ class StandaloneRedis extends BaseModel
                         return null;
                     }
                     $redis_version = $this->getRedisVersion();
-                    $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username) . ':' : '';
                     $encodedPass = rawurlencode($this->redis_password);
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverIp}:{$this->public_port}/0";
@@ -343,7 +378,7 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
-                if (! $password) {
+                if (!$password) {
                     return null;
                 }
 
@@ -358,7 +393,7 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
-                if (! $username) {
+                if (!$username) {
                     $this->runtime_environment_variables()->create([
                         'key' => 'REDIS_USERNAME',
                         'value' => 'default',

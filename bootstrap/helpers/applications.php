@@ -5,7 +5,19 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Tag;
+use Illuminate\Support\Facades\Log;
+
+use function collect;
+use function data_get;
+use function str;
+use function currentTeam;
+use function generateUrl;
+use function generateLabelsApplication;
+use function base64_encode;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
@@ -14,7 +26,7 @@ use Visus\Cuid2\Cuid2;
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
     $application_id = $application->id;
-    $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
+    $deployment_link = Url::fromString($application->link() . "/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
     $server_id = $application->destination->server->id;
     $server_name = $application->destination->server->name;
@@ -51,7 +63,7 @@ function queue_application_deployment(Application $application, string $deployme
 
     if ($existing_deployment) {
         // If force_rebuild is true or rollback is true or no_questions_asked is true, we'll still create a new deployment
-        if (! $force_rebuild && ! $rollback && ! $no_questions_asked) {
+        if (!$force_rebuild && !$rollback && !$no_questions_asked) {
             // Return the existing deployment's details
             return [
                 'status' => 'skipped',
@@ -196,7 +208,7 @@ function clone_application(Application $source, $destination, array $overrides =
     }
 
     // Prepare name and URL
-    $name = $overrides['name'] ?? 'clone-of-'.str($source->name)->limit(20).'-'.$uuid;
+    $name = $overrides['name'] ?? 'clone-of-' . str($source->name)->limit(20) . '-' . $uuid;
     $applicationSettings = $source->settings;
     $url = $overrides['fqdn'] ?? $source->fqdn;
 
@@ -212,13 +224,21 @@ function clone_application(Application $source, $destination, array $overrides =
         'additional_servers_count',
         'additional_networks_count',
     ])->fill(array_merge([
-        'uuid' => $uuid,
-        'name' => $name,
-        'fqdn' => $url,
-        'status' => 'exited',
-        'destination_id' => $destination->id,
-    ], $overrides));
+                    'uuid' => $uuid,
+                    'name' => $name,
+                    'fqdn' => $url,
+                    'status' => 'exited',
+                    'destination_id' => $destination->id,
+                ], $overrides));
     $newApplication->save();
+
+    // Clone additional relationships
+    foreach ($source->additional_servers as $additional_server) {
+        $newApplication->additional_servers()->create($additional_server->toArray());
+    }
+    foreach ($source->additional_networks as $additional_network) {
+        $newApplication->additional_networks()->create($additional_network->toArray());
+    }
 
     // Update custom labels if needed
     if ($newApplication->destination->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
@@ -235,8 +255,8 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'application_id' => $newApplication->id,
-        ]);
+                    'application_id' => $newApplication->id,
+                ]);
         $newApplicationSettings->save();
     }
 
@@ -254,10 +274,10 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => (string) new Cuid2,
-            'application_id' => $newApplication->id,
-            'team_id' => currentTeam()->id,
-        ]);
+                    'uuid' => (string) new Cuid2,
+                    'application_id' => $newApplication->id,
+                    'team_id' => currentTeam()->id,
+                ]);
         $newTask->save();
     }
 
@@ -269,12 +289,12 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => (string) new Cuid2,
-            'application_id' => $newApplication->id,
-            'status' => 'exited',
-            'fqdn' => null,
-            'docker_compose_domains' => null,
-        ]);
+                    'uuid' => (string) new Cuid2,
+                    'application_id' => $newApplication->id,
+                    'status' => 'exited',
+                    'fqdn' => null,
+                    'docker_compose_domains' => null,
+                ]);
         $newPreview->save();
 
         // Regenerate FQDN for the cloned preview
@@ -292,7 +312,7 @@ function clone_application(Application $source, $destination, array $overrides =
         if (str_starts_with($volume->name, $source->uuid)) {
             $newName = str($volume->name)->replace($source->uuid, $newApplication->uuid);
         } else {
-            $newName = $newApplication->uuid.'-'.str($volume->name)->afterLast('-');
+            $newName = $newApplication->uuid . '-' . str($volume->name)->afterLast('-');
         }
 
         $newPersistentVolume = $volume->replicate([
@@ -300,9 +320,9 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'name' => $newName,
-            'resource_id' => $newApplication->id,
-        ]);
+                    'name' => $newName,
+                    'resource_id' => $newApplication->id,
+                ]);
         $newPersistentVolume->save();
 
         if ($cloneVolumeData) {
@@ -323,7 +343,7 @@ function clone_application(Application $source, $destination, array $overrides =
                     no_questions_asked: true
                 );
             } catch (\Exception $e) {
-                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                \Log::error('Failed to copy volume data for ' . $volume->name . ': ' . $e->getMessage());
             }
         }
     }
@@ -336,8 +356,8 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'resource_id' => $newApplication->id,
-        ]);
+                    'resource_id' => $newApplication->id,
+                ]);
         $newStorage->save();
     }
 
@@ -350,10 +370,10 @@ function clone_application(Application $source, $destination, array $overrides =
                 'created_at',
                 'updated_at',
             ])->fill([
-                'resourceable_id' => $newApplication->id,
-                'resourceable_type' => $newApplication->getMorphClass(),
-                'is_preview' => false,
-            ]);
+                        'resourceable_id' => $newApplication->id,
+                        'resourceable_type' => $newApplication->getMorphClass(),
+                        'is_preview' => false,
+                    ]);
             $newEnvironmentVariable->save();
         });
     }
@@ -367,10 +387,10 @@ function clone_application(Application $source, $destination, array $overrides =
                 'created_at',
                 'updated_at',
             ])->fill([
-                'resourceable_id' => $newApplication->id,
-                'resourceable_type' => $newApplication->getMorphClass(),
-                'is_preview' => true,
-            ]);
+                        'resourceable_id' => $newApplication->id,
+                        'resourceable_type' => $newApplication->getMorphClass(),
+                        'is_preview' => true,
+                    ]);
             $newPreviewEnvironmentVariable->save();
         });
     }

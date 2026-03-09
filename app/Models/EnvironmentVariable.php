@@ -5,6 +5,36 @@ namespace App\Models;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use OpenApi\Attributes as OA;
+use App\Models\BaseModel;
+use App\Models\Application;
+use App\Models\Service;
+use App\Models\SharedEnvironmentVariable;
+use Illuminate\Support\Collection;
+use function config;
+use function decrypt;
+use function encrypt;
+use function ray;
+use function str;
+use function collect;
+
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $key
+ * @property string $value
+ * @property string|null $real_value
+ * @property string|null $comment
+ * @property bool $is_literal
+ * @property bool $is_multiline
+ * @property bool $is_preview
+ * @property bool $is_runtime
+ * @property bool $is_buildtime
+ * @property bool $is_shared
+ * @property string $resourceable_type
+ * @property int $resourceable_id
+ * @property-read \Illuminate\Database\Eloquent\Model $resourceable
+ * @property-read \Illuminate\Database\Eloquent\Model $resource
+ */
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -74,14 +104,14 @@ class EnvironmentVariable extends BaseModel
     protected static function booted()
     {
         static::created(function (EnvironmentVariable $environment_variable) {
-            if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
+            if ($environment_variable->resourceable_type === Application::class && !$environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
                     ->where('resourceable_type', Application::class)
                     ->where('resourceable_id', $environment_variable->resourceable_id)
                     ->where('is_preview', true)
                     ->first();
 
-                if (! $found) {
+                if (!$found) {
                     $application = Application::find($environment_variable->resourceable_id);
                     if ($application) {
                         ModelsEnvironmentVariable::create([
@@ -117,8 +147,8 @@ class EnvironmentVariable extends BaseModel
     protected function value(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value = null) => $this->get_environment_variables($value),
-            set: fn (?string $value = null) => $this->set_environment_variables($value),
+            get: fn(?string $value = null) => $this->get_environment_variables($value),
+            set: fn(?string $value = null) => $this->set_environment_variables($value),
         );
     }
 
@@ -139,11 +169,11 @@ class EnvironmentVariable extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! $this->relationLoaded('resourceable')) {
+                if (!$this->relationLoaded('resourceable')) {
                     $this->load('resourceable');
                 }
                 $resource = $this->resourceable;
-                if (! $resource) {
+                if (!$resource) {
                     return null;
                 }
 
@@ -155,7 +185,7 @@ class EnvironmentVariable extends BaseModel
                 }
 
                 if ($this->is_literal || $this->is_multiline) {
-                    $real_value = '\''.$real_value.'\'';
+                    $real_value = '\'' . $real_value . '\'';
                 } else {
                     $real_value = escapeEnvVariables($real_value);
                 }
@@ -168,7 +198,7 @@ class EnvironmentVariable extends BaseModel
     protected function isReallyRequired(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->is_required && str($this->real_value)->isEmpty(),
+            get: fn() => $this->is_required && str($this->real_value)->isEmpty(),
         );
     }
 
@@ -203,7 +233,7 @@ class EnvironmentVariable extends BaseModel
         return Attribute::make(
             get: function () {
                 $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
+                if (str($this->value)->startsWith('{{' . $type) && str($this->value)->endsWith('}}')) {
                     return true;
                 }
 
@@ -224,7 +254,7 @@ class EnvironmentVariable extends BaseModel
         }
         foreach ($sharedEnvsFound as $sharedEnv) {
             $type = str($sharedEnv)->trim()->match('/(.*?)\./');
-            if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+            if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 continue;
             }
             $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
@@ -249,7 +279,7 @@ class EnvironmentVariable extends BaseModel
 
     private function get_environment_variables(?string $environment_variable = null): ?string
     {
-        if (! $environment_variable) {
+        if (!$environment_variable) {
             return null;
         }
 
@@ -263,7 +293,7 @@ class EnvironmentVariable extends BaseModel
         }
         $environment_variable = trim($environment_variable);
         $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
+        if (str($environment_variable)->startsWith('{{' . $type) && str($environment_variable)->endsWith('}}')) {
             return encrypt($environment_variable);
         }
 
@@ -273,14 +303,14 @@ class EnvironmentVariable extends BaseModel
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => str($value)->trim()->replace(' ', '_')->value,
+            set: fn(string $value) => str($value)->trim()->replace(' ', '_')->value,
         );
     }
 
     protected function updateIsShared(): void
     {
         $type = str($this->value)->after('{{')->before('.')->value;
-        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
+        $isShared = str($this->value)->startsWith('{{' . $type) && str($this->value)->endsWith('}}');
         $this->is_shared = $isShared;
     }
 }

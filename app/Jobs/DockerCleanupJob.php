@@ -17,6 +17,10 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
+use function str;
+use function event;
+use function collect;
+
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -31,7 +35,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('docker-cleanup-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
+        return [(new WithoutOverlapping('docker-cleanup-' . $this->server->uuid))->expireAfter(600)->dontRelease()];
     }
 
     public function __construct(
@@ -39,12 +43,13 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public bool $manualCleanup = false,
         public bool $deleteUnusedVolumes = false,
         public bool $deleteUnusedNetworks = false
-    ) {}
+    ) {
+    }
 
     public function handle(): void
     {
         try {
-            if (! $this->server->isFunctional()) {
+            if (!$this->server->isFunctional()) {
                 return;
             }
 
@@ -61,7 +66,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     deleteUnusedNetworks: $this->deleteUnusedNetworks
                 );
                 $usageAfter = $this->server->getDiskUsage();
-                $message = ($this->manualCleanup ? 'Manual' : 'Forced').' Docker cleanup job executed successfully. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
+                $message = ($this->manualCleanup ? 'Manual' : 'Forced') . ' Docker cleanup job executed successfully. Disk usage before: ' . $this->usageBefore . '%, Disk usage after: ' . $usageAfter . '%.';
 
                 $this->execution_log->update([
                     'status' => 'success',
@@ -105,9 +110,9 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $diskSaved = $this->usageBefore - $usageAfter;
 
                 if ($diskSaved > 0) {
-                    $message = 'Saved '.$diskSaved.'% disk space. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
+                    $message = 'Saved ' . $diskSaved . '% disk space. Disk usage before: ' . $this->usageBefore . '%, Disk usage after: ' . $usageAfter . '%.';
                 } else {
-                    $message = 'Docker cleanup job executed successfully, but no disk space was saved. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
+                    $message = 'Docker cleanup job executed successfully, but no disk space was saved. Disk usage before: ' . $this->usageBefore . '%, Disk usage after: ' . $usageAfter . '%.';
                 }
 
                 $this->execution_log->update([
@@ -119,7 +124,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
                 event(new DockerCleanupDone($this->execution_log));
             } else {
-                $message = 'No cleanup needed for '.$this->server->name;
+                $message = 'No cleanup needed for ' . $this->server->name;
 
                 $this->execution_log->update([
                     'status' => 'success',
@@ -137,7 +142,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
                 event(new DockerCleanupDone($this->execution_log));
             }
-            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
+            $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: ' . $e->getMessage()));
             throw $e;
         } finally {
             if ($this->execution_log) {

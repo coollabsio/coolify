@@ -14,7 +14,45 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use OpenApi\Attributes as OA;
+use App\Models\Subscription;
+use App\Models\Project;
+use App\Models\Application;
+use App\Models\Server;
+use App\Models\PrivateKey;
+use App\Models\Tag;
+use App\Models\SharedEnvironmentVariable;
+use App\Models\S3Storage;
+use App\Models\TeamInvitation;
+use App\Models\CloudProviderToken;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
+use App\Models\EmailNotificationSettings;
+use App\Models\DiscordNotificationSettings;
+use App\Models\TelegramNotificationSettings;
+use App\Models\SlackNotificationSettings;
+use App\Models\PushoverNotificationSettings;
+use App\Models\WebhookNotificationSettings;
 
+use function currentTeam;
+use function data_get;
+use function isCloud;
+use function isDev;
+use function config;
+use function collect;
+
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $description
+ * @property bool $personal_team
+ * @property bool $show_boarding
+ * @property string|null $custom_server_limit
+ * @property-read \App\Models\Subscription|null $subscription
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Server[] $servers
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Project[] $projects
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\User[] $members
+ */
 #[OA\Schema(
     description: 'Team model',
     type: 'object',
@@ -122,7 +160,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return 9999999;
         }
         $team = Team::find(currentTeam()->id);
-        if (! $team) {
+        if (!$team) {
             return 0;
         }
 

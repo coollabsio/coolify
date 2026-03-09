@@ -2,13 +2,54 @@
 
 namespace App\Models;
 
-use App\Traits\ClearsGlobalSearchCache;
-use App\Traits\HasMetrics;
-use App\Traits\HasSafeStringAttribute;
+use App\Models\Server;
+use App\Models\Destination;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
+use App\Models\LocalPersistentVolume;
+use App\Models\LocalFileVolume;
+use App\Models\SslCertificate;
+use App\Models\EnvironmentVariable;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\Tag;
+use App\Models\Environment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+use function currentTeam;
+use function once;
+use function database_configuration_dir;
+use function instant_remote_process;
+use function data_get;
+use function str;
+use function route;
+use function now;
+use function collect;
+
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $name
+ * @property string|null $status
+ * @property string $image
+ * @property string|null $mongo_user
+ * @property string|null $mongo_password
+ * @property string|null $mongo_db
+ * @property string|null $mongo_initdb_root_user
+ * @property string|null $mongo_initdb_root_password
+ * @property string|null $mongo_conf
+ * @property bool $is_public
+ * @property int|null $public_port
+ * @property string|null $ports_mappings
+ * @property string|null $config_hash
+ * @property bool $enable_ssl
+ * @property string $ssl_mode
+ * @property int $environment_id
+ * @property-read \App\Models\Server|null $server
+ * @property-read \App\Models\Environment $environment
+ * @property-read \App\Models\StandaloneDocker|\App\Models\SwarmDocker|null $destination
+ */
 class StandaloneMongodb extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
@@ -27,14 +68,14 @@ class StandaloneMongodb extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'mongodb-configdb-'.$database->uuid,
+                'name' => 'mongodb-configdb-' . $database->uuid,
                 'mount_path' => '/data/configdb',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
             ]);
             LocalPersistentVolume::create([
-                'name' => 'mongodb-db-'.$database->uuid,
+                'name' => 'mongodb-db-' . $database->uuid,
                 'mount_path' => '/data/db',
                 'host_path' => null,
                 'resource_id' => $database->id,
@@ -84,7 +125,7 @@ class StandaloneMongodb extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = $this->image.$this->ports_mappings.$this->mongo_conf;
+        $newConfigHash = $this->image . $this->ports_mappings . $this->mongo_conf;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -120,7 +161,7 @@ class StandaloneMongodb extends BaseModel
 
     public function workdir()
     {
-        return database_configuration_dir()."/{$this->uuid}";
+        return database_configuration_dir() . "/{$this->uuid}";
     }
 
     public function deleteConfigurations()
@@ -128,7 +169,7 @@ class StandaloneMongodb extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            instant_remote_process(['rm -rf ' . $this->workdir()], $server, false);
         }
     }
 
@@ -240,16 +281,16 @@ class StandaloneMongodb extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === '' ? null : $value,
+            set: fn($value) => $value === '' ? null : $value,
         );
     }
 
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            get: fn() => is_null($this->ports_mappings)
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -257,7 +298,7 @@ class StandaloneMongodb extends BaseModel
     public function databaseType(): Attribute
     {
         return new Attribute(
-            get: fn () => $this->type(),
+            get: fn() => $this->type(),
         );
     }
 

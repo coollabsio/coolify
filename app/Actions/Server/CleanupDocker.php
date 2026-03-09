@@ -4,6 +4,10 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
+use function collect;
+use function config;
+use function getHelperVersion;
+use function instant_remote_process;
 
 class CleanupDocker
 {
@@ -125,9 +129,9 @@ class CleanupDocker
         // Add infrastructure image exclusion (matches any registry prefix)
         $grepCommands .= " | grep -v -E '{$infraExcludePattern}'";
 
-        $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
-            $grepCommands.' | '.
-            "xargs -r -I {} sh -c 'docker inspect --format \"{{{{index .Config.Labels \\\"coolify.managed\\\"}}}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
+        $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | " .
+            $grepCommands . ' | ' .
+            "xargs -r -I {} sh -c 'docker inspect --format \"{{index .Config.Labels \\\"coolify.managed\\\"}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
 
         return implode(' && ', $commands);
     }
@@ -174,13 +178,13 @@ class CleanupDocker
                         'image_ref' => $imageRef,
                     ];
                 })
-                ->filter(fn ($image) => ! empty($image['tag']));
+                ->filter(fn($image) => !empty($image['tag']));
 
             // Separate images into categories
             // PR images (pr-*) and build images (*-build) are excluded from retention
             // Build images will be cleaned up by docker image prune -af
-            $prImages = $images->filter(fn ($image) => str_starts_with($image['tag'], 'pr-'));
-            $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
+            $prImages = $images->filter(fn($image) => str_starts_with($image['tag'], 'pr-'));
+            $regularImages = $images->filter(fn($image) => !str_starts_with($image['tag'], 'pr-') && !str_ends_with($image['tag'], '-build'));
 
             // Always delete all PR images
             foreach ($prImages as $image) {
@@ -194,7 +198,7 @@ class CleanupDocker
 
             // Filter out current running image from regular images and sort by creation date
             $sortedRegularImages = $regularImages
-                ->filter(fn ($image) => $image['tag'] !== $currentTag)
+                ->filter(fn($image) => $image['tag'] !== $currentTag)
                 ->sortByDesc('created_at')
                 ->values();
 
