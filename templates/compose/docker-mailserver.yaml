@@ -1,0 +1,44 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A full-featured, production-ready mail server in a Docker container.
+# category: email
+# tags: email, mail, smtp, imap, postfix, dovecot, self-hosted
+# logo: svgs/docker-mailserver.svg
+# port: 443
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail.example.com
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    environment:
+      - OVERRIDE_HOSTNAME=mail.example.com
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - SSL_TYPE=manual
+      - SSL_CERT_PATH=/etc/letsencrypt/live/mail.example.com/fullchain.pem
+      - SSL_KEY_PATH=/etc/letsencrypt/live/mail.example.com/privkey.pem
+      - POSTMASTER_ADDRESS=postmaster@example.com
+      - PERMIT_DOCKER=network
+      - ONE_DIR=1
+      - ENABLE_POP3=0
+      - ENABLE_IMAP=1
+      - ENABLE_POSTGREY=0
+      - SPOOF_PROTECTION=1
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
