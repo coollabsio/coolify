@@ -136,4 +136,23 @@ class Configuration extends Component
 
         return false;
     }
+
+    public function hasLaravel(): bool
+    {
+        foreach ($this->applications as $application) {
+            $image = strtolower($application->image ?? '');
+            if (str_contains($image, 'laravel') || str_contains($image, 'php')) {
+                return true;
+            }
+            $envVars = $application->environment_variables()->get();
+            foreach ($envVars as $envVar) {
+                $key = strtoupper($envVar->key ?? '');
+                if (str_contains($key, 'LARAVEL') || str_contains($key, 'APP_KEY') || str_contains($key, 'APP_ENV')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }
