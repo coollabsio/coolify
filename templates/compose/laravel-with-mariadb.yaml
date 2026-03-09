@@ -43,7 +43,7 @@ services:
 
           [program:queue-worker]
           process_name=%(program_name)s_%(process_num)02d
-          command=sh -c "while true; do if [ -f /var/www/html/artisan ]; then php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600; else echo 'Waiting for Laravel installation...'; sleep 10; fi; done"
+          command=sh -c "while [ ! -f /var/www/html/artisan ]; do echo 'Waiting for Laravel installation...'; sleep 10; done; php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600"
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -114,6 +114,13 @@ services:
           chown -R www-data:www-data /var/www/html/bootstrap/cache
           chmod -R 775 /var/www/html/storage
           chmod -R 775 /var/www/html/bootstrap/cache
+
+          # Create shutdown.sh script for supervisor
+          cat > /usr/local/bin/shutdown.sh << 'EOF'
+          #!/bin/sh
+          /usr/bin/supervisorctl shutdown
+          EOF
+          chmod +x /usr/local/bin/shutdown.sh
 
           # Start supervisord
           exec /usr/bin/supervisord -c /etc/supervisord.conf
