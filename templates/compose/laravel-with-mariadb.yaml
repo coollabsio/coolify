@@ -32,7 +32,7 @@ services:
           autorestart=true
 
           [program:scheduler]
-          command=sh -c "while true; do php /var/www/html/artisan schedule:run --verbose --no-interaction 2>&1; sleep 60; done"
+          command=sh -c "while true; do if [ -f /var/www/html/artisan ]; then php /var/www/html/artisan schedule:run --verbose --no-interaction 2>&1; else echo 'Waiting for Laravel installation...'; fi; sleep 60; done"
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
@@ -43,7 +43,7 @@ services:
 
           [program:queue-worker]
           process_name=%(program_name)s_%(process_num)02d
-          command=php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+          command=sh -c "while true; do if [ -f /var/www/html/artisan ]; then php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600; else echo 'Waiting for Laravel installation...'; sleep 10; fi; done"
           redirect_stderr=true
           stdout_logfile=/dev/stdout
           stdout_logfile_maxbytes=0
