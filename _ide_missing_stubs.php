@@ -619,4 +619,7 @@ namespace App\Models {
         {
         }
     }
+    class DockerCleanupExecution extends \Illuminate\Database\Eloquent\Model
+    {
+    }
 }
