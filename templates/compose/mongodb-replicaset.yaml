@@ -1,0 +1,87 @@
+# documentation: https://www.mongodb.com/docs/manual/replication/
+# slogan: MongoDB Replica Set — a highly available, fault-tolerant MongoDB deployment with automatic failover.
+# category: database
+# tags: database, nosql, mongodb, replicaset, high-availability, failover
+# logo: svgs/mongodb.svg
+# port: 27017
+
+services:
+  mongo1:
+    image: mongo:7
+    command: >
+      mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo/replica.key
+    volumes:
+      - mongo1-data:/data/db
+      - mongo-keyfile:/etc/mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$SERVICE_USER_MONGODB
+      - MONGO_INITDB_ROOT_PASSWORD=$SERVICE_PASSWORD_MONGODB
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  mongo2:
+    image: mongo:7
+    command: >
+      mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo/replica.key
+    volumes:
+      - mongo2-data:/data/db
+      - mongo-keyfile:/etc/mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$SERVICE_USER_MONGODB
+      - MONGO_INITDB_ROOT_PASSWORD=$SERVICE_PASSWORD_MONGODB
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  mongo3:
+    image: mongo:7
+    command: >
+      mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo/replica.key
+    volumes:
+      - mongo3-data:/data/db
+      - mongo-keyfile:/etc/mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$SERVICE_USER_MONGODB
+      - MONGO_INITDB_ROOT_PASSWORD=$SERVICE_PASSWORD_MONGODB
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      mongosh --host mongo1 --username $SERVICE_USER_MONGODB --password $SERVICE_PASSWORD_MONGODB --authenticationDatabase admin --eval '
+        rs.initiate({
+          _id: "rs0",
+          members: [
+            { _id: 0, host: "mongo1:27017", priority: 2 },
+            { _id: 1, host: "mongo2:27017", priority: 1 },
+            { _id: 2, host: "mongo3:27017", priority: 1 }
+          ]
+        })
+      '
+  mongo-keyfile-init:
+    image: mongo:7
+    restart: "no"
+    entrypoint: >
+      bash -c '
+        if [ ! -f /etc/mongo/replica.key ]; then
+          openssl rand -base64 756 > /etc/mongo/replica.key
+          chmod 400 /etc/mongo/replica.key
+          chown 999:999 /etc/mongo/replica.key
+        fi
+      '
+    volumes:
+      - mongo-keyfile:/etc/mongo
