@@ -78,6 +78,11 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                $settings = instanceSettings();
+                // Prevent password login when global OAuth-only is enabled
+                if ($settings->oauth_only) {
+                    return null;
+                }
                 // Prevent OAuth-only users from logging in with password
                 if ($user->oauth_only) {
                     return null;
