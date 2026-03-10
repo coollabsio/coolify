@@ -64,9 +64,21 @@ services:
       - type: bind
         source: ./entrypoint.sh
         target: /entrypoint.sh
+        mode: "0755"
         content: |
           #!/bin/sh
           set -e
+
+          echo "Starting Laravel setup..."
+
+          # Ensure entrypoint script is executable
+          chmod +x /entrypoint.sh 2>/dev/null || true
+
+          # Always install supervisor and basic tools first
+          if ! command -v supervisord >/dev/null 2>&1; then
+            echo "Installing supervisor and required packages..."
+            apk add --no-cache supervisor curl git unzip
+          fi
 
           # Check if PHP extensions are already installed
           if php -m | grep -q "pdo_mysql" && \
@@ -79,12 +91,8 @@ services:
           else
             echo "Installing PHP extensions..."
 
-            # Install required packages
+            # Install required packages for PHP extensions
             apk add --no-cache \
-              supervisor \
-              curl \
-              git \
-              unzip \
               oniguruma-dev \
               libzip-dev \
               postgresql-dev \
@@ -120,21 +128,46 @@ services:
 
           # Install Composer if not present
           if ! command -v composer >/dev/null 2>&1; then
+            echo "Installing Composer..."
             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
             chmod +x /usr/local/bin/composer
+            echo "Composer installed successfully!"
           fi
+
+          # Create Laravel directories if they don't exist (before installation)
+          mkdir -p /var/www/html
+          mkdir -p /var/www/html/storage/logs
+          mkdir -p /var/www/html/storage/framework/cache
+          mkdir -p /var/www/html/storage/framework/sessions
+          mkdir -p /var/www/html/storage/framework/views
+          mkdir -p /var/www/html/bootstrap/cache
 
           # Install Laravel if not present
           if [ ! -f /var/www/html/artisan ]; then
             echo "Laravel not found. Installing Laravel..."
             cd /var/www/html
-            # Clear directory first
-            rm -rf * .[!.]* 2>/dev/null || true
+
+            # Only clear if directory is not empty
+            if [ "$(ls -A /var/www/html 2>/dev/null)" ]; then
+              echo "Clearing existing files..."
+              rm -rf * .[!.]* 2>/dev/null || true
+            fi
+
+            echo "Creating Laravel project..."
             composer create-project laravel/laravel . --prefer-dist --no-interaction --no-scripts
+
+            # Run post-install scripts after installation
+            if [ -f /var/www/html/artisan ]; then
+              echo "Running Laravel post-install scripts..."
+              php artisan key:generate --force || true
+            fi
+
             echo "Laravel installed successfully!"
+          else
+            echo "Laravel already installed, skipping installation..."
           fi
 
-          # Create Laravel directories if they don't exist
+          # Ensure Laravel directories exist and have correct permissions
           mkdir -p /var/www/html/storage/logs
           mkdir -p /var/www/html/storage/framework/cache
           mkdir -p /var/www/html/storage/framework/sessions
@@ -148,8 +181,15 @@ services:
 
           # Wait for Laravel to be fully installed before starting supervisor
           echo "Waiting for Laravel installation to complete..."
+          max_wait=300
+          waited=0
           while [ ! -f /var/www/html/artisan ]; do
+            if [ $waited -ge $max_wait ]; then
+              echo "ERROR: Laravel installation timeout after ${max_wait}s"
+              exit 1
+            fi
             sleep 2
+            waited=$((waited + 2))
           done
           echo "Laravel is ready!"
 
@@ -164,7 +204,7 @@ services:
             chmod +x /usr/local/bin/shutdown.sh
           fi
 
-          # Start supervisord
+          echo "Starting supervisor..."
           exec /usr/bin/supervisord -c /etc/supervisord.conf
     environment:
       - SERVICE_URL_LARAVEL
@@ -193,10 +233,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "php-fpm", "-t"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 && test -f /var/www/html/artisan && php /var/www/html/artisan --version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
   nginx:
@@ -243,12 +284,14 @@ services:
               }
           }
     depends_on:
-      - laravel
+      laravel:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "nginx", "-t"]
+      test: ["CMD-SHELL", "nginx -t && pgrep nginx >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   mariadb:
     image: mariadb:11
@@ -267,11 +310,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass $SERVICE_PASSWORD_REDIS
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"${SERVICE_PASSWORD_REDIS}\" ping | grep -q PONG || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5
