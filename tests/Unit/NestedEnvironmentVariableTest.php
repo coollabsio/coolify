@@ -205,3 +205,8 @@ test('replaceVariables handles truncated brace format', function () {
     $result = replaceVariables('{API_URL');
     expect($result->value())->toBe('API_URL');
 });
+
+test('replaceVariables handles bare dollar format for generic variable', function () {
+    $result = replaceVariables('$MY_VAR');
+    expect($result->value())->toBe('MY_VAR');
+});

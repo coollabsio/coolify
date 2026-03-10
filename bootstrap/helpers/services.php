@@ -112,6 +112,11 @@ function replaceVariables(string $variable): Stringable
         return $str->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
     }
 
+    // Handle $VAR format
+    if ($str->startsWith('$')) {
+        return $str->after('$');
+    }
+
     // Handle {VAR} format (from regex capture group without $)
     if ($str->startsWith('{') && $str->endsWith('}')) {
         return str(substr($variable, 1, -1));
