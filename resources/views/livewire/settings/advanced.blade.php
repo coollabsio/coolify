@@ -21,6 +21,17 @@
                             helper="Allow users to self-register. If disabled, only administrators can create accounts."
                             label="Registration Allowed" />
                     </div>
+                    <h4 class="pt-4">OAuth Settings</h4>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="oauth_registration_enabled"
+                            helper="Allow users to self-register via OAuth providers even when general registration is disabled."
+                            label="OAuth Registration" />
+                    </div>
+                    <div class="md:w-96">
+                        <x-forms.checkbox instantSave id="oauth_only"
+                            helper="Restrict users to OAuth-only authentication. OAuth users cannot create or use passwords. This allows centralized access control via your OAuth provider."
+                            label="OAuth Only" />
+                    </div>
                     <div class="md:w-96">
                         <x-forms.checkbox instantSave id="do_not_track"
                             helper="Opt out of reporting this instance to coolify.io's installation count. No other data is collected."
