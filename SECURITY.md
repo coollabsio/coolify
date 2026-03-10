@@ -21,7 +21,7 @@ If you find a security vulnerability in a currently supported version, please fo
 1. **DO NOT** disclose the vulnerability publicly.
 2. Send a detailed report to: `security@coollabs.io` or report it via [GitHub Security Advisories](https://github.com/coollabsio/coolify/security/advisories/new).
 3. Include in your report:
-    - **Explanation:** Detailed explanation of the vulnerability.
-    - **Affected Versions:** Which Coolify versions are affected.
-    - **Reproduction:** Clear steps to reproduce the vulnerability.
-    - **Impact:** Assessment of the potential impact of the vulnerability.
+   - **Explanation:** Detailed explanation of the vulnerability.
+   - **Affected Versions:** Which Coolify versions are affected.
+   - **Reproduction:** Clear steps to reproduce the vulnerability.
+   - **Impact:** Assessment of the potential impact of the vulnerability.
