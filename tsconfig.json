@@ -42,7 +42,7 @@
 
 		// Projects
 		"incremental": true,
-		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildInfo",
+		"tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildInfo",
 
 		// Completeness
 		"skipLibCheck": true
