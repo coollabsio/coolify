@@ -805,9 +805,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 $this->write_deployment_configurations();
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => true],
-                );
+                if ($this->preserveRepository) {
+                    $this->execute_remote_command(
+                        ['command' => "cd {$server_workdir} && {$start_command}", 'hidden' => true],
+                    );
+                } else {
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => true],
+                    );
+                }
             } else {
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->preserveRepository) {

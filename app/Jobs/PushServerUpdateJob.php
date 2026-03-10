@@ -307,6 +307,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
                     $application->status = $aggregatedStatus;
                     $application->save();
+                } elseif ($aggregatedStatus) {
+                    $application->update(['last_online_at' => now()]);
                 }
 
                 continue;
@@ -321,6 +323,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
                 $application->status = $aggregatedStatus;
                 $application->save();
+            } elseif ($aggregatedStatus) {
+                $application->update(['last_online_at' => now()]);
             }
         }
     }
@@ -371,6 +375,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {
                     $subResource->status = $aggregatedStatus;
                     $subResource->save();
+                } elseif ($aggregatedStatus) {
+                    $subResource->update(['last_online_at' => now()]);
                 }
 
                 continue;
@@ -386,6 +392,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {
                 $subResource->status = $aggregatedStatus;
                 $subResource->save();
+            } elseif ($aggregatedStatus) {
+                $subResource->update(['last_online_at' => now()]);
             }
         }
     }
@@ -399,6 +407,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($application->status !== $containerStatus) {
             $application->status = $containerStatus;
             $application->save();
+        } else {
+            $application->update(['last_online_at' => now()]);
         }
     }
 
@@ -413,6 +423,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($application->status !== $containerStatus) {
             $application->status = $containerStatus;
             $application->save();
+        } else {
+            $application->update(['last_online_at' => now()]);
         }
     }
 
@@ -508,6 +520,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($database->status !== $containerStatus) {
             $database->status = $containerStatus;
             $database->save();
+        } else {
+            $database->update(['last_online_at' => now()]);
         }
         if ($this->isRunning($containerStatus) && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
@@ -545,39 +559,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $database = $this->databases->where('uuid', $databaseUuid)->first();
             if ($database) {
                 if (! str($database->status)->startsWith('exited')) {
-                    $database->status = 'exited';
-                    $database->save();
+                    $database->update([
+                        'status' => 'exited',
+                        'restart_count' => 0,
+                        'last_restart_at' => null,
+                        'last_restart_type' => null,
+                    ]);
                 }
                 if ($database->is_public) {
                     StopDatabaseProxy::dispatch($database);
                 }
             }
         });
-    }
-
-    private function updateServiceSubStatus(string $serviceId, string $subType, string $subId, string $containerStatus)
-    {
-        $service = $this->services->where('id', $serviceId)->first();
-        if (! $service) {
-            return;
-        }
-        if ($subType === 'application') {
-            $application = $service->applications->where('id', $subId)->first();
-            if ($application) {
-                if ($application->status !== $containerStatus) {
-                    $application->status = $containerStatus;
-                    $application->save();
-                }
-            }
-        } elseif ($subType === 'database') {
-            $database = $service->databases->where('id', $subId)->first();
-            if ($database) {
-                if ($database->status !== $containerStatus) {
-                    $database->status = $containerStatus;
-                    $database->save();
-                }
-            }
-        }
     }
 
     private function updateNotFoundServiceStatus()

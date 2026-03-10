@@ -4,11 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Subscription;
 use App\Models\Team;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 
-class StripeProcessJob implements ShouldQueue
+class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

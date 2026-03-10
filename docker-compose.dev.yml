@@ -73,6 +73,7 @@ services:
     volumes:
       - ./storage:/var/www/html/storage
       - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
+      - ./docker/coolify-realtime/terminal-utils.js:/terminal/terminal-utils.js
     environment:
       SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
