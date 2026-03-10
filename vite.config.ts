@@ -13,14 +13,6 @@ export default defineConfig({
 		inertia(),
 		svelte({
 			configFile: "svelte.config.ts",
-			// TODO: Remove once Inertia v3 https://github.com/inertiajs/inertia/tree/3.x is released and runes=true is set in svelte.config.ts
-			dynamicCompileOptions({ filename, compileOptions }) {
-				// Enforce runes mode for all files not in node_modules
-				if (!/[\\/]node_modules[\\/]/.test(filename) && !compileOptions.runes) {
-					return { runes: true };
-				}
-				return undefined;
-			},
 		}),
 		tailwindcss(),
 	],
