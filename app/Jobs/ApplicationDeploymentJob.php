@@ -2194,9 +2194,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         $this->create_workdir();
+
+        $dirWithCommit = $this->workdir;
+        if ($this->application->settings->is_git_submodules_enabled && $this->basedir !== $this->workdir) {    
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "if git cat-file -e {$this->commit}^{commit} > /dev/null 2>&1;then echo 'No'; else echo 'Yes';fi"),
+                    'hidden' => true,
+                    'save' => 'workdir_is_submodule',
+                ]
+            );
+            $this->application_deployment_queue->addLogEntry("Workdir is submodule: {$this->saved_outputs->get('workdir_is_submodule')}");
+            if (trim($this->saved_outputs->get('workdir_is_submodule')) === 'Yes') {
+                $dirWithCommit = $this->basedir;
+            }
+        }
+
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
+                executeInDocker($this->deployment_uuid, "cd {$dirWithCommit} && git log -1 {$this->commit} --pretty=%B"),
                 'hidden' => true,
                 'save' => 'commit_message',
             ]
