@@ -1,3 +1,4 @@
+import inertia from "@inertiajs/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import laravel from "laravel-vite-plugin";
@@ -9,6 +10,7 @@ export default defineConfig({
 			input: ["resources/js/app.ts"],
 			refresh: true,
 		}),
+		inertia(),
 		svelte({
 			configFile: "svelte.config.ts",
 			// TODO: Remove once Inertia v3 https://github.com/inertiajs/inertia/tree/3.x is released and runes=true is set in svelte.config.ts
