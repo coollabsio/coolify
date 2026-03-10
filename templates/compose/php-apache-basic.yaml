@@ -1,0 +1,29 @@
+# documentation: https://www.php.net/manual/en/install.unix.apache2.php
+# slogan: Very simple PHP hosting with Apache
+# category: web
+# tags: php, apache, hosting, website, simple
+# logo: svgs/php.svg
+# port: 80
+
+services:
+  php-apache:
+    image: php:8.4-apache
+    volumes:
+      - php-apache-files:/var/www/html
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+    healthcheck:
+      test: ["CMD", "php", "-v"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  php-apache-files:
+    name: ${SERVICE_NAME}_php-apache-files
+
+networks:
+  default:
+    name: ${SERVICE_NAME}_network
+

@@ -68,39 +68,55 @@ services:
           #!/bin/sh
           set -e
 
-          # Install required packages
-          apk add --no-cache \
-            supervisor \
-            curl \
-            git \
-            unzip \
-            oniguruma-dev \
-            libzip-dev \
-            postgresql-dev \
-            mysql-client \
-            mariadb-client \
-            freetype-dev \
-            libjpeg-turbo-dev \
-            libpng-dev \
-            icu-dev \
-            libxml2-dev
+          # Check if PHP extensions are already installed
+          if php -m | grep -q "pdo_mysql" && \
+             php -m | grep -q "mbstring" && \
+             php -m | grep -q "zip" && \
+             php -m | grep -q "gd" && \
+             php -m | grep -q "intl" && \
+             php -m | grep -q "opcache"; then
+            echo "PHP extensions already installed, skipping compilation..."
+          else
+            echo "Installing PHP extensions..."
 
-          # Install PHP extensions
-          docker-php-ext-install -j$(nproc) \
-            pdo_mysql \
-            pdo_pgsql \
-            mbstring \
-            zip \
-            exif \
-            pcntl \
-            bcmath \
-            gd \
-            intl \
-            opcache
+            # Install required packages
+            apk add --no-cache \
+              supervisor \
+              curl \
+              git \
+              unzip \
+              oniguruma-dev \
+              libzip-dev \
+              postgresql-dev \
+              mysql-client \
+              mariadb-client \
+              freetype-dev \
+              libjpeg-turbo-dev \
+              libpng-dev \
+              icu-dev \
+              libxml2-dev
 
-          # Configure PHP-FPM
-          sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
-          sed -i 's/;clear_env = no/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
+            # Install PHP extensions
+            docker-php-ext-install -j$(nproc) \
+              pdo_mysql \
+              pdo_pgsql \
+              mbstring \
+              zip \
+              exif \
+              pcntl \
+              bcmath \
+              gd \
+              intl \
+              opcache
+
+            echo "PHP extensions installed successfully!"
+          fi
+
+          # Configure PHP-FPM (only if not already configured)
+          if ! grep -q "listen = 0.0.0.0:9000" /usr/local/etc/php-fpm.d/www.conf 2>/dev/null; then
+            sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
+            sed -i 's/;clear_env = no/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
+          fi
 
           # Install Composer if not present
           if ! command -v composer >/dev/null 2>&1; then
@@ -137,14 +153,16 @@ services:
           done
           echo "Laravel is ready!"
 
-          # Create shutdown.sh script for supervisor
-          cat > /usr/local/bin/shutdown.sh << 'EOF'
+          # Create shutdown.sh script for supervisor (only if not exists)
+          if [ ! -f /usr/local/bin/shutdown.sh ]; then
+            cat > /usr/local/bin/shutdown.sh << 'EOF'
           #!/bin/sh
           if [ -f /tmp/supervisord.pid ]; then
             kill -TERM $(cat /tmp/supervisord.pid) 2>/dev/null || true
           fi
           EOF
-          chmod +x /usr/local/bin/shutdown.sh
+            chmod +x /usr/local/bin/shutdown.sh
+          fi
 
           # Start supervisord
           exec /usr/bin/supervisord -c /etc/supervisord.conf

@@ -5195,6 +5195,22 @@
         "logo": "svgs/wordpress.svg",
         "minversion": "0.0.0"
     },
+    "php-apache-basic": {
+        "documentation": "https://www.php.net/manual/en/install.unix.apache2.php?utm_source=coolify.io",
+        "slogan": "Very simple PHP hosting with Apache.",
+        "compose": "IyBkb2N1bWVudGF0aW9uOiBodHRwczovL3d3dy5waHAubmV0L21hbnVhbC9lbi9pbnN0YWxsLnVuaXguYXBhY2hlMi5waHANCiMgc2xvZ2FuOiBWZXJ5IHNpbXBsZSBQSFAgaG9zdGluZyB3aXRoIEFwYWNoZQ0KIyBjYXRlZ29yeTogd2ViDQojIHRhZ3M6IHBocCwgYXBhY2hlLCBob3N0aW5nLCB3ZWJzaXRlLCBzaW1wbGUNCiMgbG9nbzogc3Zncy9waHAuc3ZnDQojIHBvcnQ6IDgwDQoNCnNlcnZpY2VzOg0KICBwaHAtYXBhY2hlOg0KICAgIGltYWdlOiBwaHA6OC40LWFwYWNoZQ0KICAgIHZvbHVtZXM6DQogICAgICAtIHBocC1hcGFjaGUtZmlsZXM6L3Zhci93d3cvaHRtbA0KICAgIGVudmlyb25tZW50Og0KICAgICAgLSBBUEFDSEVfRE9DVU1FTlRfUk9PVD0vdmFyL3d3dy9odG1sDQogICAgaGVhbHRoY2hlY2s6DQogICAgICB0ZXN0OiBbIkNNRCIsICJwaHAiLCAiLXYiXQ0KICAgICAgaW50ZXJ2YWw6IDEwcw0KICAgICAgdGltZW91dDogNXMNCiAgICAgIHJldHJpZXM6IDUNCiAgICAgIHN0YXJ0X3BlcmlvZDogMTBzDQoNCnZvbHVtZXM6DQogIHBocC1hcGFjaGUtZmlsZXM6DQogICAgbmFtZTogJHtTRVJWSUNFX05BTUV9X3BocC1hcGFjaGUtZmlsZXMNCg0KbmV0d29ya3M6DQogIGRlZmF1bHQ6DQogICAgbmFtZTogJHtTRVJWSUNFX05BTUV9X25ldHdvcmsNCg0K",
+        "tags": [
+            "php",
+            "apache",
+            "hosting",
+            "website",
+            "simple"
+        ],
+        "category": "web",
+        "logo": "svgs/php.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "yamtrack-with-postgresql": {
         "documentation": "https://github.com/FuzzyGrim/Yamtrack/wiki?utm_source=coolify.io",
         "slogan": "Yamtrack is a self hosted media tracker for movies, tv shows, anime, manga, video games and books.",

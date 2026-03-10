@@ -333,6 +333,26 @@ if [ ! -z "$TEMPLATE_CHANGES" ]; then
     echo -e "${BLUE}Regenerando service templates JSON...${NC}"
     echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
 
+    # Asegurar que todos los archivos .env de templates/compose estén copiados
+    echo -e "${YELLOW}Copiando archivos .env de templates/compose...${NC}"
+    if [ -d "$COOLIFY_DIR/templates/compose" ]; then
+        while IFS= read -r envfile; do
+            RELATIVE_PATH="${envfile#$COOLIFY_DIR/}"
+            DEST_FILE="/var/www/html/$RELATIVE_PATH"
+            DEST_DIR=$(dirname "$DEST_FILE")
+            docker exec "$COOLIFY_CONTAINER" mkdir -p "$DEST_DIR" 2>/dev/null || true
+            if [ -f "$envfile" ]; then
+                if docker cp "$envfile" "$COOLIFY_CONTAINER:$DEST_FILE" 2>/dev/null; then
+                    docker exec -u root "$COOLIFY_CONTAINER" chown www-data:www-data "$DEST_FILE" 2>/dev/null || true
+                    docker exec -u root "$COOLIFY_CONTAINER" chmod 644 "$DEST_FILE" 2>/dev/null || true
+                    echo -e "${GREEN}✓ Copiado: $RELATIVE_PATH${NC}"
+                else
+                    echo -e "${YELLOW}⚠️  No se pudo copiar: $RELATIVE_PATH${NC}"
+                fi
+            fi
+        done < <(find "$COOLIFY_DIR/templates/compose" -type f -name "*.env" 2>/dev/null)
+    fi
+
     # Verificar si el comando generate:services existe y funciona
     if docker exec -u www-data "$COOLIFY_CONTAINER" sh -c "cd /var/www/html && php artisan list | grep -q 'generate:services'" 2>/dev/null; then
         echo -e "${YELLOW}Ejecutando: php artisan generate:services${NC}"
