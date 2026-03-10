@@ -17,6 +17,11 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
+        // Prevent OAuth-only users from resetting passwords
+        if ($user->oauth_only) {
+            throw new \Exception('OAuth-only users cannot reset passwords.');
+        }
+
         Validator::make($input, [
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
