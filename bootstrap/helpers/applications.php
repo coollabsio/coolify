@@ -28,6 +28,11 @@ function queue_application_deployment(Application $application, string $deployme
         $destination_id = $destination->id;
     }
 
+    $pinnedCommit = str($application->git_commit_sha ?? '')->trim()->value();
+    if ($pull_request_id === 0 && ! $rollback && $pinnedCommit !== '' && $pinnedCommit !== 'HEAD') {
+        $commit = $pinnedCommit;
+    }
+
     // Check if the deployment queue is full for this server
     $serverForQueueCheck = $server ?? Server::find($server_id);
     $queue_limit = $serverForQueueCheck->settings->deployment_queue_limit ?? 25;
