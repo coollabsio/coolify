@@ -15,6 +15,12 @@ class Advanced extends Component
     public bool $is_registration_enabled;
 
     #[Validate('boolean')]
+    public bool $oauth_registration_enabled;
+
+    #[Validate('boolean')]
+    public bool $oauth_only;
+
+    #[Validate('boolean')]
     public bool $do_not_track;
 
     #[Validate('boolean')]
@@ -41,6 +47,8 @@ class Advanced extends Component
     {
         return [
             'is_registration_enabled' => 'boolean',
+            'oauth_registration_enabled' => 'boolean',
+            'oauth_only' => 'boolean',
             'do_not_track' => 'boolean',
             'is_dns_validation_enabled' => 'boolean',
             'custom_dns_servers' => 'nullable|string',
@@ -62,6 +70,8 @@ class Advanced extends Component
         $this->allowed_ips = $this->settings->allowed_ips;
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->oauth_registration_enabled = $this->settings->oauth_registration_enabled ?? false;
+        $this->oauth_only = $this->settings->oauth_only ?? false;
         $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
         $this->is_api_enabled = $this->settings->is_api_enabled;
         $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
@@ -142,6 +152,8 @@ class Advanced extends Component
     {
         try {
             $this->settings->is_registration_enabled = $this->is_registration_enabled;
+            $this->settings->oauth_registration_enabled = $this->oauth_registration_enabled;
+            $this->settings->oauth_only = $this->oauth_only;
             $this->settings->do_not_track = $this->do_not_track;
             $this->settings->is_dns_validation_enabled = $this->is_dns_validation_enabled;
             $this->settings->custom_dns_servers = $this->custom_dns_servers;
