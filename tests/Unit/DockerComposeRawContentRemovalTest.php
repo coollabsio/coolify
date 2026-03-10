@@ -35,10 +35,10 @@ it('ensures applicationParser updates docker_compose_raw from original compose, 
     // Read the applicationParser function from parsers.php
     $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
-    // Check that docker_compose_raw is set from originalCompose, not cleanedCompose
+    // Check that docker_compose_raw is set from originalCompose (with empty sections filtered), not cleanedCompose
     expect($parsersFile)
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
-        ->toContain('$resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);')
+        ->toContain('$resource->docker_compose_raw = Yaml::dump(filterEmptyComposeSections($originalYaml), 10, 2);')
         ->not->toContain('$resource->docker_compose_raw = $cleanedCompose;');
 });
 
@@ -50,10 +50,10 @@ it('ensures serviceParser updates docker_compose_raw from original compose, not 
     $serviceParserStart = strpos($parsersFile, 'function serviceParser(Service $resource): Collection');
     $serviceParserContent = substr($parsersFile, $serviceParserStart);
 
-    // Check that docker_compose_raw is set from originalCompose within serviceParser
+    // Check that docker_compose_raw is set from originalCompose (with empty sections filtered) within serviceParser
     expect($serviceParserContent)
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
-        ->toContain('$resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);')
+        ->toContain('$resource->docker_compose_raw = Yaml::dump(filterEmptyComposeSections($originalYaml), 10, 2);')
         ->not->toContain('$resource->docker_compose_raw = $cleanedCompose;');
 });
 

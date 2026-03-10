@@ -17,6 +17,199 @@ use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 /**
+ * Normalizes a Compose path by collapsing "." and ".." segments.
+ *
+ * @param  string  $path  Repo-relative or absolute path
+ * @return string Normalized absolute path rooted at repo root
+ */
+function normalizeComposePath(string $path): string
+{
+    $segments = [];
+
+    foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+
+        if ($segment === '..') {
+            array_pop($segments);
+
+            continue;
+        }
+
+        $segments[] = $segment;
+    }
+
+    return '/'.implode('/', $segments);
+}
+
+/**
+ * Extracts local file paths from the Docker Compose `include` section.
+ * Only supports local file paths (relative or absolute). Skips remote URLs (oci://, https://, etc.).
+ * Has time complexity of O(n^2) because of the nested foreach loops. This is acceptable here because the number of includes is usually very small.
+ *
+ * @param  array<string, mixed>  $yaml  Parsed compose YAML
+ * @param  string  $composeDir  Directory of the main compose file (for resolving relative paths)
+ * @return array<int, string> List of resolved include paths relative to repo root
+ */
+function extractComposeIncludePaths(array $yaml, string $composeDir): array
+{
+    $include = data_get($yaml, 'include');
+    if (! $include) {
+        return [];
+    }
+
+    $paths = [];
+    $includeList = is_array($include) ? $include : [$include];
+
+    foreach ($includeList as $item) {
+        if (is_string($item)) {
+            $path = resolveComposeIncludePath($item, $composeDir);
+            if ($path !== null) {
+                $paths[] = $path;
+            }
+        } elseif (is_array($item) && isset($item['path'])) {
+            $pathItems = is_array($item['path']) ? $item['path'] : [$item['path']];
+            foreach ($pathItems as $pathItem) {
+                if (is_string($pathItem)) {
+                    $path = resolveComposeIncludePath($pathItem, $composeDir);
+                    if ($path !== null) {
+                        $paths[] = $path;
+                    }
+                }
+            }
+        }
+    }
+
+    return array_values(array_unique($paths));
+}
+
+/**
+ * Resolves an include path relative to the compose file directory.
+ * Returns null for remote URLs (oci://, https://, etc.) which we don't support.
+ *
+ * @param  string  $includePath  Path from include section (e.g. ./backend/docker-compose.yml)
+ * @param  string  $composeDir  Directory of the including compose file
+ * @return string|null Resolved path from repo root, or null for unsupported remote paths
+ */
+function resolveComposeIncludePath(string $includePath, string $composeDir): ?string
+{
+    $path = trim($includePath);
+    if ($path === '') {
+        return null;
+    }
+
+    if (str_starts_with($path, 'oci://') || str_starts_with($path, 'https://') || str_starts_with($path, 'http://')) {
+        return null;
+    }
+
+    // resolve relative path
+    $path = str_replace('\\', '/', $path);
+    if (str_starts_with($path, '/')) {
+        return normalizeComposePath($path);
+    }
+
+    $composeDir = trim(normalizeComposePath($composeDir), '/');
+    $resolved = $composeDir === '' ? $path : $composeDir.'/'.ltrim($path, '/');
+
+    return normalizeComposePath($resolved);
+}
+
+/**
+ * Parses marker-delimited include file content fetched from Git commands.
+ *
+ * @return array<string, string> Map of normalized include path => raw file content
+ */
+function parseComposeIncludeFiles(string $includedContent): array
+{
+    preg_match_all('/===INCLUDE:(.+?)===\R?(.*?)(?=(?:===INCLUDE:.+?===)|\z)/s', $includedContent, $matches, PREG_SET_ORDER);
+
+    $includedFiles = [];
+
+    foreach ($matches as $match) {
+        $path = trim($match[1] ?? '');
+        $content = ltrim($match[2] ?? '', "\r\n");
+        $content = rtrim($content);
+
+        if ($path === '' || $content === '') {
+            continue;
+        }
+
+        $includedFiles[$path] = $content;
+    }
+
+    return $includedFiles;
+}
+
+/**
+ * Merges Docker Compose files when the main file uses `include`.
+ * Merges services, volumes, networks, configs, and secrets from included files.
+ * The main file takes precedence for conflicts (later in merge order).
+ *
+ * @param  array<string, mixed>  $mainYaml  Parsed main compose YAML
+ * @param  array<string, string>  $includedFiles  Map of path => content for each included file
+ * @return array<string, mixed> Merged compose structure (include section removed)
+ */
+function mergeComposeWithIncludes(array $mainYaml, array $includedFiles): array
+{
+    $merged = $mainYaml;
+    unset($merged['include']);
+
+    $topLevelKeys = ['services', 'volumes', 'networks', 'configs', 'secrets'];
+    $mergedSections = collect($topLevelKeys)->mapWithKeys(fn ($key) => [$key => collect(data_get($merged, $key, []))]);
+
+    foreach ($includedFiles as $content) {
+        try {
+            $included = Yaml::parse($content);
+        } catch (\Exception) {
+            continue;
+        }
+
+        if (! is_array($included)) {
+            continue;
+        }
+
+        foreach ($topLevelKeys as $key) {
+            $section = $mergedSections->get($key);
+            foreach (data_get($included, $key, []) as $name => $value) {
+                if (! $section->has($name)) {
+                    $section->put($name, $value);
+                }
+            }
+        }
+    }
+
+    foreach ($topLevelKeys as $key) {
+        $merged[$key] = $mergedSections->get($key)->toArray();
+    }
+
+    return filterEmptyComposeSections($merged);
+}
+
+/**
+ * Removes empty top-level sections (volumes, networks, configs, secrets) from a compose array.
+ * Empty sections like "volumes: {  }" are not valid/clean YAML and should be omitted.
+ *
+ * @param  array<string, mixed>  $compose  Parsed compose structure
+ * @return array<string, mixed> Compose with empty sections removed
+ */
+function filterEmptyComposeSections(array $compose): array
+{
+    $emptyKeys = ['volumes', 'networks', 'configs', 'secrets'];
+
+    foreach ($emptyKeys as $key) {
+        if (isset($compose[$key]) && (is_array($compose[$key]) || $compose[$key] instanceof \Countable)) {
+            $count = is_array($compose[$key]) ? count($compose[$key]) : $compose[$key]->count();
+            if ($count === 0) {
+                unset($compose[$key]);
+            }
+        }
+    }
+
+    return $compose;
+}
+
+/**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
  * This should be called BEFORE saving to database to prevent malicious data from being stored.
  *
@@ -366,6 +559,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $originalCompose = $compose;
     if (! $compose) {
         return collect([]);
+    }
+
+    // Resolve include directives so deployable compose has all services from included files
+    $resolved = $resource->resolveComposeIncludes($compose);
+    if ($resolved !== null) {
+        $compose = $resolved;
     }
 
     $pullRequestId = $pull_request_id;
@@ -1474,7 +1673,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+        $resource->docker_compose_raw = Yaml::dump(filterEmptyComposeSections($originalYaml), 10, 2);
     } catch (\Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
         ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
@@ -2697,7 +2896,7 @@ function serviceParser(Service $resource): Collection
                 }
             }
         }
-        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+        $resource->docker_compose_raw = Yaml::dump(filterEmptyComposeSections($originalYaml), 10, 2);
     } catch (\Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
         ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());

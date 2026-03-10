@@ -1525,6 +1525,74 @@ class Application extends BaseModel
         }
     }
 
+    /**
+     * Resolves docker compose include directives by fetching included files from Git and merging.
+     * Returns merged YAML string, or null if resolution fails (caller should use original content).
+     */
+    public function resolveComposeIncludes(string $composeContent): ?string
+    {
+        if (! $this->destination?->server) {
+            return null;
+        }
+
+        try {
+            $mainYaml = Yaml::parse($composeContent);
+            if (! is_array($mainYaml)) {
+                return null;
+            }
+
+            $workdir = rtrim($this->base_directory, '/');
+            $composeFile = $this->docker_compose_location;
+            $fullComposePath = $workdir.$composeFile;
+            $composeDir = dirname($fullComposePath);
+            if ($composeDir === '/' || $composeDir === '.') {
+                $composeDir = '';
+            }
+
+            $includePaths = extractComposeIncludePaths($mainYaml, $composeDir);
+            if (empty($includePaths)) {
+                return $composeContent;
+            }
+
+            $uuid = new Cuid2;
+            ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+
+            $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
+            if (! $gitRemoteStatus['is_accessible']) {
+                return null;
+            }
+
+            $fetchIncludeCommands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+            ]);
+            foreach ($includePaths as $path) {
+                $includeMarker = escapeshellarg("===INCLUDE:{$path}===");
+                $gitPath = escapeshellarg('HEAD:'.ltrim($path, '/'));
+                $fetchIncludeCommands->push("printf '%s\n' {$includeMarker} && git show {$gitPath}");
+            }
+
+            $includedContent = instant_remote_process($fetchIncludeCommands->toArray(), $this->destination->server);
+
+            instant_remote_process(["rm -rf /tmp/{$uuid}"], $this->destination->server, false);
+
+            $includedFiles = parseComposeIncludeFiles($includedContent);
+            if (count($includedFiles) !== count($includePaths)) {
+                return null;
+            }
+
+            $merged = mergeComposeWithIncludes($mainYaml, $includedFiles);
+
+            return Yaml::dump($merged, 10, 2);
+        } catch (\Throwable $e) {
+            \Log::debug('Failed to resolve Docker Compose include: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
     public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         // Use provided restore values or capture current values as fallback
@@ -1537,52 +1605,54 @@ class Application extends BaseModel
         ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
-        $fileList = collect([".$workdir$composeFile"]);
+        $gitComposePath = ltrim(normalizeComposePath($composeFile), '/');
+        $fullComposePath = $workdir.$composeFile;
+        $composeDir = dirname($fullComposePath);
+        if ($composeDir === '/' || $composeDir === '.') {
+            $composeDir = '';
+        }
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
             throw new \RuntimeException("Failed to read Git source:\n\n{$gitRemoteStatus['error']}");
         }
-        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
-        $gitVersion = str($getGitVersion)->explode(' ')->last();
-
-        if (version_compare($gitVersion, '2.35.1', '<')) {
-            $fileList = $fileList->map(function ($file) {
-                $parts = explode('/', trim($file, '.'));
-                $paths = collect();
-                $currentPath = '';
-                foreach ($parts as $part) {
-                    $currentPath .= ($currentPath ? '/' : '').$part;
-                    if (str($currentPath)->isNotEmpty()) {
-                        $paths->push($currentPath);
-                    }
-                }
-
-                return $paths;
-            })->flatten()->unique()->values();
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
-            ]);
-        } else {
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
-            ]);
-        }
+        $commands = collect([
+            "rm -rf /tmp/{$uuid}",
+            "mkdir -p /tmp/{$uuid}",
+            "cd /tmp/{$uuid}",
+            $cloneCommand,
+            'git show '.escapeshellarg("HEAD:{$gitComposePath}"),
+        ]);
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
+
+            if ($composeFileContent) {
+                try {
+                    $mainYaml = \Symfony\Component\Yaml\Yaml::parse($composeFileContent);
+                    $includePaths = extractComposeIncludePaths($mainYaml, $composeDir);
+
+                    if (! empty($includePaths)) {
+                        $fetchIncludeCommands = collect([
+                            "cd /tmp/{$uuid}",
+                        ]);
+                        foreach ($includePaths as $path) {
+                            $includeMarker = escapeshellarg("===INCLUDE:{$path}===");
+                            $gitPath = escapeshellarg('HEAD:'.ltrim($path, '/'));
+                            $fetchIncludeCommands->push("printf '%s\n' {$includeMarker} && git show {$gitPath}");
+                        }
+                        $includedContent = instant_remote_process($fetchIncludeCommands->toArray(), $this->destination->server);
+                        $includedFiles = parseComposeIncludeFiles($includedContent);
+
+                        if (count($includedFiles) !== count($includePaths)) {
+                            throw new \RuntimeException('Failed to read every Docker Compose include file from Git.');
+                        }
+
+                        $merged = mergeComposeWithIncludes($mainYaml, $includedFiles);
+                        $composeFileContent = \Symfony\Component\Yaml\Yaml::dump($merged, 10, 2);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to resolve Docker Compose include, using main file only: '.$e->getMessage());
+                }
+            }
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
