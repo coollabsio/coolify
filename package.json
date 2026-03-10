@@ -20,7 +20,9 @@
 		"prettier-plugin-svelte": "^3.5.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"svelte": "^5.53.7",
+		"svelte-check": "^4.4.5",
 		"tailwindcss": "^4.2.1",
+		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.57.0",
 		"vite": "^8.0.0-beta.16"
 	},
@@ -33,6 +35,7 @@
 		"preview": "vite preview",
 		"format": "prettier --config prettier.config.ts --cache --cache-strategy metadata --write .",
 		"lint": "bunx --bun eslint --config eslint.config.ts --cache --cache-location node_modules/.cache/eslint --fix .",
+		"check": "svelte-check --tsconfig tsconfig.json",
 		"test:lint": "bunx --bun eslint --config eslint.config.ts --cache --cache-location node_modules/.cache/eslint .",
 		"test:format": "prettier --config prettier.config.ts --cache --cache-strategy metadata --check ."
 	}
