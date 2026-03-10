@@ -1,0 +1,49 @@
+# documentation: https://surrealdb.com/docs
+# slogan: SurrealDB with TiKV — a distributed, scalable multi-model database backed by TiKV for production-grade storage.
+# category: database
+# tags: database, nosql, graph, document, sql, surrealdb, tikv, distributed, production
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  pd:
+    image: pingcap/pd:latest
+    command: >
+      --name=pd
+      --data-dir=/data/pd
+      --client-urls=http://0.0.0.0:2379
+      --peer-urls=http://0.0.0.0:2380
+      --advertise-client-urls=http://pd:2379
+      --advertise-peer-urls=http://pd:2380
+    volumes:
+      - pd-data:/data/pd
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:2379/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  tikv:
+    image: pingcap/tikv:latest
+    command: >
+      --addr=0.0.0.0:20160
+      --advertise-addr=tikv:20160
+      --data-dir=/data/tikv
+      --pd=pd:2379
+    volumes:
+      - tikv-data:/data/tikv
+    depends_on:
+      pd:
+        condition: service_healthy
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user $SERVICE_USER_SURREALDB --pass $SERVICE_PASSWORD_SURREALDB tikv://pd:2379
+    environment:
+      - SERVICE_FQDN_SURREALDB_8000
+    depends_on:
+      tikv:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
