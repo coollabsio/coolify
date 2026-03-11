@@ -46,12 +46,18 @@ class PhpMyAdminController extends Controller
             // URL del formulario de login de phpMyAdmin
             $loginUrl = $baseUrl.'index.php';
             
-            // Escapar valores para HTML
+            // Escapar valores para HTML y JavaScript
             $server = htmlspecialchars($credentials['server'] ?? '1', ENT_QUOTES, 'UTF-8');
             $username = htmlspecialchars($credentials['username'] ?? 'root', ENT_QUOTES, 'UTF-8');
             $password = htmlspecialchars($credentials['password'] ?? '', ENT_QUOTES, 'UTF-8');
+            
+            // Escapar para JavaScript (JSON encode)
+            $serverJs = json_encode($server);
+            $usernameJs = json_encode($username);
+            $passwordJs = json_encode($password);
+            $loginUrlJs = json_encode($loginUrl);
 
-            // Generar página HTML que envía el formulario automáticamente mediante POST
+            // Generar página HTML que redirige a phpMyAdmin y rellena el formulario con JavaScript
             $html = <<<HTML
 <!DOCTYPE html>
 <html lang="es">
@@ -104,30 +110,77 @@ class PhpMyAdminController extends Controller
         <p>Por favor espera mientras se completa el inicio de sesión automático.</p>
     </div>
     
-    <form id="phpmyadmin-form" method="post" action="{$loginUrl}" style="display: none;">
-        <input type="hidden" name="pma_servername" value="{$server}">
-        <input type="hidden" name="pma_username" value="{$username}">
-        <input type="hidden" name="pma_password" value="{$password}">
-        <input type="hidden" name="server" value="{$server}">
-    </form>
-    
     <script>
-        // Enviar el formulario inmediatamente cuando la página carga
-        (function() {
-            const form = document.getElementById('phpmyadmin-form');
-            if (form) {
-                // Enviar inmediatamente sin esperar
-                form.submit();
-            }
-        })();
+        // Redirigir a phpMyAdmin y luego rellenar el formulario
+        const loginUrl = {$loginUrlJs};
+        const server = {$serverJs};
+        const username = {$usernameJs};
+        const password = {$passwordJs};
         
-        // Fallback: si después de 2 segundos no se ha redirigido, mostrar mensaje
-        setTimeout(function() {
-            const container = document.querySelector('.container');
-            if (container && document.visibilityState === 'visible') {
-                container.innerHTML = '<h1>Redirigiendo...</h1><p>Si no se redirige automáticamente, <a href="{$loginUrl}" style="color: white; text-decoration: underline;">haz clic aquí</a>.</p>';
-            }
-        }, 2000);
+        console.log('[phpMyAdmin Autologin] Redirecting to:', loginUrl);
+        console.log('[phpMyAdmin Autologin] Credentials:', {server: server, username: username});
+        
+        // Redirigir a phpMyAdmin
+        window.location.href = loginUrl;
+        
+        // Intentar rellenar el formulario cuando la página carga
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                try {
+                    // Buscar el formulario de login
+                    const loginForm = document.querySelector('form[name="login_form"]') || 
+                                    document.querySelector('form#login_form') ||
+                                    document.querySelector('form.login-form') ||
+                                    document.querySelector('form');
+                    
+                    if (loginForm) {
+                        console.log('[phpMyAdmin Autologin] Form found, filling...');
+                        
+                        // Buscar campos
+                        const serverInput = loginForm.querySelector('input[name="pma_servername"]') ||
+                                         loginForm.querySelector('input[name="server"]') ||
+                                         loginForm.querySelector('select[name="pma_servername"]') ||
+                                         loginForm.querySelector('select[name="server"]');
+                        
+                        const usernameInput = loginForm.querySelector('input[name="pma_username"]') ||
+                                            loginForm.querySelector('input[name="username"]');
+                        
+                        const passwordInput = loginForm.querySelector('input[name="pma_password"]') ||
+                                            loginForm.querySelector('input[name="password"]');
+                        
+                        if (serverInput) {
+                            if (serverInput.tagName === 'SELECT') {
+                                const option = Array.from(serverInput.options).find(opt => 
+                                    opt.value === server || opt.text.includes(server)
+                                );
+                                if (option) serverInput.value = option.value;
+                                else if (serverInput.options.length > 0) serverInput.value = serverInput.options[0].value;
+                            } else {
+                                serverInput.value = server;
+                            }
+                        }
+                        
+                        if (usernameInput) usernameInput.value = username;
+                        if (passwordInput) passwordInput.value = password;
+                        
+                        // Intentar enviar el formulario
+                        if (serverInput && usernameInput && passwordInput) {
+                            setTimeout(function() {
+                                const submitButton = loginForm.querySelector('input[type="submit"]') ||
+                                                   loginForm.querySelector('button[type="submit"]') ||
+                                                   loginForm.querySelector('button');
+                                if (submitButton) {
+                                    console.log('[phpMyAdmin Autologin] Submitting form...');
+                                    loginForm.submit();
+                                }
+                            }, 500);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[phpMyAdmin Autologin] Error:', e);
+                }
+            }, 1000);
+        });
     </script>
 </body>
 </html>

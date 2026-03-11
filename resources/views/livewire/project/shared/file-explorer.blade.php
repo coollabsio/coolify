@@ -768,64 +768,60 @@
             </div>
 
 <script>
-    // Definir la URL del endpoint de autologin
-    window.phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
-    console.log('[phpMyAdmin] Script loaded, autologin URL:', window.phpMyAdminAutologinUrl);
+    // Evitar múltiples registros del listener
+    if (window.phpMyAdminListenerRegistered) {
+        // Ya está registrado, no hacer nada
+    } else {
+        window.phpMyAdminListenerRegistered = true;
 
-    // Función para manejar el evento openPhpMyAdmin
-    function handleOpenPhpMyAdmin(data) {
-        console.log('[phpMyAdmin] Event received:', data);
+        // Definir la URL del endpoint de autologin
+        window.phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
+        console.log('[phpMyAdmin] Script loaded, autologin URL:', window.phpMyAdminAutologinUrl);
 
-        if (!data || !data.url) {
-            console.error('[phpMyAdmin] Invalid data received:', data);
-            return;
+        // Función para manejar el evento openPhpMyAdmin
+        function handleOpenPhpMyAdmin(data) {
+            console.log('[phpMyAdmin] Event received:', data);
+
+            if (!data || !data.url) {
+                console.error('[phpMyAdmin] Invalid data received:', data);
+                return;
+            }
+
+            // Si hay datos encriptados, usar el endpoint de autologin
+            if (data.encryptedData) {
+                console.log('[phpMyAdmin] Using autologin endpoint');
+                const autologinUrl = window.phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
+                console.log('[phpMyAdmin] Opening:', autologinUrl);
+                // Abrir solo una vez
+                window.open(autologinUrl, '_blank');
+                return;
+            }
+
+            console.log('[phpMyAdmin] No encrypted data, opening direct URL:', data.url);
+            window.open(data.url, '_blank');
         }
 
-        // Si hay datos encriptados, usar el endpoint de autologin
-        if (data.encryptedData) {
-            console.log('[phpMyAdmin] Using autologin endpoint');
-            const autologinUrl = window.phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
-            console.log('[phpMyAdmin] Opening:', autologinUrl);
-            window.open(autologinUrl, '_blank');
-            return;
+        // Registrar listeners de Livewire cuando esté disponible (solo una vez)
+        function registerListener() {
+            if (window.phpMyAdminListenerRegistered === 'registered') {
+                return; // Ya registrado
+            }
+            window.phpMyAdminListenerRegistered = 'registered';
+
+            Livewire.on('console-log', (data) => {
+                console.log('[FileExplorer Debug]', data);
+            });
+
+            Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
+            console.log('[phpMyAdmin] Listener registered');
         }
 
-        console.log('[phpMyAdmin] No encrypted data, opening direct URL:', data.url);
-        window.open(data.url, '_blank');
+        // Intentar registrar cuando Livewire esté disponible
+        if (window.Livewire) {
+            registerListener();
+        }
+
+        document.addEventListener('livewire:init', registerListener);
+        document.addEventListener('livewire:initialized', registerListener);
     }
-
-    // Registrar listeners de Livewire cuando esté disponible
-    document.addEventListener('livewire:init', function() {
-        console.log('[phpMyAdmin] Livewire init event fired');
-
-    Livewire.on('console-log', (data) => {
-        console.log('[FileExplorer Debug]', data);
-    });
-
-        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
-        console.log('[phpMyAdmin] Listener registered on livewire:init');
-    });
-
-    // Fallback: registrar también cuando Livewire ya está cargado
-    if (window.Livewire) {
-        console.log('[phpMyAdmin] Livewire already loaded, registering listeners');
-
-        Livewire.on('console-log', (data) => {
-            console.log('[FileExplorer Debug]', data);
-        });
-
-        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
-        console.log('[phpMyAdmin] Listener registered (fallback)');
-    }
-
-    // También escuchar eventos globales de Livewire
-    window.addEventListener('livewire:init', function() {
-        console.log('[phpMyAdmin] Window livewire:init event fired');
-    });
-
-    // Registrar usando $wire si está disponible (Livewire 3)
-    document.addEventListener('livewire:initialized', function() {
-        console.log('[phpMyAdmin] Livewire initialized');
-        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
-    });
 </script>
