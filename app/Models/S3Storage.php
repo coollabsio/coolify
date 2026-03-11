@@ -129,8 +129,7 @@ class S3Storage extends BaseModel
             if ($this->unusable_email_sent === false && is_transactional_emails_enabled()) {
                 $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
-                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
-
+                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => base_url().'/storages/'.$this->uuid]);
                 // Load the team with its members and their roles explicitly
                 $team = $this->team()->with(['members' => function ($query) {
                     $query->withPivot('role');
