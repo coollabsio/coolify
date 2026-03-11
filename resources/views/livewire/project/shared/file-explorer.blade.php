@@ -770,18 +770,14 @@
 <script>
     // Definir la URL del endpoint de autologin
     window.phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
+    console.log('[phpMyAdmin] Script loaded, autologin URL:', window.phpMyAdminAutologinUrl);
 
-    // Registrar listeners de Livewire cuando esté disponible
-    document.addEventListener('livewire:init', function() {
-        Livewire.on('console-log', (data) => {
-            console.log('[FileExplorer Debug]', data);
-        });
-
-        Livewire.on('openPhpMyAdmin', (data) => {
+    // Función para manejar el evento openPhpMyAdmin
+    function handleOpenPhpMyAdmin(data) {
         console.log('[phpMyAdmin] Event received:', data);
 
         if (!data || !data.url) {
-            console.error('[phpMyAdmin] Invalid data received');
+            console.error('[phpMyAdmin] Invalid data received:', data);
             return;
         }
 
@@ -794,170 +790,42 @@
             return;
         }
 
-        console.log('[phpMyAdmin] No encrypted data, using fallback method');
-        // Si no hay datos encriptados, usar el método anterior con JavaScript
-        const phpMyAdminWindow = window.open(data.url, '_blank');
+        console.log('[phpMyAdmin] No encrypted data, opening direct URL:', data.url);
+        window.open(data.url, '_blank');
+    }
 
-            // Si hay credenciales, intentar autocompletar el formulario después de que cargue
-            if (data.credentials && phpMyAdminWindow) {
-                // Función para autocompletar el formulario
-                const autoFillForm = () => {
-                    try {
-                        if (!phpMyAdminWindow || !phpMyAdminWindow.document) {
-                            return false;
-                        }
+    // Registrar listeners de Livewire cuando esté disponible
+    document.addEventListener('livewire:init', function() {
+        console.log('[phpMyAdmin] Livewire init event fired');
 
-                        // Buscar el formulario de login de phpMyAdmin
-                        const loginForm = phpMyAdminWindow.document.querySelector('form[name="login_form"]') ||
-                                        phpMyAdminWindow.document.querySelector('form#login_form') ||
-                                        phpMyAdminWindow.document.querySelector('form.login-form') ||
-                                        phpMyAdminWindow.document.querySelector('form');
+    Livewire.on('console-log', (data) => {
+        console.log('[FileExplorer Debug]', data);
+    });
 
-                        if (!loginForm) {
-                            return false;
-                        }
-
-                        // Buscar campos de servidor (puede ser input o select)
-                        let serverInput = loginForm.querySelector('input[name="pma_servername"]') ||
-                                         loginForm.querySelector('input[name="server"]') ||
-                                         loginForm.querySelector('select[name="pma_servername"]') ||
-                                         loginForm.querySelector('select[name="server"]') ||
-                                         loginForm.querySelector('#input_servername') ||
-                                         loginForm.querySelector('#server') ||
-                                         loginForm.querySelector('select');
-
-                        // Buscar campo de usuario
-                        let usernameInput = loginForm.querySelector('input[name="pma_username"]') ||
-                                         loginForm.querySelector('input[name="username"]') ||
-                                         loginForm.querySelector('input[id*="username"]') ||
-                                         loginForm.querySelector('input[type="text"]:not([type="hidden"])');
-
-                        // Buscar campo de contraseña
-                        let passwordInput = loginForm.querySelector('input[name="pma_password"]') ||
-                                         loginForm.querySelector('input[name="password"]') ||
-                                         loginForm.querySelector('input[id*="password"]') ||
-                                         loginForm.querySelector('input[type="password"]');
-
-                        let filled = false;
-
-                        // Rellenar servidor
-                        if (serverInput && data.credentials.server) {
-                            if (serverInput.tagName === 'SELECT') {
-                                // Buscar opción que coincida
-                                const option = Array.from(serverInput.options).find(opt =>
-                                    opt.value === data.credentials.server ||
-                                    opt.text.toLowerCase().includes(data.credentials.server.toLowerCase())
-                                );
-                                if (option) {
-                                    serverInput.value = option.value;
-                                    filled = true;
-                                } else if (serverInput.options.length > 0) {
-                                    // Usar la primera opción disponible
-                                    serverInput.value = serverInput.options[0].value;
-                                    filled = true;
-                                }
-                            } else {
-                                serverInput.value = data.credentials.server;
-                                serverInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                serverInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                filled = true;
-                            }
-                        }
-
-                        // Rellenar usuario
-                        if (usernameInput && data.credentials.username) {
-                            usernameInput.value = data.credentials.username;
-                            usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            usernameInput.dispatchEvent(new Event('change', { bubbles: true }));
-                            filled = true;
-                        }
-
-                        // Rellenar contraseña
-                        if (passwordInput && data.credentials.password) {
-                            passwordInput.value = data.credentials.password;
-                            passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
-                            filled = true;
-                        }
-
-                        // Si todos los campos están llenos, intentar enviar automáticamente
-                        if (filled && serverInput && usernameInput && passwordInput) {
-                            setTimeout(() => {
-                                try {
-                                    const submitButton = loginForm.querySelector('input[type="submit"]') ||
-                                                       loginForm.querySelector('button[type="submit"]') ||
-                                                       loginForm.querySelector('button.btn-primary') ||
-                                                       loginForm.querySelector('button');
-
-                                    if (submitButton &&
-                                        (serverInput.value || (serverInput.tagName === 'SELECT' && serverInput.selectedIndex >= 0)) &&
-                                        usernameInput.value &&
-                                        passwordInput.value) {
-                                        // Enviar el formulario
-                                        loginForm.submit();
-                                    }
-                                } catch (e) {
-                                    console.log('Error al enviar formulario:', e);
-                                }
-                            }, 800);
-                        }
-
-                        return filled;
-                    } catch (e) {
-                        // Error de CORS o acceso denegado - esto es normal si phpMyAdmin está en otro dominio
-                        return false;
-                    }
-                };
-
-                // Intentar múltiples veces con diferentes delays para asegurar que la página cargue
-                const attempts = [800, 1500, 2500, 4000];
-                let successCount = 0;
-
-                attempts.forEach((delay, index) => {
-                    setTimeout(() => {
-                        if (autoFillForm()) {
-                            successCount++;
-                        }
-
-                        // Si después de todos los intentos no se pudo autocompletar, mostrar las credenciales en consola
-                        if (index === attempts.length - 1 && successCount === 0) {
-                            console.log('%cCredenciales para phpMyAdmin:', 'color: blue; font-weight: bold; font-size: 14px;');
-                            console.log('Servidor:', data.credentials.server);
-                            console.log('Usuario:', data.credentials.username);
-                            console.log('Contraseña:', data.credentials.password);
-                        }
-                    }, delay);
-                });
-            }
-        }
-        });
+        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
+        console.log('[phpMyAdmin] Listener registered on livewire:init');
     });
 
     // Fallback: registrar también cuando Livewire ya está cargado
     if (window.Livewire) {
+        console.log('[phpMyAdmin] Livewire already loaded, registering listeners');
+
         Livewire.on('console-log', (data) => {
             console.log('[FileExplorer Debug]', data);
         });
 
-        Livewire.on('openPhpMyAdmin', (data) => {
-            console.log('[phpMyAdmin] Event received:', data);
-
-            if (!data || !data.url) {
-                console.error('[phpMyAdmin] Invalid data received');
-                return;
-            }
-
-            // Si hay datos encriptados, usar el endpoint de autologin
-            if (data.encryptedData) {
-                console.log('[phpMyAdmin] Using autologin endpoint');
-                const autologinUrl = window.phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
-                console.log('[phpMyAdmin] Opening:', autologinUrl);
-                window.open(autologinUrl, '_blank');
-                return;
-            }
-
-            console.log('[phpMyAdmin] No encrypted data, using fallback method');
-            window.open(data.url, '_blank');
-        });
+        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
+        console.log('[phpMyAdmin] Listener registered (fallback)');
     }
+
+    // También escuchar eventos globales de Livewire
+    window.addEventListener('livewire:init', function() {
+        console.log('[phpMyAdmin] Window livewire:init event fired');
+    });
+
+    // Registrar usando $wire si está disponible (Livewire 3)
+    document.addEventListener('livewire:initialized', function() {
+        console.log('[phpMyAdmin] Livewire initialized');
+        Livewire.on('openPhpMyAdmin', handleOpenPhpMyAdmin);
+    });
 </script>
