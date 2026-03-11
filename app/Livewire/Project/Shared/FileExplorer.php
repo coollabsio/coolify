@@ -2104,35 +2104,27 @@ class FileExplorer extends Component
                 $baseUrl = 'https://'.$baseUrl;
             }
 
-            // Obtener credenciales de la base de datos para inicio de sesión automático
-            $dbCredentials = $this->getDatabaseCredentials($service->environment, $service);
+            // Limpiar la URL base (sin parámetros GET ni index.php)
+            // El endpoint de autologin se encargará de hacer el POST con las credenciales
+            $url = \Spatie\Url\Url::fromString($baseUrl);
+            $path = $url->getPath();
             
-            if ($dbCredentials) {
-                // Construir URL con parámetros de inicio de sesión automático
-                // phpMyAdmin soporta inicio de sesión automático mediante parámetros GET
-                // Formato: index.php?pma_username=user&pma_password=pass&server=1
-                $url = \Spatie\Url\Url::fromString($baseUrl);
-                
-                // Asegurar que la URL apunte al index.php
-                $path = $url->getPath();
-                if (! str_ends_with($path, 'index.php') && ! str_ends_with($path, '/')) {
-                    $url = $url->withPath(rtrim($path, '/').'/index.php');
-                } elseif (str_ends_with($path, '/')) {
-                    $url = $url->withPath(rtrim($path, '/').'/index.php');
-                }
-                
-                // Agregar parámetros de inicio de sesión automático
-                $url = $url->withQueryParameters([
-                    'pma_username' => $dbCredentials['username'],
-                    'pma_password' => $dbCredentials['password'],
-                    'server' => $dbCredentials['server'] ?? '1',
-                ]);
-
-                return $url->__toString();
+            // Remover index.php si está presente
+            if (str_ends_with($path, 'index.php')) {
+                $path = dirname($path);
             }
+            $path = rtrim($path, '/');
+            
+            // Asegurar que termine con /
+            if (empty($path) || $path === '/') {
+                $path = '/';
+            } else {
+                $path .= '/';
+            }
+            
+            $url = $url->withPath($path)->withoutQueryParameters();
 
-            // Si no se pueden obtener credenciales, devolver URL sin autenticación
-            return $baseUrl;
+            return $url->__toString();
         } catch (\Throwable $e) {
             return null;
         }

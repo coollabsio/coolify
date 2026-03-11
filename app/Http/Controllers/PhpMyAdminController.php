@@ -26,7 +26,32 @@ class PhpMyAdminController extends Controller
             $phpMyAdminUrl = $data['url'];
             $credentials = $data['credentials'];
 
-            // Generar página HTML que envía el formulario automáticamente
+            // Limpiar la URL para obtener solo la base (sin parámetros GET ni index.php)
+            $urlParts = parse_url($phpMyAdminUrl);
+            $baseUrl = $urlParts['scheme'].'://'.$urlParts['host'];
+            if (isset($urlParts['port'])) {
+                $baseUrl .= ':'.$urlParts['port'];
+            }
+            if (isset($urlParts['path'])) {
+                $path = rtrim($urlParts['path'], '/');
+                // Si termina en index.php, quitarlo
+                if (str_ends_with($path, 'index.php')) {
+                    $path = dirname($path);
+                }
+                $baseUrl .= $path;
+            }
+            // Asegurar que termine con /
+            $baseUrl = rtrim($baseUrl, '/').'/';
+            
+            // URL del formulario de login de phpMyAdmin
+            $loginUrl = $baseUrl.'index.php';
+            
+            // Escapar valores para HTML
+            $server = htmlspecialchars($credentials['server'] ?? '1', ENT_QUOTES, 'UTF-8');
+            $username = htmlspecialchars($credentials['username'] ?? 'root', ENT_QUOTES, 'UTF-8');
+            $password = htmlspecialchars($credentials['password'] ?? '', ENT_QUOTES, 'UTF-8');
+
+            // Generar página HTML que envía el formulario automáticamente mediante POST
             $html = <<<HTML
 <!DOCTYPE html>
 <html lang="es">
@@ -79,31 +104,30 @@ class PhpMyAdminController extends Controller
         <p>Por favor espera mientras se completa el inicio de sesión automático.</p>
     </div>
     
-    <form id="phpmyadmin-form" method="post" action="{$phpMyAdminUrl}" style="display: none;">
-        <input type="hidden" name="pma_servername" value="{$credentials['server']}">
-        <input type="hidden" name="pma_username" value="{$credentials['username']}">
-        <input type="hidden" name="pma_password" value="{$credentials['password']}">
-        <input type="hidden" name="server" value="{$credentials['server']}">
+    <form id="phpmyadmin-form" method="post" action="{$loginUrl}" style="display: none;">
+        <input type="hidden" name="pma_servername" value="{$server}">
+        <input type="hidden" name="pma_username" value="{$username}">
+        <input type="hidden" name="pma_password" value="{$password}">
+        <input type="hidden" name="server" value="{$server}">
     </form>
     
     <script>
-        // Intentar enviar el formulario automáticamente
-        window.onload = function() {
-            setTimeout(function() {
-                const form = document.getElementById('phpmyadmin-form');
-                if (form) {
-                    form.submit();
-                }
-            }, 500);
-        };
+        // Enviar el formulario inmediatamente cuando la página carga
+        (function() {
+            const form = document.getElementById('phpmyadmin-form');
+            if (form) {
+                // Enviar inmediatamente sin esperar
+                form.submit();
+            }
+        })();
         
-        // Si después de 3 segundos no se ha redirigido, mostrar mensaje
+        // Fallback: si después de 2 segundos no se ha redirigido, mostrar mensaje
         setTimeout(function() {
             const container = document.querySelector('.container');
-            if (container) {
-                container.innerHTML = '<h1>Redirigiendo...</h1><p>Si no se redirige automáticamente, <a href="{$phpMyAdminUrl}" style="color: white; text-decoration: underline;">haz clic aquí</a>.</p>';
+            if (container && document.visibilityState === 'visible') {
+                container.innerHTML = '<h1>Redirigiendo...</h1><p>Si no se redirige automáticamente, <a href="{$loginUrl}" style="color: white; text-decoration: underline;">haz clic aquí</a>.</p>';
             }
-        }, 3000);
+        }, 2000);
     </script>
 </body>
 </html>
