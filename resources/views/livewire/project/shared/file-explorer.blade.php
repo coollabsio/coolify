@@ -764,18 +764,20 @@
         </div>
     </div>
 
+                </div>
             </div>
 
-@script
+@push('scripts')
 <script>
-    // Definir la URL del endpoint de autologin fuera del listener
-    const phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
+    document.addEventListener('DOMContentLoaded', function() {
+        // Definir la URL del endpoint de autologin fuera del listener
+        const phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
 
-    Livewire.on('console-log', (data) => {
-        console.log('[FileExplorer Debug]', data);
-    });
+        Livewire.on('console-log', (data) => {
+            console.log('[FileExplorer Debug]', data);
+        });
 
-    Livewire.on('openPhpMyAdmin', (data) => {
+        Livewire.on('openPhpMyAdmin', (data) => {
         console.log('[phpMyAdmin] Event received:', data);
 
         if (!data || !data.url) {
@@ -928,6 +930,7 @@
                 });
             }
         }
+        });
     });
 </script>
-@endscript
+@endpush
