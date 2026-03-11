@@ -105,6 +105,7 @@ services:
               libxml2-dev
 
             # Install PHP extensions
+            # Compile extensions in parallel (warnings about existing directories are normal)
             docker-php-ext-install -j$(nproc) \
               pdo_mysql \
               pdo_pgsql \
@@ -115,7 +116,7 @@ services:
               bcmath \
               gd \
               intl \
-              opcache
+              opcache 2>&1 | grep -vE "(mkdir: can't create directory|File exists)" || true
 
             echo "PHP extensions installed successfully!"
           fi

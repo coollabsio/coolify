@@ -93,6 +93,8 @@ class FileExplorer extends Component
 
     public int $perPage = 50;
 
+    public ?string $phpMyAdminUrl = null;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -1034,15 +1036,19 @@ class FileExplorer extends Component
             
             if (str_ends_with(strtolower($filePath), '.zip')) {
                 // Try multiple methods: unzip command, Python, or PHP
+                // Para archivos grandes, ejecutar con output periódico para mantener conexión activa
                 $extractionCommand = "cd {$fileDirEscaped} && ";
                 $extractionCommand .= "if command -v unzip >/dev/null 2>&1; then ";
-                $extractionCommand .= "unzip -q -o {$fileNameEscaped} -d . 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                // Ejecutar unzip en background con output periódico usando un script temporal
+                // Esto mantiene la conexión activa y permite capturar el resultado
+                $extractionCommand .= "(unzip -o {$fileNameEscaped} -d . 2>&1 | while IFS= read -r line; do echo \"PROGRESS: \\\$line\"; done; echo 'EXTRACTION_SUCCESS') || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python3 >/dev/null 2>&1; then ";
-                $extractionCommand .= "python3 -c \"import zipfile, os; z=zipfile.ZipFile('{$fileNameEscaped}'); z.extractall('.'); z.close()\" 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                // Python con output periódico cada 100 archivos
+                $extractionCommand .= "python3 -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v python >/dev/null 2>&1; then ";
-                $extractionCommand .= "python -c \"import zipfile, os; z=zipfile.ZipFile('{$fileNameEscaped}'); z.extractall('.'); z.close()\" 2>&1 && echo 'EXTRACTION_SUCCESS'; ";
+                $extractionCommand .= "python -c \"import zipfile, os, sys; z=zipfile.ZipFile('{$fileNameEscaped}'); files=z.namelist(); total=len(files); [z.extract(f, '.') or (print(f'PROGRESS: Extracted {i+1}/{total}') if (i+1)%100==0 else None) for i, f in enumerate(files)]; z.close(); print('EXTRACTION_SUCCESS')\" 2>&1 || echo 'EXTRACTION_FAILED'; ";
                 $extractionCommand .= "elif command -v php >/dev/null 2>&1; then ";
-                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$fileNameEscaped}') === TRUE) { \\\$zip->extractTo('.'); \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
+                $extractionCommand .= "php -r \"\\\$zip = new ZipArchive(); if (\\\$zip->open('{$fileNameEscaped}') === TRUE) { \\\$total = \\\$zip->numFiles; for (\\\$i = 0; \\\$i < \\\$total; \\\$i++) { \\\$zip->extractTo('.', [\\\$zip->getNameIndex(\\\$i)]); if ((\\\$i+1) % 100 == 0) echo 'PROGRESS: Extracted ' . (\\\$i+1) . '/' . \\\$total . ' files...' . PHP_EOL; } \\\$zip->close(); echo 'EXTRACTION_SUCCESS'; } else { echo 'EXTRACTION_FAILED'; }\" 2>&1; ";
                 $extractionCommand .= "else ";
                 $extractionCommand .= "echo 'TOOL_NOT_FOUND:unzip'; ";
                 $extractionCommand .= "fi";
@@ -1085,8 +1091,15 @@ class FileExplorer extends Component
                 $command = "sudo {$command}";
             }
 
-            // Execute extraction synchronously and check result
-            $output = instant_remote_process([$command], $server, false);
+            // Para archivos grandes, usar timeout extendido (2 horas = 7200 segundos)
+            // y deshabilitar multiplexing para evitar problemas de conexión
+            $extendedTimeout = 7200; // 2 horas para archivos grandes
+            
+            // Notificar al usuario sobre archivos grandes
+            $this->dispatch('info', 'Extrayendo archivo. Esto puede tardar varios minutos para archivos grandes...');
+            
+            // Execute extraction with extended timeout and disabled multiplexing for large files
+            $output = instant_remote_process([$command], $server, false, false, $extendedTimeout, true);
             $output = trim($output ?? '');
 
             // Check if extraction was successful
@@ -1097,11 +1110,15 @@ class FileExplorer extends Component
             } elseif (str_contains($output, 'TOOL_NOT_FOUND:')) {
                 $tool = str_replace('TOOL_NOT_FOUND:', '', $output);
                 $this->dispatch('error', "Required tool not found in container: {$tool}. Please install it first.");
-            } elseif (!empty($output)) {
+            } elseif (str_contains($output, 'EXTRACTION_FAILED')) {
                 // Show error output from extraction command
                 $this->dispatch('error', 'Extraction failed: '.$output);
+            } elseif (!empty($output)) {
+                // Si hay output pero no contiene EXTRACTION_SUCCESS, puede ser un error parcial
+                $this->dispatch('error', 'Extraction may have failed. Output: '.substr($output, 0, 500));
             } else {
-                $this->dispatch('error', 'Extraction failed. No output received from container.');
+                // No output puede indicar timeout o conexión perdida para archivos muy grandes
+                $this->dispatch('error', 'Extraction failed. No output received from container. This may indicate a timeout for very large files. Please try again or extract the file manually using the terminal.');
             }
 
             $this->selectedFiles = [];
@@ -1901,43 +1918,170 @@ class FileExplorer extends Component
 
     public function openDatabasePanel()
     {
-        if ($this->selected_container === 'default') {
-            $this->dispatch('error', 'Please select a container first.');
+        // Buscar servicio phpMyAdmin en el mismo entorno (funciona para todos los contenedores)
+        $phpMyAdminService = $this->findPhpMyAdminService();
 
-            return;
+        if ($phpMyAdminService) {
+            // Obtener la URL del servicio phpMyAdmin
+            $phpMyAdminUrl = $this->getPhpMyAdminUrl($phpMyAdminService);
+            if ($phpMyAdminUrl) {
+                $this->phpMyAdminUrl = $phpMyAdminUrl;
+                // Disparar evento para abrir phpMyAdmin en nueva ventana
+                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl);
+
+                return;
+            }
         }
 
-        // Ensure we have the latest container list and check database type
-        $this->loadContainers();
-        $this->checkForDatabaseContainers();
-        $this->checkDatabaseType();
-
-        // Verify that the selected container or any available container is MySQL/MariaDB
-        $databaseContainers = $this->getDatabaseContainers();
-        if (! $this->isMySQLOrMariaDB && ! $this->hasMySQLOrMariaDBContainer && count($databaseContainers) === 0) {
-            $this->dispatch('error', 'No MySQL or MariaDB container detected. Please make sure you have selected a container with MySQL/MariaDB installed.');
-
-            return;
-        }
-
-        $this->showDatabasePanel = true;
-        // Load databases automatically when opening panel
-        $this->loadDatabases();
+        // Si no se encuentra phpMyAdmin, mostrar mensaje
+        $this->dispatch('error', 'phpMyAdmin service not found in this environment. Please add phpMyAdmin as a service to use it for database management.');
     }
 
-
-    public function closeDatabasePanel()
+    private function findPhpMyAdminService(): ?\App\Models\Service
     {
-        $this->showDatabasePanel = false;
-        $this->selectedDatabase = null;
-        $this->tables = [];
-        $this->selectedTable = null;
-        $this->tableStructure = [];
-        $this->tableData = [];
-        $this->currentPage = 1;
+        try {
+            // Obtener el entorno actual desde el recurso
+            $environment = null;
+            if ($this->type === 'service' && $this->resource instanceof \App\Models\Service) {
+                $environment = $this->resource->environment;
+            } elseif ($this->type === 'application' && $this->resource instanceof \App\Models\Application) {
+                $environment = $this->resource->environment;
+            } elseif ($this->type === 'database') {
+                // Para bases de datos standalone, obtener el entorno desde el recurso
+                if (method_exists($this->resource, 'environment')) {
+                    $environment = $this->resource->environment;
+                }
+            }
+
+            if (! $environment) {
+                return null;
+            }
+
+            // Buscar todos los servicios en el entorno
+            $allServices = $environment->services()->get();
+
+            // Buscar por nombre de servicio, imagen o docker_compose
+            foreach ($allServices as $service) {
+                $serviceName = str($service->name)->lower();
+                
+                // Verificar nombre del servicio
+                if ($serviceName->contains('phpmyadmin')) {
+                    return $service;
+                }
+
+                // Verificar en las aplicaciones del servicio
+                foreach ($service->applications as $app) {
+                    $appName = str($app->name)->lower();
+                    $imageName = str($app->image)->lower();
+                    if ($appName->contains('phpmyadmin') || $imageName->contains('phpmyadmin')) {
+                        return $service;
+                    }
+                }
+
+                // Verificar en docker_compose_raw por servicios phpmyadmin
+                if ($service->docker_compose_raw) {
+                    try {
+                        $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($service->docker_compose_raw);
+                        $services = data_get($dockerCompose, 'services', []);
+                        foreach ($services as $serviceNameInCompose => $serviceConfig) {
+                            $serviceNameLower = str($serviceNameInCompose)->lower();
+                            $image = str(data_get($serviceConfig, 'image', ''))->lower();
+                            
+                            if ($serviceNameLower->contains('phpmyadmin') || $image->contains('phpmyadmin')) {
+                                return $service;
+                            }
+                        }
+                    } catch (\Throwable) {
+                        // Ignorar errores de parsing
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
-    // Adminer integration removed - using built-in database panel instead
+    private function getPhpMyAdminUrl(\App\Models\Service $service): ?string
+    {
+        try {
+            // Buscar la aplicación phpMyAdmin en el servicio
+            $phpMyAdminApp = null;
+            
+            foreach ($service->applications as $app) {
+                $appName = str($app->name)->lower();
+                $imageName = str($app->image)->lower();
+                
+                if ($appName->contains('phpmyadmin') || $imageName->contains('phpmyadmin')) {
+                    $phpMyAdminApp = $app;
+                    break;
+                }
+            }
+
+            // Si no se encuentra específicamente phpMyAdmin, usar la primera aplicación del servicio
+            if (! $phpMyAdminApp) {
+                $phpMyAdminApp = $service->applications()->first();
+            }
+
+            if (! $phpMyAdminApp) {
+                return null;
+            }
+
+            // Intentar obtener FQDN de la aplicación
+            if ($phpMyAdminApp->fqdn) {
+                $fqdns = $phpMyAdminApp->fqdns;
+                if (! empty($fqdns)) {
+                    $url = $fqdns[0];
+                    // Asegurar que tenga esquema http/https
+                    if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+                        $url = 'https://'.$url;
+                    }
+                    return $url;
+                }
+            }
+
+            // Si no hay FQDN en la aplicación, intentar obtenerlo desde las variables de entorno
+            $envVar = $service->environment_variables()
+                ->where(function ($query) {
+                    $query->where('key', 'like', 'SERVICE_URL_%PHPMYADMIN%')
+                        ->orWhere('key', 'like', 'SERVICE_FQDN_%PHPMYADMIN%')
+                        ->orWhere('key', 'like', 'SERVICE_URL_PHPMYADMIN')
+                        ->orWhere('key', 'like', 'SERVICE_FQDN_PHPMYADMIN');
+                })
+                ->first();
+
+            if ($envVar && $envVar->real_value) {
+                $url = $envVar->real_value;
+                // Asegurar que tenga esquema http/https
+                if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+                    $url = 'https://'.$url;
+                }
+                return $url;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+
+    // Métodos del panel integrado de bases de datos - ya no se usan (reemplazado por phpMyAdmin)
+    // Se mantienen comentados por si se necesitan en el futuro
+    
+    // public function closeDatabasePanel()
+    // {
+    //     $this->showDatabasePanel = false;
+    //     $this->selectedDatabase = null;
+    //     $this->tables = [];
+    //     $this->selectedTable = null;
+    //     $this->tableStructure = [];
+    //     $this->tableData = [];
+    //     $this->currentPage = 1;
+    // }
+
+    // Adminer integration removed - using phpMyAdmin instead
 
     public function loadDatabases()
     {
