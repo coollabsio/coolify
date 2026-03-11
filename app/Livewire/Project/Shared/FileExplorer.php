@@ -1922,19 +1922,45 @@ class FileExplorer extends Component
         $phpMyAdminService = $this->findPhpMyAdminService();
 
         if ($phpMyAdminService) {
-            // Obtener la URL del servicio phpMyAdmin con credenciales automáticas
+            // Obtener la URL del servicio phpMyAdmin
             $phpMyAdminUrl = $this->getPhpMyAdminUrl($phpMyAdminService);
             if ($phpMyAdminUrl) {
+                // Obtener credenciales de la base de datos para autocompletar el formulario
+                $dbCredentials = $this->getDatabaseCredentials($phpMyAdminService->environment, $phpMyAdminService);
+                
+                // Intentar configurar autenticación automática en phpMyAdmin
+                $this->configurePhpMyAdminAutoLogin($phpMyAdminService, $dbCredentials);
+                
                 $this->phpMyAdminUrl = $phpMyAdminUrl;
-                // Disparar evento para abrir phpMyAdmin en nueva ventana
-                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl);
+                // Disparar evento para abrir phpMyAdmin en nueva ventana con credenciales
+                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl, credentials: $dbCredentials);
 
-                return;
+            return;
             }
         }
 
         // Si no se encuentra phpMyAdmin, mostrar mensaje
         $this->dispatch('error', 'phpMyAdmin service not found in this environment. Please add phpMyAdmin as a service to use it for database management.');
+    }
+
+    private function configurePhpMyAdminAutoLogin(\App\Models\Service $phpMyAdminService, ?array $dbCredentials): void
+    {
+        if (! $dbCredentials) {
+            return;
+        }
+
+        try {
+            // Agregar variables de entorno para autenticación automática en phpMyAdmin
+            // La imagen de linuxserver/phpmyadmin soporta estas variables cuando PMA_ARBITRARY=1
+            // Sin embargo, estas variables no funcionan directamente para autenticación automática
+            // Por eso usamos JavaScript para autocompletar el formulario
+            
+            // Nota: Las variables PMA_USER, PMA_PASSWORD y PMA_HOST no proporcionan
+            // autenticación automática en la imagen de linuxserver/phpmyadmin.
+            // El autocompletado se maneja mediante JavaScript en el frontend.
+        } catch (\Throwable $e) {
+            // Ignorar errores
+        }
     }
 
     private function findPhpMyAdminService(): ?\App\Models\Service

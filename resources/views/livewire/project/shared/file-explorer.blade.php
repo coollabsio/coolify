@@ -220,12 +220,12 @@
                                 Select All
                             </x-forms.button>
                         @endif
-                        <x-forms.button wire:click="openDatabasePanel" class="bg-green-600">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
-                            </svg>
+                            <x-forms.button wire:click="openDatabasePanel" class="bg-green-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                </svg>
                             phpMyAdmin
-                        </x-forms.button>
+                            </x-forms.button>
                         @if ($selected_container !== 'default')
                             <x-forms.button wire:click="openImportDatabaseDialog" class="bg-purple-600">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,18 +233,18 @@
                                 </svg>
                                 Import Database
                             </x-forms.button>
-                            <x-forms.button wire:click="openQuickEdit('wp-config.php')" class="bg-blue-600" title="Quick Edit wp-config.php">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                </svg>
-                                wp-config.php
-                            </x-forms.button>
-                            <x-forms.button wire:click="openQuickEdit('.env')" class="bg-blue-600" title="Quick Edit .env">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                </svg>
-                                .env
-                            </x-forms.button>
+                        <x-forms.button wire:click="openQuickEdit('wp-config.php')" class="bg-blue-600" title="Quick Edit wp-config.php">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            wp-config.php
+                        </x-forms.button>
+                        <x-forms.button wire:click="openQuickEdit('.env')" class="bg-blue-600" title="Quick Edit .env">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            .env
+                        </x-forms.button>
                         @endif
                     </div>
                 @endif
@@ -477,7 +477,7 @@
                                 </div>
                             </div>
                         </template>
-                    @endif
+                @endif
             </div>
         @endif
     @endif
@@ -764,8 +764,8 @@
         </div>
     </div>
 
-</div>
-
+            </div>
+            
 @script
 <script>
     Livewire.on('console-log', (data) => {
@@ -774,7 +774,139 @@
 
     Livewire.on('openPhpMyAdmin', (data) => {
         if (data.url) {
-            window.open(data.url, '_blank');
+            const phpMyAdminWindow = window.open(data.url, '_blank');
+            
+            // Si hay credenciales, intentar autocompletar el formulario después de que cargue
+            if (data.credentials && phpMyAdminWindow) {
+                // Función para autocompletar el formulario
+                const autoFillForm = () => {
+                    try {
+                        if (!phpMyAdminWindow || !phpMyAdminWindow.document) {
+                            return false;
+                        }
+                        
+                        // Buscar el formulario de login de phpMyAdmin
+                        const loginForm = phpMyAdminWindow.document.querySelector('form[name="login_form"]') || 
+                                        phpMyAdminWindow.document.querySelector('form#login_form') ||
+                                        phpMyAdminWindow.document.querySelector('form.login-form') ||
+                                        phpMyAdminWindow.document.querySelector('form');
+                        
+                        if (!loginForm) {
+                            return false;
+                        }
+                        
+                        // Buscar campos de servidor (puede ser input o select)
+                        let serverInput = loginForm.querySelector('input[name="pma_servername"]') ||
+                                         loginForm.querySelector('input[name="server"]') ||
+                                         loginForm.querySelector('select[name="pma_servername"]') ||
+                                         loginForm.querySelector('select[name="server"]') ||
+                                         loginForm.querySelector('#input_servername') ||
+                                         loginForm.querySelector('#server') ||
+                                         loginForm.querySelector('select');
+                        
+                        // Buscar campo de usuario
+                        let usernameInput = loginForm.querySelector('input[name="pma_username"]') ||
+                                         loginForm.querySelector('input[name="username"]') ||
+                                         loginForm.querySelector('input[id*="username"]') ||
+                                         loginForm.querySelector('input[type="text"]:not([type="hidden"])');
+                        
+                        // Buscar campo de contraseña
+                        let passwordInput = loginForm.querySelector('input[name="pma_password"]') ||
+                                         loginForm.querySelector('input[name="password"]') ||
+                                         loginForm.querySelector('input[id*="password"]') ||
+                                         loginForm.querySelector('input[type="password"]');
+                        
+                        let filled = false;
+                        
+                        // Rellenar servidor
+                        if (serverInput && data.credentials.server) {
+                            if (serverInput.tagName === 'SELECT') {
+                                // Buscar opción que coincida
+                                const option = Array.from(serverInput.options).find(opt => 
+                                    opt.value === data.credentials.server || 
+                                    opt.text.toLowerCase().includes(data.credentials.server.toLowerCase())
+                                );
+                                if (option) {
+                                    serverInput.value = option.value;
+                                    filled = true;
+                                } else if (serverInput.options.length > 0) {
+                                    // Usar la primera opción disponible
+                                    serverInput.value = serverInput.options[0].value;
+                                    filled = true;
+                                }
+                            } else {
+                                serverInput.value = data.credentials.server;
+                                serverInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                serverInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                filled = true;
+                            }
+                        }
+                        
+                        // Rellenar usuario
+                        if (usernameInput && data.credentials.username) {
+                            usernameInput.value = data.credentials.username;
+                            usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            usernameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            filled = true;
+                        }
+                        
+                        // Rellenar contraseña
+                        if (passwordInput && data.credentials.password) {
+                            passwordInput.value = data.credentials.password;
+                            passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            filled = true;
+                        }
+                        
+                        // Si todos los campos están llenos, intentar enviar automáticamente
+                        if (filled && serverInput && usernameInput && passwordInput) {
+                            setTimeout(() => {
+                                try {
+                                    const submitButton = loginForm.querySelector('input[type="submit"]') ||
+                                                       loginForm.querySelector('button[type="submit"]') ||
+                                                       loginForm.querySelector('button.btn-primary') ||
+                                                       loginForm.querySelector('button');
+                                    
+                                    if (submitButton && 
+                                        (serverInput.value || (serverInput.tagName === 'SELECT' && serverInput.selectedIndex >= 0)) &&
+                                        usernameInput.value && 
+                                        passwordInput.value) {
+                                        // Enviar el formulario
+                                        loginForm.submit();
+                                    }
+                                } catch (e) {
+                                    console.log('Error al enviar formulario:', e);
+                                }
+                            }, 800);
+                        }
+                        
+                        return filled;
+                    } catch (e) {
+                        // Error de CORS o acceso denegado - esto es normal si phpMyAdmin está en otro dominio
+                        return false;
+                    }
+                };
+                
+                // Intentar múltiples veces con diferentes delays para asegurar que la página cargue
+                const attempts = [800, 1500, 2500, 4000];
+                let successCount = 0;
+                
+                attempts.forEach((delay, index) => {
+                    setTimeout(() => {
+                        if (autoFillForm()) {
+                            successCount++;
+                        }
+                        
+                        // Si después de todos los intentos no se pudo autocompletar, mostrar las credenciales en consola
+                        if (index === attempts.length - 1 && successCount === 0) {
+                            console.log('%cCredenciales para phpMyAdmin:', 'color: blue; font-weight: bold; font-size: 14px;');
+                            console.log('Servidor:', data.credentials.server);
+                            console.log('Usuario:', data.credentials.username);
+                            console.log('Contraseña:', data.credentials.password);
+                        }
+                    }, delay);
+                });
+            }
         }
     });
 </script>
