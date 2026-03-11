@@ -55,43 +55,50 @@ class StartDatabaseProxy
         if (isDev()) {
             $host_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
-        $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
 
-    error_log  /var/log/nginx/error.log;
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
 
     events {
         worker_connections  1024;
     }
     stream {
-       server {
+        server {
             listen $database->public_port;
-            proxy_pass $containerName:$internalPort;
-            $timeoutConfig
-       }
+            proxy_pass $database->uuid:5432;
+        }
     }
     EOF;
-        $docker_compose = [
-            'services' => [
-                $proxyContainerName => [
-                    'image' => 'nginx:stable-alpine',
-                    'container_name' => $proxyContainerName,
-                    'restart' => RESTART_MODE,
-                    'ports' => [
-                        "$database->public_port:$database->public_port",
+        $dockerfile = <<<EOF
+    FROM nginx:1.24.0-alpine
+    COPY nginx.conf /etc/nginx/nginx.conf
+    EXPOSE $database->public_port
+    EOF;
+        try {
+            $base64 = base64_encode($nginxconf);
+            instant_remote_process(["echo '{$base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null"], $server);
+            $container_name = "{$database->uuid}-proxy";
+            $payload = [
+                'name' => $container_name,
+                'image' => 'nginx:1.24.0-alpine',
+                'restart_policy' => 'empty',
+                'network' => "{$database->uuid}",
+                'ports' => [
+                    [
+                        'target' => $database->public_port,
+                        'published' => $database->public_port,
                     ],
-                    'networks' => [
-                        $network,
+                ],
+                'volumes' => [
+                    [
+                        'type' => 'bind',
+                        'source' => "$host_configuration_dir/nginx.conf",
+                        'target' => '/etc/nginx/nginx.conf',
                     ],
-                    'volumes' => [
-                        [
-                            'type' => 'bind',
-                            'source' => "$host_configuration_dir/nginx.conf",
-                            'target' => '/etc/nginx/nginx.conf',
-                        ],
-                    ],
+                ],    ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
@@ -162,14 +169,5 @@ class StartDatabaseProxy
         }
 
         return false;
-    }
-
-    private function buildProxyTimeoutConfig(?int $timeout): string
-    {
-        if ($timeout === null || $timeout < 1) {
-            $timeout = 3600;
-        }
-
-        return "proxy_timeout {$timeout}s;";
     }
 }
