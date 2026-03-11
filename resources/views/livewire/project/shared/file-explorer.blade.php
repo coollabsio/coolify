@@ -783,7 +783,8 @@
         // Si hay datos encriptados, usar el endpoint de autologin
         if (data.encryptedData) {
             console.log('[phpMyAdmin] Using autologin endpoint');
-            const autologinUrl = `{{ route('phpmyadmin.autologin') }}?data=${encodeURIComponent(data.encryptedData)}`;
+            const autologinBaseUrl = @js(route('phpmyadmin.autologin'));
+            const autologinUrl = autologinBaseUrl + '?data=' + encodeURIComponent(data.encryptedData);
             console.log('[phpMyAdmin] Opening:', autologinUrl);
             window.open(autologinUrl, '_blank');
             return;
