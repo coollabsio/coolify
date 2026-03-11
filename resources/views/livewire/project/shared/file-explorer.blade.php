@@ -767,12 +767,12 @@
                 </div>
             </div>
 
-@push('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Definir la URL del endpoint de autologin fuera del listener
-        const phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
+    // Definir la URL del endpoint de autologin
+    window.phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
 
+    // Registrar listeners de Livewire cuando esté disponible
+    document.addEventListener('livewire:init', function() {
         Livewire.on('console-log', (data) => {
             console.log('[FileExplorer Debug]', data);
         });
@@ -788,7 +788,7 @@
         // Si hay datos encriptados, usar el endpoint de autologin
         if (data.encryptedData) {
             console.log('[phpMyAdmin] Using autologin endpoint');
-            const autologinUrl = phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
+            const autologinUrl = window.phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
             console.log('[phpMyAdmin] Opening:', autologinUrl);
             window.open(autologinUrl, '_blank');
             return;
@@ -932,5 +932,32 @@
         }
         });
     });
+
+    // Fallback: registrar también cuando Livewire ya está cargado
+    if (window.Livewire) {
+        Livewire.on('console-log', (data) => {
+            console.log('[FileExplorer Debug]', data);
+        });
+
+        Livewire.on('openPhpMyAdmin', (data) => {
+            console.log('[phpMyAdmin] Event received:', data);
+
+            if (!data || !data.url) {
+                console.error('[phpMyAdmin] Invalid data received');
+                return;
+            }
+
+            // Si hay datos encriptados, usar el endpoint de autologin
+            if (data.encryptedData) {
+                console.log('[phpMyAdmin] Using autologin endpoint');
+                const autologinUrl = window.phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
+                console.log('[phpMyAdmin] Opening:', autologinUrl);
+                window.open(autologinUrl, '_blank');
+                return;
+            }
+
+            console.log('[phpMyAdmin] No encrypted data, using fallback method');
+            window.open(data.url, '_blank');
+        });
+    }
 </script>
-@endpush
