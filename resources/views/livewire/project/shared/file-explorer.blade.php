@@ -478,7 +478,6 @@
                             </div>
                         </template>
                     @endif
-                @endif
             </div>
         @endif
     @endif
