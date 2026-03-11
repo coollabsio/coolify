@@ -1,5 +1,5 @@
 <div @if ($isUpgradeAvailable) title="New version available" @else title="No upgrade available" @endif
-    x-init="$wire.checkUpdate" x-data="upgradeModal({
+    x-data="upgradeModal({
         currentVersion: @js($currentVersion),
         latestVersion: @js($latestVersion),
         devMode: @js($devMode)
@@ -239,6 +239,25 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
+
+                // Suppress Livewire's internal error dialog during upgrade.
+                // When the server restarts, Livewire requests fail and its JS
+                // tries to call showModal() on a <dialog>, throwing InvalidStateError.
+                // This hook intercepts failed requests so the error doesn't block
+                // the polling catch block from switching to health-check mode.
+                this._upgradeInProgress = true;
+                if (!this._livewireHookRegistered) {
+                    this._livewireHookRegistered = true;
+                    const self = this;
+                    Livewire.hook('request', ({ fail }) => {
+                        if (self._upgradeInProgress) {
+                            fail((response, failCallback) => {
+                                console.log('Livewire request failed during upgrade (suppressed)');
+                            });
+                        }
+                    });
+                }
+
                 // Trigger server-side upgrade script via Livewire
                 this.$wire.$call('upgrade');
                 // Start client-side status polling
@@ -330,6 +349,7 @@
                     this.beforeUnloadHandler = null;
                 }
 
+                this._upgradeInProgress = false;
                 this.upgradeComplete = true;
                 this.currentStep = 5;
                 this.currentStatus = `Successfully upgraded to ${this.latestVersion}`;
@@ -368,11 +388,13 @@
                     this.beforeUnloadHandler = null;
                 }
 
+                this._upgradeInProgress = false;
                 this.upgradeError = true;
                 this.currentStatus = `Error: ${message}`;
             },
 
             closeErrorModal() {
+                this._upgradeInProgress = false;
                 this.modalOpen = false;
                 this.showProgress = false;
                 this.upgradeError = false;
