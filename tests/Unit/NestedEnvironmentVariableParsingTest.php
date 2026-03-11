@@ -206,6 +206,39 @@ test('nested variables with complex paths', function () {
     expect($split['default'])->toBe('${SERVICE_URL_CONFIG}/v2/config.json');
 });
 
+test('replaceVariables strips leading dollar sign from bare $VAR format', function () {
+    // Bug #8851: When a compose value is $SERVICE_USER_POSTGRES (bare $VAR, no braces),
+    // replaceVariables must strip the $ so the parsed name is SERVICE_USER_POSTGRES.
+    // Without this, the fallback code path creates a DB entry with key=$SERVICE_USER_POSTGRES.
+    expect(replaceVariables('$SERVICE_USER_POSTGRES')->value())->toBe('SERVICE_USER_POSTGRES')
+        ->and(replaceVariables('$SERVICE_PASSWORD_POSTGRES')->value())->toBe('SERVICE_PASSWORD_POSTGRES')
+        ->and(replaceVariables('$SERVICE_FQDN_APPWRITE')->value())->toBe('SERVICE_FQDN_APPWRITE');
+});
+
+test('bare dollar variable in bash-style fallback does not capture trailing brace', function () {
+    // Bug #8851: ${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE} causes the regex to
+    // capture "SERVICE_FQDN_APPWRITE}" (with trailing }) because \}? in the regex
+    // greedily matches the closing brace of the outer ${...} construct.
+    // The fix uses capture group 2 (clean variable name) instead of group 1.
+    $value = '${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}';
+
+    $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
+    preg_match_all($regex, $value, $valueMatches);
+
+    // Group 2 should contain clean variable names without any braces
+    expect($valueMatches[2])->toContain('_APP_DOMAIN')
+        ->and($valueMatches[2])->toContain('SERVICE_FQDN_APPWRITE');
+
+    // Verify no match in group 2 has trailing }
+    foreach ($valueMatches[2] as $match) {
+        expect($match)->not->toEndWith('}', "Variable name '{$match}' should not end with }");
+    }
+
+    // Group 1 (previously used) would have the bug — SERVICE_FQDN_APPWRITE}
+    // This demonstrates why group 2 must be used instead
+    expect($valueMatches[1])->toContain('SERVICE_FQDN_APPWRITE}');
+});
+
 test('operator precedence with nesting', function () {
     // The first :- at depth 0 should be used, not the one inside nested braces
     $input = '${A:-${B:-default}}';

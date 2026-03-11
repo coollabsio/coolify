@@ -442,9 +442,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -1509,6 +1509,18 @@ function serviceParser(Service $resource): Collection
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
+
+    // Clean up corrupted environment variables from previous parser bugs
+    // (keys starting with $ or ending with } should not exist as env var names)
+    $resource->environment_variables()
+        ->where('resourceable_type', get_class($resource))
+        ->where('resourceable_id', $resource->id)
+        ->where(function ($q) {
+            $q->where('key', 'LIKE', '$%')
+                ->orWhere('key', 'LIKE', '%}');
+        })
+        ->delete();
+
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1686,9 +1698,9 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -1928,7 +1940,7 @@ function serviceParser(Service $resource): Collection
 
                 } else {
                     $value = generateEnvValue($command, $resource);
-                    $resource->environment_variables()->updateOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
