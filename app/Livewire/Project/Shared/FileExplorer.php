@@ -1922,7 +1922,7 @@ class FileExplorer extends Component
         $phpMyAdminService = $this->findPhpMyAdminService();
 
         if ($phpMyAdminService) {
-            // Obtener la URL del servicio phpMyAdmin
+            // Obtener la URL del servicio phpMyAdmin con credenciales automáticas
             $phpMyAdminUrl = $this->getPhpMyAdminUrl($phpMyAdminService);
             if ($phpMyAdminUrl) {
                 $this->phpMyAdminUrl = $phpMyAdminUrl;
@@ -2028,39 +2028,178 @@ class FileExplorer extends Component
                 return null;
             }
 
+            $baseUrl = null;
+
             // Intentar obtener FQDN de la aplicación
             if ($phpMyAdminApp->fqdn) {
                 $fqdns = $phpMyAdminApp->fqdns;
                 if (! empty($fqdns)) {
-                    $url = $fqdns[0];
-                    // Asegurar que tenga esquema http/https
-                    if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
-                        $url = 'https://'.$url;
-                    }
-                    return $url;
+                    $baseUrl = $fqdns[0];
                 }
             }
 
             // Si no hay FQDN en la aplicación, intentar obtenerlo desde las variables de entorno
-            $envVar = $service->environment_variables()
+            if (! $baseUrl) {
+                $envVar = $service->environment_variables()
+                    ->where(function ($query) {
+                        $query->where('key', 'like', 'SERVICE_URL_%PHPMYADMIN%')
+                            ->orWhere('key', 'like', 'SERVICE_FQDN_%PHPMYADMIN%')
+                            ->orWhere('key', 'like', 'SERVICE_URL_PHPMYADMIN')
+                            ->orWhere('key', 'like', 'SERVICE_FQDN_PHPMYADMIN');
+                    })
+                    ->first();
+
+                if ($envVar && $envVar->real_value) {
+                    $baseUrl = $envVar->real_value;
+                }
+            }
+
+            if (! $baseUrl) {
+                return null;
+            }
+
+            // Asegurar que tenga esquema http/https
+            if (! str_starts_with($baseUrl, 'http://') && ! str_starts_with($baseUrl, 'https://')) {
+                $baseUrl = 'https://'.$baseUrl;
+            }
+
+            // Obtener credenciales de la base de datos para inicio de sesión automático
+            $dbCredentials = $this->getDatabaseCredentials($service->environment, $service);
+            
+            if ($dbCredentials) {
+                // Construir URL con parámetros de inicio de sesión automático
+                // phpMyAdmin soporta inicio de sesión automático mediante parámetros GET
+                // Formato: index.php?pma_username=user&pma_password=pass&server=1
+                $url = \Spatie\Url\Url::fromString($baseUrl);
+                
+                // Asegurar que la URL apunte al index.php
+                $path = $url->getPath();
+                if (! str_ends_with($path, 'index.php') && ! str_ends_with($path, '/')) {
+                    $url = $url->withPath(rtrim($path, '/').'/index.php');
+                } elseif (str_ends_with($path, '/')) {
+                    $url = $url->withPath(rtrim($path, '/').'/index.php');
+                }
+                
+                // Agregar parámetros de inicio de sesión automático
+                $url = $url->withQueryParameters([
+                    'pma_username' => $dbCredentials['username'],
+                    'pma_password' => $dbCredentials['password'],
+                    'server' => $dbCredentials['server'] ?? '1',
+                ]);
+
+                return $url->__toString();
+            }
+
+            // Si no se pueden obtener credenciales, devolver URL sin autenticación
+            return $baseUrl;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function getDatabaseCredentials($environment, \App\Models\Service $phpMyAdminService): ?array
+    {
+        try {
+            // Buscar contenedor de base de datos en el mismo servicio o entorno
+            $dbContainer = null;
+            $dbService = null;
+            $rootPassword = null;
+
+            // Primero, buscar en el mismo servicio de phpMyAdmin (puede tener MySQL/MariaDB incluido)
+            if ($phpMyAdminService->docker_compose_raw) {
+                try {
+                    $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($phpMyAdminService->docker_compose_raw);
+                    $services = data_get($dockerCompose, 'services', []);
+                    
+                    foreach ($services as $serviceNameInCompose => $serviceConfig) {
+                        $image = str(data_get($serviceConfig, 'image', ''))->lower();
+                        $serviceNameLower = str($serviceNameInCompose)->lower();
+                        
+                        // Buscar MySQL o MariaDB (excluir phpmyadmin)
+                        if (($image->contains('mysql') || $image->contains('mariadb') || 
+                             $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) &&
+                            ! $serviceNameLower->contains('phpmyadmin')) {
+                            $dbService = $phpMyAdminService;
+                            $dbContainer = $serviceNameInCompose;
+                            break;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Ignorar errores de parsing
+                }
+            }
+
+            // Si no se encuentra en el mismo servicio, buscar en otros servicios del entorno
+            if (! $dbService) {
+                $allServices = $environment->services()->get();
+                
+                foreach ($allServices as $service) {
+                    // Saltar el servicio phpMyAdmin
+                    if ($service->id === $phpMyAdminService->id) {
+                        continue;
+                    }
+                    
+                    // Verificar en docker_compose_raw por servicios MySQL/MariaDB
+                    if ($service->docker_compose_raw) {
+                        try {
+                            $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($service->docker_compose_raw);
+                            $services = data_get($dockerCompose, 'services', []);
+                            
+                            foreach ($services as $serviceNameInCompose => $serviceConfig) {
+                                $image = str(data_get($serviceConfig, 'image', ''))->lower();
+                                $serviceNameLower = str($serviceNameInCompose)->lower();
+                                
+                                // Buscar MySQL o MariaDB
+                                if ($image->contains('mysql') || $image->contains('mariadb') || 
+                                    $serviceNameLower->contains('mysql') || $serviceNameLower->contains('mariadb')) {
+                                    $dbService = $service;
+                                    $dbContainer = $serviceNameInCompose;
+                                    break 2;
+                                }
+                            }
+                        } catch (\Throwable) {
+                            // Ignorar errores de parsing
+                        }
+                    }
+                }
+            }
+
+            if (! $dbService || ! $dbContainer) {
+                return null;
+            }
+
+            // Obtener credenciales desde las variables de entorno del servicio
+            $rootPasswordVar = $dbService->environment_variables()
                 ->where(function ($query) {
-                    $query->where('key', 'like', 'SERVICE_URL_%PHPMYADMIN%')
-                        ->orWhere('key', 'like', 'SERVICE_FQDN_%PHPMYADMIN%')
-                        ->orWhere('key', 'like', 'SERVICE_URL_PHPMYADMIN')
-                        ->orWhere('key', 'like', 'SERVICE_FQDN_PHPMYADMIN');
+                    $query->where('key', 'MYSQL_ROOT_PASSWORD')
+                        ->orWhere('key', 'MARIADB_ROOT_PASSWORD');
                 })
                 ->first();
 
-            if ($envVar && $envVar->real_value) {
-                $url = $envVar->real_value;
-                // Asegurar que tenga esquema http/https
-                if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
-                    $url = 'https://'.$url;
-                }
-                return $url;
+            if (! $rootPasswordVar || ! $rootPasswordVar->real_value) {
+                return null;
             }
 
-            return null;
+            // Obtener el nombre del host del contenedor
+            // phpMyAdmin puede conectarse usando el nombre del servicio en la misma red Docker
+            // Si están en el mismo servicio, usar el nombre del servicio directamente
+            // Si están en servicios diferentes pero mismo entorno, necesitamos el nombre completo
+            if ($dbService->id === $phpMyAdminService->id) {
+                // Mismo servicio: usar el nombre del servicio directamente
+                $dbHost = $dbContainer;
+            } else {
+                // Diferentes servicios: necesitamos construir el nombre completo del contenedor
+                // En Docker Compose, los servicios en la misma red se pueden acceder por nombre
+                // Pero necesitamos verificar si están en la misma red
+                // Por ahora, intentar con el nombre del servicio directamente
+                $dbHost = $dbContainer;
+            }
+
+            return [
+                'username' => 'root',
+                'password' => $rootPasswordVar->real_value,
+                'server' => $dbHost,
+            ];
         } catch (\Throwable $e) {
             return null;
         }
