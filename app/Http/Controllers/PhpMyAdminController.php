@@ -86,6 +86,7 @@ class PhpMyAdminController extends Controller
             abort(400, 'Missing data parameter. Please try again from the file explorer.');
         }
 
+        try {
             // Limpiar la URL para obtener solo la base (sin parámetros GET ni index.php)
             $urlParts = parse_url($phpMyAdminUrl);
             $baseUrl = $urlParts['scheme'].'://'.$urlParts['host'];
@@ -116,6 +117,17 @@ class PhpMyAdminController extends Controller
             $usernameJs = json_encode($username);
             $passwordJs = json_encode($password);
             $loginUrlJs = json_encode($loginUrl);
+
+            // Generar opciones alternativas de servidor
+            $serverOptionsHtml = '';
+            $alternativeServers = ['mariadb', 'mysql', '127.0.0.1', 'localhost'];
+            if (!in_array(strtolower($server), array_map('strtolower', $alternativeServers))) {
+                $serverOptionsHtml = '<div class="info" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 255, 0, 0.1); border-radius: 4px; font-size: 0.85rem;"><strong>Opciones alternativas de servidor:</strong><ul style="margin-top: 0.5rem; padding-left: 1.5rem; text-align: left;">';
+                foreach ($alternativeServers as $altServer) {
+                    $serverOptionsHtml .= '<li style="margin-bottom: 0.25rem;">'.$altServer.'</li>';
+                }
+                $serverOptionsHtml .= '</ul></div>';
+            }
 
             // Generar página HTML que muestra las credenciales y abre phpMyAdmin
             $html = <<<HTML
