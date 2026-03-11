@@ -32,11 +32,17 @@ class ServiceDatabase extends BaseModel
 
     /**
      * Get query builder for service databases owned by current team.
+     * Includes both Service-based and Application-based (Git Docker Compose) databases.
      * If you need all service databases without further query chaining, use ownedByCurrentTeamCached() instead.
      */
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        $teamId = currentTeam()->id;
+
+        return ServiceDatabase::where(function ($query) use ($teamId) {
+            $query->whereRelation('service.environment.project.team', 'id', $teamId)
+                ->orWhereRelation('application.environment.project.team', 'id', $teamId);
+        })->orderBy('name');
     }
 
     /**
@@ -51,8 +57,13 @@ class ServiceDatabase extends BaseModel
 
     public function restart()
     {
-        $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        if ($this->application_id) {
+            $container_id = $this->name.'-'.$this->application->uuid;
+            remote_process(["docker restart {$container_id}"], $this->application->destination->server);
+        } else {
+            $container_id = $this->name.'-'.$this->service->uuid;
+            remote_process(["docker restart {$container_id}"], $this->service->server);
+        }
     }
 
     public function isRunning()
@@ -114,8 +125,13 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
-        $realIp = $this->service->server->ip;
-        if ($this->service->server->isLocalhost() || isDev()) {
+        if ($this->application_id) {
+            $server = $this->application->destination->server;
+        } else {
+            $server = $this->service->server;
+        }
+        $realIp = $server->ip;
+        if ($server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
 
@@ -124,17 +140,35 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
+        if ($this->application_id) {
+            return data_get($this, 'application.environment.project.team');
+        }
+
         return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()
     {
+        if ($this->application_id) {
+            return application_configuration_dir()."/{$this->application->uuid}";
+        }
+
         return service_configuration_dir()."/{$this->service->uuid}";
     }
 
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function application()
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function isGitBased(): bool
+    {
+        return $this->application_id !== null;
     }
 
     public function persistentStorages()

@@ -2783,6 +2783,27 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // For Git-based Docker Compose applications, persist detected databases
+            // so that backup functionality becomes available — mirroring the Service model path.
+            if ($isDatabase && $pull_request_id === 0) {
+                $existingServiceDb = \App\Models\ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+                if (! $existingServiceDb) {
+                    \App\Models\ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'uuid' => \Illuminate\Support\Str::uuid(),
+                        'image' => $image->value(),
+                        'application_id' => $resource->id,
+                        'service_id' => null,
+                        'status' => 'exited',
+                    ]);
+                } else {
+                    $existingServiceDb->update(['image' => $image->value()]);
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {

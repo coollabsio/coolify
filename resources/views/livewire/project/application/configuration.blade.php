@@ -66,6 +66,15 @@
                 href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Tags</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
+            @if ($application->build_pack === 'dockercompose')
+                @php $composeDbs = $application->databases()->whereNull('deleted_at')->whereNotNull('image')->get(); @endphp
+                @foreach ($composeDbs as $composeDb)
+                    @if ($composeDb->isBackupSolutionAvailable())
+                        <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                            href="{{ route('project.application.compose-db.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid, 'compose_db_uuid' => $composeDb->uuid]) }}"><span class="menu-item-label">{{ $composeDb->name }} Backups</span></a>
+                    @endif
+                @endforeach
+            @endif
         </div>
         <div class="w-full sm:flex-grow">
             @if ($currentRoute === 'project.application.configuration')
