@@ -146,8 +146,8 @@ services:
     image: "postgres:16-alpine"
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-litellm}
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
     volumes:
       - "pg-data:/var/lib/postgresql/data"
     healthcheck:
