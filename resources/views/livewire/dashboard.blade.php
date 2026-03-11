@@ -12,6 +12,7 @@
         <div class="flex items-center gap-2 pb-2">
             <h3>Projects</h3>
             @if ($projects->count() > 0)
+            @can('create', App\Models\Project::class)
                 <x-modal-input buttonTitle="Add" title="New Project">
                     <x-slot:content>
                         <button
@@ -24,6 +25,7 @@
                     </x-slot:content>
                     <livewire:project.add-empty />
                 </x-modal-input>
+            @endcan
             @endif
         </div>
         @if ($projects->count() > 0)
@@ -65,9 +67,11 @@
             <div class="flex flex-col gap-1">
                 <div class='font-bold dark:text-warning'>No projects found.</div>
                 <div class="flex items-center gap-1">
-                    <x-modal-input buttonTitle="Add" title="New Project">
-                        <livewire:project.add-empty />
-                    </x-modal-input> your first project or
+                    @can('create', App\Models\Project::class)
+                        <x-modal-input buttonTitle="Add" title="New Project">
+                            <livewire:project.add-empty />
+                        </x-modal-input>
+                    @endcan your first project or
                     go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a> page.
                 </div>
             </div>
@@ -78,6 +82,7 @@
         <div class="flex items-center gap-2 pb-2">
             <h3>Servers</h3>
             @if ($servers->count() > 0 && $privateKeys->count() > 0)
+            @can('create', App\Models\Server::class)
                 <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
                     <x-slot:content>
                         <button
@@ -90,6 +95,7 @@
                     </x-slot:content>
                     <livewire:server.create />
                 </x-modal-input>
+            @endcan
             @endif
         </div>
         @if ($servers->count() > 0)
@@ -140,9 +146,11 @@
                 <div class="flex flex-col gap-1">
                     <div class='font-bold dark:text-warning'>No servers found.</div>
                     <div class="flex items-center gap-1">
-                        <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
-                            <livewire:server.create />
-                        </x-modal-input> your first server
+                        @can('create', App\Models\Server::class)
+                            <x-modal-input buttonTitle="Add" title="New Server" :closeOutside="false">
+                                <livewire:server.create />
+                            </x-modal-input>
+                        @endcan your first server
                         or
                         go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}" {{ wireNavigate() }}>onboarding</a>
                         page.
