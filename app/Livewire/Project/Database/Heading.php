@@ -69,7 +69,11 @@ class Heading extends Component
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
+        $this->parameters = [
+            'project_uuid' => $this->database->environment->project->uuid,
+            'environment_uuid' => $this->database->environment->uuid,
+            'database_uuid' => $this->database->uuid,
+        ];
     }
 
     public function stop()

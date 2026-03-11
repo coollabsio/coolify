@@ -16,6 +16,9 @@
         </div>
     @endif
 
+    <x-forms.input id="comment" label="Comment"
+        helper="Add a note to document what this environment variable is used for." maxlength="256" />
+
     @if (!$shared)
         <x-forms.checkbox id="is_buildtime"
             helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."

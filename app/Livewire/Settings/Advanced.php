@@ -95,7 +95,9 @@ class Advanced extends Component
                     // Check if it's valid CIDR notation
                     if (str_contains($entry, '/')) {
                         [$ip, $mask] = explode('/', $entry);
-                        if (filter_var($ip, FILTER_VALIDATE_IP) && is_numeric($mask) && $mask >= 0 && $mask <= 32) {
+                        $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+                        $maxMask = $isIpv6 ? 128 : 32;
+                        if (filter_var($ip, FILTER_VALIDATE_IP) && is_numeric($mask) && $mask >= 0 && $mask <= $maxMask) {
                             return $entry;
                         }
                         $invalidEntries[] = $entry;
@@ -111,7 +113,7 @@ class Advanced extends Component
                     $invalidEntries[] = $entry;
 
                     return null;
-                })->filter()->unique();
+                })->filter()->values()->all();
 
                 if (! empty($invalidEntries)) {
                     $this->dispatch('error', 'Invalid IP addresses or subnets: '.implode(', ', $invalidEntries));
@@ -119,13 +121,15 @@ class Advanced extends Component
                     return;
                 }
 
-                if ($validEntries->isEmpty()) {
+                if (empty($validEntries)) {
                     $this->dispatch('error', 'No valid IP addresses or subnets provided');
 
                     return;
                 }
 
-                $this->allowed_ips = $validEntries->implode(',');
+                $validEntries = deduplicateAllowlist($validEntries);
+
+                $this->allowed_ips = implode(',', $validEntries);
             }
 
             $this->instantSave();

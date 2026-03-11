@@ -24,6 +24,8 @@ class Show extends Component
 
     public bool $isLocked = false;
 
+    public bool $isMagicVariable = false;
+
     public bool $isSharedVariable = false;
 
     public string $type;
@@ -33,6 +35,8 @@ class Show extends Component
     public ?string $value = null;
 
     public ?string $real_value = null;
+
+    public ?string $comment = null;
 
     public bool $is_shared = false;
 
@@ -63,6 +67,7 @@ class Show extends Component
     protected $rules = [
         'key' => 'required|string',
         'value' => 'nullable',
+        'comment' => 'nullable|string|max:256',
         'is_multiline' => 'required|boolean',
         'is_literal' => 'required|boolean',
         'is_shown_once' => 'required|boolean',
@@ -104,6 +109,7 @@ class Show extends Component
                 $this->validate([
                     'key' => 'required|string',
                     'value' => 'nullable',
+                    'comment' => 'nullable|string|max:256',
                     'is_multiline' => 'required|boolean',
                     'is_literal' => 'required|boolean',
                     'is_shown_once' => 'required|boolean',
@@ -118,6 +124,7 @@ class Show extends Component
             }
             $this->env->key = $this->key;
             $this->env->value = $this->value;
+            $this->env->comment = $this->comment;
             $this->env->is_multiline = $this->is_multiline;
             $this->env->is_literal = $this->is_literal;
             $this->env->is_shown_once = $this->is_shown_once;
@@ -125,6 +132,7 @@ class Show extends Component
         } else {
             $this->key = $this->env->key;
             $this->value = $this->env->value;
+            $this->comment = $this->env->comment;
             $this->is_multiline = $this->env->is_multiline;
             $this->is_literal = $this->env->is_literal;
             $this->is_shown_once = $this->env->is_shown_once;
@@ -140,9 +148,13 @@ class Show extends Component
     public function checkEnvs()
     {
         $this->isDisabled = false;
+        $this->isMagicVariable = false;
+
         if (str($this->env->key)->startsWith('SERVICE_FQDN') || str($this->env->key)->startsWith('SERVICE_URL') || str($this->env->key)->startsWith('SERVICE_NAME')) {
             $this->isDisabled = true;
+            $this->isMagicVariable = true;
         }
+
         if ($this->env->is_shown_once) {
             $this->isLocked = true;
         }

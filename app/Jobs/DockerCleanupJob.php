@@ -91,6 +91,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
                 $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
                 event(new DockerCleanupDone($this->execution_log));
+
+                return;
             }
 
             if ($this->usageBefore >= $this->server->settings->docker_cleanup_threshold) {

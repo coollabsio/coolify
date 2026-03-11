@@ -62,6 +62,7 @@ use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
+use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -119,6 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
 
@@ -166,9 +168,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/terminal/auth/ips', function () {
         if (auth()->check()) {
             $team = auth()->user()->currentTeam();
-            $ipAddresses = $team->servers->where('settings.is_terminal_enabled', true)->pluck('ip')->toArray();
+            $ipAddresses = $team->servers
+                ->where('settings.is_terminal_enabled', true)
+                ->pluck('ip')
+                ->filter()
+                ->values();
 
-            return response()->json(['ipAddresses' => $ipAddresses], 200);
+            if (isDev()) {
+                $ipAddresses = $ipAddresses->merge([
+                    'coolify-testing-host',
+                    'host.docker.internal',
+                    'localhost',
+                    '127.0.0.1',
+                    base_ip(),
+                ])->filter()->unique()->values();
+            }
+
+            return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
         }
 
         return response()->json(['ipAddresses' => []], 401);

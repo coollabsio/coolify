@@ -377,6 +377,17 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
+        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+            if (! $destination) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                    ],
+                ], 422);
+            }
+        }
         $services = get_service_templates();
         $serviceKeys = $services->keys();
         if ($serviceKeys->contains($request->type)) {
@@ -543,6 +554,17 @@ class ServicesController extends Controller
                 return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
             }
             $destination = $destinations->first();
+            if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+                $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+                if (! $destination) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                        ],
+                    ], 422);
+                }
+            }
             if (! isBase64Encoded($request->docker_compose_raw)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1141,10 +1163,7 @@ class ServicesController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
-                            ]
+                            ref: '#/components/schemas/EnvironmentVariable'
                         )
                     ),
                 ]
@@ -1187,6 +1206,7 @@ class ServicesController extends Controller
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
         ]);
 
         if ($validator->fails()) {
@@ -1202,7 +1222,19 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
-        $env->fill($request->all());
+        $env->value = $request->value;
+        if ($request->has('is_literal')) {
+            $env->is_literal = $request->is_literal;
+        }
+        if ($request->has('is_multiline')) {
+            $env->is_multiline = $request->is_multiline;
+        }
+        if ($request->has('is_shown_once')) {
+            $env->is_shown_once = $request->is_shown_once;
+        }
+        if ($request->has('comment')) {
+            $env->comment = $request->comment;
+        }
         $env->save();
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
@@ -1265,10 +1297,8 @@ class ServicesController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variables updated.'],
-                            ]
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
                 ]
@@ -1430,6 +1460,7 @@ class ServicesController extends Controller
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
+            'comment' => 'string|nullable|max:256',
         ]);
 
         if ($validator->fails()) {
@@ -1447,7 +1478,14 @@ class ServicesController extends Controller
             ], 409);
         }
 
-        $env = $service->environment_variables()->create($request->all());
+        $env = $service->environment_variables()->create([
+            'key' => $key,
+            'value' => $request->value,
+            'is_literal' => $request->is_literal ?? false,
+            'is_multiline' => $request->is_multiline ?? false,
+            'is_shown_once' => $request->is_shown_once ?? false,
+            'comment' => $request->comment ?? null,
+        ]);
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }

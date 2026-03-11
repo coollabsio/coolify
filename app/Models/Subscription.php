@@ -8,9 +8,30 @@ class Subscription extends Model
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'stripe_refunded_at' => 'datetime',
+        ];
+    }
+
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function billingInterval(): string
+    {
+        if ($this->stripe_plan_id) {
+            $configKey = collect(config('subscription'))
+                ->search($this->stripe_plan_id);
+
+            if ($configKey && str($configKey)->contains('yearly')) {
+                return 'yearly';
+            }
+        }
+
+        return 'monthly';
     }
 
     public function type()
