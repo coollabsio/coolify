@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
+use App\Http\Controllers\PhpMyAdminController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -103,6 +104,8 @@ Route::middleware(['throttle:login'])->group(function () {
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
+
+Route::get('/phpmyadmin/autologin', [PhpMyAdminController::class, 'autoLogin'])->name('phpmyadmin.autologin')->middleware('auth');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {

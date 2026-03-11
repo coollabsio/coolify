@@ -1932,8 +1932,23 @@ class FileExplorer extends Component
                 $this->configurePhpMyAdminAutoLogin($phpMyAdminService, $dbCredentials);
                 
                 $this->phpMyAdminUrl = $phpMyAdminUrl;
+                
+                // Crear URL encriptada para el autologin
+                $encryptedData = null;
+                if ($dbCredentials) {
+                    try {
+                        $dataToEncrypt = json_encode([
+                            'url' => $phpMyAdminUrl,
+                            'credentials' => $dbCredentials,
+                        ]);
+                        $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
+                    } catch (\Throwable $e) {
+                        // Si falla el cifrado, usar el método anterior
+                    }
+                }
+                
                 // Disparar evento para abrir phpMyAdmin en nueva ventana con credenciales
-                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl, credentials: $dbCredentials);
+                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl, credentials: $dbCredentials, encryptedData: $encryptedData);
 
             return;
             }
@@ -2195,15 +2210,70 @@ class FileExplorer extends Component
             }
 
             // Obtener credenciales desde las variables de entorno del servicio
+            // Buscar primero en las variables de entorno del servicio de base de datos
             $rootPasswordVar = $dbService->environment_variables()
                 ->where(function ($query) {
                     $query->where('key', 'MYSQL_ROOT_PASSWORD')
-                        ->orWhere('key', 'MARIADB_ROOT_PASSWORD');
+                        ->orWhere('key', 'MARIADB_ROOT_PASSWORD')
+                        ->orWhere('key', 'SERVICE_PASSWORD_ROOT')
+                        ->orWhere('key', 'SERVICE_PASSWORD_MYSQLROOT')
+                        ->orWhere('key', 'SERVICE_PASSWORD_MARIADBROOT');
                 })
                 ->first();
 
-            if (! $rootPasswordVar || ! $rootPasswordVar->real_value) {
-                return null;
+            // Si no se encuentra, buscar también en las aplicaciones del servicio
+            if (! $rootPasswordVar || ! $rootPasswordVar->real_value || str($rootPasswordVar->real_value)->startsWith('$')) {
+                // Buscar en las aplicaciones de base de datos del servicio
+                $dbApps = $dbService->databases()->get();
+                foreach ($dbApps as $dbApp) {
+                    if ($dbApp->mysql_root_password) {
+                        $rootPassword = $dbApp->mysql_root_password;
+                        $dbHost = $dbContainer;
+                        
+                        return [
+                            'username' => 'root',
+                            'password' => $rootPassword,
+                            'server' => $dbHost,
+                        ];
+                    }
+                }
+                
+                // Si aún no se encuentra, intentar obtener desde el contenedor directamente
+                if ($dbService->server) {
+                    try {
+                        $containerName = "{$dbContainer}-{$dbService->uuid}";
+                        $server = $dbService->server;
+                        $escapedContainer = escapeshellarg($containerName);
+                        
+                        // Intentar obtener la contraseña desde las variables de entorno del contenedor
+                        $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep -E '(MYSQL_ROOT_PASSWORD|MARIADB_ROOT_PASSWORD)' | head -1";
+                        if ($server->isNonRoot()) {
+                            $envCommand = "sudo {$envCommand}";
+                        }
+                        
+                        $envOutput = instant_remote_process([$envCommand], $server, false);
+                        if ($envOutput && str_contains($envOutput, '=')) {
+                            $parts = explode('=', trim($envOutput), 2);
+                            if (count($parts) === 2) {
+                                $rootPassword = $parts[1];
+                                $dbHost = $dbContainer;
+                                
+                                return [
+                                    'username' => 'root',
+                                    'password' => $rootPassword,
+                                    'server' => $dbHost,
+                                ];
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        // Ignorar errores
+                    }
+                }
+                
+                // Si aún no se encuentra, retornar null
+                if (! $rootPasswordVar || ! $rootPasswordVar->real_value || str($rootPasswordVar->real_value)->startsWith('$')) {
+                    return null;
+                }
             }
 
             // Obtener el nombre del host del contenedor
