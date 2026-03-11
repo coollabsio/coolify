@@ -73,6 +73,65 @@ it('runs standalone database proxy on the master domain router server for remote
         ->and($dockerCompose)->not->toContain('standalone-network');
 });
 
+it('keeps configurable database proxy timeout when routing through the master domain router server', function () {
+    $edgeServer = \Mockery::mock(Server::class)->makePartial();
+    $edgeServer->id = 3;
+
+    $deploymentServer = \Mockery::mock(Server::class)->makePartial();
+    $deploymentServer->id = 4;
+    $deploymentServer->ip = '10.8.0.44';
+    $deploymentServer->proxy = ['type' => 'NONE'];
+
+    $database = new StandalonePostgresql;
+    $database->uuid = 'standalone-db-timeout-uuid';
+    $database->name = 'standalone-db-timeout';
+    $database->public_port = 15444;
+    $database->public_port_timeout = 7200;
+    $database->setRelation('destination', (object) [
+        'server' => $deploymentServer,
+        'network' => 'standalone-timeout-network',
+    ]);
+    $database->setRelation('environment', (object) [
+        'project' => (object) ['team_id' => 124],
+    ]);
+
+    $action = new class($edgeServer) extends StartDatabaseProxy
+    {
+        public array $calls = [];
+
+        public function __construct(private ?Server $edgeServer) {}
+
+        protected function runRemoteCommands(array $commands, Server $server, bool $throwError = true): ?string
+        {
+            $this->calls[] = [
+                'server_id' => $server->id,
+                'commands' => $commands,
+                'throw_error' => $throwError,
+            ];
+
+            return null;
+        }
+
+        protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
+        {
+            return $this->edgeServer;
+        }
+
+        protected function resolveConfigurationDirectory(string $databaseUuid): string
+        {
+            return "/tmp/database-proxy/{$databaseUuid}";
+        }
+    };
+
+    $action->handle($database);
+
+    preg_match("/echo '([^']+)' \\| base64 -d \\| tee .*nginx\\.conf/", $action->calls[2]['commands'][1], $nginxMatches);
+    $nginxConf = base64_decode($nginxMatches[1] ?? '');
+
+    expect($nginxConf)->toContain('proxy_pass 10.8.0.44:5432;')
+        ->and($nginxConf)->toContain('proxy_timeout 7200s;');
+});
+
 it('keeps standalone database proxy on deployment server when no master domain router server is configured', function () {
     $deploymentServer = \Mockery::mock(Server::class)->makePartial();
     $deploymentServer->id = 2;
@@ -416,6 +475,31 @@ it('supports service database deployment server fallback from service.server whe
     expect($action->calls)->toHaveCount(2)
         ->and($action->calls[0]['server_id'])->toBe(61)
         ->and($action->calls[1]['server_id'])->toBe(61);
+});
+
+it('uses the dev host configuration path only for the bind mount source', function () {
+    $action = new class extends StartDatabaseProxy
+    {
+        public function configurationDirectory(string $databaseUuid): string
+        {
+            return $this->resolveConfigurationDirectory($databaseUuid);
+        }
+
+        public function hostConfigurationDirectory(string $databaseUuid): string
+        {
+            return $this->resolveHostConfigurationDirectory($databaseUuid);
+        }
+
+        protected function isDevelopmentEnvironment(): bool
+        {
+            return true;
+        }
+    };
+
+    expect($action->configurationDirectory('dev-db-uuid'))
+        ->toBe('/data/coolify/databases/dev-db-uuid/proxy')
+        ->and($action->hostConfigurationDirectory('dev-db-uuid'))
+        ->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/dev-db-uuid/proxy');
 });
 
 it('uses ssl internal redis port 6380 for remote database proxy upstream target', function () {

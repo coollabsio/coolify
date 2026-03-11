@@ -80,6 +80,8 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = $this->resolveConfigurationDirectory($database->uuid);
+        $host_configuration_dir = $this->resolveHostConfigurationDirectory($database->uuid, $configuration_dir);
+        $timeoutConfig = $this->buildProxyTimeoutConfig($database->public_port_timeout);
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -93,6 +95,7 @@ class StartDatabaseProxy
        server {
             listen $database->public_port;
             proxy_pass $upstreamTarget;
+            $timeoutConfig
        }
     }
     EOF;
@@ -106,7 +109,7 @@ class StartDatabaseProxy
             'volumes' => [
                 [
                     'type' => 'bind',
-                    'source' => "$configuration_dir/nginx.conf",
+                    'source' => "$host_configuration_dir/nginx.conf",
                     'target' => '/etc/nginx/nginx.conf',
                 ],
             ],
@@ -184,12 +187,28 @@ class StartDatabaseProxy
 
     protected function resolveConfigurationDirectory(string $databaseUuid): string
     {
-        $configurationDirectory = database_proxy_dir($databaseUuid);
-        if (isDev()) {
-            $configurationDirectory = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$databaseUuid.'/proxy';
+        return database_proxy_dir($databaseUuid);
+    }
+
+    protected function resolveHostConfigurationDirectory(string $databaseUuid, ?string $configurationDirectory = null): string
+    {
+        $configurationDirectory ??= $this->resolveConfigurationDirectory($databaseUuid);
+        if ($this->isDevelopmentEnvironment()) {
+            return '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$databaseUuid.'/proxy';
         }
 
         return $configurationDirectory;
+    }
+
+    protected function isDevelopmentEnvironment(): bool
+    {
+        if (app()->bound('config')) {
+            return isDev();
+        }
+
+        $appEnv = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? getenv('APP_ENV');
+
+        return $appEnv === 'local';
     }
 
     protected function resolveEdgeProxyServerForTeamId(?int $teamId): ?Server
@@ -310,5 +329,14 @@ class StartDatabaseProxy
         }
 
         return false;
+    }
+
+    private function buildProxyTimeoutConfig(?int $timeout): string
+    {
+        if ($timeout === null || $timeout < 1) {
+            $timeout = 3600;
+        }
+
+        return "proxy_timeout {$timeout}s;";
     }
 }
