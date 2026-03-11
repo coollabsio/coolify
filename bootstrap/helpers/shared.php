@@ -3225,12 +3225,10 @@ function isAssociativeArray($array)
  */
 function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
-    // Currently disabled
-    return;
     if ($resource instanceof Service) {
-        $ip = $resource->server->ip;
+        $server = $resource->server;
     } else {
-        $ip = $resource->destination->server->ip;
+        $server = $resource->destination->server;
     }
     if (isAssociativeArray($where_to_add)) {
         $isAssociativeArray = true;
@@ -3244,11 +3242,25 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
             $where_to_add->push("COOLIFY_APP_NAME=\"{$resource->name}\"");
         }
     }
-    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_IP')->isEmpty()) {
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_ID')->isEmpty()) {
         if ($isAssociativeArray) {
-            $where_to_add->put('COOLIFY_SERVER_IP', "\"{$ip}\"");
+            $where_to_add->put('COOLIFY_SERVER_ID', $server->id);
         } else {
-            $where_to_add->push("COOLIFY_SERVER_IP=\"{$ip}\"");
+            $where_to_add->push("COOLIFY_SERVER_ID={$server->id}");
+        }
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_NAME')->isEmpty()) {
+        if ($isAssociativeArray) {
+            $where_to_add->put('COOLIFY_SERVER_NAME', "\"{$server->name}\"");
+        } else {
+            $where_to_add->push("COOLIFY_SERVER_NAME=\"{$server->name}\"");
+        }
+    }
+    if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_SERVER_HOSTNAME')->isEmpty()) {
+        if ($isAssociativeArray) {
+            $where_to_add->put('COOLIFY_SERVER_HOSTNAME', "\"{$server->ip}\"");
+        } else {
+            $where_to_add->push("COOLIFY_SERVER_HOSTNAME=\"{$server->ip}\"");
         }
     }
     if ($where_to_check != null && $where_to_check->where('key', 'COOLIFY_ENVIRONMENT_NAME')->isEmpty()) {
