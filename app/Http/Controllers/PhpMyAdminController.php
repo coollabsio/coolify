@@ -197,6 +197,7 @@ class PhpMyAdminController extends Controller
                 <span class="credential-value" id="server-value">{$server}</span>
                 <button class="copy-btn" onclick="copyToClipboard('server-value', this)">Copiar</button>
             </div>
+            {$serverOptionsHtml}
             <div class="credential-item">
                 <span class="credential-label">Usuario:</span>
                 <span class="credential-value" id="username-value">{$username}</span>
@@ -217,8 +218,12 @@ class PhpMyAdminController extends Controller
         <div class="info">
             <strong>💡 Consejo:</strong> Haz clic en "Abrir phpMyAdmin" y luego pega las credenciales en el formulario de login. 
             También puedes copiar cada campo individualmente usando los botones "Copiar".<br><br>
-            <strong>⚠️ Nota importante:</strong> Si el servidor muestra "Name does not resolve", asegúrate de que phpMyAdmin y la base de datos estén en el mismo servicio de Docker Compose. 
-            Si están en servicios diferentes, puede que necesites usar la IP del contenedor o configurar la conexión manualmente.
+            <strong>⚠️ Nota sobre el servidor:</strong> 
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; text-align: left;">
+                <li>Si phpMyAdmin y la base de datos están en el <strong>mismo servicio</strong> de Docker Compose, usa el <strong>nombre del servicio</strong> (ej: "mariadb")</li>
+                <li>Si están en <strong>servicios diferentes</strong>, usa la <strong>IP interna</strong> mostrada arriba o el <strong>nombre completo del contenedor</strong></li>
+                <li>Si aparece "Name does not resolve", prueba primero con el nombre del servicio, luego con la IP</li>
+            </ul>
         </div>
     </div>
     

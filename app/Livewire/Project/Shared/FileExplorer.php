@@ -2300,41 +2300,121 @@ class FileExplorer extends Component
                 // Dentro de Docker Compose, los servicios se comunican por nombre de servicio
                 $dbHost = $dbContainer;
             } else {
-                // Diferentes servicios: intentar obtener la IP del contenedor o usar el nombre completo
-                // Primero intentar obtener la IP del contenedor de la base de datos
+                // Diferentes servicios: verificar si están conectados a la misma red Docker
+                // Si están en la misma red, pueden usar el nombre del servicio con alias
+                // Si no, necesitamos la IP interna del contenedor
+                
                 $dbHost = null;
                 
-                try {
-                    $containerName = "{$dbContainer}-{$dbService->uuid}";
-                    $server = $dbService->server;
-                    
-                    if ($server) {
-                        // Intentar obtener la IP del contenedor
-                        $escapedContainer = escapeshellarg($containerName);
-                        $ipCommand = "docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' {$escapedContainer} 2>/dev/null | head -1";
-                        if ($server->isNonRoot()) {
-                            $ipCommand = "sudo {$ipCommand}";
-                        }
-                        
-                        $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
-                        
-                        if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
-                            $dbHost = $containerIP;
-                            \Log::info('phpMyAdmin: Using container IP', [
-                                'container' => $containerName,
-                                'ip' => $containerIP,
-                            ]);
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    \Log::warning('phpMyAdmin: Could not get container IP', [
-                        'error' => $e->getMessage(),
-                    ]);
-                }
+                // Verificar si ambos servicios están en la misma red
+                $phpMyAdminNetworks = collect($phpMyAdminService->networks())->pluck('name')->toArray();
+                $dbServiceNetworks = collect($dbService->networks())->pluck('name')->toArray();
+                $commonNetworks = array_intersect($phpMyAdminNetworks, $dbServiceNetworks);
                 
-                // Si no se pudo obtener la IP, usar el nombre completo del contenedor
-                if (! $dbHost) {
+                if (!empty($commonNetworks)) {
+                    // Están en la misma red: intentar usar el nombre del servicio con alias
+                    // El alias suele ser: {serviceName}-{serviceUuid}
                     $dbHost = "{$dbContainer}-{$dbService->uuid}";
+                    
+                    \Log::info('phpMyAdmin: Services in same network, using container name with alias', [
+                        'dbHost' => $dbHost,
+                        'commonNetworks' => $commonNetworks,
+                    ]);
+                } else {
+                    // No están en la misma red: obtener la IP interna del contenedor en la red de phpMyAdmin
+                    try {
+                        $dbContainerName = "{$dbContainer}-{$dbService->uuid}";
+                        $phpMyAdminContainerName = null;
+                        
+                        // Buscar el contenedor de phpMyAdmin
+                        foreach ($phpMyAdminService->applications as $app) {
+                            if (str($app->name)->lower()->contains('phpmyadmin') || 
+                                str($app->image)->lower()->contains('phpmyadmin')) {
+                                $phpMyAdminContainerName = "{$app->name}-{$phpMyAdminService->uuid}";
+                                break;
+                            }
+                        }
+                        
+                        // Si no encontramos el contenedor de phpMyAdmin, usar el primer contenedor del servicio
+                        if (! $phpMyAdminContainerName) {
+                            $firstApp = $phpMyAdminService->applications()->first();
+                            if ($firstApp) {
+                                $phpMyAdminContainerName = "{$firstApp->name}-{$phpMyAdminService->uuid}";
+                            }
+                        }
+                        
+                        $server = $dbService->server;
+                        
+                        if ($server && $phpMyAdminContainerName) {
+                            // Obtener la red de phpMyAdmin
+                            $escapedPhpMyAdmin = escapeshellarg($phpMyAdminContainerName);
+                            $phpMyAdminNetworksCommand = "docker inspect --format='{{range \$key, \$value := .NetworkSettings.Networks}}{{\$key}} {{end}}' {$escapedPhpMyAdmin} 2>/dev/null";
+                            if ($server->isNonRoot()) {
+                                $phpMyAdminNetworksCommand = "sudo {$phpMyAdminNetworksCommand}";
+                            }
+                            
+                            $phpMyAdminNetworksOutput = trim(instant_remote_process([$phpMyAdminNetworksCommand], $server, false) ?? '');
+                            $phpMyAdminNetworks = array_filter(explode(' ', $phpMyAdminNetworksOutput));
+                            
+                            // Obtener las redes del contenedor de la base de datos
+                            $escapedDbContainer = escapeshellarg($dbContainerName);
+                            $dbNetworksCommand = "docker inspect --format='{{range \$key, \$value := .NetworkSettings.Networks}}{{\$key}} {{end}}' {$escapedDbContainer} 2>/dev/null";
+                            if ($server->isNonRoot()) {
+                                $dbNetworksCommand = "sudo {$dbNetworksCommand}";
+                            }
+                            
+                            $dbNetworksOutput = trim(instant_remote_process([$dbNetworksCommand], $server, false) ?? '');
+                            $dbNetworks = array_filter(explode(' ', $dbNetworksOutput));
+                            
+                            // Buscar una red común
+                            $commonNetwork = array_intersect($phpMyAdminNetworks, $dbNetworks);
+                            
+                            if (!empty($commonNetwork)) {
+                                // Están en una red común: obtener la IP en esa red
+                                $commonNetworkName = reset($commonNetwork);
+                                $ipCommand = "docker inspect --format='{{index .NetworkSettings.Networks \"{$commonNetworkName}\" | .IPAddress}}' {$escapedDbContainer} 2>/dev/null";
+                                if ($server->isNonRoot()) {
+                                    $ipCommand = "sudo {$ipCommand}";
+                                }
+                                
+                                $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
+                                
+                                if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
+                                    $dbHost = $containerIP;
+                                    \Log::info('phpMyAdmin: Using container IP in common network', [
+                                        'container' => $dbContainerName,
+                                        'network' => $commonNetworkName,
+                                        'ip' => $containerIP,
+                                    ]);
+                                }
+                            } else {
+                                // No hay red común: usar la primera IP disponible del contenedor de la base de datos
+                                $ipCommand = "docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' {$escapedDbContainer} 2>/dev/null | head -1";
+                                if ($server->isNonRoot()) {
+                                    $ipCommand = "sudo {$ipCommand}";
+                                }
+                                
+                                $containerIP = trim(instant_remote_process([$ipCommand], $server, false) ?? '');
+                                
+                                if (!empty($containerIP) && filter_var($containerIP, FILTER_VALIDATE_IP)) {
+                                    $dbHost = $containerIP;
+                                    \Log::info('phpMyAdmin: Using container IP (no common network)', [
+                                        'container' => $dbContainerName,
+                                        'ip' => $containerIP,
+                                    ]);
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('phpMyAdmin: Could not get container IP', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                    
+                    // Si no se pudo obtener la IP, usar el nombre completo del contenedor como último recurso
+                    if (! $dbHost) {
+                        $dbHost = "{$dbContainer}-{$dbService->uuid}";
+                    }
                 }
             }
 
