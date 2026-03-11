@@ -216,7 +216,9 @@ class PhpMyAdminController extends Controller
         
         <div class="info">
             <strong>💡 Consejo:</strong> Haz clic en "Abrir phpMyAdmin" y luego pega las credenciales en el formulario de login. 
-            También puedes copiar cada campo individualmente usando los botones "Copiar".
+            También puedes copiar cada campo individualmente usando los botones "Copiar".<br><br>
+            <strong>⚠️ Nota importante:</strong> Si el servidor muestra "Name does not resolve", asegúrate de que phpMyAdmin y la base de datos estén en el mismo servicio de Docker Compose. 
+            Si están en servicios diferentes, puede que necesites usar la IP del contenedor o configurar la conexión manualmente.
         </div>
     </div>
     
