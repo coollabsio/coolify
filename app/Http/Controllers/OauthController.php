@@ -18,11 +18,12 @@ class OauthController extends Controller
     public function callback(string $provider)
     {
         try {
+            $oauth_setting = OauthSetting::where('provider', $provider)->first();
             $oauthUser = get_socialite_provider($provider)->user();
             $user = User::whereEmail($oauthUser->email)->first();
             if (! $user) {
                 $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
+                if (! $settings->is_registration_enabled && ! $oauth_setting->is_registration_enabled) {
                     abort(403, 'Registration is disabled');
                 }
 
