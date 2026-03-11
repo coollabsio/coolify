@@ -1,0 +1,23 @@
+# documentation: https://github.com/librespeed/speedtest
+# slogan: Self-hosted lightweight Speed Test.
+# category: devtools
+# tags: speedtest, internet-speed
+# logo: svgs/librespeed.png
+# port: 80
+
+services:
+  librespeed:
+    image: adolfintel/speedtest:latest
+    container_name: librespeed
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - PASSWORD=password
+    network_mode: bridge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
