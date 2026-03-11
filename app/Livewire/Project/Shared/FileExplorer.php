@@ -1940,11 +1940,20 @@ class FileExplorer extends Component
                         $dataToEncrypt = json_encode([
                             'url' => $phpMyAdminUrl,
                             'credentials' => $dbCredentials,
-                        ]);
+                        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                        
+                        // Intentar cifrar los datos
                         $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
+                        
+                        // También guardar en sesión como respaldo
+                        session(['phpmyadmin_data' => $encryptedData]);
                     } catch (\Throwable $e) {
-                        // Si falla el cifrado, usar el método anterior
+                        // Si falla el cifrado, guardar en sesión sin cifrar (menos seguro pero funcional)
                         \Log::error('Error encrypting phpMyAdmin data: '.$e->getMessage());
+                        session(['phpmyadmin_data_plain' => [
+                            'url' => $phpMyAdminUrl,
+                            'credentials' => $dbCredentials,
+                        ]]);
                     }
                 }
                 

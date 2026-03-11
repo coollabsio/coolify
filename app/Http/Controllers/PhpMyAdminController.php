@@ -10,43 +10,81 @@ class PhpMyAdminController extends Controller
 {
     public function autoLogin(Request $request)
     {
-        // Intentar obtener datos de POST primero, luego de GET
-        $encryptedData = $request->input('data') ?? $request->query('data');
+        // Intentar obtener datos de múltiples fuentes: POST, GET, o sesión
+        $encryptedData = $request->input('data') ?? $request->query('data') ?? session('phpmyadmin_data');
+        $plainData = session('phpmyadmin_data_plain');
         
-        if (! $encryptedData) {
-            abort(400, 'Missing data parameter');
+        \Log::info('phpMyAdmin autologin request', [
+            'method' => $request->method(),
+            'has_encrypted_data' => !empty($encryptedData),
+            'has_plain_data' => !empty($plainData),
+            'encrypted_data_length' => $encryptedData ? strlen($encryptedData) : 0,
+            'request_all_keys' => array_keys($request->all()),
+        ]);
+        
+        // Si hay datos sin cifrar en sesión, usarlos directamente (más confiable)
+        if ($plainData && isset($plainData['url']) && isset($plainData['credentials'])) {
+            session()->forget('phpmyadmin_data_plain');
+            $phpMyAdminUrl = $plainData['url'];
+            $credentials = $plainData['credentials'];
+        } elseif ($encryptedData) {
+            // Intentar descifrar los datos cifrados
+            try {
+                // Si viene por GET, puede estar codificado en URL
+                if ($request->isMethod('get')) {
+                    $encryptedData = urldecode($encryptedData);
+                }
+                
+                // Limpiar la sesión después de usarla
+                session()->forget('phpmyadmin_data');
+                
+                try {
+                    $decryptedData = Crypt::decryptString($encryptedData);
+                } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                    \Log::error('phpMyAdmin: Decryption failed', [
+                        'error' => $e->getMessage(),
+                        'data_length' => strlen($encryptedData),
+                        'data_preview' => substr($encryptedData, 0, 100),
+                    ]);
+                    abort(400, 'Decryption failed. Please try again from the file explorer.');
+                }
+                
+                $data = json_decode($decryptedData, true);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    \Log::error('phpMyAdmin: JSON decode error', [
+                        'error' => json_last_error_msg(),
+                        'decrypted_length' => strlen($decryptedData),
+                        'decrypted_preview' => substr($decryptedData, 0, 200),
+                    ]);
+                    abort(400, 'Invalid JSON data: '.json_last_error_msg());
+                }
+                
+                if (! isset($data['url']) || ! isset($data['credentials'])) {
+                    \Log::error('phpMyAdmin: Missing required fields', [
+                        'has_url' => isset($data['url']),
+                        'has_credentials' => isset($data['credentials']),
+                        'data_keys' => array_keys($data ?? []),
+                    ]);
+                    abort(400, 'Invalid data structure');
+                }
+                
+                $phpMyAdminUrl = $data['url'];
+                $credentials = $data['credentials'];
+            } catch (\Exception $e) {
+                \Log::error('phpMyAdmin: Exception processing encrypted data', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                ]);
+                abort(400, 'Error processing data: '.$e->getMessage());
+            }
+        } else {
+            \Log::error('phpMyAdmin: No data available', [
+                'request_all' => $request->all(),
+                'query_params' => $request->query(),
+            ]);
+            abort(400, 'Missing data parameter. Please try again from the file explorer.');
         }
-
-        try {
-            // Si viene por GET, puede estar codificado en URL
-            // Si viene por POST, ya está decodificado automáticamente por Laravel
-            if ($request->isMethod('get')) {
-                $encryptedData = urldecode($encryptedData);
-            }
-            
-            $decryptedData = Crypt::decryptString($encryptedData);
-            $data = json_decode($decryptedData, true);
-            
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                \Log::error('phpMyAdmin: JSON decode error', [
-                    'error' => json_last_error_msg(),
-                    'decrypted_length' => strlen($decryptedData),
-                    'decrypted_preview' => substr($decryptedData, 0, 100),
-                ]);
-                abort(400, 'Invalid JSON data: '.json_last_error_msg());
-            }
-            
-            if (! isset($data['url']) || ! isset($data['credentials'])) {
-                \Log::error('phpMyAdmin: Missing required fields', [
-                    'has_url' => isset($data['url']),
-                    'has_credentials' => isset($data['credentials']),
-                    'data_keys' => array_keys($data ?? []),
-                ]);
-                abort(400, 'Invalid data structure');
-            }
-
-            $phpMyAdminUrl = $data['url'];
-            $credentials = $data['credentials'];
 
             // Limpiar la URL para obtener solo la base (sin parámetros GET ni index.php)
             $urlParts = parse_url($phpMyAdminUrl);
@@ -332,8 +370,19 @@ class PhpMyAdminController extends Controller
 HTML;
 
             return response($html)->header('Content-Type', 'text/html; charset=utf-8');
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            \Log::error('phpMyAdmin: Decryption exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            abort(400, 'Decryption failed: '.$e->getMessage());
         } catch (\Exception $e) {
-            abort(400, 'Invalid encrypted data');
+            \Log::error('phpMyAdmin: General exception', [
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            abort(400, 'Error processing request: '.$e->getMessage());
         }
     }
 }

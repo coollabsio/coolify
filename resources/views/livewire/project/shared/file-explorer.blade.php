@@ -787,39 +787,14 @@
                 return;
             }
 
-        // Si hay datos encriptados, usar el endpoint de autologin
-        if (data.encryptedData) {
-            console.log('[phpMyAdmin] Using autologin endpoint');
-
-            // Crear un formulario oculto para enviar los datos por POST (evita problemas con URLs largas)
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = window.phpMyAdminAutologinUrl;
-            form.target = '_blank';
-            form.style.display = 'none';
-
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'data';
-            input.value = data.encryptedData;
-            form.appendChild(input);
-
-            // Agregar token CSRF si está disponible
-            const csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_token';
-                csrfInput.value = csrfToken.getAttribute('content');
-                form.appendChild(csrfInput);
+            // Si hay datos encriptados, usar el endpoint de autologin
+            // Los datos ya están guardados en sesión, así que solo redirigimos
+            if (data.encryptedData) {
+                console.log('[phpMyAdmin] Using autologin endpoint (data in session)');
+                // Los datos ya están en sesión, solo abrir la URL
+                window.open(window.phpMyAdminAutologinUrl, '_blank');
+                return;
             }
-
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
-
-            return;
-        }
 
             console.log('[phpMyAdmin] No encrypted data, opening direct URL:', data.url);
             window.open(data.url, '_blank');
