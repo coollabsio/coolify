@@ -1944,11 +1944,17 @@ class FileExplorer extends Component
                         $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
                     } catch (\Throwable $e) {
                         // Si falla el cifrado, usar el método anterior
+                        \Log::error('Error encrypting phpMyAdmin data: '.$e->getMessage());
                     }
                 }
                 
                 // Disparar evento para abrir phpMyAdmin en nueva ventana con credenciales
-                $this->dispatch('openPhpMyAdmin', url: $phpMyAdminUrl, credentials: $dbCredentials, encryptedData: $encryptedData);
+                // En Livewire 3, pasar los datos como parámetros nombrados
+                $this->dispatch('openPhpMyAdmin', 
+                    url: $phpMyAdminUrl, 
+                    credentials: $dbCredentials, 
+                    encryptedData: $encryptedData
+                );
 
             return;
             }
@@ -2264,8 +2270,25 @@ class FileExplorer extends Component
                 
                 // Si aún no se encuentra, retornar null
                 if (! $rootPasswordVar || ! $rootPasswordVar->real_value || str($rootPasswordVar->real_value)->startsWith('$')) {
+                    \Log::warning('phpMyAdmin: Could not resolve database password', [
+                        'dbService' => $dbService->id,
+                        'dbContainer' => $dbContainer,
+                    ]);
                     return null;
                 }
+            }
+
+            // Obtener el valor real de la contraseña
+            $rootPassword = $rootPasswordVar->real_value;
+            
+            // Si la contraseña aún empieza con $, intentar obtenerla del contenedor
+            if (str($rootPassword)->startsWith('$')) {
+                \Log::warning('phpMyAdmin: Password variable not resolved, trying container', [
+                    'password_var' => $rootPassword,
+                ]);
+                
+                // Ya intentamos obtenerla del contenedor arriba, si llegamos aquí es que falló
+                return null;
             }
 
             // Obtener el nombre del host del contenedor
@@ -2283,9 +2306,15 @@ class FileExplorer extends Component
                 $dbHost = $dbContainer;
             }
 
+            \Log::info('phpMyAdmin: Credentials obtained', [
+                'username' => 'root',
+                'server' => $dbHost,
+                'password_length' => strlen($rootPassword),
+            ]);
+
             return [
                 'username' => 'root',
-                'password' => $rootPasswordVar->real_value,
+                'password' => $rootPassword,
                 'server' => $dbHost,
             ];
         } catch (\Throwable $e) {

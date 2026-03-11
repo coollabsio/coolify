@@ -773,16 +773,25 @@
     });
 
     Livewire.on('openPhpMyAdmin', (data) => {
-        if (data.url) {
-            // Si hay datos encriptados, usar el endpoint de autologin
-            if (data.encryptedData) {
-                const autologinUrl = `{{ route('phpmyadmin.autologin') }}?data=${encodeURIComponent(data.encryptedData)}`;
-                window.open(autologinUrl, '_blank');
-                return;
-            }
-            
-            // Si no hay datos encriptados, usar el método anterior con JavaScript
-            const phpMyAdminWindow = window.open(data.url, '_blank');
+        console.log('[phpMyAdmin] Event received:', data);
+        
+        if (!data || !data.url) {
+            console.error('[phpMyAdmin] Invalid data received');
+            return;
+        }
+        
+        // Si hay datos encriptados, usar el endpoint de autologin
+        if (data.encryptedData) {
+            console.log('[phpMyAdmin] Using autologin endpoint');
+            const autologinUrl = `{{ route('phpmyadmin.autologin') }}?data=${encodeURIComponent(data.encryptedData)}`;
+            console.log('[phpMyAdmin] Opening:', autologinUrl);
+            window.open(autologinUrl, '_blank');
+            return;
+        }
+        
+        console.log('[phpMyAdmin] No encrypted data, using fallback method');
+        // Si no hay datos encriptados, usar el método anterior con JavaScript
+        const phpMyAdminWindow = window.open(data.url, '_blank');
             
             // Si hay credenciales, intentar autocompletar el formulario después de que cargue
             if (data.credentials && phpMyAdminWindow) {
