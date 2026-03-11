@@ -10,17 +10,39 @@ class PhpMyAdminController extends Controller
 {
     public function autoLogin(Request $request)
     {
-        $encryptedData = $request->query('data');
+        // Intentar obtener datos de POST primero, luego de GET
+        $encryptedData = $request->input('data') ?? $request->query('data');
         
         if (! $encryptedData) {
             abort(400, 'Missing data parameter');
         }
 
         try {
-            $data = json_decode(Crypt::decryptString($encryptedData), true);
+            // Si viene por GET, puede estar codificado en URL
+            // Si viene por POST, ya está decodificado automáticamente por Laravel
+            if ($request->isMethod('get')) {
+                $encryptedData = urldecode($encryptedData);
+            }
+            
+            $decryptedData = Crypt::decryptString($encryptedData);
+            $data = json_decode($decryptedData, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                \Log::error('phpMyAdmin: JSON decode error', [
+                    'error' => json_last_error_msg(),
+                    'decrypted_length' => strlen($decryptedData),
+                    'decrypted_preview' => substr($decryptedData, 0, 100),
+                ]);
+                abort(400, 'Invalid JSON data: '.json_last_error_msg());
+            }
             
             if (! isset($data['url']) || ! isset($data['credentials'])) {
-                abort(400, 'Invalid data');
+                \Log::error('phpMyAdmin: Missing required fields', [
+                    'has_url' => isset($data['url']),
+                    'has_credentials' => isset($data['credentials']),
+                    'data_keys' => array_keys($data ?? []),
+                ]);
+                abort(400, 'Invalid data structure');
             }
 
             $phpMyAdminUrl = $data['url'];
