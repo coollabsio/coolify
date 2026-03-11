@@ -107,36 +107,33 @@ class PhpMyAdminController extends Controller
             // URL del formulario de login de phpMyAdmin
             $loginUrl = $baseUrl.'index.php';
             
-            // Escapar valores para HTML y JavaScript
-            $server = htmlspecialchars($credentials['server'] ?? '1', ENT_QUOTES, 'UTF-8');
-            $username = htmlspecialchars($credentials['username'] ?? 'root', ENT_QUOTES, 'UTF-8');
-            $password = htmlspecialchars($credentials['password'] ?? '', ENT_QUOTES, 'UTF-8');
+            // Obtener credenciales
+            $server = $credentials['server'] ?? 'localhost';
+            $username = $credentials['username'] ?? 'root';
+            $password = $credentials['password'] ?? '';
             
-            // Escapar para JavaScript (JSON encode)
-            $serverJs = json_encode($server);
-            $usernameJs = json_encode($username);
-            $passwordJs = json_encode($password);
-            $loginUrlJs = json_encode($loginUrl);
-
-            // Generar opciones alternativas de servidor
-            $serverOptionsHtml = '';
-            $alternativeServers = ['mariadb', 'mysql', '127.0.0.1', 'localhost'];
-            if (!in_array(strtolower($server), array_map('strtolower', $alternativeServers))) {
-                $serverOptionsHtml = '<div class="info" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 255, 0, 0.1); border-radius: 4px; font-size: 0.85rem;"><strong>Opciones alternativas de servidor:</strong><ul style="margin-top: 0.5rem; padding-left: 1.5rem; text-align: left;">';
-                foreach ($alternativeServers as $altServer) {
-                    $serverOptionsHtml .= '<li style="margin-bottom: 0.25rem;">'.$altServer.'</li>';
-                }
-                $serverOptionsHtml .= '</ul></div>';
+            // Si phpMyAdmin está en el mismo docker-compose que la base de datos,
+            // usar el nombre del servicio directamente (sin UUID)
+            // Extraer solo el nombre del servicio si es un contenedor con UUID
+            if (preg_match('/^([a-z0-9]+)-[a-z0-9]{20,}/', $server, $matches)) {
+                $server = $matches[1]; // Usar solo el nombre del servicio
             }
-
-            // Generar página HTML que muestra las credenciales y abre phpMyAdmin
+            
+            // Escapar valores para HTML
+            $serverEscaped = htmlspecialchars($server, ENT_QUOTES, 'UTF-8');
+            $usernameEscaped = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+            $passwordEscaped = htmlspecialchars($password, ENT_QUOTES, 'UTF-8');
+            $loginUrlEscaped = htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8');
+            
+            // Generar página HTML que hace login automático con POST (como Plesk)
+            // phpMyAdmin usa los campos: pma_username, pma_password, server
             $html = <<<HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Credenciales phpMyAdmin - Coolify</title>
+    <title>Iniciando phpMyAdmin - Coolify</title>
     <style>
         * {
             margin: 0;
@@ -158,224 +155,53 @@ class PhpMyAdminController extends Controller
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 2rem;
-            max-width: 600px;
+            max-width: 500px;
             width: 100%;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         h1 {
-            margin: 0 0 1.5rem 0;
-            font-size: 1.75rem;
-            text-align: center;
+            margin: 0 0 1rem 0;
+            font-size: 1.5rem;
         }
-        .credentials-box {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        .credential-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-        }
-        .credential-item:last-child {
-            margin-bottom: 0;
-        }
-        .credential-label {
-            font-weight: 600;
-            min-width: 100px;
-            font-size: 0.9rem;
-        }
-        .credential-value {
-            flex: 1;
-            font-family: 'Courier New', monospace;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 0.5rem 0.75rem;
-            border-radius: 4px;
-            word-break: break-all;
-            font-size: 0.9rem;
-        }
-        .copy-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 0.4rem 0.8rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-        .copy-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        .copy-btn.copied {
-            background: #10b981;
-            border-color: #10b981;
-        }
-        .actions {
-            display: flex;
-            gap: 1rem;
-            flex-direction: column;
-        }
-        .btn {
-            padding: 0.875rem 1.5rem;
-            border-radius: 8px;
-            border: none;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
-        .btn-primary {
-            background: white;
-            color: #667eea;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        .info {
+        p {
             margin-top: 1rem;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
             font-size: 0.9rem;
-            line-height: 1.6;
+            opacity: 0.9;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔐 Credenciales phpMyAdmin</h1>
-        
-        <div class="credentials-box">
-            <div class="credential-item">
-                <span class="credential-label">Servidor:</span>
-                <span class="credential-value" id="server-value">{$server}</span>
-                <button class="copy-btn" onclick="copyToClipboard('server-value', this)">Copiar</button>
-            </div>
-            {$serverOptionsHtml}
-            <div class="credential-item">
-                <span class="credential-label">Usuario:</span>
-                <span class="credential-value" id="username-value">{$username}</span>
-                <button class="copy-btn" onclick="copyToClipboard('username-value', this)">Copiar</button>
-            </div>
-            <div class="credential-item">
-                <span class="credential-label">Contraseña:</span>
-                <span class="credential-value" id="password-value">{$password}</span>
-                <button class="copy-btn" onclick="copyToClipboard('password-value', this)">Copiar</button>
-            </div>
-        </div>
-        
-        <div class="actions">
-            <a href="{$loginUrl}" target="_blank" class="btn btn-primary">Abrir phpMyAdmin</a>
-            <button class="btn btn-secondary" onclick="copyAllCredentials()">Copiar todas las credenciales</button>
-        </div>
-        
-        <div class="info">
-            <strong>💡 Consejo:</strong> Haz clic en "Abrir phpMyAdmin" y luego pega las credenciales en el formulario de login. 
-            También puedes copiar cada campo individualmente usando los botones "Copiar".<br><br>
-            <strong>⚠️ Nota sobre el servidor:</strong> 
-            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; text-align: left;">
-                <li>Si phpMyAdmin y la base de datos están en el <strong>mismo servicio</strong> de Docker Compose, usa el <strong>nombre del servicio</strong> (ej: "mariadb")</li>
-                <li>Si están en <strong>servicios diferentes</strong>, usa la <strong>IP interna</strong> mostrada arriba o el <strong>nombre completo del contenedor</strong></li>
-                <li>Si aparece "Name does not resolve", prueba primero con el nombre del servicio, luego con la IP</li>
-            </ul>
-        </div>
+        <div class="spinner"></div>
+        <h1>🔐 Iniciando sesión en phpMyAdmin...</h1>
+        <p>Serás redirigido automáticamente.</p>
     </div>
     
+    <form id="phpmyadmin-login-form" method="POST" action="{$loginUrlEscaped}" style="display: none;">
+        <input type="hidden" name="pma_username" value="{$usernameEscaped}">
+        <input type="hidden" name="pma_password" value="{$passwordEscaped}">
+        <input type="hidden" name="server" value="{$serverEscaped}">
+    </form>
+    
     <script>
-        const loginUrl = {$loginUrlJs};
-        const server = {$serverJs};
-        const username = {$usernameJs};
-        const password = {$passwordJs};
-        
-        function copyToClipboard(elementId, button) {
-            const element = document.getElementById(elementId);
-            const text = element.textContent;
-            
-            navigator.clipboard.writeText(text).then(function() {
-                const originalText = button.textContent;
-                button.textContent = '✓ Copiado';
-                button.classList.add('copied');
-                
-                setTimeout(function() {
-                    button.textContent = originalText;
-                    button.classList.remove('copied');
-                }, 2000);
-            }).catch(function(err) {
-                console.error('Error al copiar:', err);
-                // Fallback para navegadores antiguos
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                
-                button.textContent = '✓ Copiado';
-                button.classList.add('copied');
-                setTimeout(function() {
-                    button.textContent = 'Copiar';
-                    button.classList.remove('copied');
-                }, 2000);
-            });
-        }
-        
-        function copyAllCredentials() {
-            const credentials = `Servidor: {$server}\nUsuario: {$username}\nContraseña: {$password}`;
-            
-            navigator.clipboard.writeText(credentials).then(function() {
-                const btn = event.target;
-                const originalText = btn.textContent;
-                btn.textContent = '✓ Todas copiadas';
-                btn.classList.add('copied');
-                
-                setTimeout(function() {
-                    btn.textContent = originalText;
-                    btn.classList.remove('copied');
-                }, 2000);
-            }).catch(function(err) {
-                console.error('Error al copiar:', err);
-                // Fallback
-                const textarea = document.createElement('textarea');
-                textarea.value = credentials;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                
-                const btn = event.target;
-                btn.textContent = '✓ Todas copiadas';
-                btn.classList.add('copied');
-                setTimeout(function() {
-                    btn.textContent = 'Copiar todas las credenciales';
-                    btn.classList.remove('copied');
-                }, 2000);
-            });
-        }
-        
-        // Intentar rellenar automáticamente si phpMyAdmin se abre en la misma ventana
-        // (Esto solo funcionará si el usuario hace clic en "Abrir phpMyAdmin" y luego vuelve aquí)
-        window.addEventListener('focus', function() {
-            // Si la página recupera el foco, puede ser que phpMyAdmin esté abierto
-            // No hacemos nada automático aquí para evitar problemas
-        });
+        // Enviar formulario automáticamente al cargar la página
+        window.onload = function() {
+            document.getElementById('phpmyadmin-login-form').submit();
+        };
     </script>
 </body>
 </html>

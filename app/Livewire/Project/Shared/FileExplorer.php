@@ -1918,6 +1918,62 @@ class FileExplorer extends Component
 
     public function openDatabasePanel()
     {
+        // Si es una base de datos, verificar si tiene phpMyAdmin integrado
+        if ($this->type === 'database' && 
+            ($this->resource instanceof \App\Models\StandaloneMariadb || 
+             $this->resource instanceof \App\Models\StandaloneMysql)) {
+            
+            $database = $this->resource;
+            $containerName = $database->uuid.'-phpmyadmin';
+            $server = $database->destination->server;
+            
+            // Verificar si el contenedor phpMyAdmin existe
+            if ($server) {
+                $escapedContainer = escapeshellarg($containerName);
+                $checkCommand = "docker ps -a --filter name=^{$escapedContainer}$ --format '{{.Names}}'";
+                if ($server->isNonRoot()) {
+                    $checkCommand = "sudo {$checkCommand}";
+                }
+                
+                $containerExists = instant_remote_process([$checkCommand], $server, false);
+                if (!empty(trim($containerExists))) {
+                    // phpMyAdmin está integrado, obtener URL y credenciales
+                    $phpMyAdminUrl = $this->getPhpMyAdminUrlForDatabase($database);
+                    if ($phpMyAdminUrl) {
+                        $dbCredentials = $this->getDatabaseCredentialsForIntegratedPhpMyAdmin($database);
+                        
+                        if ($dbCredentials) {
+                            // Crear URL encriptada para el autologin
+                            $encryptedData = null;
+                            try {
+                                $dataToEncrypt = json_encode([
+                                    'url' => $phpMyAdminUrl,
+                                    'credentials' => $dbCredentials,
+                                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                                
+                                $encryptedData = \Illuminate\Support\Facades\Crypt::encryptString($dataToEncrypt);
+                                session(['phpmyadmin_data' => $encryptedData]);
+                            } catch (\Throwable $e) {
+                                \Log::error('Error encrypting phpMyAdmin data: '.$e->getMessage());
+                                session(['phpmyadmin_data_plain' => [
+                                    'url' => $phpMyAdminUrl,
+                                    'credentials' => $dbCredentials,
+                                ]]);
+                            }
+                            
+                            $this->dispatch('openPhpMyAdmin', 
+                                url: $phpMyAdminUrl, 
+                                credentials: $dbCredentials, 
+                                encryptedData: $encryptedData
+                            );
+                            
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
         // Buscar servicio phpMyAdmin en el mismo entorno (funciona para todos los contenedores)
         $phpMyAdminService = $this->findPhpMyAdminService();
 
@@ -1972,6 +2028,69 @@ class FileExplorer extends Component
         // Si no se encuentra phpMyAdmin, mostrar mensaje
         $this->dispatch('error', 'phpMyAdmin service not found in this environment. Please add phpMyAdmin as a service to use it for database management.');
     }
+    
+    private function getPhpMyAdminUrlForDatabase($database): ?string
+    {
+        try {
+            $server = $database->destination->server;
+            $containerName = $database->uuid.'-phpmyadmin';
+            
+            // Obtener la URL desde las variables de entorno del contenedor
+            $escapedContainer = escapeshellarg($containerName);
+            $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep PMA_ABSOLUTE_URI | cut -d'=' -f2";
+            if ($server->isNonRoot()) {
+                $envCommand = "sudo {$envCommand}";
+            }
+            
+            $url = trim(instant_remote_process([$envCommand], $server, false) ?? '');
+            if (!empty($url)) {
+                return $url;
+            }
+            
+            // Si no se encuentra en las variables de entorno, generar una URL basada en el servidor
+            $fqdn = generateFqdn(server: $server, random: "{$database->uuid}-phpmyadmin", parserVersion: 2);
+            $url = generateUrl($server, "{$database->uuid}-phpmyadmin");
+            
+            return $url;
+        } catch (\Throwable $e) {
+            \Log::error('Error getting phpMyAdmin URL for database: '.$e->getMessage());
+            return null;
+        }
+    }
+    
+    private function getDatabaseCredentialsForIntegratedPhpMyAdmin($database): ?array
+    {
+        try {
+            $containerName = $database->uuid;
+            $server = $database->destination->server;
+            
+            // Obtener credenciales desde la base de datos
+            $rootPassword = null;
+            if ($database instanceof \App\Models\StandaloneMariadb) {
+                $rootPassword = $database->mariadb_root_password;
+            } elseif ($database instanceof \App\Models\StandaloneMysql) {
+                $rootPassword = $database->mysql_root_password;
+            }
+            
+            if (!$rootPassword) {
+                return null;
+            }
+            
+            // phpMyAdmin está en el mismo docker-compose que la base de datos
+            // En docker-compose, los servicios se comunican por nombre de servicio
+            // El nombre del servicio es el mismo que el container_name (que es el UUID)
+            // Pero dentro del docker-compose, phpMyAdmin puede usar el nombre del servicio directamente
+            // que es el mismo UUID. Sin embargo, para mayor compatibilidad, usamos el UUID completo
+            return [
+                'username' => 'root',
+                'password' => $rootPassword,
+                'server' => $containerName, // UUID de la base de datos (nombre del servicio en docker-compose)
+            ];
+        } catch (\Throwable $e) {
+            \Log::error('Error getting database credentials for integrated phpMyAdmin: '.$e->getMessage());
+            return null;
+        }
+    }
 
     private function configurePhpMyAdminAutoLogin(\App\Models\Service $phpMyAdminService, ?array $dbCredentials): void
     {
@@ -2006,6 +2125,32 @@ class FileExplorer extends Component
                 // Para bases de datos standalone, obtener el entorno desde el recurso
                 if (method_exists($this->resource, 'environment')) {
                     $environment = $this->resource->environment;
+                }
+                
+                // Si es una base de datos, verificar si tiene phpMyAdmin integrado en su docker-compose
+                if ($this->resource instanceof \App\Models\StandaloneMariadb || 
+                    $this->resource instanceof \App\Models\StandaloneMysql) {
+                    // Verificar si la base de datos tiene phpMyAdmin en su configuración
+                    // Las bases de datos ahora tienen phpMyAdmin integrado, así que crear un servicio virtual
+                    // o buscar el contenedor phpMyAdmin directamente
+                    $containerName = $this->resource->uuid.'-phpmyadmin';
+                    
+                    // Verificar si el contenedor existe
+                    $server = $this->resource->destination->server;
+                    if ($server) {
+                        $escapedContainer = escapeshellarg($containerName);
+                        $checkCommand = "docker ps -a --filter name=^{$escapedContainer}$ --format '{{.Names}}'";
+                        if ($server->isNonRoot()) {
+                            $checkCommand = "sudo {$checkCommand}";
+                        }
+                        
+                        $containerExists = instant_remote_process([$checkCommand], $server, false);
+                        if (!empty(trim($containerExists))) {
+                            // El contenedor existe, retornar un servicio virtual
+                            // Necesitamos obtener la URL desde las variables de entorno o generar una
+                            return $this->createVirtualPhpMyAdminService($this->resource);
+                        }
+                    }
                 }
             }
 
@@ -2321,13 +2466,15 @@ class FileExplorer extends Component
                 $commonNetworks = array_intersect($phpMyAdminNetworks, $dbServiceNetworks);
                 
                 if (!empty($commonNetworks)) {
-                    // Están en la misma red: intentar usar el nombre del servicio con alias
-                    // El alias suele ser: {serviceName}-{serviceUuid}
-                    $dbHost = "{$dbContainer}-{$dbService->uuid}";
+                    // Están en la misma red: intentar primero con solo el nombre del servicio
+                    // Si eso no funciona, se puede probar con el nombre completo del contenedor
+                    // Pero primero intentemos con el nombre simple del servicio (más común)
+                    $dbHost = $dbContainer;
                     
-                    \Log::info('phpMyAdmin: Services in same network, using container name with alias', [
+                    \Log::info('phpMyAdmin: Services in same network, using service name', [
                         'dbHost' => $dbHost,
                         'commonNetworks' => $commonNetworks,
+                        'dbContainer' => $dbContainer,
                     ]);
                 } else {
                     // No están en la misma red: obtener la IP interna del contenedor en la red de phpMyAdmin

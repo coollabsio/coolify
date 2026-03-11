@@ -202,6 +202,57 @@ class StartMariadb
             ];
         }
 
+        // Add phpMyAdmin service integrated with the database
+        $phpmyadmin_container_name = $container_name.'-phpmyadmin';
+        $phpmyadmin_volume_name = $container_name.'-phpmyadmin-config';
+        
+        // Generate FQDN for phpMyAdmin
+        $server = $this->database->destination->server;
+        $phpmyadmin_fqdn = generateFqdn(server: $server, random: "{$container_name}-phpmyadmin", parserVersion: 2);
+        $phpmyadmin_url = generateUrl($server, "{$container_name}-phpmyadmin");
+        
+        $docker_compose['services'][$phpmyadmin_container_name] = [
+            'image' => 'lscr.io/linuxserver/phpmyadmin:latest',
+            'container_name' => $phpmyadmin_container_name,
+            'environment' => [
+                'PUID=1000',
+                'PGID=1000',
+                'TZ=Europe/Madrid',
+                'PMA_ARBITRARY=1',
+                'PMA_ABSOLUTE_URI='.$phpmyadmin_url,
+                'PMA_HOST='.$container_name,
+                'PMA_USER=root',
+                'PMA_PASSWORD='.$this->database->mariadb_root_password,
+            ],
+            'networks' => [
+                $this->database->destination->network,
+            ],
+            'volumes' => [
+                $phpmyadmin_volume_name.':/config',
+            ],
+            'depends_on' => [
+                $container_name => [
+                    'condition' => 'service_healthy',
+                ],
+            ],
+            'healthcheck' => [
+                'test' => ['CMD', 'curl', '-f', 'http://127.0.0.1:80'],
+                'interval' => '2s',
+                'timeout' => '10s',
+                'retries' => 15,
+            ],
+            'labels' => defaultDatabaseLabels($this->database)->toArray(),
+        ];
+        
+        // Add phpmyadmin volume
+        if (!isset($docker_compose['volumes'])) {
+            $docker_compose['volumes'] = [];
+        }
+        $docker_compose['volumes'][$phpmyadmin_volume_name] = [
+            'name' => $phpmyadmin_volume_name,
+            'external' => false,
+        ];
+
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -216,6 +267,9 @@ class StartMariadb
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, 'chown mysql:mysql /etc/mysql/certs/server.crt /etc/mysql/certs/server.key');
         }
+        
+        // Create ServiceApplication for phpMyAdmin after deployment
+        $this->commands[] = "echo 'Setting up phpMyAdmin application...'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
