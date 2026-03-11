@@ -57,129 +57,245 @@ class PhpMyAdminController extends Controller
             $passwordJs = json_encode($password);
             $loginUrlJs = json_encode($loginUrl);
 
-            // Generar página HTML que redirige a phpMyAdmin y rellena el formulario con JavaScript
+            // Generar página HTML que muestra las credenciales y abre phpMyAdmin
             $html = <<<HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conectando a phpMyAdmin...</title>
+    <title>Credenciales phpMyAdmin - Coolify</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            min-height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-        }
-        .container {
-            text-align: center;
             padding: 2rem;
         }
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 4px solid white;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         h1 {
-            margin: 0 0 1rem 0;
-            font-size: 1.5rem;
+            margin: 0 0 1.5rem 0;
+            font-size: 1.75rem;
+            text-align: center;
         }
-        p {
-            margin: 0;
-            opacity: 0.9;
+        .credentials-box {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .credential-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+        .credential-item:last-child {
+            margin-bottom: 0;
+        }
+        .credential-label {
+            font-weight: 600;
+            min-width: 100px;
+            font-size: 0.9rem;
+        }
+        .credential-value {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 0.9rem;
+        }
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .copy-btn.copied {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        .actions {
+            display: flex;
+            gap: 1rem;
+            flex-direction: column;
+        }
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="spinner"></div>
-        <h1>Conectando a phpMyAdmin...</h1>
-        <p>Por favor espera mientras se completa el inicio de sesión automático.</p>
+        <h1>🔐 Credenciales phpMyAdmin</h1>
+        
+        <div class="credentials-box">
+            <div class="credential-item">
+                <span class="credential-label">Servidor:</span>
+                <span class="credential-value" id="server-value">{$server}</span>
+                <button class="copy-btn" onclick="copyToClipboard('server-value', this)">Copiar</button>
+            </div>
+            <div class="credential-item">
+                <span class="credential-label">Usuario:</span>
+                <span class="credential-value" id="username-value">{$username}</span>
+                <button class="copy-btn" onclick="copyToClipboard('username-value', this)">Copiar</button>
+            </div>
+            <div class="credential-item">
+                <span class="credential-label">Contraseña:</span>
+                <span class="credential-value" id="password-value">{$password}</span>
+                <button class="copy-btn" onclick="copyToClipboard('password-value', this)">Copiar</button>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="{$loginUrl}" target="_blank" class="btn btn-primary">Abrir phpMyAdmin</a>
+            <button class="btn btn-secondary" onclick="copyAllCredentials()">Copiar todas las credenciales</button>
+        </div>
+        
+        <div class="info">
+            <strong>💡 Consejo:</strong> Haz clic en "Abrir phpMyAdmin" y luego pega las credenciales en el formulario de login. 
+            También puedes copiar cada campo individualmente usando los botones "Copiar".
+        </div>
     </div>
     
     <script>
-        // Redirigir a phpMyAdmin y luego rellenar el formulario
         const loginUrl = {$loginUrlJs};
         const server = {$serverJs};
         const username = {$usernameJs};
         const password = {$passwordJs};
         
-        console.log('[phpMyAdmin Autologin] Redirecting to:', loginUrl);
-        console.log('[phpMyAdmin Autologin] Credentials:', {server: server, username: username});
+        function copyToClipboard(elementId, button) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(function() {
+                const originalText = button.textContent;
+                button.textContent = '✓ Copiado';
+                button.classList.add('copied');
+                
+                setTimeout(function() {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Error al copiar:', err);
+                // Fallback para navegadores antiguos
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                button.textContent = '✓ Copiado';
+                button.classList.add('copied');
+                setTimeout(function() {
+                    button.textContent = 'Copiar';
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
         
-        // Redirigir a phpMyAdmin
-        window.location.href = loginUrl;
+        function copyAllCredentials() {
+            const credentials = `Servidor: {$server}\nUsuario: {$username}\nContraseña: {$password}`;
+            
+            navigator.clipboard.writeText(credentials).then(function() {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Todas copiadas';
+                btn.classList.add('copied');
+                
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Error al copiar:', err);
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = credentials;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                const btn = event.target;
+                btn.textContent = '✓ Todas copiadas';
+                btn.classList.add('copied');
+                setTimeout(function() {
+                    btn.textContent = 'Copiar todas las credenciales';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
         
-        // Intentar rellenar el formulario cuando la página carga
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                try {
-                    // Buscar el formulario de login
-                    const loginForm = document.querySelector('form[name="login_form"]') || 
-                                    document.querySelector('form#login_form') ||
-                                    document.querySelector('form.login-form') ||
-                                    document.querySelector('form');
-                    
-                    if (loginForm) {
-                        console.log('[phpMyAdmin Autologin] Form found, filling...');
-                        
-                        // Buscar campos
-                        const serverInput = loginForm.querySelector('input[name="pma_servername"]') ||
-                                         loginForm.querySelector('input[name="server"]') ||
-                                         loginForm.querySelector('select[name="pma_servername"]') ||
-                                         loginForm.querySelector('select[name="server"]');
-                        
-                        const usernameInput = loginForm.querySelector('input[name="pma_username"]') ||
-                                            loginForm.querySelector('input[name="username"]');
-                        
-                        const passwordInput = loginForm.querySelector('input[name="pma_password"]') ||
-                                            loginForm.querySelector('input[name="password"]');
-                        
-                        if (serverInput) {
-                            if (serverInput.tagName === 'SELECT') {
-                                const option = Array.from(serverInput.options).find(opt => 
-                                    opt.value === server || opt.text.includes(server)
-                                );
-                                if (option) serverInput.value = option.value;
-                                else if (serverInput.options.length > 0) serverInput.value = serverInput.options[0].value;
-                            } else {
-                                serverInput.value = server;
-                            }
-                        }
-                        
-                        if (usernameInput) usernameInput.value = username;
-                        if (passwordInput) passwordInput.value = password;
-                        
-                        // Intentar enviar el formulario
-                        if (serverInput && usernameInput && passwordInput) {
-                            setTimeout(function() {
-                                const submitButton = loginForm.querySelector('input[type="submit"]') ||
-                                                   loginForm.querySelector('button[type="submit"]') ||
-                                                   loginForm.querySelector('button');
-                                if (submitButton) {
-                                    console.log('[phpMyAdmin Autologin] Submitting form...');
-                                    loginForm.submit();
-                                }
-                            }, 500);
-                        }
-                    }
-                } catch (e) {
-                    console.error('[phpMyAdmin Autologin] Error:', e);
-                }
-            }, 1000);
+        // Intentar rellenar automáticamente si phpMyAdmin se abre en la misma ventana
+        // (Esto solo funcionará si el usuario hace clic en "Abrir phpMyAdmin" y luego vuelve aquí)
+        window.addEventListener('focus', function() {
+            // Si la página recupera el foco, puede ser que phpMyAdmin esté abierto
+            // No hacemos nada automático aquí para evitar problemas
         });
     </script>
 </body>
