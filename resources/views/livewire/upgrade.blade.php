@@ -419,6 +419,19 @@
                             this.showSuccess();
                         } else if (data.status === 'error') {
                             this.showError(data.message);
+                        } else if (data.status === 'none' && this.showProgress) {
+                            // Status file cleared after server restart —
+                            // fall back to health check to detect when server is back
+                            if (!this.serviceDown) {
+                                this.serviceDown = true;
+                                this.currentStep = 4;
+                                this.currentStatus = 'Coolify is restarting with the new version...';
+                                if (this.checkUpgradeStatusInterval) {
+                                    clearInterval(this.checkUpgradeStatusInterval);
+                                    this.checkUpgradeStatusInterval = null;
+                                }
+                                this.revive();
+                            }
                         }
                     } catch (error) {
                         // Service is down - switch to health check mode
