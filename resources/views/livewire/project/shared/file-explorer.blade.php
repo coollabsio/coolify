@@ -52,9 +52,9 @@
                             </svg>
                             New Folder
                         </x-forms.button>
-                        <div class="relative inline-block" 
-                             x-data="{ 
-                                 uploading: false, 
+                        <div class="relative inline-block"
+                             x-data="{
+                                 uploading: false,
                                  progress: 0,
                                  fileName: '',
                                  errorMsg: '',
@@ -64,50 +64,50 @@
                                      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
                                      const uploadId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                                      const csrfToken = document.querySelector('meta[name=csrf-token]')?.content;
-                                     
+
                                      this.uploading = true;
                                      this.progress = 0;
                                      this.fileName = file.name;
                                      this.errorMsg = '';
                                      this.successMsg = '';
-                                     
+
                                      try {
                                          // Send each chunk
                                          for (let i = 0; i < totalChunks; i++) {
                                              const start = i * CHUNK_SIZE;
                                              const end = Math.min(start + CHUNK_SIZE, file.size);
                                              const chunk = file.slice(start, end);
-                                             
+
                                              const formData = new FormData();
                                              formData.append('chunk', chunk, file.name);
                                              formData.append('uploadId', uploadId);
                                              formData.append('chunkIndex', i);
                                              formData.append('totalChunks', totalChunks);
                                              formData.append('fileName', file.name);
-                                             
+
                                              const resp = await fetch('/file-explorer/upload-chunk', {
                                                  method: 'POST',
                                                  headers: { 'X-CSRF-TOKEN': csrfToken },
                                                  body: formData
                                              });
-                                             
+
                                              if (!resp.ok) {
                                                  const err = await resp.json().catch(() => ({}));
                                                  throw new Error(err.message || 'Chunk ' + i + ' failed');
                                              }
-                                             
+
                                              this.progress = Math.round(((i + 1) / totalChunks) * 90); // 0-90% for chunks
                                          }
-                                         
+
                                          // Finalize: assemble + docker cp
                                          this.progress = 92;
                                          const serverId = await $wire.getSelectedServerId();
                                          const containerName = $wire.selected_container;
                                          const currentPath = $wire.currentPath;
-                                         
+
                                          const finalResp = await fetch('/file-explorer/finalize-upload', {
                                              method: 'POST',
-                                             headers: { 
+                                             headers: {
                                                  'X-CSRF-TOKEN': csrfToken,
                                                  'Content-Type': 'application/json',
                                                  'Accept': 'application/json'
@@ -121,20 +121,20 @@
                                                  destinationPath: currentPath
                                              })
                                          });
-                                         
+
                                          const result = await finalResp.json();
-                                         
+
                                          if (!finalResp.ok || !result.success) {
                                              throw new Error(result.message || 'Finalize failed');
                                          }
-                                         
+
                                          this.progress = 100;
                                          this.successMsg = 'File uploaded!';
                                          alert('Upload completed! Saved in: ' + currentPath);
-                                         
+
                                          // Refresh file list via Livewire
                                          $wire.onChunkedUploadComplete();
-                                         
+
                                          setTimeout(() => {
                                              this.uploading = false;
                                              this.progress = 0;
@@ -142,7 +142,7 @@
                                              this.successMsg = '';
                                              document.getElementById('uploadFileInput').value = '';
                                          }, 2000);
-                                         
+
                                      } catch (err) {
                                          this.errorMsg = err.message;
                                          this.uploading = false;
@@ -153,17 +153,17 @@
                                      }
                                  }
                              }">
-                            <input type="file" 
-                                   id="uploadFileInput" 
-                                   class="hidden" 
+                            <input type="file"
+                                   id="uploadFileInput"
+                                   class="hidden"
                                    accept="*"
                                    x-on:change="
                                        if ($event.target.files.length > 0) {
                                            uploadChunked($event.target.files[0]);
                                        }
                                    ">
-                            <x-forms.button type="button" 
-                                            class="bg-coollabs" 
+                            <x-forms.button type="button"
+                                            class="bg-coollabs"
                                             onclick="document.getElementById('uploadFileInput').click()"
                                             :disabled="$selected_container === 'default'">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,9 +171,9 @@
                                 </svg>
                                 Upload File
                             </x-forms.button>
-                            
+
                             <!-- Progress Bar -->
-                            <div x-show="uploading" 
+                            <div x-show="uploading"
                                  x-cloak
                                  class="absolute top-full left-0 right-0 mt-2 w-full min-w-[250px] bg-white dark:bg-coolgray-800 rounded-lg shadow-lg border border-coolgray-300 dark:border-coolgray-600 p-3 z-50">
                                 <div class="flex items-center gap-2 mb-2">
@@ -184,13 +184,13 @@
                                     <span class="text-xs text-gray-500 dark:text-gray-400 ml-auto" x-text="Math.round(progress) + '%'"></span>
                                 </div>
                                 <div class="w-full bg-coolgray-200 dark:bg-coolgray-700 rounded-full h-2 overflow-hidden">
-                                    <div class="bg-coollabs h-2 rounded-full transition-all duration-300 ease-out" 
+                                    <div class="bg-coollabs h-2 rounded-full transition-all duration-300 ease-out"
                                          :style="'width: ' + progress + '%'"></div>
                                 </div>
                                 <div x-show="successMsg" class="text-xs text-green-500 mt-1" x-text="successMsg"></div>
                                 <div x-show="errorMsg" class="text-xs text-red-500 mt-1" x-text="errorMsg"></div>
                             </div>
-                            
+
                             @if ($selected_container === 'default')
                                 <div class="absolute top-full left-0 mt-1 text-xs text-red-500 whitespace-nowrap">
                                     Select a container first
@@ -317,10 +317,10 @@
                                                 $filePath = null;
                                                 $filePathEscaped = '';
                                                 $isSelected = false;
-                                                
+
                                                 // Ensure selectedFiles is always an array
                                                 $selectedFilesArray = isset($selectedFiles) && is_array($selectedFiles) ? $selectedFiles : [];
-                                                
+
                                                 if (isset($file['path']) && is_string($file['path'])) {
                                                     $trimmedPath = trim($file['path']);
                                                     if (!empty($trimmedPath)) {
@@ -428,14 +428,14 @@
                             }
                         @endphp
                         <template x-teleport="body">
-                            <div x-data="{ editorOpen: true }" 
+                            <div x-data="{ editorOpen: true }"
                                 x-show="editorOpen"
                                 x-cloak
                                 class="fixed top-0 left-0 z-[99999] flex flex-col w-screen h-screen bg-coolgray-50 dark:bg-coolgray-900"
                                 style="z-index: 99999;">
                                 <!-- Backdrop -->
                                 <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" wire:click="closeFile"></div>
-                                
+
                                 <!-- Modal Content -->
                                 <div class="relative z-10 flex flex-col w-full h-full bg-white dark:bg-coolgray-800 shadow-2xl">
                                     <!-- Header -->
@@ -462,12 +462,12 @@
                                             </x-forms.button>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Editor Container -->
                                     <div class="flex-1 overflow-hidden" style="height: calc(100vh - 80px); min-height: 0;">
                                         <div wire:key="file-editor-{{ md5($selectedFile) }}" class="w-full h-full">
-                                            <x-forms.textarea 
-                                                id="fileContent" 
+                                            <x-forms.textarea
+                                                id="fileContent"
                                                 useMonacoEditor
                                                 monacoEditorLanguage="{{ $fileLanguage }}"
                                                 wire:model="fileContent"
@@ -548,8 +548,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
-                <x-forms.button wire:click="moveFile" 
-                                 class="bg-coollabs" 
+                <x-forms.button wire:click="moveFile"
+                                 class="bg-coollabs"
                                  wire:loading.attr="disabled"
                                  :disabled="empty($moveSource) || empty($moveDestination)">Move</x-forms.button>
                 <x-forms.button wire:click="closeMoveDialog" class="bg-gray-600">Cancel</x-forms.button>
@@ -614,8 +614,8 @@
                                 @if (!$file['is_directory'])
                                     @php
                                         $fileName = strtolower($file['name']);
-                                        $isSQLFile = str_ends_with($fileName, '.sql') && 
-                                                    !str_ends_with($fileName, '.sql.gz') && 
+                                        $isSQLFile = str_ends_with($fileName, '.sql') &&
+                                                    !str_ends_with($fileName, '.sql.gz') &&
                                                     !str_ends_with($fileName, '.sql.zip');
                                     @endphp
                                     @if ($isSQLFile)
@@ -747,7 +747,7 @@
                 <div class="mb-4 text-sm text-gray-700 dark:text-gray-300">
                     <p>You are about to extract:</p>
                     <p class="font-bold mt-1 text-base max-w-[350px] truncate text-coollabs">{{ $extractArchiveName }}</p>
-                    
+
                     <div class="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/40 border border-yellow-200 dark:border-yellow-800 rounded flex gap-3 text-yellow-800 dark:text-yellow-300">
                         <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                         <div>
@@ -765,35 +765,37 @@
     </div>
 
             </div>
-            
+
 @script
 <script>
+    // Definir la URL del endpoint de autologin fuera del listener
+    const phpMyAdminAutologinUrl = @js(route('phpmyadmin.autologin'));
+
     Livewire.on('console-log', (data) => {
         console.log('[FileExplorer Debug]', data);
     });
 
     Livewire.on('openPhpMyAdmin', (data) => {
         console.log('[phpMyAdmin] Event received:', data);
-        
+
         if (!data || !data.url) {
             console.error('[phpMyAdmin] Invalid data received');
             return;
         }
-        
+
         // Si hay datos encriptados, usar el endpoint de autologin
         if (data.encryptedData) {
             console.log('[phpMyAdmin] Using autologin endpoint');
-            const autologinBaseUrl = @js(route('phpmyadmin.autologin'));
-            const autologinUrl = autologinBaseUrl + '?data=' + encodeURIComponent(data.encryptedData);
+            const autologinUrl = phpMyAdminAutologinUrl + '?data=' + encodeURIComponent(data.encryptedData);
             console.log('[phpMyAdmin] Opening:', autologinUrl);
             window.open(autologinUrl, '_blank');
             return;
         }
-        
+
         console.log('[phpMyAdmin] No encrypted data, using fallback method');
         // Si no hay datos encriptados, usar el método anterior con JavaScript
         const phpMyAdminWindow = window.open(data.url, '_blank');
-            
+
             // Si hay credenciales, intentar autocompletar el formulario después de que cargue
             if (data.credentials && phpMyAdminWindow) {
                 // Función para autocompletar el formulario
@@ -802,17 +804,17 @@
                         if (!phpMyAdminWindow || !phpMyAdminWindow.document) {
                             return false;
                         }
-                        
+
                         // Buscar el formulario de login de phpMyAdmin
-                        const loginForm = phpMyAdminWindow.document.querySelector('form[name="login_form"]') || 
+                        const loginForm = phpMyAdminWindow.document.querySelector('form[name="login_form"]') ||
                                         phpMyAdminWindow.document.querySelector('form#login_form') ||
                                         phpMyAdminWindow.document.querySelector('form.login-form') ||
                                         phpMyAdminWindow.document.querySelector('form');
-                        
+
                         if (!loginForm) {
                             return false;
                         }
-                        
+
                         // Buscar campos de servidor (puede ser input o select)
                         let serverInput = loginForm.querySelector('input[name="pma_servername"]') ||
                                          loginForm.querySelector('input[name="server"]') ||
@@ -821,27 +823,27 @@
                                          loginForm.querySelector('#input_servername') ||
                                          loginForm.querySelector('#server') ||
                                          loginForm.querySelector('select');
-                        
+
                         // Buscar campo de usuario
                         let usernameInput = loginForm.querySelector('input[name="pma_username"]') ||
                                          loginForm.querySelector('input[name="username"]') ||
                                          loginForm.querySelector('input[id*="username"]') ||
                                          loginForm.querySelector('input[type="text"]:not([type="hidden"])');
-                        
+
                         // Buscar campo de contraseña
                         let passwordInput = loginForm.querySelector('input[name="pma_password"]') ||
                                          loginForm.querySelector('input[name="password"]') ||
                                          loginForm.querySelector('input[id*="password"]') ||
                                          loginForm.querySelector('input[type="password"]');
-                        
+
                         let filled = false;
-                        
+
                         // Rellenar servidor
                         if (serverInput && data.credentials.server) {
                             if (serverInput.tagName === 'SELECT') {
                                 // Buscar opción que coincida
-                                const option = Array.from(serverInput.options).find(opt => 
-                                    opt.value === data.credentials.server || 
+                                const option = Array.from(serverInput.options).find(opt =>
+                                    opt.value === data.credentials.server ||
                                     opt.text.toLowerCase().includes(data.credentials.server.toLowerCase())
                                 );
                                 if (option) {
@@ -859,7 +861,7 @@
                                 filled = true;
                             }
                         }
-                        
+
                         // Rellenar usuario
                         if (usernameInput && data.credentials.username) {
                             usernameInput.value = data.credentials.username;
@@ -867,7 +869,7 @@
                             usernameInput.dispatchEvent(new Event('change', { bubbles: true }));
                             filled = true;
                         }
-                        
+
                         // Rellenar contraseña
                         if (passwordInput && data.credentials.password) {
                             passwordInput.value = data.credentials.password;
@@ -875,7 +877,7 @@
                             passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
                             filled = true;
                         }
-                        
+
                         // Si todos los campos están llenos, intentar enviar automáticamente
                         if (filled && serverInput && usernameInput && passwordInput) {
                             setTimeout(() => {
@@ -884,10 +886,10 @@
                                                        loginForm.querySelector('button[type="submit"]') ||
                                                        loginForm.querySelector('button.btn-primary') ||
                                                        loginForm.querySelector('button');
-                                    
-                                    if (submitButton && 
+
+                                    if (submitButton &&
                                         (serverInput.value || (serverInput.tagName === 'SELECT' && serverInput.selectedIndex >= 0)) &&
-                                        usernameInput.value && 
+                                        usernameInput.value &&
                                         passwordInput.value) {
                                         // Enviar el formulario
                                         loginForm.submit();
@@ -897,24 +899,24 @@
                                 }
                             }, 800);
                         }
-                        
+
                         return filled;
                     } catch (e) {
                         // Error de CORS o acceso denegado - esto es normal si phpMyAdmin está en otro dominio
                         return false;
                     }
                 };
-                
+
                 // Intentar múltiples veces con diferentes delays para asegurar que la página cargue
                 const attempts = [800, 1500, 2500, 4000];
                 let successCount = 0;
-                
+
                 attempts.forEach((delay, index) => {
                     setTimeout(() => {
                         if (autoFillForm()) {
                             successCount++;
                         }
-                        
+
                         // Si después de todos los intentos no se pudo autocompletar, mostrar las credenciales en consola
                         if (index === attempts.length - 1 && successCount === 0) {
                             console.log('%cCredenciales para phpMyAdmin:', 'color: blue; font-weight: bold; font-size: 14px;');
