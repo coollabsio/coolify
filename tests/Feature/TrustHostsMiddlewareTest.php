@@ -286,6 +286,56 @@ it('skips host validation for API routes', function () {
     expect($response->status())->not->toBe(400);
 });
 
+it('trusts localhost when FQDN is configured', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    $middleware = new TrustHosts($this->app);
+    $hosts = $middleware->hosts();
+
+    expect($hosts)->toContain('localhost');
+});
+
+it('trusts 127.0.0.1 when FQDN is configured', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    $middleware = new TrustHosts($this->app);
+    $hosts = $middleware->hosts();
+
+    expect($hosts)->toContain('127.0.0.1');
+});
+
+it('trusts IPv6 loopback when FQDN is configured', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    $middleware = new TrustHosts($this->app);
+    $hosts = $middleware->hosts();
+
+    expect($hosts)->toContain('[::1]');
+});
+
+it('allows local access via localhost when FQDN is configured and request uses localhost host header', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+
+    $response = $this->get('/', [
+        'Host' => 'localhost',
+    ]);
+
+    // Should NOT be rejected as untrusted host (would be 400)
+    expect($response->status())->not->toBe(400);
+});
+
 it('skips host validation for webhook endpoints', function () {
     // All webhook routes are under /webhooks/* prefix (see RouteServiceProvider)
     // and use cryptographic signature validation instead of host validation

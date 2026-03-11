@@ -46,7 +46,7 @@
                 href="{{ route('project.application.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Scheduled Tasks</span></a>
             <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Webhooks</span></a>
-            @if ($application->deploymentType() !== 'deploy_key')
+            @if ($application->git_based())
                 <a class="sub-menu-item" {{ wireNavigate() }} wire:current.exact="menu-item-active"
                     href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"><span class="menu-item-label">Preview Deployments</span></a>
             @endif

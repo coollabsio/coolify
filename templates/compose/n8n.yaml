@@ -7,7 +7,7 @@
 
 services:
   n8n:
-    image: n8nio/n8n:2.1.5
+    image: n8nio/n8n:2.10.2
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -38,7 +38,7 @@ services:
       retries: 10
 
   task-runners:
-    image: n8nio/runners:2.1.5
+    image: n8nio/runners:2.10.2
     environment:
       - N8N_RUNNERS_TASK_BROKER_URI=${N8N_RUNNERS_TASK_BROKER_URI:-http://n8n:5679}
       - N8N_RUNNERS_AUTH_TOKEN=${SERVICE_PASSWORD_N8N}

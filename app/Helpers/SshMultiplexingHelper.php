@@ -37,7 +37,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
-        $checkCommand .= "{$server->user}@{$server->ip}";
+        $checkCommand .= self::escapedUserAtHost($server);
         $process = Process::run($checkCommand);
 
         if ($process->exitCode() !== 0) {
@@ -80,7 +80,7 @@ class SshMultiplexingHelper
             $establishCommand .= ' -o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
-        $establishCommand .= "{$server->user}@{$server->ip}";
+        $establishCommand .= self::escapedUserAtHost($server);
         $establishProcess = Process::run($establishCommand);
         if ($establishProcess->exitCode() !== 0) {
             return false;
@@ -101,7 +101,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $closeCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
-        $closeCommand .= "{$server->user}@{$server->ip}";
+        $closeCommand .= self::escapedUserAtHost($server);
         Process::run($closeCommand);
 
         // Clear connection metadata from cache
@@ -141,9 +141,9 @@ class SshMultiplexingHelper
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
         if ($server->isIpv6()) {
-            $scp_command .= "{$source} {$server->user}@[{$server->ip}]:{$dest}";
+            $scp_command .= "{$source} ".escapeshellarg($server->user).'@['.escapeshellarg($server->ip)."]:{$dest}";
         } else {
-            $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
+            $scp_command .= "{$source} ".self::escapedUserAtHost($server).":{$dest}";
         }
 
         return $scp_command;
@@ -189,11 +189,16 @@ class SshMultiplexingHelper
         $delimiter = base64_encode($delimiter);
         $command = str_replace($delimiter, '', $command);
 
-        $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL
+        $ssh_command .= self::escapedUserAtHost($server)." 'bash -se' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
 
         return $ssh_command;
+    }
+
+    private static function escapedUserAtHost(Server $server): string
+    {
+        return escapeshellarg($server->user).'@'.escapeshellarg($server->ip);
     }
 
     private static function isMultiplexingEnabled(): bool
@@ -224,9 +229,9 @@ class SshMultiplexingHelper
 
         // Bruh
         if ($isScp) {
-            $options .= "-P {$server->port} ";
+            $options .= '-P '.escapeshellarg((string) $server->port).' ';
         } else {
-            $options .= "-p {$server->port} ";
+            $options .= '-p '.escapeshellarg((string) $server->port).' ';
         }
 
         return $options;
@@ -245,7 +250,7 @@ class SshMultiplexingHelper
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
-        $healthCommand .= "{$server->user}@{$server->ip} 'echo \"health_check_ok\"'";
+        $healthCommand .= self::escapedUserAtHost($server)." 'echo \"health_check_ok\"'";
 
         $process = Process::run($healthCommand);
         $isHealthy = $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');

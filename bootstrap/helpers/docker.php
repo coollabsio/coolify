@@ -139,8 +139,9 @@ function checkMinimumDockerEngineVersion($dockerVersion)
 }
 function executeInDocker(string $containerId, string $command)
 {
-    return "docker exec {$containerId} bash -c '{$command}'";
-    // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
+    $escapedCommand = str_replace("'", "'\\''", $command);
+
+    return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
@@ -1005,6 +1006,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--ip6' => 'ip6',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',

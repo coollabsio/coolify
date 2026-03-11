@@ -19,6 +19,7 @@ class StandaloneKeydb extends BaseModel
 
     protected $casts = [
         'keydb_password' => 'encrypted',
+        'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
         'last_restart_type' => 'string',

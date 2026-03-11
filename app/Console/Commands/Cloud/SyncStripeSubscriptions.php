@@ -36,7 +36,14 @@ class SyncStripeSubscriptions extends Command
         $this->newLine();
 
         $job = new SyncStripeSubscriptionsJob($fix);
-        $result = $job->handle();
+        $fetched = 0;
+        $result = $job->handle(function (int $count) use (&$fetched): void {
+            $fetched = $count;
+            $this->output->write("\r  Fetching subscriptions from Stripe... {$fetched}");
+        });
+        if ($fetched > 0) {
+            $this->output->write("\r".str_repeat(' ', 60)."\r");
+        }
 
         if (isset($result['error'])) {
             $this->error($result['error']);
@@ -66,6 +73,19 @@ class SyncStripeSubscriptions extends Command
             }
         } else {
             $this->info('No discrepancies found. All subscriptions are in sync.');
+        }
+
+        if (count($result['resubscribed']) > 0) {
+            $this->newLine();
+            $this->warn('Resubscribed users (same email, different customer): '.count($result['resubscribed']));
+            $this->newLine();
+
+            foreach ($result['resubscribed'] as $resub) {
+                $this->line("  - Team ID: {$resub['team_id']} | Email: {$resub['email']}");
+                $this->line("    Old: {$resub['old_stripe_subscription_id']} (cus: {$resub['old_stripe_customer_id']})");
+                $this->line("    New: {$resub['new_stripe_subscription_id']} (cus: {$resub['new_stripe_customer_id']}) [{$resub['new_status']}]");
+                $this->newLine();
+            }
         }
 
         if (count($result['errors']) > 0) {

@@ -6960,6 +6960,16 @@ components:
         health_check_start_period:
           type: integer
           description: 'Health check start period in seconds.'
+        health_check_type:
+          type: string
+          description: 'Health check type: http or cmd.'
+          enum:
+            - http
+            - cmd
+        health_check_command:
+          type: string
+          nullable: true
+          description: 'Health check command for CMD type.'
         limits_memory:
           type: string
           description: 'Memory limit.'
@@ -7231,6 +7241,9 @@ components:
           type: string
         real_value:
           type: string
+        comment:
+          type: string
+          nullable: true
         version:
           type: string
         created_at:

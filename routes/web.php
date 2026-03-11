@@ -168,9 +168,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/terminal/auth/ips', function () {
         if (auth()->check()) {
             $team = auth()->user()->currentTeam();
-            $ipAddresses = $team->servers->where('settings.is_terminal_enabled', true)->pluck('ip')->toArray();
+            $ipAddresses = $team->servers
+                ->where('settings.is_terminal_enabled', true)
+                ->pluck('ip')
+                ->filter()
+                ->values();
 
-            return response()->json(['ipAddresses' => $ipAddresses], 200);
+            if (isDev()) {
+                $ipAddresses = $ipAddresses->merge([
+                    'coolify-testing-host',
+                    'host.docker.internal',
+                    'localhost',
+                    '127.0.0.1',
+                    base_ip(),
+                ])->filter()->unique()->values();
+            }
+
+            return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
         }
 
         return response()->json(['ipAddresses' => []], 401);

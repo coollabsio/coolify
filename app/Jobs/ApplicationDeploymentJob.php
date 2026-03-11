@@ -690,8 +690,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Inject build arguments after build subcommand if not using build secrets
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
-                // Escape single quotes for bash -c context used by executeInDocker
-                $build_args_string = str_replace("'", "'\\''", $build_args_string);
 
                 // Inject build args right after 'build' subcommand (not at the end)
                 $original_command = $build_command;
@@ -703,9 +701,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$build_command}"), 'hidden' => true],
-            );
+            try {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$build_command}"), 'hidden' => true],
+                );
+            } catch (\RuntimeException $e) {
+                if (str_contains($e->getMessage(), "matching `'") || str_contains($e->getMessage(), 'unexpected EOF')) {
+                    throw new DeploymentException("Custom build command failed due to shell syntax error. Please check your command for special characters (like unmatched quotes): {$this->docker_compose_custom_build_command}");
+                }
+
+                throw $e;
+            }
         } else {
             $command = "{$this->coolify_variables} docker compose";
             // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
@@ -722,8 +728,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
-                // Escape single quotes for bash -c context used by executeInDocker
-                $build_args_string = str_replace("'", "'\\''", $build_args_string);
                 $command .= " {$build_args_string}";
                 $this->application_deployment_queue->addLogEntry('Adding build arguments to Docker Compose build command.');
             }
@@ -772,9 +776,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 $this->write_deployment_configurations();
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$start_command}"), 'hidden' => true],
-                );
+
+                try {
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$start_command}"), 'hidden' => true],
+                    );
+                } catch (\RuntimeException $e) {
+                    if (str_contains($e->getMessage(), "matching `'") || str_contains($e->getMessage(), 'unexpected EOF')) {
+                        throw new DeploymentException("Custom start command failed due to shell syntax error. Please check your command for special characters (like unmatched quotes): {$this->docker_compose_custom_start_command}");
+                    }
+
+                    throw $e;
+                }
             } else {
                 $this->write_deployment_configurations();
                 $this->docker_compose_location = '/docker-compose.yaml';
@@ -799,9 +812,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 $this->write_deployment_configurations();
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => true],
-                );
+                if ($this->preserveRepository) {
+                    $this->execute_remote_command(
+                        ['command' => "cd {$server_workdir} && {$start_command}", 'hidden' => true],
+                    );
+                } else {
+                    $this->execute_remote_command(
+                        [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$start_command}"), 'hidden' => true],
+                    );
+                }
             } else {
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->preserveRepository) {
@@ -1804,7 +1823,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                     if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
-                        $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
+                        $healthcheckLabel = $this->application->health_check_type === 'cmd' ? 'Healthcheck command' : 'Healthcheck URL';
+                        $this->application_deployment_queue->addLogEntry("{$healthcheckLabel} (inside the container): {$this->full_healthcheck_url}");
                     }
                     $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
                     $sleeptime = 0;
@@ -2183,7 +2203,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->create_workdir();
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 {$this->commit} --pretty=%B"),
+                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 ".escapeshellarg($this->commit)." --pretty=%B"),
                 'hidden' => true,
                 'save' => 'commit_message',
             ]
@@ -2762,27 +2782,54 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function generate_healthcheck_commands()
     {
+        // Handle CMD type healthcheck
+        if ($this->application->health_check_type === 'cmd' && ! empty($this->application->health_check_command)) {
+            $command = str_replace(["\r\n", "\r", "\n"], ' ', $this->application->health_check_command);
+            $this->full_healthcheck_url = $command;
+
+            return $command;
+        }
+
+        // HTTP type healthcheck (default)
         if (! $this->application->health_check_port) {
-            $health_check_port = $this->application->ports_exposes_array[0];
+            $health_check_port = (int) $this->application->ports_exposes_array[0];
         } else {
-            $health_check_port = $this->application->health_check_port;
+            $health_check_port = (int) $this->application->health_check_port;
         }
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
             $health_check_port = 80;
         }
-        if ($this->application->health_check_path) {
-            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1",
-            ];
+
+        $method = $this->sanitizeHealthCheckValue($this->application->health_check_method, '/^[A-Z]+$/', 'GET');
+        $scheme = $this->sanitizeHealthCheckValue($this->application->health_check_scheme, '/^https?$/', 'http');
+        $host = $this->sanitizeHealthCheckValue($this->application->health_check_host, '/^[a-zA-Z0-9.\-_]+$/', 'localhost');
+        $path = $this->application->health_check_path
+            ? $this->sanitizeHealthCheckValue($this->application->health_check_path, '#^[a-zA-Z0-9/\-_.~%]+$#', '/')
+            : null;
+
+        $url = escapeshellarg("{$scheme}://{$host}:{$health_check_port}".($path ?? '/'));
+        $method = escapeshellarg($method);
+
+        if ($path) {
+            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$scheme}://{$host}:{$health_check_port}{$path}";
         } else {
-            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1",
-            ];
+            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$scheme}://{$host}:{$health_check_port}/";
         }
 
+        $generated_healthchecks_commands = [
+            "curl -s -X {$method} -f {$url} > /dev/null || wget -q -O- {$url} > /dev/null || exit 1",
+        ];
+
         return implode(' ', $generated_healthchecks_commands);
+    }
+
+    private function sanitizeHealthCheckValue(string $value, string $pattern, string $default): string
+    {
+        if (preg_match($pattern, $value)) {
+            return $value;
+        }
+
+        return $default;
     }
 
     private function pull_latest_image($image)
@@ -2865,7 +2912,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function build_image()
     {
         // Add Coolify related variables to the build args/secrets
-        if (! $this->dockerBuildkitSupported) {
+        if (! $this->dockerSecretsSupported) {
             // Traditional build args approach - generate COOLIFY_ variables locally
             $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
             $coolify_envs->each(function ($value, $key) {
@@ -3476,8 +3523,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function add_build_env_variables_to_dockerfile()
     {
-        if ($this->dockerBuildkitSupported) {
-            // We dont need to add build secrets to dockerfile for buildkit, as we already added them with --secret flag in function generate_docker_env_flags_for_secrets
+        if ($this->dockerSecretsSupported) {
+            // We dont need to add ARG declarations when using Docker build secrets, as variables are passed with --secret flag
             return;
         }
 

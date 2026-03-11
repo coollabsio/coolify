@@ -37,7 +37,7 @@ class General extends Component
     #[Validate(['required'])]
     public string $gitBranch;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'])]
     public ?string $gitCommitSha = null;
 
     #[Validate(['string', 'nullable'])]
@@ -184,7 +184,7 @@ class General extends Component
             'fqdn' => 'nullable',
             'gitRepository' => 'required',
             'gitBranch' => 'required',
-            'gitCommitSha' => 'nullable',
+            'gitCommitSha' => ['nullable', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
             'installCommand' => 'nullable',
             'buildCommand' => 'nullable',
             'startCommand' => 'nullable',

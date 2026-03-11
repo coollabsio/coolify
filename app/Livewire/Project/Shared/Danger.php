@@ -45,10 +45,10 @@ class Danger extends Component
 
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
-                $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $parameters['service_uuid'])->first();
             } elseif (isset($parameters['stack_service_uuid'])) {
-                $this->resource = ServiceApplication::where('uuid', $parameters['stack_service_uuid'])->first()
-                    ?? ServiceDatabase::where('uuid', $parameters['stack_service_uuid'])->first();
+                $this->resource = ServiceApplication::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first()
+                    ?? ServiceDatabase::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first();
             }
         }
 

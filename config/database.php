@@ -49,7 +49,7 @@ return [
             'search_path' => 'public',
             'sslmode' => 'prefer',
             'options' => [
-                PDO::PGSQL_ATTR_DISABLE_PREPARES => env('DB_DISABLE_PREPARES', false),
+                (defined('Pdo\Pgsql::ATTR_DISABLE_PREPARES') ? \Pdo\Pgsql::ATTR_DISABLE_PREPARES : \PDO::PGSQL_ATTR_DISABLE_PREPARES) => env('DB_DISABLE_PREPARES', false),
             ],
         ],
 

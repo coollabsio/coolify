@@ -141,6 +141,15 @@ else
     log "Network 'coolify' already exists"
 fi
 
+# Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
+# Only changes owner — preserves existing group to respect custom setups
+SSH_OWNER=$(stat -c '%u' /data/coolify/ssh 2>/dev/null || echo "unknown")
+if [ "$SSH_OWNER" != "9999" ]; then
+    log "Fixing SSH directory ownership (was owned by UID $SSH_OWNER)"
+    chown -R 9999 /data/coolify/ssh
+    chmod -R 700 /data/coolify/ssh
+fi
+
 # Check if Docker config file exists
 DOCKER_CONFIG_MOUNT=""
 if [ -f /root/.docker/config.json ]; then

@@ -54,7 +54,7 @@
         "stevebauman/purify": "^6.3.1",
         "stripe/stripe-php": "^16.6.0",
         "symfony/yaml": "^7.4.1",
-        "visus/cuid2": "^4.1.0",
+        "visus/cuid2": "^6.0.0",
         "yosymfony/toml": "^1.0.4",
         "zircote/swagger-php": "^5.8.0"
     },

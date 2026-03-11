@@ -92,6 +92,15 @@ class ServerSetting extends Model
         });
     }
 
+    /**
+     * Validate that a sentinel token contains only safe characters.
+     * Prevents OS command injection when the token is interpolated into shell commands.
+     */
+    public static function isValidSentinelToken(string $token): bool
+    {
+        return (bool) preg_match('/\A[a-zA-Z0-9._\-+=\/]+\z/', $token);
+    }
+
     public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)
     {
         $data = [
