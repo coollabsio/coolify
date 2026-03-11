@@ -19,8 +19,8 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -1002,7 +1002,7 @@ class ApplicationsController extends Controller
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1095,13 +1095,23 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
+        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
+            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
+            if (! $destination) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
+                    ],
+                ], 422);
+            }
+        }
         if ($type === 'public') {
             $validationRules = [
                 'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
                 'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -1297,7 +1307,6 @@ class ApplicationsController extends Controller
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -1525,7 +1534,6 @@ class ApplicationsController extends Controller
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
-                'docker_compose_location' => 'string',
                 'docker_compose_domains' => 'array|nullable',
                 'docker_compose_domains.*' => 'array:name,domain',
                 'docker_compose_domains.*.name' => 'string|required',
@@ -2463,14 +2471,13 @@ class ApplicationsController extends Controller
         $this->authorize('update', $application);
 
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled'];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'static_image' => 'string',
             'watch_paths' => 'string|nullable',
-            'docker_compose_location' => 'string',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_domains.*' => 'array:name,domain',
             'docker_compose_domains.*.name' => 'string|required',
@@ -2919,10 +2926,7 @@ class ApplicationsController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Environment variable updated.'],
-                            ]
+                            ref: '#/components/schemas/EnvironmentVariable'
                         )
                     ),
                 ]
@@ -2943,7 +2947,7 @@ class ApplicationsController extends Controller
     )]
     public function update_env_by_uuid(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -2973,6 +2977,7 @@ class ApplicationsController extends Controller
             'is_shown_once' => 'boolean',
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
+            'comment' => 'string|nullable|max:256',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -3014,6 +3019,9 @@ class ApplicationsController extends Controller
                 if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
                     $env->is_buildtime = $request->is_buildtime;
                 }
+                if ($request->has('comment') && $env->comment != $request->comment) {
+                    $env->comment = $request->comment;
+                }
                 $env->save();
 
                 return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
@@ -3043,6 +3051,9 @@ class ApplicationsController extends Controller
                 }
                 if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
                     $env->is_buildtime = $request->is_buildtime;
+                }
+                if ($request->has('comment') && $env->comment != $request->comment) {
+                    $env->comment = $request->comment;
                 }
                 $env->save();
 
@@ -3336,7 +3347,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -3361,6 +3372,7 @@ class ApplicationsController extends Controller
             'is_shown_once' => 'boolean',
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
+            'comment' => 'string|nullable|max:256',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -3396,6 +3408,7 @@ class ApplicationsController extends Controller
                     'is_shown_once' => $request->is_shown_once ?? false,
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
+                    'comment' => $request->comment ?? null,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -3420,6 +3433,7 @@ class ApplicationsController extends Controller
                     'is_shown_once' => $request->is_shown_once ?? false,
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
+                    'comment' => $request->comment ?? null,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);

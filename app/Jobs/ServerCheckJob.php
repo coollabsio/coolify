@@ -15,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -32,6 +33,19 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     public function __construct(public Server $server) {}
+
+    public function failed(?\Throwable $exception): void
+    {
+        if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
+            Log::warning('ServerCheckJob timed out', [
+                'server_id' => $this->server->id,
+                'server_name' => $this->server->name,
+            ]);
+
+            // Delete the queue job so it doesn't appear in Horizon's failed list.
+            $this->job?->delete();
+        }
+    }
 
     public function handle()
     {

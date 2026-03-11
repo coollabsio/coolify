@@ -11,6 +11,10 @@ class ServiceDatabase extends BaseModel
 
     protected $guarded = [];
 
+    protected $casts = [
+        'public_port_timeout' => 'integer',
+    ];
+
     protected static function booted()
     {
         static::deleting(function ($service) {
@@ -124,7 +128,7 @@ class ServiceDatabase extends BaseModel
 
     public function team()
     {
-        return data_get($this, 'environment.project.team');
+        return data_get($this, 'service.environment.project.team');
     }
 
     public function workdir()

@@ -23,19 +23,28 @@ Activate this skill when:
 
 Use `search-docs` for detailed Pest 4 patterns and documentation.
 
-## Basic Usage
+## Test Directory Structure
 
-### Creating Tests
+- `tests/Feature/` and `tests/Unit/` — Legacy tests (keep, don't delete)
+- `tests/v4/Feature/` — New feature tests (SQLite :memory: database)
+- `tests/v4/Browser/` — Browser tests (Pest Browser Plugin + Playwright)
+- `tests/Browser/` — Legacy Dusk browser tests (keep, don't delete)
 
-All tests must be written using Pest. Use `php artisan make:test --pest {name}`.
+New tests go in `tests/v4/`. The v4 suite uses SQLite :memory: with a schema dump (`database/schema/testing-schema.sql`) instead of running migrations.
 
-### Test Organization
+Do NOT remove tests without approval.
 
-- Unit/Feature tests: `tests/Feature` and `tests/Unit` directories.
-- Browser tests: `tests/Browser/` directory.
-- Do NOT remove tests without approval - these are core application code.
+## Running Tests
 
-### Basic Test Structure
+- All v4 tests: `php artisan test --compact tests/v4/`
+- Browser tests: `php artisan test --compact tests/v4/Browser/`
+- Feature tests: `php artisan test --compact tests/v4/Feature/`
+- Specific file: `php artisan test --compact tests/v4/Browser/LoginTest.php`
+- Filter: `php artisan test --compact --filter=testName`
+- Headed (see browser): `./vendor/bin/pest tests/v4/Browser/ --headed`
+- Debug (pause on failure): `./vendor/bin/pest tests/v4/Browser/ --debug`
+
+## Basic Test Structure
 
 <code-snippet name="Basic Pest Test Example" lang="php">
 
@@ -45,23 +54,9 @@ it('is true', function () {
 
 </code-snippet>
 
-### Running Tests
-
-- Run minimal tests with filter before finalizing: `php artisan test --compact --filter=testName`.
-- Run all tests: `php artisan test --compact`.
-- Run file: `php artisan test --compact tests/Feature/ExampleTest.php`.
-
 ## Assertions
 
 Use specific assertions (`assertSuccessful()`, `assertNotFound()`) instead of `assertStatus()`:
-
-<code-snippet name="Pest Response Assertion" lang="php">
-
-it('returns all', function () {
-    $this->postJson('/api/docs', [])->assertSuccessful();
-});
-
-</code-snippet>
 
 | Use | Instead of |
 |-----|------------|
@@ -75,7 +70,7 @@ Import mock function before use: `use function Pest\Laravel\mock;`
 
 ## Datasets
 
-Use datasets for repetitive tests (validation rules, etc.):
+Use datasets for repetitive tests:
 
 <code-snippet name="Pest Dataset Example" lang="php">
 
@@ -88,73 +83,94 @@ it('has emails', function (string $email) {
 
 </code-snippet>
 
-## Pest 4 Features
+## Browser Testing (Pest Browser Plugin + Playwright)
 
-| Feature | Purpose |
-|---------|---------|
-| Browser Testing | Full integration tests in real browsers |
-| Smoke Testing | Validate multiple pages quickly |
-| Visual Regression | Compare screenshots for visual changes |
-| Test Sharding | Parallel CI runs |
-| Architecture Testing | Enforce code conventions |
+Browser tests use `pestphp/pest-plugin-browser` with Playwright. They run **outside Docker** — the plugin starts an in-process HTTP server and Playwright browser automatically.
 
-### Browser Test Example
+### Key Rules
 
-Browser tests run in real browsers for full integration testing:
+1. **Always use `RefreshDatabase`** — the in-process server uses SQLite :memory:
+2. **Always seed `InstanceSettings::create(['id' => 0])` in `beforeEach`** — most pages crash without it
+3. **Use `User::factory()` for auth tests** — create users with `id => 0` for root user
+4. **No Dusk, no Selenium** — use `visit()`, `fill()`, `click()`, `assertSee()` from the Pest Browser API
+5. **Place tests in `tests/v4/Browser/`**
+6. **Views with bare `function` declarations** will crash on the second request in the same process — wrap with `function_exists()` guard if you encounter this
 
-- Browser tests live in `tests/Browser/`.
-- Use Laravel features like `Event::fake()`, `assertAuthenticated()`, and model factories.
-- Use `RefreshDatabase` for clean state per test.
-- Interact with page: click, type, scroll, select, submit, drag-and-drop, touch gestures.
-- Test on multiple browsers (Chrome, Firefox, Safari) if requested.
-- Test on different devices/viewports (iPhone 14 Pro, tablets) if requested.
-- Switch color schemes (light/dark mode) when appropriate.
-- Take screenshots or pause tests for debugging.
+### Browser Test Template
 
-<code-snippet name="Pest Browser Test Example" lang="php">
+<code-snippet name="Coolify Browser Test Template" lang="php">
+<?php
 
-it('may reset the password', function () {
-    Notification::fake();
+use App\Models\InstanceSettings;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-    $this->actingAs(User::factory()->create());
+uses(RefreshDatabase::class);
 
-    $page = visit('/sign-in');
-
-    $page->assertSee('Sign In')
-        ->assertNoJavaScriptErrors()
-        ->click('Forgot Password?')
-        ->fill('email', 'nuno@laravel.com')
-        ->click('Send Reset Link')
-        ->assertSee('We have emailed your password reset link!');
-
-    Notification::assertSent(ResetPassword::class);
+beforeEach(function () {
+    InstanceSettings::create(['id' => 0]);
 });
 
+it('can visit the page', function () {
+    $page = visit('/login');
+
+    $page->assertSee('Login');
+});
 </code-snippet>
 
-### Smoke Testing
+### Browser Test with Form Interaction
 
-Quickly validate multiple pages have no JavaScript errors:
+<code-snippet name="Browser Test Form Example" lang="php">
+it('fails login with invalid credentials', function () {
+    User::factory()->create([
+        'id' => 0,
+        'email' => 'test@example.com',
+        'password' => Hash::make('password'),
+    ]);
 
-<code-snippet name="Pest Smoke Testing Example" lang="php">
+    $page = visit('/login');
 
-$pages = visit(['/', '/about', '/contact']);
-
-$pages->assertNoJavaScriptErrors()->assertNoConsoleLogs();
-
+    $page->fill('email', 'random@email.com')
+        ->fill('password', 'wrongpassword123')
+        ->click('Login')
+        ->assertSee('These credentials do not match our records');
+});
 </code-snippet>
 
-### Visual Regression Testing
+### Browser API Reference
 
-Capture and compare screenshots to detect visual changes.
+| Method | Purpose |
+|--------|---------|
+| `visit('/path')` | Navigate to a page |
+| `->fill('field', 'value')` | Fill an input by name |
+| `->click('Button Text')` | Click a button/link by text |
+| `->assertSee('text')` | Assert visible text |
+| `->assertDontSee('text')` | Assert text is not visible |
+| `->assertPathIs('/path')` | Assert current URL path |
+| `->assertSeeIn('.selector', 'text')` | Assert text in element |
+| `->screenshot()` | Capture screenshot |
+| `->debug()` | Pause test, keep browser open |
+| `->wait(seconds)` | Wait N seconds |
 
-### Test Sharding
+### Debugging
 
-Split tests across parallel processes for faster CI runs.
+- Screenshots auto-saved to `tests/Browser/Screenshots/` on failure
+- `->debug()` pauses and keeps browser open (press Enter to continue)
+- `->screenshot()` captures state at any point
+- `--headed` flag shows browser, `--debug` pauses on failure
 
-### Architecture Testing
+## SQLite Testing Setup
 
-Pest 4 includes architecture testing (from Pest 3):
+v4 tests use SQLite :memory: instead of PostgreSQL. Schema loaded from `database/schema/testing-schema.sql`.
+
+### Regenerating the Schema
+
+When migrations change, regenerate from the running PostgreSQL database:
+
+```bash
+docker exec coolify php artisan schema:generate-testing
+```
+
+## Architecture Testing
 
 <code-snippet name="Architecture Test Example" lang="php">
 
@@ -172,3 +188,6 @@ arch('controllers')
 - Forgetting datasets for repetitive validation tests
 - Deleting tests without approval
 - Forgetting `assertNoJavaScriptErrors()` in browser tests
+- **Browser tests: forgetting `InstanceSettings::create(['id' => 0])` — most pages crash without it**
+- **Browser tests: forgetting `RefreshDatabase` — SQLite :memory: starts empty**
+- **Browser tests: views with bare `function` declarations crash on second request — wrap with `function_exists()` guard**

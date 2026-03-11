@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Application;
-use Mockery;
 
 /**
  * Unit tests to verify that containers without health checks are not

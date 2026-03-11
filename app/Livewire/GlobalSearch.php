@@ -1495,6 +1495,7 @@ class GlobalSearch extends Component
                 'type' => 'one-click-service-'.$serviceKey,
                 'category' => 'Services',
                 'resourceType' => 'service',
+                'logo' => data_get($service, 'logo'),
             ]);
         }
 

@@ -21,7 +21,7 @@ class ApplicationSeeder extends Seeder
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'v4.x',
             'base_directory' => '/docker-compose',
-            'docker_compose_location' => 'docker-compose-test.yaml',
+            'docker_compose_location' => '/docker-compose-test.yaml',
             'build_pack' => 'dockercompose',
             'ports_exposes' => '80',
             'environment_id' => 1,

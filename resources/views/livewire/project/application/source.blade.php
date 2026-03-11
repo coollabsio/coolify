@@ -28,7 +28,7 @@
         <div class="pb-4">Code source of your application.</div>
 
         <div class="flex flex-col gap-2">
-            @if (!$privateKeyId)
+            @if (blank($privateKeyId))
                 <div>Currently connected source: <span
                         class="font-bold text-warning">{{ data_get($application, 'source.name', 'No source connected') }}</span>
                 </div>
@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        @if ($privateKeyId)
+        @if (filled($privateKeyId))
             <h3 class="pt-4">Deploy Key</h3>
             <div class="py-2 pt-4">Currently attached Private Key: <span
                     class="dark:text-warning">{{ $privateKeyName }}</span>

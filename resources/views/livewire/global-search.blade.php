@@ -699,15 +699,21 @@
                                             class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div
-                                                        class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M12 4v16m8-8H4" />
-                                                        </svg>
-                                                    </div>
+                                                    @if (! empty($item['logo']))
+                                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-7 h-7 object-contain">
+                                                        </div>
+                                                    @else
+                                                        <div
+                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none"
+                                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                    d="M12 4v16m8-8H4" />
+                                                            </svg>
+                                                        </div>
+                                                    @endif
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <div class="font-medium text-neutral-900 dark:text-white truncate">
@@ -808,15 +814,22 @@
                                                 class="search-result-item w-full text-left block px-4 py-3 hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-transparent hover:border-warning-500 focus:border-warning-500">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                        <div
-                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                class="h-5 w-5 text-warning-600 dark:text-warning-400"
-                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2" d="M12 4v16m8-8H4" />
-                                                            </svg>
-                                                        </div>
+                                                        <template x-if="item.logo">
+                                                            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                                <img :src="'/' + item.logo" :alt="item.name" class="w-7 h-7 object-contain">
+                                                            </div>
+                                                        </template>
+                                                        <template x-if="!item.logo">
+                                                            <div
+                                                                class="flex-shrink-0 w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center">
+                                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                                    class="h-5 w-5 text-warning-600 dark:text-warning-400"
+                                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                                        stroke-width="2" d="M12 4v16m8-8H4" />
+                                                                </svg>
+                                                            </div>
+                                                        </template>
                                                         <div class="flex-1 min-w-0">
                                                             <div class="flex items-center gap-2 mb-1">
                                                                 <div class="font-medium text-neutral-900 dark:text-white truncate"
