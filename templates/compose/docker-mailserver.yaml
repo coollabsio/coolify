@@ -1,0 +1,55 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A production-ready, full-featured mail server in a Docker container — supporting SMTP, IMAP, DKIM, SPF, DMARC, and more.
+# category: hosting
+# tags: email, mail, smtp, imap, dkim, spf, dmarc, postfix, dovecot, self-hosted
+# logo: svgs/mailpit.svg
+# port: 143
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: mail
+    domainname: $SERVICE_FQDN_MAILSERVER
+    volumes:
+      - mail-data:/var/mail
+      - mail-state:/var/mail-state
+      - mail-logs:/var/log/mail
+      - mail-config:/tmp/docker-mailserver
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    environment:
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=1
+      - SSL_TYPE=manual
+      - SSL_CERT_PATH=/etc/letsencrypt/live/$SERVICE_FQDN_MAILSERVER/fullchain.pem
+      - SSL_KEY_PATH=/etc/letsencrypt/live/$SERVICE_FQDN_MAILSERVER/privkey.pem
+      - PERMIT_DOCKER=none
+      - ONE_DIR=1
+      - POSTMASTER_ADDRESS=postmaster@$SERVICE_FQDN_MAILSERVER
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "ss", "--listening", "--tcp", "|", "grep", "-P", "LISTEN.+:smtp"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    volumes:
+      - roundcube-data:/var/roundcube/db
+    environment:
+      - ROUNDCUBEMAIL_DEFAULT_HOST=mailserver
+      - ROUNDCUBEMAIL_SMTP_SERVER=mailserver
+      - ROUNDCUBEMAIL_SMTP_PORT=587
+    depends_on:
+      mailserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
