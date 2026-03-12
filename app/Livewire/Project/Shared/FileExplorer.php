@@ -2029,14 +2029,64 @@ class FileExplorer extends Component
         $this->dispatch('error', 'phpMyAdmin service not found in this environment. Please add phpMyAdmin as a service to use it for database management.');
     }
     
+    private function findDatabasesInEnvironment(): \Illuminate\Support\Collection
+    {
+        $databases = collect();
+        
+        try {
+            // Obtener el entorno actual
+            $environment = null;
+            if ($this->type === 'database' && 
+                ($this->resource instanceof \App\Models\StandaloneMariadb || 
+                 $this->resource instanceof \App\Models\StandaloneMysql)) {
+                // Si ya es una base de datos, usarla directamente
+                $databases->push($this->resource);
+                return $databases;
+            } elseif ($this->type === 'service' && $this->resource instanceof \App\Models\Service) {
+                $environment = $this->resource->environment;
+            } elseif ($this->type === 'application' && $this->resource instanceof \App\Models\Application) {
+                $environment = $this->resource->environment;
+            }
+            
+            if ($environment) {
+                // Buscar todas las bases de datos MySQL/MariaDB en el entorno
+                $mariadbDatabases = \App\Models\StandaloneMariadb::whereHas('destination', function ($query) use ($environment) {
+                    $query->where('environment_id', $environment->id);
+                })->get();
+                
+                $mysqlDatabases = \App\Models\StandaloneMysql::whereHas('destination', function ($query) use ($environment) {
+                    $query->where('environment_id', $environment->id);
+                })->get();
+                
+                $databases = $mariadbDatabases->merge($mysqlDatabases);
+            }
+        } catch (\Throwable $e) {
+            \Log::error('Error finding databases in environment: '.$e->getMessage());
+        }
+        
+        return $databases;
+    }
+    
     private function getPhpMyAdminUrlForDatabase($database): ?string
     {
         try {
             $server = $database->destination->server;
             $containerName = $database->uuid.'-phpmyadmin';
             
-            // Obtener la URL desde las variables de entorno del contenedor
+            // Verificar si el contenedor phpMyAdmin existe
             $escapedContainer = escapeshellarg($containerName);
+            $checkCommand = "docker ps -a --filter name=^{$escapedContainer}$ --format '{{.Names}}'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            
+            $containerExists = instant_remote_process([$checkCommand], $server, false);
+            if (empty(trim($containerExists))) {
+                // El contenedor no existe aún, puede que necesite reiniciarse la base de datos
+                return null;
+            }
+            
+            // Obtener la URL desde las variables de entorno del contenedor
             $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep PMA_ABSOLUTE_URI | cut -d'=' -f2";
             if ($server->isNonRoot()) {
                 $envCommand = "sudo {$envCommand}";
@@ -2078,9 +2128,9 @@ class FileExplorer extends Component
             
             // phpMyAdmin está en el mismo docker-compose que la base de datos
             // En docker-compose, los servicios se comunican por nombre de servicio
-            // El nombre del servicio es el mismo que el container_name (que es el UUID)
-            // Pero dentro del docker-compose, phpMyAdmin puede usar el nombre del servicio directamente
-            // que es el mismo UUID. Sin embargo, para mayor compatibilidad, usamos el UUID completo
+            // El nombre del servicio en docker-compose es el UUID de la base de datos
+            // phpMyAdmin puede conectarse usando este nombre directamente
+            // Usamos el UUID completo como nombre del servidor
             return [
                 'username' => 'root',
                 'password' => $rootPassword,

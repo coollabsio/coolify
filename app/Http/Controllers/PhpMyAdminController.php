@@ -112,21 +112,25 @@ class PhpMyAdminController extends Controller
             $username = $credentials['username'] ?? 'root';
             $password = $credentials['password'] ?? '';
             
-            // Si phpMyAdmin está en el mismo docker-compose que la base de datos,
-            // usar el nombre del servicio directamente (sin UUID)
-            // Extraer solo el nombre del servicio si es un contenedor con UUID
-            if (preg_match('/^([a-z0-9]+)-[a-z0-9]{20,}/', $server, $matches)) {
-                $server = $matches[1]; // Usar solo el nombre del servicio
-            }
+            // El servidor debe ser el UUID completo de la base de datos
+            // que es el nombre del servicio en docker-compose
+            // phpMyAdmin puede conectarse usando este nombre directamente
             
-            // Escapar valores para HTML
+            // Escapar valores para HTML y JavaScript
             $serverEscaped = htmlspecialchars($server, ENT_QUOTES, 'UTF-8');
             $usernameEscaped = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
             $passwordEscaped = htmlspecialchars($password, ENT_QUOTES, 'UTF-8');
             $loginUrlEscaped = htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8');
             
+            // Escapar para JavaScript (JSON encode)
+            $serverJs = json_encode($server, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+            $usernameJs = json_encode($username, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+            $passwordJs = json_encode($password, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+            $loginUrlJs = json_encode($loginUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+            
             // Generar página HTML que hace login automático con POST (como Plesk)
-            // phpMyAdmin usa los campos: pma_username, pma_password, server
+            // phpMyAdmin puede usar diferentes nombres de campos según la versión
+            // Intentamos con múltiples variantes para máxima compatibilidad
             $html = <<<HTML
 <!DOCTYPE html>
 <html lang="es">
@@ -191,17 +195,39 @@ class PhpMyAdminController extends Controller
         <p>Serás redirigido automáticamente.</p>
     </div>
     
-    <form id="phpmyadmin-login-form" method="POST" action="{$loginUrlEscaped}" style="display: none;">
+    <form id="phpmyadmin-login-form" method="POST" action="{$loginUrlEscaped}" target="_blank" style="display: none;">
         <input type="hidden" name="pma_username" value="{$usernameEscaped}">
         <input type="hidden" name="pma_password" value="{$passwordEscaped}">
-        <input type="hidden" name="server" value="{$serverEscaped}">
+        <input type="hidden" name="server" value="1">
+        <input type="hidden" name="pma_servername" value="{$serverEscaped}">
+        <input type="hidden" name="username" value="{$usernameEscaped}">
+        <input type="hidden" name="password" value="{$passwordEscaped}">
+        <input type="hidden" name="pma_hostname" value="{$serverEscaped}">
     </form>
     
+    <iframe id="phpmyadmin-frame" name="phpmyadmin-frame" style="display: none;"></iframe>
+    
     <script>
+        // Función para enviar el formulario automáticamente
+        function submitPhpMyAdminForm() {
+            const form = document.getElementById('phpmyadmin-login-form');
+            if (form) {
+                // Enviar el formulario inmediatamente
+                form.submit();
+                
+                // Redirigir a phpMyAdmin después de un breve delay
+                setTimeout(function() {
+                    window.location.href = {$loginUrlJs};
+                }, 500);
+            }
+        }
+        
         // Enviar formulario automáticamente al cargar la página
-        window.onload = function() {
-            document.getElementById('phpmyadmin-login-form').submit();
-        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', submitPhpMyAdminForm);
+        } else {
+            submitPhpMyAdminForm();
+        }
     </script>
 </body>
 </html>
