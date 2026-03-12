@@ -2086,6 +2086,41 @@ class FileExplorer extends Component
                 return null;
             }
             
+            // Buscar ServiceApplication para phpMyAdmin si está en un servicio
+            // Primero intentar obtener desde variables de entorno del servicio
+            $environment = $database->environment;
+            if ($environment) {
+                // Buscar servicios que puedan tener phpMyAdmin
+                $services = $environment->services()->get();
+                foreach ($services as $service) {
+                    // Buscar aplicación phpMyAdmin en el servicio
+                    foreach ($service->applications as $app) {
+                        $appName = str($app->name)->lower();
+                        $imageName = str($app->image)->lower();
+                        if ($appName->contains('phpmyadmin') || $imageName->contains('phpmyadmin')) {
+                            if ($app->fqdn) {
+                                $fqdns = $app->fqdns;
+                                if (!empty($fqdns)) {
+                                    return $fqdns[0];
+                                }
+                            }
+                            
+                            // Buscar en variables de entorno
+                            $envVar = $service->environment_variables()
+                                ->where(function ($query) {
+                                    $query->where('key', 'like', 'SERVICE_URL_%PHPMYADMIN%')
+                                        ->orWhere('key', 'like', 'SERVICE_FQDN_%PHPMYADMIN%');
+                                })
+                                ->first();
+                            
+                            if ($envVar && $envVar->real_value) {
+                                return $envVar->real_value;
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Obtener la URL desde las variables de entorno del contenedor
             $envCommand = "docker exec {$escapedContainer} env 2>/dev/null | grep PMA_ABSOLUTE_URI | cut -d'=' -f2";
             if ($server->isNonRoot()) {
@@ -2098,8 +2133,9 @@ class FileExplorer extends Component
             }
             
             // Si no se encuentra en las variables de entorno, generar una URL basada en el servidor
-            $fqdn = generateFqdn(server: $server, random: "{$database->uuid}-phpmyadmin", parserVersion: 2);
-            $url = generateUrl($server, "{$database->uuid}-phpmyadmin");
+            // Usar un nombre más corto para evitar URLs muy largas
+            $phpmyadminRandom = substr($database->uuid, 0, 8).'-phpmyadmin';
+            $url = generateUrl($server, $phpmyadminRandom);
             
             return $url;
         } catch (\Throwable $e) {

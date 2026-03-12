@@ -209,8 +209,10 @@ class StartMysql
         
         // Generate FQDN for phpMyAdmin
         $server = $this->database->destination->server;
-        $phpmyadmin_fqdn = generateFqdn(server: $server, random: "{$container_name}-phpmyadmin", parserVersion: 2);
-        $phpmyadmin_url = generateUrl($server, "{$container_name}-phpmyadmin");
+        // Usar un nombre más corto para evitar URLs muy largas
+        $phpmyadminRandom = substr($container_name, 0, 8).'-phpmyadmin';
+        $phpmyadmin_fqdn = generateFqdn(server: $server, random: $phpmyadminRandom, parserVersion: 2);
+        $phpmyadmin_url = generateUrl($server, $phpmyadminRandom);
         
         $docker_compose['services'][$phpmyadmin_container_name] = [
             'image' => 'lscr.io/linuxserver/phpmyadmin:latest',
