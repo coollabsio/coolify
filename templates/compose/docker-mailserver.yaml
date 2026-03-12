@@ -1,0 +1,36 @@
+# documentation: https://docker-mailserver.github.io/docker-mailserver/latest/
+# slogan: A production-ready fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam, Antivirus, etc.) running inside a container.
+# category: email
+# tags: email, smtp, imap, mail, mailserver, postfix, dovecot
+# logo: svgs/docker-mailserver.png
+# port: 25
+
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    hostname: ${MAIL_HOSTNAME:-mail.example.com}
+    volumes:
+      - mailserver-mail-data:/var/mail
+      - mailserver-mail-state:/var/mail-state
+      - mailserver-mail-logs:/var/log/mail
+      - mailserver-config:/tmp/docker-mailserver
+    ports:
+      - "25:25"
+      - "143:143"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    environment:
+      - SERVICE_URL_MAILSERVER_25
+      - ENABLE_RSPAMD=1
+      - ENABLE_CLAMAV=0
+      - ENABLE_FAIL2BAN=0
+      - SSL_TYPE=manual
+      - PERMIT_DOCKER=network
+      - LOG_LEVEL=warn
+    healthcheck:
+      test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
