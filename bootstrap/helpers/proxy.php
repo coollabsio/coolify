@@ -155,7 +155,42 @@ function ensureProxyNetworksExist(Server $server)
         });
     }
 
+    // Fix IPv6 gateway CIDR issue: Docker may store the gateway with a CIDR
+    // suffix (e.g. ::1/64) which causes ParseAddr errors in Traefik.
+    $commands->push(fixIpv6GatewayCidrCommand('coolify'));
+
     return $commands->flatten();
+}
+
+/**
+ * Returns a shell command that detects and fixes an IPv6 gateway stored with
+ * a CIDR suffix (e.g. "::1/64") on the given Docker network. The CIDR notation
+ * belongs only on the Subnet field; when present on the Gateway it causes
+ * Go's netip.ParseAddr to fail with "unexpected character, want colon".
+ */
+function fixIpv6GatewayCidrCommand(string $network): string
+{
+    return <<<BASH
+if command -v jq >/dev/null 2>&1; then
+  IPV6_GW=\$(docker network inspect {$network} 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":")) | .Gateway' 2>/dev/null)
+  if echo "\$IPV6_GW" | grep -q '/'; then
+    echo "Fixing IPv6 gateway CIDR on network {$network}..."
+    IPV4_SUBNET=\$(docker network inspect {$network} 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":") | not) | .Subnet')
+    IPV4_GW=\$(docker network inspect {$network} 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":") | not) | .Gateway')
+    IPV6_SUBNET=\$(docker network inspect {$network} 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":")) | .Subnet')
+    IPV6_GW_FIXED=\$(echo "\$IPV6_GW" | sed 's|/.*||')
+    for C in \$(docker network inspect {$network} --format '{{range .Containers}}{{.Name}} {{end}}'); do
+      docker network disconnect {$network} "\$C" 2>/dev/null || true
+    done
+    docker network rm {$network} 2>/dev/null || true
+    docker network create --attachable --ipv6 --subnet "\$IPV4_SUBNET" --gateway "\$IPV4_GW" --subnet "\$IPV6_SUBNET" --gateway "\$IPV6_GW_FIXED" {$network} 2>/dev/null
+    for C in \$(docker ps --format '{{.Names}}' | grep '^coolify'); do
+      docker network connect {$network} "\$C" 2>/dev/null || true
+    done
+    echo "IPv6 gateway fixed on network {$network}"
+  fi
+fi
+BASH;
 }
 
 function extractCustomProxyCommands(Server $server, string $existing_config): array

@@ -139,6 +139,31 @@ if ! docker network inspect coolify >/dev/null 2>&1; then
     fi
 else
     log "Network 'coolify' already exists"
+    # Fix IPv6 gateway CIDR issue: Docker may store the gateway with a CIDR
+    # suffix (e.g. ::1/64) which causes ParseAddr errors in Traefik.
+    # The CIDR notation belongs only on the Subnet field, not the Gateway.
+    if command -v jq >/dev/null 2>&1; then
+        IPV6_GW=$(docker network inspect coolify 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":")) | .Gateway' 2>/dev/null)
+        if echo "$IPV6_GW" | grep -q '/'; then
+            log "Found IPv6 gateway with CIDR notation ($IPV6_GW), recreating network to fix..."
+            IPV4_SUBNET=$(docker network inspect coolify 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":") | not) | .Subnet')
+            IPV4_GW=$(docker network inspect coolify 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":") | not) | .Gateway')
+            IPV6_SUBNET=$(docker network inspect coolify 2>/dev/null | jq -r '.[0].IPAM.Config[] | select(.Gateway | test(":")) | .Subnet')
+            IPV6_GW_FIXED=$(echo "$IPV6_GW" | sed 's|/.*||')
+            for CONTAINER in $(docker network inspect coolify --format '{{range .Containers}}{{.Name}} {{end}}'); do
+                docker network disconnect coolify "$CONTAINER" 2>/dev/null || true
+            done
+            docker network rm coolify 2>/dev/null || true
+            docker network create --attachable --ipv6 \
+                --subnet "$IPV4_SUBNET" --gateway "$IPV4_GW" \
+                --subnet "$IPV6_SUBNET" --gateway "$IPV6_GW_FIXED" \
+                coolify 2>/dev/null
+            for CONTAINER in $(docker ps --format '{{.Names}}' | grep '^coolify'); do
+                docker network connect coolify "$CONTAINER" 2>/dev/null || true
+            done
+            log "Network 'coolify' recreated with fixed IPv6 gateway ($IPV6_GW_FIXED)"
+        fi
+    fi
 fi
 
 # Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
