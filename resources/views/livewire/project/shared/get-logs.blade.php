@@ -314,8 +314,15 @@
                         <button
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
-                                    navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    if (!navigator.clipboard) {
+                                        Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS.']);
+                                        return;
+                                    }
+                                    navigator.clipboard.writeText(logs).then(() => {
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    }).catch(() => {
+                                        Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                    });
                                 });
                             "
                             title="Copy Logs"
