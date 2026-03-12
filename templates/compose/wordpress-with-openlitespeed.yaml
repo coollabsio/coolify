@@ -1,0 +1,40 @@
+# documentation: https://openlitespeed.org/kb/wordpress-installation/
+# slogan: WordPress powered by OpenLiteSpeed — high-performance web server with full LiteSpeed Cache support.
+# category: cms
+# tags: wordpress, openlitespeed, php, litespeed, cms, blog
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp84
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - ols-config:/usr/local/lsws/conf
+      - ols-admin-conf:/usr/local/lsws/admin/conf
+      - ols-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 15
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
