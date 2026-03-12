@@ -212,7 +212,8 @@ class SyncBunny extends Command
             $timestamp = time();
             $tmpDir = sys_get_temp_dir().'/coolify-cdn-combined-'.$timestamp;
             $branchName = 'update-releases-and-versions-'.$timestamp;
-            $versionsTargetPath = $nightly ? 'json/versions-nightly.json' : 'json/versions.json';
+            $versionsTargetPath = $nightly ? 'json/nightly/versions.json' : 'json/versions.json';
+            $releasesTargetPath = $nightly ? 'json/nightly/releases.json' : 'json/releases.json';
 
             // 3. Clone the repository
             $this->info('Cloning coolify-cdn repository...');
@@ -237,7 +238,7 @@ class SyncBunny extends Command
 
             // 5. Write releases.json
             $this->info('Writing releases.json...');
-            $releasesPath = "$tmpDir/json/releases.json";
+            $releasesPath = "$tmpDir/$releasesTargetPath";
             $releasesDir = dirname($releasesPath);
 
             if (! is_dir($releasesDir)) {
@@ -282,7 +283,7 @@ class SyncBunny extends Command
             // 7. Stage both files
             $this->info('Staging changes...');
             $output = [];
-            exec('cd '.escapeshellarg($tmpDir).' && git add json/releases.json '.escapeshellarg($versionsTargetPath).' 2>&1', $output, $returnCode);
+            exec('cd '.escapeshellarg($tmpDir).' && git add '.escapeshellarg($releasesTargetPath).' '.escapeshellarg($versionsTargetPath).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 $this->error('Failed to stage changes: '.implode("\n", $output));
                 exec('rm -rf '.escapeshellarg($tmpDir));
@@ -383,7 +384,7 @@ class SyncBunny extends Command
             $timestamp = time();
             $tmpDir = sys_get_temp_dir().'/coolify-cdn-versions-'.$timestamp;
             $branchName = 'update-versions-'.$timestamp;
-            $targetPath = $nightly ? 'json/versions-nightly.json' : 'json/versions.json';
+            $targetPath = $nightly ? 'json/nightly/versions.json' : 'json/versions.json';
 
             // Clone the repository
             $this->info('Cloning coolify-cdn repository...');
@@ -514,6 +515,179 @@ class SyncBunny extends Command
     }
 
     /**
+     * Sync static files (install.sh, upgrade.sh, docker-compose files, .env.production) to GitHub repository via PR
+     */
+    private function syncFilesToGitHubRepo(bool $nightly = false): bool
+    {
+        $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+        $this->info("Syncing $envLabel static files to GitHub repository...");
+
+        try {
+            $parentDir = realpath(dirname(__FILE__).'/../../..');
+
+            if ($nightly) {
+                $files = [
+                    "$parentDir/other/nightly/install.sh" => 'scripts/nightly/install.sh',
+                    "$parentDir/other/nightly/upgrade.sh" => 'scripts/nightly/upgrade.sh',
+                    "$parentDir/other/nightly/docker-compose.yml" => 'docker/nightly/docker-compose.yml',
+                    "$parentDir/other/nightly/docker-compose.prod.yml" => 'docker/nightly/docker-compose.prod.yml',
+                    "$parentDir/other/nightly/.env.production" => 'environment/nightly/.env.production',
+                ];
+            } else {
+                $files = [
+                    "$parentDir/scripts/install.sh" => 'scripts/install.sh',
+                    "$parentDir/scripts/upgrade.sh" => 'scripts/upgrade.sh',
+                    "$parentDir/docker-compose.yml" => 'docker/docker-compose.yml',
+                    "$parentDir/docker-compose.prod.yml" => 'docker/docker-compose.prod.yml',
+                    "$parentDir/.env.production" => 'environment/.env.production',
+                ];
+            }
+
+            // Verify all source files exist
+            foreach ($files as $source => $target) {
+                if (! file_exists($source)) {
+                    $this->error("Source file not found: $source");
+
+                    return false;
+                }
+            }
+
+            $timestamp = time();
+            $tmpDir = sys_get_temp_dir().'/coolify-cdn-files-'.$timestamp;
+            $branchName = 'update-files-'.$timestamp;
+
+            // Clone the repository
+            $this->info('Cloning coolify-cdn repository...');
+            $output = [];
+            exec('gh repo clone coollabsio/coolify-cdn '.escapeshellarg($tmpDir).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to clone repository: '.implode("\n", $output));
+
+                return false;
+            }
+
+            // Create feature branch
+            $this->info('Creating feature branch...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git checkout -b '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to create branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Copy files to their CDN repo paths
+            $stagedFiles = [];
+            foreach ($files as $source => $target) {
+                $targetPath = "$tmpDir/$target";
+                $targetDir = dirname($targetPath);
+
+                if (! is_dir($targetDir)) {
+                    if (! mkdir($targetDir, 0755, true)) {
+                        $this->error("Failed to create directory: $targetDir");
+                        exec('rm -rf '.escapeshellarg($tmpDir));
+
+                        return false;
+                    }
+                }
+
+                if (! copy($source, $targetPath)) {
+                    $this->error("Failed to copy $source to $targetPath");
+                    exec('rm -rf '.escapeshellarg($tmpDir));
+
+                    return false;
+                }
+
+                $stagedFiles[] = $target;
+                $this->info("Copied: $target");
+            }
+
+            // Stage all files
+            $this->info('Staging changes...');
+            $output = [];
+            $addCommand = 'cd '.escapeshellarg($tmpDir).' && git add '.implode(' ', array_map('escapeshellarg', $stagedFiles)).' 2>&1';
+            exec($addCommand, $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to stage changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Check for changes
+            $this->info('Checking for changes...');
+            $statusOutput = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git status --porcelain 2>&1', $statusOutput, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to check repository status: '.implode("\n", $statusOutput));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            if (empty(array_filter($statusOutput))) {
+                $this->info('All files are already up to date. No changes to commit.');
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return true;
+            }
+
+            // Commit changes
+            $commitMessage = "Update $envLabel static files - ".date('Y-m-d H:i:s');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to commit changes: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Push to remote
+            $this->info('Pushing branch to remote...');
+            $output = [];
+            exec('cd '.escapeshellarg($tmpDir).' && git push origin '.escapeshellarg($branchName).' 2>&1', $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->error('Failed to push branch: '.implode("\n", $output));
+                exec('rm -rf '.escapeshellarg($tmpDir));
+
+                return false;
+            }
+
+            // Create pull request
+            $this->info('Creating pull request...');
+            $prTitle = "Update $envLabel static files - ".date('Y-m-d H:i:s');
+            $fileList = implode("\n- ", $stagedFiles);
+            $prBody = "Automated update of $envLabel static files:\n- $fileList";
+            $prCommand = 'gh pr create --repo coollabsio/coolify-cdn --title '.escapeshellarg($prTitle).' --body '.escapeshellarg($prBody).' --base main --head '.escapeshellarg($branchName).' 2>&1';
+            $output = [];
+            exec($prCommand, $output, $returnCode);
+
+            // Clean up
+            exec('rm -rf '.escapeshellarg($tmpDir));
+
+            if ($returnCode !== 0) {
+                $this->error('Failed to create PR: '.implode("\n", $output));
+
+                return false;
+            }
+
+            $this->info('Pull request created successfully!');
+            if (! empty($output)) {
+                $this->info('PR URL: '.implode("\n", $output));
+            }
+            $this->info('Files synced: '.count($stagedFiles));
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->error('Error syncing files to GitHub: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle()
@@ -582,9 +756,9 @@ class SyncBunny extends Command
             }
             if (! $only_template && ! $only_version && ! $only_github_releases && ! $only_github_versions) {
                 if ($nightly) {
-                    $this->info('About to sync files NIGHTLY (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                    $this->info('About to sync NIGHTLY files (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN and Coolify CDN.');
                 } else {
-                    $this->info('About to sync files PRODUCTION (docker-compose.yml, docker-compose.prod.yml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+                    $this->info('About to sync PRODUCTION files (docker-compose.yml, docker-compose.prod.yml, upgrade.sh, install.sh, etc) to BunnyCDN and Coolify CDN.');
                 }
                 $confirmed = confirm('Are you sure you want to sync?');
                 if (! $confirmed) {
@@ -692,7 +866,16 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
             ]);
-            $this->info('All files uploaded & purged...');
+            $this->info('All files uploaded & purged to BunnyCDN.');
+
+            // Sync files to GitHub CDN repository
+            $this->info('Syncing files to GitHub CDN repository...');
+            $githubSuccess = $this->syncFilesToGitHubRepo($nightly);
+            if ($githubSuccess) {
+                $this->info('GitHub PR created successfully for static files.');
+            } else {
+                $this->error('Failed to create GitHub PR for static files.');
+            }
         } catch (\Throwable $e) {
             $this->error('Error: '.$e->getMessage());
         }
