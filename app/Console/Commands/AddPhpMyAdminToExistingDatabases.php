@@ -135,7 +135,7 @@ class AddPhpMyAdminToExistingDatabases extends Command
 
                 // Reiniciar el servicio para aplicar los cambios
                 $this->info("   🔄 Reiniciando servicio...");
-                RestartService::run($service);
+                RestartService::run($service, pullLatestImages: false);
 
                 $this->info("   ✅ phpMyAdmin agregado exitosamente!");
                 $successCount++;
