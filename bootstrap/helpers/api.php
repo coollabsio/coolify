@@ -144,6 +144,50 @@ function sharedDataApplications()
     ];
 }
 
+function moveResourceToEnvironment(Request $request, $resource, string $resourceType, int $teamId): \Illuminate\Http\JsonResponse
+{
+
+    $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        'environment_uuid' => 'required|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $extraFields = array_diff(array_keys($request->all()), ['environment_uuid']);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    $newEnvironment = \App\Models\Environment::ownedByCurrentTeamAPI($teamId)
+        ->whereUuid($request->environment_uuid)
+        ->first();
+
+    if (! $newEnvironment) {
+        return response()->json(['message' => 'Target environment not found or not owned by your team.'], 404);
+    }
+
+    if ($resource->environment_id === $newEnvironment->id) {
+        return response()->json(['message' => "$resourceType is already in this environment."], 400);
+    }
+
+    $resource->update(['environment_id' => $newEnvironment->id]);
+
+    return response()->json([
+        'message' => "$resourceType moved successfully.",
+        'uuid' => $resource->uuid,
+        'project_uuid' => $newEnvironment->project->uuid,
+        'environment_uuid' => $newEnvironment->uuid,
+    ]);
+}
+
 function validateIncomingRequest(Request $request)
 {
     // check if request is json
