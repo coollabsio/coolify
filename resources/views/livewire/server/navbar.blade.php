@@ -94,6 +94,11 @@
                             Terminal
                         </a>
             @endcan
+            <a class="{{ request()->routeIs('server.dns') ? 'dark:text-white' : '' }}" href="{{ route('server.dns', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}" {{ wireNavigate() }}>
+                            DNS & Hostname
+                        </a>
             @can('update', $server)
                         <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}" href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
