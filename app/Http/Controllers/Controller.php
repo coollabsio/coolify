@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Events\TestEvent;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
@@ -27,7 +26,7 @@ class Controller extends BaseController
     public function realtime_test()
     {
         if (auth()->user()?->currentTeam()->id !== 0) {
-            return redirect(RouteServiceProvider::HOME);
+            return redirect('/');
         }
         TestEvent::dispatch();
 
@@ -43,7 +42,7 @@ class Controller extends BaseController
     {
         $request->fulfill();
 
-        return redirect(RouteServiceProvider::HOME);
+        return redirect('/');
     }
 
     public function forgot_password(Request $request)

@@ -1,18 +1,18 @@
 <?php
 
 use App\Exceptions\DeploymentException;
-use App\Exceptions\Handler;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 
-test('DeploymentException is in the dontReport array', function () {
-    $handler = new Handler(app());
+test('DeploymentException is in the dontReport list', function () {
+    $handler = app(ExceptionHandler::class);
 
-    // Use reflection to access the protected $dontReport property
+    $exception = new DeploymentException('Test deployment failure');
+
     $reflection = new ReflectionClass($handler);
-    $property = $reflection->getProperty('dontReport');
-    $property->setAccessible(true);
-    $dontReport = $property->getValue($handler);
+    $method = $reflection->getMethod('shouldReport');
+    $method->setAccessible(true);
 
-    expect($dontReport)->toContain(DeploymentException::class);
+    expect($method->invoke($handler, $exception))->toBeFalse();
 });
 
 test('DeploymentException can be created with a message', function () {
@@ -39,33 +39,25 @@ test('DeploymentException can be created from another exception', function () {
 });
 
 test('DeploymentException is not reported when thrown', function () {
-    $handler = new Handler(app());
+    $handler = app(ExceptionHandler::class);
 
-    // DeploymentException should not be reported (logged)
     $exception = new DeploymentException('Test deployment failure');
 
-    // Check that the exception should not be reported
     $reflection = new ReflectionClass($handler);
     $method = $reflection->getMethod('shouldReport');
     $method->setAccessible(true);
 
-    $shouldReport = $method->invoke($handler, $exception);
-
-    expect($shouldReport)->toBeFalse();
+    expect($method->invoke($handler, $exception))->toBeFalse();
 });
 
 test('RuntimeException is still reported when thrown', function () {
-    $handler = new Handler(app());
+    $handler = app(ExceptionHandler::class);
 
-    // RuntimeException should still be reported (this is for Coolify bugs)
     $exception = new RuntimeException('Unexpected error in Coolify code');
 
-    // Check that the exception should be reported
     $reflection = new ReflectionClass($handler);
     $method = $reflection->getMethod('shouldReport');
     $method->setAccessible(true);
 
-    $shouldReport = $method->invoke($handler, $exception);
-
-    expect($shouldReport)->toBeTrue();
+    expect($method->invoke($handler, $exception))->toBeTrue();
 });

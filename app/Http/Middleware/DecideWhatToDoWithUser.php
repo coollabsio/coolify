@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Providers\RouteServiceProvider;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -57,10 +56,10 @@ class DecideWhatToDoWithUser
             return redirect()->route('onboarding');
         }
         if (auth()->user()->hasVerifiedEmail() && $request->path() === 'verify') {
-            return redirect(RouteServiceProvider::HOME);
+            return redirect('/');
         }
         if (isSubscriptionActive() && $request->routeIs('subscription.index')) {
-            return redirect(RouteServiceProvider::HOME);
+            return redirect('/');
         }
 
         return $next($request);

@@ -3,7 +3,6 @@
 namespace App\Livewire\Subscription;
 
 use App\Models\InstanceSettings;
-use App\Providers\RouteServiceProvider;
 use Livewire\Component;
 
 class Index extends Component
@@ -23,7 +22,7 @@ class Index extends Component
     public function mount()
     {
         if (! isCloud()) {
-            return redirect(RouteServiceProvider::HOME);
+            return redirect('/');
         }
         if (auth()->user()?->isMember()) {
             $this->isMember = true;

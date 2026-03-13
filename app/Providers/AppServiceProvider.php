@@ -3,10 +3,14 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
-use Illuminate\Database\Eloquent\Model;
+use App\Services\ConfigurationRepository;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
@@ -19,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
         if (App::isLocal()) {
             $this->app->register(TelescopeServiceProvider::class);
         }
+
+        $this->app->singleton(ConfigurationRepository::class, function ($app) {
+            return new ConfigurationRepository($app['config']);
+        });
     }
 
     public function boot(): void
@@ -28,7 +36,8 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
-
+        $this->configureRateLimiting();
+        $this->configureBroadcasting();
     }
 
     private function configureCommands(): void
@@ -78,5 +87,26 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            if ($request->path() === 'api/health') {
+                return Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip());
+            }
+
+            return Limit::perMinute((int) config('api.rate_limit'))->by($request->user()?->id ?: $request->ip());
+        });
+        RateLimiter::for('5', function (Request $request) {
+            return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+
+    private function configureBroadcasting(): void
+    {
+        Broadcast::routes();
+
+        require base_path('routes/channels.php');
     }
 }

@@ -32,7 +32,7 @@ class FortifyServiceProvider extends ServiceProvider
                     return redirect()->route('settings.index');
                 }
 
-                return redirect(RouteServiceProvider::HOME);
+                return redirect('/');
             }
         });
     }

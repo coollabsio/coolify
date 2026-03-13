@@ -84,7 +84,6 @@ use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
-use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -393,7 +392,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::any('/{any}', function () {
     if (auth()->user()) {
-        return redirect(RouteServiceProvider::HOME);
+        return redirect('/');
     }
 
     return redirect()->route('login');
