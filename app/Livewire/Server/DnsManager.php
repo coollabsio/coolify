@@ -39,11 +39,6 @@ class DnsManager extends Component
     // DNS Zone Records (dig-based query for any domain)
     public string $zoneDomain = '';
     public array $zoneRecords = [];
-    public string $newRecordName = '';
-    public string $newRecordType = 'A';
-    public string $newRecordValue = '';
-    public int $newRecordTtl = 3600;
-    public int $newRecordPriority = 10;
 
     // resolv.conf raw edit
     public string $resolvConfEdit = '';
@@ -427,6 +422,8 @@ class DnsManager extends Component
     public function dnsLookup()
     {
         try {
+            $this->authorize('update', $this->server);
+
             $domain = trim($this->lookupDomain);
 
             if (empty($domain)) {
@@ -469,6 +466,8 @@ class DnsManager extends Component
     public function queryZoneRecords()
     {
         try {
+            $this->authorize('update', $this->server);
+
             $domain = trim($this->zoneDomain);
 
             if (empty($domain)) {
@@ -490,7 +489,7 @@ class DnsManager extends Component
             foreach ($types as $type) {
                 $typeArg = escapeshellarg($type);
                 $result = trim(instant_remote_process(
-                    ["dig +noall +answer {$domainArg} {$typeArg} +ttlid 2>/dev/null"],
+                    ["dig +noall +answer {$domainArg} {$typeArg} 2>/dev/null"],
                     $this->server,
                     false
                 ));
@@ -541,6 +540,8 @@ class DnsManager extends Component
     public function checkPropagation()
     {
         try {
+            $this->authorize('update', $this->server);
+
             $domain = trim($this->propagationDomain);
 
             if (empty($domain)) {
@@ -557,20 +558,35 @@ class DnsManager extends Component
             $domainArg = escapeshellarg($domain);
             $typeArg = escapeshellarg($this->propagationType);
 
+            // Build a single command that queries all DNS servers in parallel
+            $parts = [];
             foreach ($this->publicDnsServers as $dns) {
                 $serverArg = escapeshellarg($dns['ip']);
-                $result = trim(instant_remote_process(
-                    ["dig +noall +answer +short @{$serverArg} {$domainArg} {$typeArg} +time=3 +tries=1 2>/dev/null || echo 'TIMEOUT'"],
-                    $this->server,
-                    false
-                ));
+                $nameArg = escapeshellarg($dns['name']);
+                $parts[] = "(result=\$(dig +noall +answer +short @{$serverArg} {$domainArg} {$typeArg} +time=3 +tries=1 2>/dev/null) && echo {$nameArg}\"|||\"" . escapeshellarg($dns['ip']) . "\"|||\"" . '${result:-NO_RECORD}' . " || echo {$nameArg}\"|||\"" . escapeshellarg($dns['ip']) . "\"|||TIMEOUT\")";
+            }
+            $cmd = implode(' & ', $parts) . ' & wait';
 
-                $this->propagationResults[] = [
-                    'server' => $dns['name'],
-                    'ip' => $dns['ip'],
-                    'result' => empty($result) ? 'No record' : $result,
-                    'status' => empty($result) || $result === 'TIMEOUT' ? 'error' : 'success',
-                ];
+            $output = trim(instant_remote_process([$cmd], $this->server, false));
+
+            if (!empty($output)) {
+                $lines = explode("\n", $output);
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if (empty($line)) {
+                        continue;
+                    }
+                    $segments = explode('|||', $line, 3);
+                    if (count($segments) === 3) {
+                        $result = trim($segments[2]);
+                        $this->propagationResults[] = [
+                            'server' => trim($segments[0]),
+                            'ip' => trim($segments[1]),
+                            'result' => $result === 'NO_RECORD' ? 'No record' : $result,
+                            'status' => in_array($result, ['NO_RECORD', 'TIMEOUT']) ? 'error' : 'success',
+                        ];
+                    }
+                }
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
