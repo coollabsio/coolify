@@ -1,0 +1,182 @@
+# documentation: https://mailu.io/
+# slogan: Mailu is a simple yet full-featured mail server as a set of Docker images, including SMTP, IMAP, webmail, and anti-spam.
+# category: email
+# tags: email, mail, smtp, imap, dovecot, postfix, rspamd, webmail, self-hosted, mailserver
+# logo: svgs/mailu.svg
+# port: 80
+
+services:
+  resolver:
+    image: ghcr.io/mailu/unbound:2024.06
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    networks:
+      mailu-network:
+        ipv4_address: 192.168.203.254
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - mailu-redis:/data
+    networks:
+      - mailu-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  front:
+    image: ghcr.io/mailu/nginx:2024.06
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_FRONT_80
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - POSTMASTER=${MAILU_POSTMASTER:-admin}
+      - SUBNET=192.168.203.0/24
+      - WEB_ADMIN=/admin
+      - WEB_WEBMAIL=/webmail
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "110:110"
+      - "995:995"
+    volumes:
+      - mailu-certs:/certs
+      - mailu-overrides-nginx:/overrides/nginx
+    dns: 192.168.203.254
+    networks:
+      - mailu-network
+    depends_on:
+      - resolver
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  admin:
+    image: ghcr.io/mailu/admin:2024.06
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - POSTMASTER=${MAILU_POSTMASTER:-admin}
+      - SUBNET=192.168.203.0/24
+      - DB_FLAVOR=sqlite
+      - INITIAL_ADMIN_ACCOUNT=${INITIAL_ADMIN_ACCOUNT:-admin}
+      - INITIAL_ADMIN_DOMAIN=${MAILU_DOMAIN:-example.com}
+      - INITIAL_ADMIN_PW=$SERVICE_PASSWORD_ADMIN
+      - INITIAL_ADMIN_MODE=ifmissing
+      - WEB_ADMIN=/admin
+      - WEB_WEBMAIL=/webmail
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - mailu-data:/data
+      - mailu-dkim:/dkim
+    dns: 192.168.203.254
+    networks:
+      - mailu-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      resolver:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  imap:
+    image: ghcr.io/mailu/dovecot:2024.06
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - POSTMASTER=${MAILU_POSTMASTER:-admin}
+      - SUBNET=192.168.203.0/24
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - mailu-mail:/mail
+      - mailu-overrides-dovecot:/overrides/dovecot
+    dns: 192.168.203.254
+    networks:
+      - mailu-network
+    depends_on:
+      - admin
+
+  smtp:
+    image: ghcr.io/mailu/postfix:2024.06
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - POSTMASTER=${MAILU_POSTMASTER:-admin}
+      - SUBNET=192.168.203.0/24
+      - MESSAGE_RATELIMIT=${MESSAGE_RATELIMIT:-200}
+      - AUTH_RATELIMIT_IP=${AUTH_RATELIMIT_IP:-60/hour}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - mailu-mailqueue:/queue
+      - mailu-overrides-postfix:/overrides/postfix
+    dns: 192.168.203.254
+    networks:
+      - mailu-network
+    depends_on:
+      - admin
+
+  antispam:
+    image: ghcr.io/mailu/rspamd:2024.06
+    restart: unless-stopped
+    hostname: antispam
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - SUBNET=192.168.203.0/24
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - mailu-filter:/var/lib/rspamd
+      - mailu-overrides-rspamd:/overrides/rspamd
+    dns: 192.168.203.254
+    networks:
+      - mailu-network
+    depends_on:
+      - front
+      - redis
+
+  webmail:
+    image: ghcr.io/mailu/snappymail:2024.06
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_SECRET
+      - DOMAIN=${MAILU_DOMAIN:-example.com}
+      - HOSTNAMES=${MAILU_HOSTNAMES:-mail.example.com}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+    volumes:
+      - mailu-webmail:/data
+    networks:
+      - mailu-network
+    depends_on:
+      - imap
+      - smtp
+
+networks:
+  mailu-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.203.0/24
