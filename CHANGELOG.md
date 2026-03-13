@@ -71,6 +71,7 @@ All notable changes to this project will be documented in this file.
 ### Maintenance
 
 - **Testing**
+  - Add CI tests workflow that runs all JS and PHP tooling checks (v4 had no automated testing or tooling)
   - Add custom Architecture test that enforces Laravel and PHP best practices to ensure security and consistency across the codebase
 - **Tooling**
   - **PHP**
