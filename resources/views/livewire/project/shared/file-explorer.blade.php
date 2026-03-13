@@ -396,6 +396,11 @@
                                                                 </svg>
                                                             </x-forms.button>
                                                         @endif
+                                                        <x-forms.button wire:click="openRenameDialog('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Rename">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                            </svg>
+                                                        </x-forms.button>
                                                         <x-forms.button wire:click="openMoveDialog('{{ $filePathEscaped }}')" class="!text-xs !px-2 !py-1" title="Move">
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
@@ -511,6 +516,51 @@
             <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
                 <x-forms.button wire:click="createFolder" class="bg-coollabs">Create</x-forms.button>
                 <x-forms.button wire:click="hideCreateFolderDialog" class="bg-gray-600">Cancel</x-forms.button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename File Dialog -->
+    <div x-data="{ modalOpen: @entangle('showRenameDialog') }"
+        x-show="modalOpen"
+        x-cloak
+        @keydown.escape.window="modalOpen = false; $wire.closeRenameDialog()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="modalOpen = false; $wire.closeRenameDialog()"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="relative w-full max-w-md bg-white dark:bg-base rounded-lg shadow-2xl flex flex-col overflow-hidden border border-coolgray-300 dark:border-coolgray-600">
+            <div class="flex items-center justify-between p-4 border-b border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <h2 class="text-xl font-bold dark:text-white">Rename File/Folder</h2>
+                <button @click="modalOpen = false; $wire.closeRenameDialog()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 dark:text-white">Current Path</label>
+                        <input type="text" value="{{ $renameSource }}" class="w-full p-2 border rounded bg-coolgray-50 dark:bg-coolgray-800" readonly>
+                    </div>
+                    <x-forms.input id="renameNewName" label="New Name" wire:model.live="renameNewName" placeholder="Enter new name" />
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Enter only the new name (not the full path). Invalid characters: /, \, null bytes
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-coolgray-300 dark:border-coolgray-600 bg-coolgray-50 dark:bg-coolgray-900">
+                <x-forms.button wire:click="renameFile"
+                                 class="bg-coollabs"
+                                 wire:loading.attr="disabled"
+                                 :disabled="empty($renameSource) || empty($renameNewName)">Rename</x-forms.button>
+                <x-forms.button wire:click="closeRenameDialog" class="bg-gray-600">Cancel</x-forms.button>
             </div>
         </div>
     </div>

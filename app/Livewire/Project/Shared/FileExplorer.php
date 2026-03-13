@@ -73,6 +73,12 @@ class FileExplorer extends Component
 
     public bool $isMySQLOrMariaDB = false;
 
+    public bool $showRenameDialog = false;
+
+    public ?string $renameSource = null;
+
+    public ?string $renameNewName = null;
+
     public bool $hasMySQLOrMariaDBContainer = false;
 
     public bool $showDatabasePanel = false;
@@ -1694,6 +1700,121 @@ class FileExplorer extends Component
         $this->showMoveDialog = false;
         $this->moveSource = null;
         $this->moveDestination = null;
+    }
+
+    public function openRenameDialog(string $path)
+    {
+        $this->renameSource = $path;
+        $this->renameNewName = basename($path);
+        $this->showRenameDialog = true;
+    }
+
+    public function closeRenameDialog()
+    {
+        $this->showRenameDialog = false;
+        $this->renameSource = null;
+        $this->renameNewName = null;
+    }
+
+    public function renameFile()
+    {
+        $sourcePath = $this->renameSource;
+        $newName = trim($this->renameNewName ?? '');
+
+        if (empty($sourcePath) || empty($newName)) {
+            $this->dispatch('error', 'Source path and new name are required.');
+
+            return;
+        }
+
+        // Validar que el nuevo nombre no contenga caracteres peligrosos
+        if (preg_match('/[\/\\\x00]/', $newName)) {
+            $this->dispatch('error', 'Invalid characters in file name. Cannot contain /, \\, or null bytes.');
+
+            return;
+        }
+
+        try {
+            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            if (is_null($container)) {
+                $this->dispatch('error', 'Container not found.');
+
+                return;
+            }
+
+            $server = data_get($container, 'server');
+            $containerName = data_get($container, 'container.Names');
+            $escapedContainer = escapeshellarg($containerName);
+            $escapedSource = escapeshellarg($sourcePath);
+            $escapedNewName = escapeshellarg($newName);
+
+            // Obtener el directorio padre del archivo original
+            $parentDir = dirname($sourcePath);
+            if ($parentDir === '.' || $parentDir === '') {
+                $parentDir = '/';
+            }
+            $escapedParentDir = escapeshellarg($parentDir);
+
+            // Construir la ruta de destino
+            $destinationPath = rtrim($parentDir, '/').'/'.$newName;
+            $escapedDest = escapeshellarg($destinationPath);
+
+            // Verificar si el destino ya existe
+            $checkCommand = "docker exec {$escapedContainer} sh -c 'test -e {$escapedDest} && echo exists || echo notexists'";
+            if ($server->isNonRoot()) {
+                $checkCommand = "sudo {$checkCommand}";
+            }
+            $checkResult = trim(instant_remote_process([$checkCommand], $server, false) ?? '');
+            
+            if ($checkResult === 'exists') {
+                $this->dispatch('error', 'A file or folder with that name already exists.');
+
+                return;
+            }
+
+            // Ejecutar el comando de renombrar (mv)
+            $command = "docker exec {$escapedContainer} sh -c 'mv {$escapedSource} {$escapedDest}'";
+            if ($server->isNonRoot()) {
+                $command = "sudo {$command}";
+            }
+
+            instant_remote_process([$command], $server);
+
+            // Si el archivo renombrado estaba abierto, actualizar la referencia
+            if ($this->selectedFile === $sourcePath) {
+                // Verificar si el destino es un directorio
+                $isDirCommand = "docker exec {$escapedContainer} sh -c 'test -d {$escapedDest} && echo isdir || echo isfile'";
+                if ($server->isNonRoot()) {
+                    $isDirCommand = "sudo {$isDirCommand}";
+                }
+                $isDirResult = trim(instant_remote_process([$isDirCommand], $server, false) ?? '');
+                
+                if ($isDirResult === 'isdir') {
+                    // Si es un directorio, cerrar el archivo
+                    $this->selectedFile = null;
+                    $this->fileContent = null;
+                } else {
+                    // Si es un archivo, actualizar la referencia y recargar el contenido
+                    $this->selectedFile = $destinationPath;
+                    $this->loadFileContent($destinationPath);
+                }
+            }
+
+            // Si estaba en los archivos seleccionados, actualizar la lista
+            if (in_array($sourcePath, $this->selectedFiles)) {
+                $this->selectedFiles = array_map(function ($path) use ($sourcePath, $destinationPath) {
+                    return $path === $sourcePath ? $destinationPath : $path;
+                }, $this->selectedFiles);
+            }
+
+            $this->renameSource = null;
+            $this->renameNewName = null;
+            $this->showRenameDialog = false;
+            $this->dispatch('success', 'File renamed successfully.');
+            $this->loadFiles();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to rename file: '.$e->getMessage());
+        }
     }
 
     public function cancelEditing()

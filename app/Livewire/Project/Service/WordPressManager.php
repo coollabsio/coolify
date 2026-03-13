@@ -379,13 +379,69 @@ class WordPressManager extends Component
             $escapedContainer = escapeshellarg($containerName);
             $escapedPrefix = escapeshellarg($newPrefix);
 
-            // Update wp-config.php
-            $updateCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && sed -i \"s/\\\$table_prefix.*=.*['\\\"][^'\\\"]*['\\\"]/\\\$table_prefix = {$escapedPrefix}/\" wp-config.php 2>&1 || true'";
-            if ($server->isNonRoot()) {
-                $updateCommand = "sudo {$updateCommand}";
-            }
+            // Create a temporary PHP script to update wp-config.php
+            // This method is more reliable than sed/perl for PHP files
+            $scriptContent = <<<'PHP'
+<?php
+$file = '/var/www/html/wp-config.php';
+if (!file_exists($file)) {
+    echo "ERROR: wp-config.php not found\n";
+    exit(1);
+}
 
-            $output = instant_remote_process([$updateCommand], $server, false);
+$content = file_get_contents($file);
+$newPrefix = $argv[1] ?? '';
+
+if (empty($newPrefix)) {
+    echo "ERROR: No prefix provided\n";
+    exit(1);
+}
+
+// Replace table_prefix with new value, handling both single and double quotes
+$pattern = '/(\$table_prefix\s*=\s*)["\']([^"\']*)["\']/';
+$replacement = '$1"' . $newPrefix . '"';
+$content = preg_replace($pattern, $replacement, $content);
+
+if (file_put_contents($file, $content) === false) {
+    echo "ERROR: Failed to write wp-config.php\n";
+    exit(1);
+}
+
+echo "SUCCESS\n";
+PHP;
+
+            // Write script to container, execute it, then remove it
+            $scriptPath = '/tmp/update_prefix_' . uniqid() . '.php';
+            $escapedScriptPath = escapeshellarg($scriptPath);
+            $escapedScriptContent = escapeshellarg($scriptContent);
+            
+            // Write script
+            $writeCommand = "docker exec {$escapedContainer} sh -c 'echo {$escapedScriptContent} > {$escapedScriptPath}'";
+            if ($server->isNonRoot()) {
+                $writeCommand = "sudo {$writeCommand}";
+            }
+            instant_remote_process([$writeCommand], $server, false);
+            
+            // Execute script
+            $executeCommand = "docker exec {$escapedContainer} sh -c 'cd /var/www/html && php {$escapedScriptPath} {$escapedPrefix} 2>&1'";
+            if ($server->isNonRoot()) {
+                $executeCommand = "sudo {$executeCommand}";
+            }
+            $output = instant_remote_process([$executeCommand], $server, false);
+            
+            // Remove script
+            $removeCommand = "docker exec {$escapedContainer} sh -c 'rm -f {$escapedScriptPath}'";
+            if ($server->isNonRoot()) {
+                $removeCommand = "sudo {$removeCommand}";
+            }
+            instant_remote_process([$removeCommand], $server, false);
+            
+            // Verify the change was made correctly
+            $finalVerify = $this->detectWpPrefix($server, $containerName);
+            if ($finalVerify !== $newPrefix) {
+                $this->dispatch('error', "No se pudo actualizar el prefijo. El prefijo actual es: ".($finalVerify ?? 'no detectado').". Output: ".($output ?? 'sin salida'));
+                return;
+            }
             
             // Refresh prefixes
             $this->detectWpPrefixes();

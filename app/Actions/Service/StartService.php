@@ -15,6 +15,10 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        
+        // Verificar y agregar phpMyAdmin si el servicio tiene MySQL/MariaDB
+        EnsurePhpMyAdminForService::run($service);
+        
         if ($stopBeforeStart) {
             StopService::run(service: $service, dockerCleanup: false);
         }
