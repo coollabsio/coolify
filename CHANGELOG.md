@@ -1266,6 +1266,16 @@ All notable changes to this project will be documented in this file.
 - Add configurable timeout for public database TCP proxy
 - Add configurable proxy timeout for public database TCP proxy (#8673)
 - *(jobs)* Implement encrypted queue jobs
+- *(proxy)* Add database-backed config storage with disk backups
+- *(proxy)* Add database-backed config storage with disk backups (#8905)
+- *(livewire)* Add selectedActions parameter and error handling to delete methods
+- *(gitlab)* Add GitLab source integration with SSH and HTTP basic auth
+- *(git-sources)* Add GitLab integration and URL encode credentials (#8910)
+- *(server)* Add server metadata collection and display
+- *(git-import)* Support custom ssh command for fetch, submodule, and lfs
+- *(ui)* Add log filter based on log level
+- *(ui)* Add log filter based on log level (#8784)
+- *(seeders)* Add GitHub deploy key example application
 
 ### 🐛 Bug Fixes
 
@@ -4622,6 +4632,39 @@ All notable changes to this project will be documented in this file.
 - *(parser)* Use firstOrCreate instead of updateOrCreate for environment variables
 - *(env-parser)* Capture clean variable names without trailing braces in bash-style defaults (#8855)
 - *(terminal)* Resolve WebSocket connection and host authorization issues (#8862)
+- *(docker-cleanup)* Respect keep for rollback setting for Nixpacks build images (#8859)
+- *(push-server)* Track last_online_at and reset database restart state
+- *(docker)* Prevent false container exits on failed docker queries (#8860)
+- *(api)* Require write permission for validation endpoints
+- *(sentinel)* Add token validation to prevent command injection
+- *(log-drain)* Prevent command injection by base64-encoding environment variables
+- *(git-ref-validation)* Prevent command injection via git references
+- Prevent command injection and fix developer view shared variables error (#8889)
+- Build-time environment variables break Next.js (#8890)
+- *(modal)* Make confirmation modal close after dispatching Livewire actions (#8892)
+- *(parser)* Preserve user-saved env vars on Docker Compose redeploy (#8894)
+- *(docker)* Add path validation to prevent command injection in file locations
+- *(security)* Sanitize newlines in health check commands to prevent RCE (#8898)
+- Prevent scheduled task input fields from losing focus
+- Prevent scheduled task input fields from losing focus (#8654)
+- *(api)* Add docker_cleanup parameter to stop endpoints
+- *(api)* Add docker_cleanup parameter to stop endpoints (#8899)
+- *(deployment)* Filter null and empty environment variables from nixpacks plan
+- *(deployment)* Filter null and empty environment variables from nixpacks plan (#8902)
+- *(livewire)* Add error handling and selectedActions to delete methods (#8909)
+- *(parsers)* Use firstOrCreate instead of updateOrCreate for environment variables
+- *(parsers)* Use firstOrCreate instead of updateOrCreate for environment variables (#8915)
+- *(ssh)* Remove undefined trackSshRetryEvent() method call (#8927)
+- *(validation)* Support scoped packages in file path validation (#8928)
+- *(parsers)* Resolve shared variables in compose environment
+- *(parsers)* Resolve shared variables in compose environment (#8930)
+- *(api)* Cast teamId to int in deployment authorization check
+- *(api)* Cast teamId to int in deployment authorization check (#8931)
+- *(git-import)* Ensure ssh key is used for fetch, submodule, and lfs operations (#8933)
+- *(ui)* Info logs were not highlighted with blue color
+- *(application)* Clarify deployment type precedence logic
+- *(git-import)* Explicitly specify ssh key and remove duplicate validation rules
+- *(application)* Clarify deployment type precedence logic (#8934)
 
 ### 💼 Other
 
@@ -5088,6 +5131,10 @@ All notable changes to this project will be documented in this file.
 - Trim whitespace from domain input in instance settings (#7837)
 - Upgrade postgres client to fix build error
 - Application rollback uses correct commit sha (#8576)
+- *(deps)* Bump rollup from 4.57.1 to 4.59.0
+- *(deps)* Bump rollup from 4.57.1 to 4.59.0 (#8691)
+- *(deps)* Bump league/commonmark from 2.8.0 to 2.8.1
+- *(deps)* Bump league/commonmark from 2.8.0 to 2.8.1 (#8793)
 
 ### 🚜 Refactor
 
@@ -5720,6 +5767,8 @@ All notable changes to this project will be documented in this file.
 - Add explicit fillable array to EnvironmentVariable model
 - Replace inline note with callout component for consistency
 - *(application-source)* Use Laravel helpers for null checks
+- *(ssh)* Remove Sentry retry event tracking from ExecuteRemoteCommand
+- Consolidate file path validation patterns and support scoped packages
 
 ### 📚 Documentation
 
@@ -5870,6 +5919,8 @@ All notable changes to this project will be documented in this file.
 - *(application)* Add comments explaining commit selection logic for rollback support
 - *(readme)* Add VPSDime to Big Sponsors list
 - *(readme)* Move MVPS to Huge Sponsors section
+- Update changelog
+- *(settings)* Clarify Do Not Track helper text
 
 ### ⚡ Performance
 
@@ -5914,6 +5965,7 @@ All notable changes to this project will be documented in this file.
 - *(rollback)* Use full-length git commit SHA values in test fixtures
 - *(rollback)* Verify shell metacharacter escaping in git commit parameter
 - *(factories)* Add missing model factories for app test suite
+- *(magic-variables)* Add feature tests for SERVICE_URL/FQDN variable handling
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -6698,6 +6750,14 @@ All notable changes to this project will be documented in this file.
 - *(version)* Bump coolify, realtime, and sentinel versions
 - *(realtime)* Upgrade npm dependencies
 - *(realtime)* Upgrade coolify-realtime to 1.0.11
+- Prepare for PR
+- Prepare for PR
+- Prepare for PR
+- Prepare for PR
+- Prepare for PR
+- *(release)* Bump version to 4.0.0-beta.466
+- Prepare for PR
+- Prepare for PR
 
 ### ◀️ Revert
 
