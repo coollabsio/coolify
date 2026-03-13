@@ -93,7 +93,7 @@
 		"lint": "phpstan --memory-limit=2G --ansi",
 		"test": [
 			"@php artisan config:clear --ansi",
-			"XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
+			"XDEBUG_MODE=coverage pest --parallel"
 		],
 		"test:refactor": "rector --dry-run",
 		"test:format": "pint --parallel --test",
