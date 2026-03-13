@@ -33,10 +33,11 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
-		"format": "prettier --config prettier.config.ts --cache --cache-strategy metadata --write .",
+		"format": "bunx --bun prettier --config prettier.config.ts --cache --cache-strategy metadata --write .",
 		"lint": "bunx --bun eslint --config eslint.config.ts --cache --cache-location node_modules/.cache/eslint --fix .",
-		"check": "svelte-check --tsconfig tsconfig.json",
+		"check": "bunx --bun svelte-check --tsconfig tsconfig.json",
 		"test:lint": "bunx --bun eslint --config eslint.config.ts --cache --cache-location node_modules/.cache/eslint .",
-		"test:format": "prettier --config prettier.config.ts --cache --cache-strategy metadata --check ."
+		"test:format": "bunx --bun prettier --config prettier.config.ts --cache --cache-strategy metadata --check .",
+		"test:all": "bun run check && bun run test:lint && bun run test:format"
 	}
 }
