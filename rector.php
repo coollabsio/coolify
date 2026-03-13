@@ -34,7 +34,7 @@ return RectorConfig::configure()
         AddOverrideAttributeToOverriddenMethodsRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
     ])
-    ->withCache(__DIR__.'/storage/rector', FileCacheStorage::class)
+    ->withCache(__DIR__.'/vendor/.cache/rector', FileCacheStorage::class)
     ->withPhpSets()
     ->withAttributesSets()
     ->withPreparedSets(

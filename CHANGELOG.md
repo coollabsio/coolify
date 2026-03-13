@@ -73,24 +73,30 @@ All notable changes to this project will be documented in this file.
 - **Testing**
   - Add custom Architecture test that enforces Laravel and PHP best practices to ensure security and consistency across the codebase
 - **Tooling**
-  - Add Rector & Rector Laravel with a strict configuration for automatic refactoring of the codebase
-  - Add a strict custom Laravel Pint preset for consistent PHP formatting across the codebase
-  - Add Larastan (PHPStan) level `max` for code analysis and type checking
-  - Add custom Composer scripts to run refactors, formatting, linting, tests and type-coverage
-  - Add strict `AppServiceProvider.php`
-    - Optionally enforce HTTPS for the Coolify dashboard
-    - Enforce strong password validation rules in production
-    - Disable destructive Artisan commands in production
-    - Automatically eager load all relationships to prevent N+1 queries
-    - Configure models and enforce morph map for polymorphic relationships
-    - Enforce immutable dates globally
-    - Disable queue interruption polling to improve performance
-    - Fake sleeps and prevent stray HTTP requests in testing
-    - Prevent exception truncation in development
-    - Use aggressive Vite prefetching for better performance
-  - Only install Ray in development and remove all `ray()` calls from production code via Rector
-  - Switch Node package manager from `NPM` to `Bun` for improved security and performance
-  - Add `$schema` to `composer.json` and `package.json`
+  - **PHP**
+    - Add Rector & Rector Laravel with a strict configuration for automatic refactoring of the codebase
+    - Only install Ray in development and remove all `ray()` calls from production code via Rector
+    - Add a strict custom Laravel Pint preset for consistent PHP formatting across the codebase
+    - Add Larastan (PHPStan) level `max` for code analysis and type checking
+    - Add custom Composer scripts to run refactors, formatting, linting, tests and type-coverage
+  - **JS**
+    - Add Prettier with plugins for consistent Svelte, TypeScript and TailwindCSS formatting and Import Sorting
+    - Add ESLint for JavaScript, TypeScript and Svelte linting
+    - Add TypeScript with strict `tsconfig.json` and `svelte-check` for svelte and type checking
+    - Add custom Bun scripts for formatting, linting, and svelte checking
+- Add strict `AppServiceProvider.php`
+  - Optionally enforce HTTPS for the Coolify dashboard
+  - Enforce strong password validation rules in production
+  - Disable destructive Artisan commands in production
+  - Automatically eager load all relationships to prevent N+1 queries
+  - Configure models and enforce morph map for polymorphic relationships
+  - Enforce immutable dates globally
+  - Disable queue interruption polling to improve performance
+  - Fake sleeps and prevent stray HTTP requests in testing
+  - Prevent exception truncation in development
+  - Use aggressive Vite prefetching for better performance
+- Switch Node package manager from `NPM` to `Bun` for improved security and performance
+- Add `$schema` to `composer.json` and `package.json`
 - **Coolify GitHub Repository**
   - Pin all GitHub Actions to full-length git SHAs to minimize the risk of supply chain attacks
   - Set permissions explicitly on each GitHub workflow to only give the minimum required permissions

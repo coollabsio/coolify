@@ -1,104 +1,125 @@
 {
-    "$schema": "https://getcomposer.org/schema.json",
-    "name": "coollabsio/coolify",
-    "type": "project",
-    "description": "An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 280+ one-click services on your own servers.",
-    "keywords": ["coolify", "php", "laravel", "inertiajs", "svelte", "svelte5", "self-hosted", "self-hosting", "docker", "docker-compose", "server", "deployment", "databases", "static-site", "nodejs", "nextjs", "mysql", "mariadb", "postgres", "redis"],
-    "homepage": "https://coolify.io",
-    "license": "AGPL-3.0",
-    "require": {
-        "php": "^8.5",
-        "inertiajs/inertia-laravel": "^2.0.20",
-        "laravel/framework": "^12.53.0",
-        "laravel/horizon": "^5.45",
-        "laravel/tinker": "^2.11.1"
-    },
-    "require-dev": {
-        "driftingly/rector-laravel": "^2.1.9",
-        "fakerphp/faker": "^1.24.1",
-        "larastan/larastan": "^3.9.2",
-        "laravel/pail": "^1.2.6",
-        "laravel/pint": "^1.27.1",
-        "mockery/mockery": "^1.6.12",
-        "nunomaduro/collision": "^8.9.1",
-        "pestphp/pest": "^4.4.1",
-        "pestphp/pest-plugin-laravel": "^4.1.0",
-        "pestphp/pest-plugin-type-coverage": "^4.0.3",
-        "phpstan/phpstan-deprecation-rules": "^2.0.4",
-        "phpstan/phpstan-strict-rules": "^2.0.10",
-        "rector/rector": "^2.3.8",
-        "spatie/laravel-ray": "^1.43.6"
-    },
-    "autoload": {
-        "psr-4": {
-            "App\\": "app/",
-            "Database\\Factories\\": "database/factories/",
-            "Database\\Seeders\\": "database/seeders/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Tests\\": "tests/"
-        }
-    },
-    "scripts": {
-        "setup": [
-            "composer install",
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "bun install",
-            "bun run build"
-        ],
-        "dev": [
-            "Composer\\Config::disableProcessTimeout",
-            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite --kill-others"
-        ],
-        "post-autoload-dump": [
-            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
-        ],
-        "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
-        ],
-        "post-install-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
-        ],
-        "pre-package-uninstall": [
-            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-        ],
-        "refactor": "rector",
-        "format": "pint --parallel",
-        "lint": "phpstan --memory-limit=2G --ansi",
-        "test": [
-            "@php artisan config:clear --ansi",
-            "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
-        ],
-        "test:refactor": "rector --dry-run",
-        "test:format": "pint --parallel --test",
-        "test:type-coverage": "pest --parallel --type-coverage --memory-limit=2G --min=100",
-        "test:all": [
-            "@test:refactor",
-            "@test:format",
-            "@lint",
-            "@test",
-            "@test:type-coverage"
-        ]
-    },
-    "extra": {
-        "laravel": {
-            "dont-discover": []
-        }
-    },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true,
-            "php-http/discovery": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+	"$schema": "https://getcomposer.org/schema.json",
+	"name": "coollabsio/coolify",
+	"description": "An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 280+ one-click services on your own servers.",
+	"type": "project",
+	"keywords": [
+		"coolify",
+		"php",
+		"laravel",
+		"inertiajs",
+		"svelte",
+		"svelte5",
+		"self-hosted",
+		"self-hosting",
+		"docker",
+		"docker-compose",
+		"server",
+		"deployment",
+		"databases",
+		"static-site",
+		"nodejs",
+		"nextjs",
+		"mysql",
+		"mariadb",
+		"postgres",
+		"redis"
+	],
+	"homepage": "https://coolify.io",
+	"license": "AGPL-3.0",
+	"require": {
+		"php": "^8.5",
+		"inertiajs/inertia-laravel": "^2.0.20",
+		"laravel/framework": "^12.53.0",
+		"laravel/horizon": "^5.45",
+		"laravel/tinker": "^2.11.1"
+	},
+	"require-dev": {
+		"driftingly/rector-laravel": "^2.1.9",
+		"fakerphp/faker": "^1.24.1",
+		"larastan/larastan": "^3.9.2",
+		"laravel/pail": "^1.2.6",
+		"laravel/pint": "^1.27.1",
+		"mockery/mockery": "^1.6.12",
+		"nunomaduro/collision": "^8.9.1",
+		"pestphp/pest": "^4.4.1",
+		"pestphp/pest-plugin-laravel": "^4.1.0",
+		"pestphp/pest-plugin-type-coverage": "^4.0.3",
+		"phpstan/phpstan-deprecation-rules": "^2.0.4",
+		"phpstan/phpstan-strict-rules": "^2.0.10",
+		"rector/rector": "^2.3.8",
+		"spatie/laravel-ray": "^1.43.6"
+	},
+	"autoload": {
+		"psr-4": {
+			"App\\": "app/",
+			"Database\\Factories\\": "database/factories/",
+			"Database\\Seeders\\": "database/seeders/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"setup": [
+			"composer install",
+			"@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+			"@php artisan key:generate",
+			"@php artisan migrate --force",
+			"bun install",
+			"bun run build"
+		],
+		"dev": [
+			"Composer\\Config::disableProcessTimeout",
+			"bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite --kill-others"
+		],
+		"post-autoload-dump": [
+			"Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+			"@php artisan package:discover --ansi"
+		],
+		"post-update-cmd": [
+			"@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+		],
+		"post-install-cmd": [
+			"@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+		],
+		"pre-package-uninstall": [
+			"Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+		],
+		"refactor": "rector",
+		"format": "pint --parallel",
+		"lint": "phpstan --memory-limit=2G --ansi",
+		"test": [
+			"@php artisan config:clear --ansi",
+			"XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
+		],
+		"test:refactor": "rector --dry-run",
+		"test:format": "pint --parallel --test",
+		"test:type-coverage": "pest --parallel --type-coverage --memory-limit=2G --min=100",
+		"test:all": [
+			"@test:refactor",
+			"@test:format",
+			"@lint",
+			"@test",
+			"@test:type-coverage"
+		]
+	},
+	"extra": {
+		"laravel": {
+			"dont-discover": []
+		}
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"preferred-install": "dist",
+		"sort-packages": true,
+		"allow-plugins": {
+			"pestphp/pest-plugin": true,
+			"php-http/discovery": true
+		}
+	},
+	"minimum-stability": "stable",
+	"prefer-stable": true
 }

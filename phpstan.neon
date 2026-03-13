@@ -27,7 +27,7 @@ parameters:
     checkAuthCallsWhenInRequestScope: true
     checkConfigTypes: true
 
-    tmpDir: ./storage/phpstan
+    tmpDir: ./vendor/.cache/phpstan
     paths:
         - app
         - bootstrap
