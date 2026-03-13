@@ -3,45 +3,90 @@ name: Tests
 on:
   push:
     branches:
+      - v5.x
+  pull_request:
+    branches:
       - "**v5.x**"
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  composer-validate:
-    name: Validate composer.json
-    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+  changes:
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    outputs:
+      php: ${{ steps.filter.outputs.php }}
+      js: ${{ steps.filter.outputs.js }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
         with:
           persist-credentials: false
 
-      - name: Setup PHP 8.5
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+      - uses: dorny/paths-filter@9d7afb8d214ad99e78fbd4247752c4caed2b6e4c # https://github.com/dorny/paths-filter/releases/tag/v4.0.0
+        id: filter
+        with:
+          filters: |
+            workflows: &workflows
+              - '.github/workflows/**'
+            php:
+              - *workflows
+              - 'app/**'
+              - 'config/**'
+              - 'database/**'
+              - 'resources/views/**'
+              - 'routes/**'
+              - 'tests/**'
+              - 'composer.json'
+              - 'composer.lock'
+              - 'phpstan.neon'
+              - 'phpunit.xml'
+              - 'pint.json'
+              - 'rector.php'
+            js:
+              - *workflows
+              - 'resources/css/**'
+              - 'resources/js/**'
+              - 'templates/**'
+              - '**/*.md'
+              - '*.ts'
+              - '*.yaml'
+              - '*.yml'
+              - '.editorconfig'
+              - '.prettierignore'
+              - 'bun.lock'
+              - 'package.json'
+              - 'pint.json'
+              - 'tsconfig.json'
+
+  composer-validate:
+    needs: changes
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
         with:
           php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
 
-      - name: Validate composer.json
-        run: composer validate --check-lock --strict
+      - run: composer validate --check-lock --strict
 
   composer-audit:
-    name: Composer Audit
-    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
-    needs: [composer-validate]
+    needs: [changes, composer-validate]
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
         with:
           persist-credentials: false
 
-      - name: Setup PHP 8.5
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
         with:
           php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
 
@@ -49,58 +94,226 @@ jobs:
         id: composer-cache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
         with:
-          path: /vendor
+          path: vendor
           key: php-${{ hashFiles('composer.lock') }}
 
-      - name: Install PHP dependencies
-        if: steps.composer-cache.outputs.cache-hit != 'true'
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
         run: composer install --no-progress --no-interaction
 
-      - name: Run Composer audit
-        run: composer audit --locked --abandoned=fail
+      - run: composer audit --locked --abandoned=fail
 
-  bun-audit:
-    name: Bun Audit
-    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
-    needs: [composer-validate]
+  php-refactor:
+    needs: [changes, composer-validate]
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
         with:
           persist-credentials: false
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # https://github.com/oven-sh/setup-bun/releases/tag/v2.1.2
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
         with:
-          bun-version: 1.3.9 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9
-      - name: Run Bun audit
-        run: bun audit --frozen-lockfile
+          php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
 
-  test:
-    name: Tests
-    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
-    needs: [composer-audit, bun-audit]
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.lock') }}
+
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - run: composer test:refactor
+
+  php-format:
+    needs: [changes, composer-validate]
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
         with:
           persist-credentials: false
 
-      - name: Setup PHP 8.5 with Xdebug
-        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+        with:
+          php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.lock') }}
+
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - run: composer test:format
+
+  php-lint:
+    needs: [changes, composer-validate]
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+        with:
+          php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.lock') }}
+
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - run: composer lint
+
+  php-test:
+    needs: [changes, composer-validate]
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
         with:
           php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
           coverage: xdebug-3.5.1 # https://github.com/xdebug/xdebug/releases/tag/3.5.1
+
       - name: Cache Composer packages
         id: composer-cache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
         with:
-          path: /vendor
+          path: vendor
           key: php-${{ hashFiles('composer.lock') }}
 
-      - name: Install PHP dependencies
-        if: steps.composer-cache.outputs.cache-hit != 'true'
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
         run: composer install --no-progress --no-interaction
 
-      - name: Run tests
-        run: composer test:all
+      - run: composer test
+
+  php-type-coverage:
+    needs: [changes, composer-validate]
+    if: ${{ needs.changes.outputs.php == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # https://github.com/shivammathur/setup-php/releases/tag/2.36.0
+        with:
+          php-version: "8.5.3" # https://github.com/php/php-src/releases/tag/php-8.5.3
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.lock') }}
+
+      - if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - run: composer test:type-coverage
+
+  bun-audit:
+    needs: changes
+    if: ${{ needs.changes.outputs.js == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # https://github.com/oven-sh/setup-bun/releases/tag/v2.1.3
+        with:
+          bun-version: 1.3.9 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9
+
+      - run: bun audit --frozen-lockfile
+
+  js-format:
+    needs: changes
+    if: ${{ needs.changes.outputs.js == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # https://github.com/oven-sh/setup-bun/releases/tag/v2.1.3
+        with:
+          bun-version: 1.3.9 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9
+
+      - name: Cache node_modules
+        id: bun-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: node_modules
+          key: bun-${{ hashFiles('bun.lock') }}
+
+      - if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
+
+      - run: bun run test:format
+
+  js-lint:
+    needs: changes
+    if: ${{ needs.changes.outputs.js == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # https://github.com/oven-sh/setup-bun/releases/tag/v2.1.3
+        with:
+          bun-version: 1.3.9 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9
+
+      - name: Cache node_modules
+        id: bun-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: node_modules
+          key: bun-${{ hashFiles('bun.lock') }}
+
+      - if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
+
+      - run: bun run test:lint
+
+  js-check:
+    needs: changes
+    if: ${{ needs.changes.outputs.js == 'true' }}
+    runs-on: ubuntu-24.04 # https://github.com/actions/runner-images
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # https://github.com/actions/checkout/releases/tag/v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # https://github.com/oven-sh/setup-bun/releases/tag/v2.1.3
+        with:
+          bun-version: 1.3.9 # https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9
+
+      - name: Cache node_modules
+        id: bun-cache
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # https://github.com/actions/cache/releases/tag/v5.0.3
+        with:
+          path: node_modules
+          key: bun-${{ hashFiles('bun.lock') }}
+
+      - if: steps.bun-cache.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
+
+      - run: bun run check

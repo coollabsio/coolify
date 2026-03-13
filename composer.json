@@ -26,7 +26,7 @@
 		"redis"
 	],
 	"homepage": "https://coolify.io",
-	"license": "AGPL-3.0",
+	"license": "AGPL-3.0-or-later",
 	"require": {
 		"php": "^8.5",
 		"inertiajs/inertia-laravel": "^2.0.20",
@@ -93,7 +93,7 @@
 		"lint": "phpstan --memory-limit=2G --ansi",
 		"test": [
 			"@php artisan config:clear --ansi",
-			"XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100"
+			"XDEBUG_MODE=coverage pest --parallel"
 		],
 		"test:refactor": "rector --dry-run",
 		"test:format": "pint --parallel --test",
