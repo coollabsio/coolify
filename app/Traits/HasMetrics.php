@@ -2,6 +2,8 @@
 
 namespace App\Traits;
 
+use App\Models\ServerSetting;
+
 trait HasMetrics
 {
     public function getCpuMetrics(int $mins = 5): ?array
@@ -26,8 +28,13 @@ trait HasMetrics
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
         $endpoint = $this->getMetricsEndpoint($type, $from);
 
+        $token = $server->settings->sentinel_token;
+        if (! ServerSetting::isValidSentinelToken($token)) {
+            throw new \Exception('Invalid sentinel token format. Please regenerate the token.');
+        }
+
         $response = instant_remote_process(
-            ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" {$endpoint}'"],
+            ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
             $server,
             false
         );

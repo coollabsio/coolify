@@ -18,6 +18,12 @@ class ValidationPatterns
     public const DESCRIPTION_PATTERN = '/^[\p{L}\p{M}\p{N}\s\-_.,!?()\'\"+=*@\/&]+$/u';
 
     /**
+     * Pattern for file paths (dockerfile location, docker compose location, etc.)
+     * Allows alphanumeric, dots, hyphens, underscores, slashes, @, ~, and +
+     */
+    public const FILE_PATH_PATTERN = '/^\/[a-zA-Z0-9._\-\/~@+]+$/';
+
+    /**
      * Get validation rules for name fields
      */
     public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
@@ -81,7 +87,25 @@ class ValidationPatterns
         ];
     }
 
-    /** 
+    /**
+     * Get validation rules for file path fields (dockerfile location, docker compose location)
+     */
+    public static function filePathRules(int $maxLength = 255): array
+    {
+        return ['nullable', 'string', 'max:'.$maxLength, 'regex:'.self::FILE_PATH_PATTERN];
+    }
+
+    /**
+     * Get validation messages for file path fields
+     */
+    public static function filePathMessages(string $field = 'dockerfileLocation', string $label = 'Dockerfile'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} location must be a valid path starting with / and containing only alphanumeric characters, dots, hyphens, underscores, slashes, @, ~, and +.",
+        ];
+    }
+
+    /**
      * Get combined validation messages for both name and description fields
      */
     public static function combinedMessages(): array

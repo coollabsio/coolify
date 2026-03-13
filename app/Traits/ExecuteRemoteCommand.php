@@ -111,13 +111,6 @@ trait ExecuteRemoteCommand
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
-                        // Track SSH retry event in Sentry
-                        $this->trackSshRetryEvent($attempt, $maxRetries, $delay, $errorMessage, [
-                            'server' => $this->server->name ?? $this->server->ip ?? 'unknown',
-                            'command' => $this->redact_sensitive_info($command),
-                            'trait' => 'ExecuteRemoteCommand',
-                        ]);
-
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
                             $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);

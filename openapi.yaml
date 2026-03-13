@@ -2111,6 +2111,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop application.'
@@ -3806,6 +3813,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop database.'
@@ -6645,6 +6659,13 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: docker_cleanup
+          in: query
+          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          schema:
+            type: boolean
+            default: true
       responses:
         '200':
           description: 'Stop service.'

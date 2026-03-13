@@ -129,7 +129,9 @@ class Index extends Component
     private function updateOrCreateVariables($variables)
     {
         $count = 0;
-        foreach ($variables as $key => $value) {
+        foreach ($variables as $key => $data) {
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+
             $found = $this->team->environment_variables()->where('key', $key)->first();
 
             if ($found) {

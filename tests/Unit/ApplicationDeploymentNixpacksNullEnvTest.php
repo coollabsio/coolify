@@ -236,6 +236,48 @@ it('handles all environment variables being null or empty', function () {
     expect($envArgs)->toBe('');
 });
 
+it('filters out null coolify env variables from env_args used in nixpacks plan JSON', function () {
+    // This test verifies the fix for GitHub issue #6830:
+    // When application->fqdn is null, COOLIFY_FQDN/COOLIFY_URL get set to null
+    // in generate_coolify_env_variables(). The generate_env_variables() method
+    // merges these into env_args which become the nixpacks plan JSON "variables".
+    // Nixpacks requires all variable values to be strings, so null causes:
+    // "Error: Failed to parse Nixpacks config file - invalid type: null, expected a string"
+
+    // Simulate the coolify env collection with null values (as produced when fqdn is null)
+    $coolify_envs = collect([
+        'COOLIFY_URL' => null,
+        'COOLIFY_FQDN' => null,
+        'COOLIFY_BRANCH' => 'main',
+        'COOLIFY_RESOURCE_UUID' => 'abc123',
+        'COOLIFY_CONTAINER_NAME' => '',
+    ]);
+
+    // Apply the same filtering logic used in generate_env_variables()
+    $env_args = collect([]);
+    $coolify_envs->each(function ($value, $key) use ($env_args) {
+        if (! is_null($value) && $value !== '') {
+            $env_args->put($key, $value);
+        }
+    });
+
+    // Null values must NOT be present — they cause nixpacks JSON parse errors
+    expect($env_args->has('COOLIFY_URL'))->toBeFalse();
+    expect($env_args->has('COOLIFY_FQDN'))->toBeFalse();
+    expect($env_args->has('COOLIFY_CONTAINER_NAME'))->toBeFalse();
+
+    // Non-null values must be preserved
+    expect($env_args->get('COOLIFY_BRANCH'))->toBe('main');
+    expect($env_args->get('COOLIFY_RESOURCE_UUID'))->toBe('abc123');
+
+    // The resulting array must be safe for json_encode into nixpacks config
+    $json = json_encode(['variables' => $env_args->toArray()], JSON_PRETTY_PRINT);
+    $parsed = json_decode($json, true);
+    foreach ($parsed['variables'] as $value) {
+        expect($value)->toBeString();
+    }
+});
+
 it('preserves environment variables with zero values', function () {
     // Mock application with nixpacks build pack
     $mockApplication = Mockery::mock(Application::class);

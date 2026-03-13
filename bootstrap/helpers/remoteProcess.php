@@ -275,9 +275,9 @@ function remove_iip($text)
     // ANSI color codes
     $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
 
-    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, etc.)
+    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, git basic auth, etc.)
     // (protocol://user:password@host → protocol://user:<REDACTED>@host)
-    $text = preg_replace('/((?:postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
+    $text = preg_replace('/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:]+:)[^@]+(@)/i', '$1'.REDACTED.'$2', $text);
 
     // Email addresses
     $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);

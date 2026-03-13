@@ -194,13 +194,13 @@ class Index extends Component
         }
     }
 
-    public function deleteDatabase($password)
+    public function deleteDatabase($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceDatabase);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceDatabase->delete();
@@ -398,13 +398,13 @@ class Index extends Component
         }
     }
 
-    public function deleteApplication($password)
+    public function deleteApplication($password, $selectedActions = [])
     {
         try {
             $this->authorize('delete', $this->serviceApplication);
 
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             $this->serviceApplication->delete();

@@ -24,10 +24,14 @@ class Delete extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
+        }
+
+        if (! empty($selectedActions)) {
+            $this->delete_from_hetzner = in_array('delete_from_hetzner', $selectedActions);
         }
         try {
             $this->authorize('delete', $this->server);
