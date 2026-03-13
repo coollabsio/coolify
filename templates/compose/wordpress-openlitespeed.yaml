@@ -1,0 +1,46 @@
+# documentation: https://openlitespeed.org/kb/1702-install-ols-wordpress-docker/
+# slogan: WordPress with OpenLiteSpeed - High-performance WordPress hosting with LiteSpeed caching.
+# category: cms
+# tags: cms, wordpress, openlitespeed, litespeed, blog, content, high-performance
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  wordpress:
+    image: litespeedtech/openlitespeed-wordpress:latest
+    volumes:
+      - wordpress-data:/var/www/vhosts/localhost/html
+      - lsws-conf:/usr/local/lsws/conf
+      - lsws-admin-conf:/usr/local/lsws/admin/conf
+    environment:
+      - SERVICE_FQDN_WORDPRESS_80
+      - DOMAIN=${SERVICE_FQDN_WORDPRESS}
+      - DB_HOST=mariadb
+      - DB_NAME=${DB_NAME:-wordpress}
+      - DB_USER=${SERVICE_USER_MARIADB}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADB_ROOT}
+      - MYSQL_DATABASE=${DB_NAME:-wordpress}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
