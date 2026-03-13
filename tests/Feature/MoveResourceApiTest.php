@@ -2,6 +2,7 @@
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -14,6 +15,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::create(['id' => 0, 'is_api_enabled' => true]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -24,12 +27,12 @@ beforeEach(function () {
     $this->bearerToken = $this->token->plainTextToken;
 
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
-    $this->destination = StandaloneDocker::factory()->create(['server_id' => $this->server->id]);
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
-    $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
+    $this->environment = $this->project->environments()->first();
 
     $this->targetProject = Project::factory()->create(['team_id' => $this->team->id]);
-    $this->targetEnvironment = Environment::factory()->create(['project_id' => $this->targetProject->id]);
+    $this->targetEnvironment = $this->targetProject->environments()->first();
 });
 
 describe('POST /api/v1/applications/{uuid}/move', function () {
@@ -170,7 +173,11 @@ describe('POST /api/v1/applications/{uuid}/move', function () {
 
 describe('POST /api/v1/databases/{uuid}/move', function () {
     test('moves database to another environment', function () {
-        $database = StandalonePostgresql::factory()->create([
+        $database = StandalonePostgresql::create([
+            'name' => 'test-pg',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'secret',
+            'postgres_db' => 'testdb',
             'environment_id' => $this->environment->id,
             'destination_id' => $this->destination->id,
             'destination_type' => $this->destination->getMorphClass(),
