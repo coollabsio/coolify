@@ -2503,6 +2503,99 @@ class DatabasesController extends Controller
         ]);
     }
 
+    #[OA\Post(
+        summary: 'Move',
+        description: 'Move database to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the database will pick up shared environment variables from the new environment on the next deployment.',
+        path: '/databases/{uuid}/move',
+        operationId: 'move-database-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Target environment to move the database to.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the target environment.'],
+                        ],
+                        required: ['environment_uuid'],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database moved successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Database moved successfully.'],
+                                'uuid' => ['type' => 'string'],
+                                'project_uuid' => ['type' => 'string'],
+                                'environment_uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        return moveResourceToEnvironment($request, $database, 'Database', $teamId);
+    }
+
     #[OA\Get(
         summary: 'Start',
         description: 'Start database. `Post` request is also accepted.',

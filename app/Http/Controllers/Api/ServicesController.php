@@ -1591,6 +1591,99 @@ class ServicesController extends Controller
         return response()->json(['message' => 'Environment variable deleted.']);
     }
 
+    #[OA\Post(
+        summary: 'Move',
+        description: 'Move service to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the service will pick up shared environment variables from the new environment on the next deployment.',
+        path: '/services/{uuid}/move',
+        operationId: 'move-service-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Target environment to move the service to.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the target environment.'],
+                        ],
+                        required: ['environment_uuid'],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Service moved successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Service moved successfully.'],
+                                'uuid' => ['type' => 'string'],
+                                'project_uuid' => ['type' => 'string'],
+                                'environment_uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('update', $service);
+
+        return moveResourceToEnvironment($request, $service, 'Service', $teamId);
+    }
+
     #[OA\Get(
         summary: 'Start',
         description: 'Start service. `Post` request is also accepted.',
