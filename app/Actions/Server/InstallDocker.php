@@ -78,6 +78,8 @@ class InstallDocker
                 $command = $command->merge([$this->getDebianDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([$this->getRhelDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('fedora')) {
+                $command = $command->merge([$this->getFedoraDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('sles')) {
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
@@ -136,6 +138,16 @@ class InstallDocker
             'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
+            ')';
+    }
+
+    private function getFedoraDockerInstallCommand(): string
+    {
+        return "curl https://releases.rancher.com/install-docker/{$this->dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$this->dockerVersion} || (".
+            'dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo && '.
+            'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
+            'systemctl start docker && '.
+            'systemctl enable docker --now'.
             ')';
     }
 

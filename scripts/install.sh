@@ -594,7 +594,8 @@ if ! [ -x "$(command -v docker)" ]; then
     "centos" | "fedora" | "rhel" | "tencentos")
         if [ -x "$(command -v dnf5)" ]; then
             # dnf5 is available
-            dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
+            dnf config-manager addrepo --from-repofile https://download.docker.com/linux/$OS_TYPE/docker-ce.repo
+ --overwrite >/dev/null 2>&1
         else
             # dnf5 is not available, use dnf
             dnf config-manager --add-repo=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo >/dev/null 2>&1
