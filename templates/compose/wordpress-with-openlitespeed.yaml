@@ -1,0 +1,75 @@
+# documentation: https://openlitespeed.org/kb/wordpress-installation/
+# slogan: WordPress powered by OpenLiteSpeed — a high-performance, open-source web server with built-in LiteSpeed Cache and PHP support.
+# category: cms
+# tags: wordpress, openlitespeed, litespeed, cms, blog, php, lscache, performance
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.8.5-lsphp84
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+      - ols-config:/usr/local/lsws/conf
+      - ols-logs:/usr/local/lsws/logs
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      wordpress-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 15
+
+  wordpress-setup:
+    image: wordpress:cli-php8.4
+    user: "0:0"
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX:-wp_}
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        cd /var/www/vhosts/localhost/html
+        if [ ! -f wp-config.php ]; then
+          wp core download --allow-root
+          wp config create --allow-root \
+            --dbhost="$$WORDPRESS_DB_HOST" \
+            --dbname="$$WORDPRESS_DB_NAME" \
+            --dbuser="$$WORDPRESS_DB_USER" \
+            --dbpass="$$WORDPRESS_DB_PASSWORD" \
+            --dbprefix="$$WORDPRESS_TABLE_PREFIX"
+          echo "WordPress files downloaded and configured. Visit the site URL to complete installation."
+        else
+          echo "WordPress already configured, skipping setup."
+        fi
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: "no"
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
