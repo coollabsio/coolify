@@ -337,7 +337,7 @@ class Server extends BaseModel
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         $redirect_url = $this->proxy->redirect_url;
-        $maintenance_page_enabled = $this->proxy->maintenance_page_enabled ?? true;
+        $maintenance_page_enabled = $this->proxy->maintenance_page_enabled ?? false;
         $custom_maintenance_html = $this->proxy->custom_maintenance_html;
         if (isDev()) {
             if ($proxy_type === ProxyTypes::CADDY->value) {

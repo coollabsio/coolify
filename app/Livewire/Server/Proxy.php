@@ -23,7 +23,7 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
-    public bool $maintenancePageEnabled = true;
+    public bool $maintenancePageEnabled = false;
 
     public ?string $customMaintenanceHtml = null;
 
@@ -54,7 +54,7 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
-        $this->maintenancePageEnabled = data_get($this->server, 'proxy.maintenance_page_enabled', true);
+        $this->maintenancePageEnabled = data_get($this->server, 'proxy.maintenance_page_enabled', false);
         $this->customMaintenanceHtml = data_get($this->server, 'proxy.custom_maintenance_html');
         $this->syncData(false);
         $this->loadProxyConfiguration();
