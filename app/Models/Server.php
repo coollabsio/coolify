@@ -337,6 +337,8 @@ class Server extends BaseModel
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         $redirect_url = $this->proxy->redirect_url;
+        $maintenance_page_enabled = $this->proxy->maintenance_page_enabled ?? true;
+        $custom_maintenance_html = $this->proxy->custom_maintenance_html;
         if (isDev()) {
             if ($proxy_type === ProxyTypes::CADDY->value) {
                 $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
@@ -354,62 +356,101 @@ class Server extends BaseModel
             "rm -f $dynamic_conf_path/default_redirect_404.caddy",
         ], $this);
 
+        $needsMaintenanceContainer = $redirect_enabled && blank($redirect_url) && $maintenance_page_enabled;
+
         if ($redirect_enabled === false) {
             instant_remote_process(["rm -f $default_redirect_file"], $this);
+            $this->stopMaintenanceContainer();
         } else {
+            if (filled($redirect_url)) {
+                $this->stopMaintenanceContainer();
+            }
+
             if ($proxy_type === ProxyTypes::CADDY->value) {
                 if (filled($redirect_url)) {
                     $conf = ":80, :443 {
    redir $redirect_url
 }";
+                } elseif ($needsMaintenanceContainer) {
+                    $conf = ":80, :443 {\n    tls internal\n    reverse_proxy coolify-maintenance:80\n}";
                 } else {
                     $conf = ':80, :443 {
     respond 503
 }';
                 }
             } elseif ($proxy_type === ProxyTypes::TRAEFIK->value) {
-                $dynamic_conf = [
-                    'http' => [
-                        'routers' => [
-                            'catchall' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                    1 => 'https',
-                                ],
-                                'service' => 'noop',
-                                'rule' => 'PathPrefix(`/`)',
-                                'tls' => [
-                                    'certResolver' => 'letsencrypt',
-                                ],
-                                'priority' => -1000,
-                            ],
-                        ],
-                        'services' => [
-                            'noop' => [
-                                'loadBalancer' => [
-                                    'servers' => [],
+                if ($needsMaintenanceContainer) {
+                    $dynamic_conf = [
+                        'http' => [
+                            'routers' => [
+                                'catchall' => [
+                                    'entryPoints' => [
+                                        0 => 'http',
+                                        1 => 'https',
+                                    ],
+                                    'service' => 'maintenance',
+                                    'rule' => 'PathPrefix(`/`)',
+                                    'tls' => [
+                                        'certResolver' => 'letsencrypt',
+                                    ],
+                                    'priority' => -1000,
                                 ],
                             ],
+                            'services' => [
+                                'maintenance' => [
+                                    'loadBalancer' => [
+                                        'servers' => [
+                                            ['url' => 'http://coolify-maintenance:80'],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
-                    ],
-                ];
-                if (filled($redirect_url)) {
-                    $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                        0 => 'redirect-regexp',
                     ];
+                } else {
+                    $dynamic_conf = [
+                        'http' => [
+                            'routers' => [
+                                'catchall' => [
+                                    'entryPoints' => [
+                                        0 => 'http',
+                                        1 => 'https',
+                                    ],
+                                    'service' => 'noop',
+                                    'rule' => 'PathPrefix(`/`)',
+                                    'tls' => [
+                                        'certResolver' => 'letsencrypt',
+                                    ],
+                                    'priority' => -1000,
+                                ],
+                            ],
+                            'services' => [
+                                'noop' => [
+                                    'loadBalancer' => [
+                                        'servers' => [],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ];
+                    if (filled($redirect_url)) {
+                        $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
+                            0 => 'redirect-regexp',
+                        ];
 
-                    $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
-                        'url' => '',
-                    ];
-                    $dynamic_conf['http']['middlewares'] = [
-                        'redirect-regexp' => [
-                            'redirectRegex' => [
-                                'regex' => '(.*)',
-                                'replacement' => $redirect_url,
-                                'permanent' => false,
+                        $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
+                            'url' => '',
+                        ];
+                        $dynamic_conf['http']['middlewares'] = [
+                            'redirect-regexp' => [
+                                'redirectRegex' => [
+                                    'regex' => '(.*)',
+                                    'replacement' => $redirect_url,
+                                    'permanent' => false,
+                                ],
                             ],
-                        ],
-                    ];
+                        ];
+                    }
                 }
                 $conf = Yaml::dump($dynamic_conf, 12, 2);
             }
@@ -420,8 +461,53 @@ class Server extends BaseModel
             ], $this);
         }
 
+        if ($needsMaintenanceContainer) {
+            $this->startMaintenanceContainer($custom_maintenance_html);
+        } elseif (! $redirect_enabled || filled($redirect_url) || ! $maintenance_page_enabled) {
+            $this->stopMaintenanceContainer();
+        }
+
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
+        }
+    }
+
+    public function startMaintenanceContainer(?string $customHtml = null): void
+    {
+        try {
+            $html = filled($customHtml) ? $customHtml : defaultMaintenancePageHtml();
+            $nginxConf = maintenanceNginxConfiguration();
+
+            $htmlBase64 = base64_encode($html);
+            $confBase64 = base64_encode($nginxConf);
+
+            instant_remote_process([
+                'mkdir -p /data/coolify/proxy/maintenance',
+                "echo '$htmlBase64' | base64 -d | tee /data/coolify/proxy/maintenance/index.html > /dev/null",
+                "echo '$confBase64' | base64 -d | tee /data/coolify/proxy/maintenance/default.conf > /dev/null",
+                'docker rm -f coolify-maintenance 2>/dev/null || true',
+                'docker pull nginx:alpine 2>/dev/null || true',
+                'docker run -d --name coolify-maintenance --network coolify --restart unless-stopped '.
+                    '--label coolify.managed=true '.
+                    '-v /data/coolify/proxy/maintenance/default.conf:/etc/nginx/conf.d/default.conf:ro '.
+                    '-v /data/coolify/proxy/maintenance/index.html:/usr/share/nginx/html/index.html:ro '.
+                    'nginx:alpine',
+            ], $this);
+        } catch (\Throwable $e) {
+            Log::error('Failed to start maintenance container: '.$e->getMessage());
+        }
+    }
+
+    public function stopMaintenanceContainer(): void
+    {
+        try {
+            instant_remote_process(
+                command: ['docker rm -f coolify-maintenance 2>/dev/null || true'],
+                server: $this,
+                throwError: false,
+            );
+        } catch (\Throwable $e) {
+            Log::error('Failed to stop maintenance container: '.$e->getMessage());
         }
     }
 

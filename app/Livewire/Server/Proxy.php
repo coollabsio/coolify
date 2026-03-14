@@ -23,6 +23,10 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public bool $maintenancePageEnabled = true;
+
+    public ?string $customMaintenanceHtml = null;
+
     public bool $generateExactLabels = false;
 
     /**
@@ -50,6 +54,8 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->maintenancePageEnabled = data_get($this->server, 'proxy.maintenance_page_enabled', true);
+        $this->customMaintenanceHtml = data_get($this->server, 'proxy.custom_maintenance_html');
         $this->syncData(false);
         $this->loadProxyConfiguration();
     }
@@ -143,12 +149,26 @@ class Proxy extends Component
         }
     }
 
+    public function instantSaveMaintenancePage()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy->maintenance_page_enabled = $this->maintenancePageEnabled;
+            $this->server->save();
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Maintenance page settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->server);
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
+            $this->server->proxy->custom_maintenance_html = $this->customMaintenanceHtml ?: null;
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');

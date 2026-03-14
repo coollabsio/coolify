@@ -21,6 +21,83 @@ function isDockerPredefinedNetwork(string $network): bool
     return in_array($network, ['default', 'host'], true);
 }
 
+function defaultMaintenancePageHtml(): string
+{
+    return <<<'HTML'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta http-equiv="refresh" content="30">
+    <title>Service Temporarily Unavailable</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(145deg,#f0f4ff 0%,#faf5ff 50%,#fff1f2 100%);color:#1f2937;padding:1.5rem}
+        @media(prefers-color-scheme:dark){body{background:linear-gradient(145deg,#0f172a 0%,#1a1033 50%,#1c1017 100%);color:#f1f5f9}}
+        main{text-align:center;max-width:28rem;opacity:0}
+        main.animate{animation:fadeIn .6s ease-out forwards}
+        main.no-animate{opacity:1}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .icon{margin:0 auto 1.5rem;width:4.5rem;height:4.5rem;border-radius:1.25rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(99,102,241,.25)}
+        @media(prefers-color-scheme:dark){.icon{box-shadow:0 8px 24px rgba(99,102,241,.15)}}
+        .icon svg{width:2rem;height:2rem;color:#fff}
+        h1{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;letter-spacing:-.02em}
+        p{font-size:1rem;line-height:1.7;color:#64748b;margin-bottom:1.75rem}
+        @media(prefers-color-scheme:dark){p{color:#94a3b8}}
+        .pill{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-radius:9999px;font-size:.8125rem;font-weight:500;color:#6366f1;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.15)}
+        @media(prefers-color-scheme:dark){.pill{color:#a5b4fc;background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.2)}}
+        .dot{width:.5rem;height:.5rem;border-radius:50%;background:#6366f1;animation:pulse 2s ease-in-out infinite}
+        @media(prefers-color-scheme:dark){.dot{background:#818cf8}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .sub{margin-top:2rem;font-size:.75rem;color:#94a3b8}
+        @media(prefers-color-scheme:dark){.sub{color:#64748b}}
+    </style>
+</head>
+<body>
+    <main>
+        <div class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.192-.14 1.743"/>
+            </svg>
+        </div>
+        <h1>Service Temporarily Unavailable</h1>
+        <p>We're performing some maintenance right now. This page will automatically refresh — your service should be back shortly.</p>
+        <div class="pill">
+            <span class="dot"></span>
+            Checking status&hellip;
+        </div>
+        <div class="sub">Error 503</div>
+    </main>
+    <script>
+        var m=document.querySelector('main');
+        if(sessionStorage.getItem('m503')){m.className='no-animate'}else{sessionStorage.setItem('m503','1');m.className='animate'}
+    </script>
+</body>
+</html>
+HTML;
+}
+
+function maintenanceNginxConfiguration(): string
+{
+    return <<<'NGINX'
+server {
+    listen 80 default_server;
+    server_name _;
+    root /usr/share/nginx/html;
+    error_page 503 /index.html;
+    location / { return 503; }
+    location = /index.html {
+        internal;
+        add_header Retry-After 300 always;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Content-Type "text/html; charset=utf-8" always;
+    }
+}
+NGINX;
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {

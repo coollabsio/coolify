@@ -42,6 +42,20 @@
                         @if ($redirectEnabled)
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
                                 id="redirectUrl" label="Redirect to (optional)" />
+                            @if (blank($redirectUrl))
+                                <x-forms.checkbox canGate="update" :canResource="$server"
+                                    instantSave="instantSaveMaintenancePage"
+                                    id="maintenancePageEnabled"
+                                    label="Show maintenance page"
+                                    helper="When enabled, a styled maintenance page is shown instead of a bare 503 response for requests to unknown hosts or stopped services." />
+                                @if ($maintenancePageEnabled)
+                                    <x-forms.textarea canGate="update" :canResource="$server"
+                                        id="customMaintenanceHtml"
+                                        label="Custom HTML (optional)"
+                                        helper="Provide custom HTML for the maintenance page. Leave empty to use the default page."
+                                        rows="6" />
+                                @endif
+                            @endif
                         @endif
                     </div>
                     @php

@@ -35,6 +35,8 @@ class StopProxy
                 'done',
             ], server: $server, throwError: false);
 
+            instant_remote_process(command: ['docker rm -f coolify-maintenance 2>/dev/null || true'], server: $server, throwError: false);
+
             $server->proxy->force_stop = $forceStop;
             $server->proxy->status = 'exited';
             $server->save();
