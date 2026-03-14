@@ -482,16 +482,13 @@ class Server extends BaseModel
             $confBase64 = base64_encode($nginxConf);
 
             instant_remote_process([
-                'mkdir -p /data/coolify/proxy/maintenance',
-                "echo '$htmlBase64' | base64 -d | tee /data/coolify/proxy/maintenance/index.html > /dev/null",
-                "echo '$confBase64' | base64 -d | tee /data/coolify/proxy/maintenance/default.conf > /dev/null",
                 'docker rm -f coolify-maintenance 2>/dev/null || true',
                 'docker pull nginx:alpine 2>/dev/null || true',
                 'docker run -d --name coolify-maintenance --network coolify --restart unless-stopped '.
-                    '--label coolify.managed=true '.
-                    '-v /data/coolify/proxy/maintenance/default.conf:/etc/nginx/conf.d/default.conf:ro '.
-                    '-v /data/coolify/proxy/maintenance/index.html:/usr/share/nginx/html/index.html:ro '.
-                    'nginx:alpine',
+                    '--label coolify.managed=true nginx:alpine',
+                "echo '$confBase64' | base64 -d | docker exec -i coolify-maintenance tee /etc/nginx/conf.d/default.conf > /dev/null",
+                "echo '$htmlBase64' | base64 -d | docker exec -i coolify-maintenance tee /usr/share/nginx/html/index.html > /dev/null",
+                'docker exec coolify-maintenance nginx -s reload',
             ], $this);
         } catch (\Throwable $e) {
             Log::error('Failed to start maintenance container: '.$e->getMessage());
