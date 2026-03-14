@@ -166,6 +166,16 @@ class ApplicationPreview extends BaseModel
         }
 
         $this->docker_compose_domains = json_encode($docker_compose_domains);
+
+        // Populate fqdn from generated domains so webhook notifications can read it
+        $allDomains = collect($docker_compose_domains)
+            ->pluck('domain')
+            ->filter(fn ($d) => ! empty($d))
+            ->flatMap(fn ($d) => explode(',', $d))
+            ->implode(',');
+
+        $this->fqdn = ! empty($allDomains) ? $allDomains : null;
+
         $this->save();
     }
 }

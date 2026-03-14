@@ -6152,6 +6152,10 @@ paths:
                   type: boolean
                   default: false
                   description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '201':
@@ -6337,6 +6341,10 @@ paths:
                   type: boolean
                   default: false
                   description: 'Force domain override even if conflicts are detected.'
+                is_container_label_escape_enabled:
+                  type: boolean
+                  default: true
+                  description: 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'
               type: object
       responses:
         '200':

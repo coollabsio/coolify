@@ -573,7 +573,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (data_get($this->application, 'docker_compose_custom_start_command')) {
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
             if (! str($this->docker_compose_custom_start_command)->contains('--project-directory')) {
-                $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory '.$this->workdir)->value();
+                $projectDir = $this->preserveRepository ? $this->application->workdir() : $this->workdir;
+                $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory '.$projectDir)->value();
             }
         }
         if (data_get($this->application, 'docker_compose_custom_build_command')) {

@@ -222,6 +222,7 @@ class ServicesController extends Controller
                             ),
                         ],
                         'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
+                        'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'],
                     ],
                 ),
             ),
@@ -288,7 +289,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -317,6 +318,7 @@ class ServicesController extends Controller
             'urls.*.name' => 'string|required',
             'urls.*.url' => 'string|nullable',
             'force_domain_override' => 'boolean',
+            'is_container_label_escape_enabled' => 'boolean',
         ];
         $validationMessages = [
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
@@ -429,6 +431,9 @@ class ServicesController extends Controller
                 $service = Service::create($servicePayload);
                 $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
                 $service->description = $request->description;
+                if ($request->has('is_container_label_escape_enabled')) {
+                    $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
+                }
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
@@ -485,7 +490,7 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
 
             $validationRules = [
                 'project_uuid' => 'string|required',
@@ -503,6 +508,7 @@ class ServicesController extends Controller
                 'urls.*.name' => 'string|required',
                 'urls.*.url' => 'string|nullable',
                 'force_domain_override' => 'boolean',
+                'is_container_label_escape_enabled' => 'boolean',
             ];
             $validationMessages = [
                 'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
@@ -609,6 +615,9 @@ class ServicesController extends Controller
             $service->destination_id = $destination->id;
             $service->destination_type = $destination->getMorphClass();
             $service->connect_to_docker_network = $connectToDockerNetwork;
+            if ($request->has('is_container_label_escape_enabled')) {
+                $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
+            }
             $service->save();
 
             $service->parse(isNew: true);
@@ -835,6 +844,7 @@ class ServicesController extends Controller
                                 ),
                             ],
                             'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Force domain override even if conflicts are detected.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. If you want to use env variables inside the labels, turn this off.'],
                         ],
                     )
                 ),
@@ -923,7 +933,7 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
-        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override'];
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -936,6 +946,7 @@ class ServicesController extends Controller
             'urls.*.name' => 'string|required',
             'urls.*.url' => 'string|nullable',
             'force_domain_override' => 'boolean',
+            'is_container_label_escape_enabled' => 'boolean',
         ];
         $validationMessages = [
             'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
@@ -1000,6 +1011,9 @@ class ServicesController extends Controller
         }
         if ($request->has('connect_to_docker_network')) {
             $service->connect_to_docker_network = $request->connect_to_docker_network;
+        }
+        if ($request->has('is_container_label_escape_enabled')) {
+            $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
         }
         $service->save();
 
