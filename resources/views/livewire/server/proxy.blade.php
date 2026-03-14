@@ -31,7 +31,7 @@
                         </x-callout>
                     @endif
                     <h3>Advanced</h3>
-                    <div class="pb-6 w-96">
+                    <div class="w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="generateExactLabels"
@@ -42,8 +42,26 @@
                         @if ($redirectEnabled)
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
                                 id="redirectUrl" label="Redirect to (optional)" />
+                            @if (blank($redirectUrl))
+                                <x-forms.checkbox canGate="update" :canResource="$server"
+                                    instantSave="instantSaveMaintenancePage"
+                                    id="maintenancePageEnabled"
+                                    label="Show maintenance page"
+                                    helper="When enabled, a styled maintenance page is shown instead of a bare 503 response for requests to unknown hosts or stopped services." />
+                            @endif
                         @endif
                     </div>
+                    @if ($redirectEnabled && blank($redirectUrl) && $maintenancePageEnabled)
+                        <div class="flex flex-col gap-2 pt-2 pb-6" style="--editor-height: 300px;">
+                            <x-forms.textarea canGate="update" :canResource="$server"
+                                id="customMaintenanceHtml"
+                                label="Custom HTML (optional)"
+                                helper="Provide custom HTML for the maintenance page. Leave empty to use the default page."
+                                useMonacoEditor monacoEditorLanguage="html" />
+                        </div>
+                    @else
+                        <div class="pb-6"></div>
+                    @endif
                     @php
                         $proxyTitle =
                             $server->proxyType() === ProxyTypes::TRAEFIK->value
