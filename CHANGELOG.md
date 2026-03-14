@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Complete redesign of the Coolify User Interface and User Experience
 - **v4 to v5 upgrade migration**
   - Coolify v4 database as `old_pgsql` connection
   -
@@ -23,7 +24,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Upgrade PHP from 8.2 to 8.5, TailwindCSS from v3 to v4.0, Laravel from v10 to v12 and all other Composer and Node dependencies to their latest versions and syntax
+- Frontend framework from Livewire 3 and Alpine.js to Svelte 5 and Inertia v3
+- Upgrade PHP from 8.2 to 8.5, TailwindCSS from v3 to v4, Vite from v7 to v8, Laravel from v10 to v12 and all other Composer and Node dependencies to their latest versions and syntax
 - **Docker**
   - Upgrade Postgres from v15 to v18, Redis from v7 to v8 and all other Docker dependencies to latest
   -

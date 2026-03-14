@@ -55,6 +55,7 @@ export default defineConfig(
 			},
 			svelte: {
 				ignoreWarnings: [
+					"@typescript-eslint/no-unsafe-call", // Reports false positives for Svelte (e.g. {@render children()}).
 					// "@typescript-eslint/no-unsafe-assignment",
 					// "@typescript-eslint/no-unsafe-member-access",
 				],
