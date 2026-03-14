@@ -2817,6 +2817,27 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            // For Application (dockercompose buildpack) resources, create or update
+            // ServiceDatabase records for detected database services so that
+            // automated backup scheduling is available (mirrors Service model path).
+            if ($isDatabase) {
+                $existingServiceDb = \App\Models\ServiceDatabase::where([
+                    'name' => $serviceName,
+                    'application_id' => $resource->id,
+                ])->first();
+
+                if (is_null($existingServiceDb)) {
+                    \App\Models\ServiceDatabase::create([
+                        'name' => $serviceName,
+                        'image' => $image,
+                        'application_id' => $resource->id,
+                    ]);
+                } elseif ($existingServiceDb->image !== $image->value()) {
+                    $existingServiceDb->image = $image;
+                    $existingServiceDb->save();
+                }
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {

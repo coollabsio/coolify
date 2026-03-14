@@ -912,6 +912,15 @@ class Application extends BaseModel
         return $this->hasMany(ApplicationPreview::class)->orderBy('pull_request_id', 'desc');
     }
 
+    /**
+     * Database services detected in this application's docker-compose file
+     * (used for backup scheduling when build_pack is 'dockercompose').
+     */
+    public function serviceDatabases()
+    {
+        return $this->hasMany(ServiceDatabase::class);
+    }
+
     public function deployment_queue()
     {
         return $this->hasMany(ApplicationDeploymentQueue::class);
