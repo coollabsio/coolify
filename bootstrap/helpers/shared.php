@@ -2817,6 +2817,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
+            if ($isDatabase) {
+                // Create or update ServiceDatabase record for backup support
+                ServiceDatabase::updateOrCreate(
+                    ['name' => $serviceName, 'application_id' => $resource->id],
+                    ['image' => (string) $image]
+                );
+                // Force deterministic container name so backup jobs can locate the container
+                $containerName = "$serviceName-{$resource->uuid}";
+            }
+
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -3209,6 +3219,19 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         ];
         $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
         $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+
+        // Clean up stale ServiceDatabase records when compose services change
+        ServiceDatabase::where('application_id', $resource->id)
+            ->whereNotIn('name', collect($yaml['services'] ?? [])->keys()->filter(function ($svcName) use ($yaml) {
+                $svc = $yaml['services'][$svcName] ?? [];
+                $img = data_get_str($svc, 'image');
+                return isDatabaseImage($img, $svc);
+            })->values()->toArray())
+            ->each(function ($staleDb) {
+                $staleDb->scheduledBackups()->delete();
+                $staleDb->delete();
+            });
+
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
         $resource->save();

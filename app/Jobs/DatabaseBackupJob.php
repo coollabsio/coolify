@@ -93,8 +93,23 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->service->server;
+                $this->server = $this->database->server();
                 $this->s3 = $this->backup->s3;
+
+                // Skip backup if the owning application is currently deploying
+                if ($this->database->application_id) {
+                    $deploying = \App\Models\ApplicationDeploymentQueue::where('application_id', $this->database->application_id)
+                        ->whereIn('status', ['in_progress', 'queued'])
+                        ->exists();
+                    if ($deploying) {
+                        Log::info('DatabaseBackupJob skipped: application is deploying', [
+                            'backup_id' => $this->backup->id,
+                            'application_id' => $this->database->application_id,
+                        ]);
+
+                        return;
+                    }
+                }
             } else {
                 $this->database = data_get($this->backup, 'database');
                 $this->server = $this->database->destination->server;
@@ -121,11 +136,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
                 $databaseType = $this->database->databaseType();
-                $serviceUuid = $this->database->service->uuid;
-                $serviceName = str($this->database->service->name)->slug();
+                $containerName = $this->database->containerName();
+                $ownerName = $this->database->application_id
+                    ? str($this->database->application->name)->slug()
+                    : str($this->database->service->name)->slug();
                 if (str($databaseType)->contains('postgres')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = $containerName;
+                    $this->directory_name = $ownerName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -155,8 +172,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->postgres_password = str($this->postgres_password)->after('POSTGRES_PASSWORD=')->value();
                     }
                 } elseif (str($databaseType)->contains('mysql')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = $containerName;
+                    $this->directory_name = $ownerName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -178,8 +195,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('MYSQL_DATABASE not found');
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = $containerName;
+                    $this->directory_name = $ownerName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
@@ -216,8 +233,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
-                    $this->container_name = "{$this->database->name}-$serviceUuid";
-                    $this->directory_name = $serviceName.'-'.$this->container_name;
+                    $this->container_name = $containerName;
+                    $this->directory_name = $ownerName.'-'.$this->container_name;
 
                     // Try to extract MongoDB credentials from environment variables
                     try {
@@ -636,7 +653,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection(shouldSave: true);
             if (data_get($this->backup, 'database_type') === \App\Models\ServiceDatabase::class) {
-                $network = $this->database->service->destination->network;
+                if ($this->database->application_id) {
+                    $network = $this->database->application->destination->network;
+                } else {
+                    $network = $this->database->service->destination->network;
+                }
             } else {
                 $network = $this->database->destination->network;
             }

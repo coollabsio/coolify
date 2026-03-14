@@ -584,6 +584,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         if ($this->pull_request_id === 0) {
+            // Wait for any running database backups to complete before deploying
+            $runningBackups = \App\Models\ServiceDatabase::where('application_id', $this->application->id)
+                ->get()
+                ->flatMap(fn ($db) => $db->scheduledBackups)
+                ->filter(fn ($backup) => $backup->executions()->where('status', 'running')->exists());
+            if ($runningBackups->isNotEmpty()) {
+                $this->application_deployment_queue->addLogEntry('Waiting for database backup to complete before deploying...');
+                sleep(10);
+            }
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
         } else {
             $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
